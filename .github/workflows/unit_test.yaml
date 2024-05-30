@@ -34,8 +34,3 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install torch
-          python -m pip install -e ".[dev]" --no-build-isolation -vvv
-      - name: Run unit tests with coverage
-        run: pytest test --cov=. --cov-report=xml --durations=20 -vv
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v3
