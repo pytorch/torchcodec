@@ -8,5 +8,6 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 dev = [
+    "numpy",
     "pytest",
 ]
