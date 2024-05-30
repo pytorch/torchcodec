@@ -37,5 +37,4 @@ jobs:
       - name: Build and install torchcodec
         run: |
           conda install ffmpeg -c conda-forge
-          ffmpeg
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
