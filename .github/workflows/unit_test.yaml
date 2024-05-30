@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        # python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.11']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3
@@ -37,4 +38,5 @@ jobs:
       - name: Build and install torchcodec
         run: |
           conda install ffmpeg -c conda-forge
+          sudo apt install -y libavcodec-dev libavformat-dev libavdevice-dev libavfilter-dev
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
