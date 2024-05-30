@@ -1,0 +1,43 @@
+build/
+dist/
+src/TorchCodec.egg-info/
+*/**/__pycache__
+*/__pycache__
+*/*.pyc
+*/**/*.pyc
+*/**/**/*.pyc
+*/**/*~
+*~
+
+docs/build
+# sphinx-gallery
+docs/source/auto_examples/
+docs/source/gen_modules/
+docs/source/generated/
+docs/source/models/generated/
+# pytorch-sphinx-theme gets installed here
+docs/src
+
+.coverage
+htmlcov
+.*.swp
+*.so*
+*.dylib*
+*/*.so*
+*/*.dylib*
+*.swp
+*.swo
+gen.yml
+.mypy_cache
+.vscode/
+.idea/
+*.orig
+*-checkpoint.ipynb
+*.venv
+
+## Xcode User settings
+xcuserdata/
+
+# direnv
+.direnv
+.envrc
