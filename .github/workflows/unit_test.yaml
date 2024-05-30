@@ -34,3 +34,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install torch
+      - name: Build and install torchcodec
+        run: |
+          python -m pip install -e ".[dev]" --no-build-isolation -vvv
