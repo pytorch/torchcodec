@@ -10,4 +10,7 @@ build-backend = "setuptools.build_meta"
 dev = [
     "numpy",
     "pytest",
+    "torchvision",
+    "pillow",
+    "opencv-python",
 ]

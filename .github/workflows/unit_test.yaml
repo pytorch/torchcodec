@@ -42,7 +42,7 @@ jobs:
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Smoke import
         run: |
-          python -c "import torch; import torchcodec"
+          python -c "import torchcodec"
       - name: Run tests
         run: |
           pytest test
