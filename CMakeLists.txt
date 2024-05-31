@@ -45,7 +45,7 @@ set(
   )
 
 # TODO remove -fpermissive
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 add_library(${LIBRARY_NAME}
     SHARED
