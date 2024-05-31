@@ -36,6 +36,7 @@ jobs:
         run: |
           python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           conda install ffmpeg pkg-config -c conda-forge
+          ffmpeg
       - name: Build and install torchcodec
         run: |
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
