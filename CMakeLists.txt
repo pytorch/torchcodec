@@ -44,7 +44,8 @@ set(
   src/torchcodec/decoders/core/VideoDecoderOps.cpp
   )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+# TODO: remove -fpermissive
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} -fpermissive")
 
 add_library(${LIBRARY_NAME}
     SHARED
@@ -52,11 +53,6 @@ add_library(${LIBRARY_NAME}
 )
 
 set_property(TARGET ${LIBRARY_NAME} PROPERTY CXX_STANDARD 17)
-
-# TODO: this should not be hard-codec and instead determined by CMAKE, or maybe
-# the code should just rely on a definition coming from the ffmpeg header (if
-# such a def exists?)
-target_compile_definitions(${LIBRARY_NAME} PRIVATE FFMPEG_VERSION_4)
 
 target_include_directories(${LIBRARY_NAME} PRIVATE ./)
 
