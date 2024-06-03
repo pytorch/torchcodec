@@ -1,6 +1,6 @@
 // (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
-#include "src/torchcodec/decoders/core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 #include <gtest/gtest.h>
 #include <opencv2/opencv.hpp>

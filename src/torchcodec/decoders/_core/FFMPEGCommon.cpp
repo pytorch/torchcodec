@@ -1,6 +1,6 @@
 // (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
-#include "src/torchcodec/decoders/core/FFMPEGCommon.h"
+#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 

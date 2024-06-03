@@ -13,7 +13,7 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 
-from torchcodec.decoders.core import (
+from torchcodec.decoders._core import (
     add_video_stream,
     create_from_bytes,
     create_from_file,

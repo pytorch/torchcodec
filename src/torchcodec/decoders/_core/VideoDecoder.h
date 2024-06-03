@@ -8,7 +8,7 @@
 #include <ostream>
 #include <string_view>
 
-#include "src/torchcodec/decoders/core/FFMPEGCommon.h"
+#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 

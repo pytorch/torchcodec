@@ -4,8 +4,8 @@
 #include <iostream>
 #include <vector>
 
-#include "src/torchcodec/decoders/core/VideoDecoder.h"
-#include "src/torchcodec/decoders/core/VideoDecoderOps.h"
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/VideoDecoderOps.h"
 #include "tools/cxx/Resources.h"
 
 namespace facebook::torchcodec {

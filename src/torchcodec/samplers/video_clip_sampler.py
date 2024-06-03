@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple, Union
 import torch
 from torch import nn, Tensor
 
-from torchcodec.decoders.core import (
+from torchcodec.decoders._core import (
     add_video_stream,
     create_from_tensor,
     get_frames_at_indices,

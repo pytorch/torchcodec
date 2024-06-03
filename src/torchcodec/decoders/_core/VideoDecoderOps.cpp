@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
-#include "src/torchcodec/decoders/core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
 
@@ -27,7 +27,7 @@ TORCH_LIBRARY(plusoneops, m) {
 //   https://github.com/pytorch/pytorch/tree/main/aten/src/ATen/native#readme
 TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
-      "torchcodec.decoders.core.video_decoder_ops",
+      "torchcodec.decoders._core.video_decoder_ops",
       "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");

@@ -11,7 +11,7 @@ import torch.utils.benchmark as benchmark
 import torchaudio
 import torchvision.io
 
-from torchcodec.decoders.core import (
+from torchcodec.decoders._core import (
     add_video_stream,
     create_from_file,
     get_next_frame,

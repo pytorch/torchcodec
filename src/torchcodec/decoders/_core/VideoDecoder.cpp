@@ -1,6 +1,6 @@
 // (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
-#include "src/torchcodec/decoders/core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
 #include <cstdint>
 #include <cstdio>
 #include <stdexcept>
@@ -17,7 +17,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include "src/torchcodec/decoders/core/FFMPEGCommon.h"
+#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 namespace {

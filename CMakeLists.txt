@@ -19,12 +19,12 @@ pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
 
 set(
   sources
-  src/torchcodec/decoders/core/FFMPEGCommon.h
-  src/torchcodec/decoders/core/FFMPEGCommon.cpp
-  src/torchcodec/decoders/core/VideoDecoder.h
-  src/torchcodec/decoders/core/VideoDecoder.cpp
-  src/torchcodec/decoders/core/VideoDecoderOps.h
-  src/torchcodec/decoders/core/VideoDecoderOps.cpp
+  src/torchcodec/decoders/_core/FFMPEGCommon.h
+  src/torchcodec/decoders/_core/FFMPEGCommon.cpp
+  src/torchcodec/decoders/_core/VideoDecoder.h
+  src/torchcodec/decoders/_core/VideoDecoder.cpp
+  src/torchcodec/decoders/_core/VideoDecoderOps.h
+  src/torchcodec/decoders/_core/VideoDecoderOps.cpp
   )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
