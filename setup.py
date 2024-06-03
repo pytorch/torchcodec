@@ -57,11 +57,10 @@ class CMakeBuild(build_ext):
         super().run()
 
     def build_extension(self, ext):
-        ext_dir = Path(self.get_ext_fullpath(ext.name)).parent.absolute()
-
+        install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute()
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_args = [
-            f"-DCMAKE_INSTALL_PREFIX={ext_dir}",
+            f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
         ]
@@ -77,9 +76,9 @@ class CMakeBuild(build_ext):
     def get_ext_filename(self, fullname):
         # When copying the .so files from the build tmp dir to the actual
         # package dir, this tells setuptools to look for a .so file without the
-        # Python ABI suffix, i.e. "module.so" instead of e.g.
-        # "module.cpython-38-x86_64-linux-gnu.so", which is what setuptools
-        # looks for by default.
+        # Python ABI suffix, i.e. "libtorchcodec.so" instead of e.g.
+        # "libtorchcodec.cpython-38-x86_64-linux-gnu.so", which is what
+        # setuptools looks for by default.
         ext_filename = super().get_ext_filename(fullname)
         ext_filename_parts = ext_filename.split(".")
         without_abi = ext_filename_parts[:-2] + ext_filename_parts[-1:]
@@ -89,7 +88,10 @@ class CMakeBuild(build_ext):
 
 video_library = Extension(
     # The name parameter specifies not just the name but mainly *where* the .so
-    # file should be copied to.
+    # file should be copied to. By setting the name this way, we're telling
+    # `libtorchcodec.so` to be copied at the root of the torchcodec package
+    # (next to the __init__.py file). This is where it's expected to be when we
+    # call torch.ops.load_library().
     name="torchcodec.libtorchcodec",
     # sources is a mandatory parameter so we have to pass it, but we leave it
     # empty because we'll be building the extension with our custom CMakeBuild
