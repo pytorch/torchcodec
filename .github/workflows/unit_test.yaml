@@ -34,11 +34,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-          # TODO: This is installing ffmpeg with GPL stuff enabled. That's just
+          # TODO: This is installing ffmpeg with 6 GPL stuff enabled. That's just
           # for testing for now so it's OK. But before we release we should make
           # sure it's not using GPL stuff by e.g. building from source like
           # in torchaudio.
-          # TODO: Make this work with ffmpeg > 4. The default conda-forge ffmpeg version is 7 ATM.
+          # TODO: Make this work with ffmpeg 4 to 7 inclusive.
           conda install "ffmpeg<7.0" pkg-config -c conda-forge
           ffmpeg -version
       - name: Build and install torchcodec

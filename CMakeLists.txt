@@ -36,10 +36,6 @@ add_library(${LIBRARY_NAME}
 
 set_property(TARGET ${LIBRARY_NAME} PROPERTY CXX_STANDARD 17)
 
-# TODO: This should eventually be removed when we support more ffmpeg versions
-# or determined within CMake.
-# target_compile_definitions(${LIBRARY_NAME} PRIVATE FFMPEG_VERSION_4)
-
 target_include_directories(${LIBRARY_NAME} PRIVATE ./)
 
 target_link_libraries(${LIBRARY_NAME}
