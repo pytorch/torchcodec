@@ -2,6 +2,8 @@
 
 
 import importlib
+import os
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -14,9 +16,19 @@ from torchcodec.samplers import (
 )
 
 
+# TODO: move this to a common util
+IN_FBCODE = os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
+
+
+# TODO: Eventually rely on common util for this
 @pytest.fixture()
 def nasa_13013() -> torch.Tensor:
-    video_path = importlib.resources.path(__package__, "nasa_13013.mp4")
+    if IN_FBCODE:
+        video_path = importlib.resources.path(__package__, "nasa_13013.mp4")
+    else:
+        video_path = (
+            Path(__file__).parent.parent / "decoders" / "resources" / "nasa_13013.mp4"
+        )
     arr = np.fromfile(video_path, dtype=np.uint8)
     video_tensor = torch.from_numpy(arr)
     return video_tensor
