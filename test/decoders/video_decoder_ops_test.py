@@ -27,6 +27,7 @@ from torchcodec.decoders._core import (
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
+IN_FBCODE = os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
 
 
 # TODO: Eventually move that as a common test util
@@ -34,12 +35,18 @@ def assert_equal(*args, **kwargs):
     torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
 
 
+# TODO: Eventually move that as a common test util
 def get_video_path(filename: str) -> pathlib.Path:
-    resource = (
-        importlib.resources.files(__package__).joinpath("resources").joinpath(filename)
-    )
-    with importlib.resources.as_file(resource) as path:
-        return path
+    if IN_FBCODE:
+        resource = (
+            importlib.resources.files(__package__)
+            .joinpath("resources")
+            .joinpath(filename)
+        )
+        with importlib.resources.as_file(resource) as path:
+            return path
+    else:
+        return pathlib.Path(__file__).parent / "resources" / filename
 
 
 # TODO: make this a fixture or wrap with @functools.lru_cache to avoid
