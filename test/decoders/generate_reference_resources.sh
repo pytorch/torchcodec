@@ -25,3 +25,9 @@ ffmpeg -ss 10.0 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time10.000000.bmp"
 ffmpeg -ss 12.979633 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time12.979633.bmp"
 # Audio generation in the form of an mp3.
 ffmpeg -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
+
+for bmp in "$RESOURCES_DIR"/*.bmp
+do
+  python convert_image_to_tensor.py "$bmp"
+  rm -f "$bmp"
+done

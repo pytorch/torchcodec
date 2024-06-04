@@ -3,18 +3,32 @@
 #include "src/torchcodec/decoders/_core/VideoDecoderOps.h"
 
 #include <gtest/gtest.h>
+#include <filesystem>
 #include <iostream>
 
+#ifdef FBCODE_BUILD
 #include "tools/cxx/Resources.h"
+#endif
 
 using namespace ::testing;
 
 namespace facebook::torchcodec {
-TEST(VideoDecoderOpsTest, TestCreateDecoderFromBuffer) {
+
+std::string getResourcePath(const std::string& filename) {
+#ifdef FBCODE_BUILD
   std::string filepath =
-      build::getResourcePath(
-          "pytorch/torchcodec/test/decoders/resources/nasa_13013.mp4")
-          .string();
+      "pytorch/torchcodec/test/decoders/resources/" + filename;
+  filepath = build::getResourcePath(filepath).string();
+#else
+  std::filesystem::path dirPath = std::filesystem::path(__FILE__);
+  std::string filepath =
+      dirPath.parent_path().string() + "/resources/" + filename;
+#endif
+  return filepath;
+}
+
+TEST(VideoDecoderOpsTest, TestCreateDecoderFromBuffer) {
+  std::string filepath = getResourcePath("nasa_13013.mp4");
   std::ostringstream outputStringStream;
   std::ifstream input(filepath, std::ios::binary);
   outputStringStream << input.rdbuf();

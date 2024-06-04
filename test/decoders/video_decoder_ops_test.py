@@ -51,14 +51,9 @@ def get_video_path(filename: str) -> pathlib.Path:
 
 # TODO: make this a fixture or wrap with @functools.lru_cache to avoid
 # re-computing?
-def get_image_as_tensor(filename: str) -> torch.Tensor:
+def load_tensor_from_file(filename: str) -> torch.Tensor:
     file_path = get_video_path(filename)
-    pil_image = Image.open(os.fspath(file_path)).convert("RGB")
-    tensor_image = transforms.ToTensor()(pil_image)
-    tensor_image = tensor_image.permute([1, 2, 0])
-    tensor_image = tensor_image * 255.0
-    tensor_image = tensor_image.to(torch.uint8)
-    return tensor_image
+    return torch.load(file_path)
 
 
 def get_reference_video_path() -> pathlib.Path:
@@ -89,14 +84,14 @@ class TestOps:
         decoder = create_from_file(str(get_reference_video_path()))
         add_video_stream(decoder)
         frame1 = get_next_frame(decoder)
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
         assert_equal(frame1, reference_frame1)
-        reference_frame2 = get_image_as_tensor("nasa_13013.mp4.frame000002.bmp")
+        reference_frame2 = load_tensor_from_file("nasa_13013.mp4.frame000002.pt")
         img2 = get_next_frame(decoder)
         assert_equal(img2, reference_frame2)
         seek_to_pts(decoder, 6.0)
         frame_time6 = get_next_frame(decoder)
-        reference_frame_time6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame_time6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame_time6, reference_frame_time6)
 
     def test_get_frame_at_pts(self):
@@ -105,7 +100,7 @@ class TestOps:
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
         frame6 = get_frame_at_pts(decoder, 6.006)
-        reference_frame6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame6, reference_frame6)
         frame6 = get_frame_at_pts(decoder, 6.02)
         assert_equal(frame6, reference_frame6)
@@ -122,11 +117,11 @@ class TestOps:
         decoder = create_from_file(str(get_reference_video_path()))
         add_video_stream(decoder)
         frame1 = get_frame_at_index(decoder, frame_index=0, stream_index=3)
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
         assert_equal(frame1, reference_frame1)
         # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
         frame6 = get_frame_at_index(decoder, frame_index=180, stream_index=3)
-        reference_frame6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame6, reference_frame6)
 
     def test_get_frames_at_indices(self):
@@ -135,8 +130,8 @@ class TestOps:
         frames1and6 = get_frames_at_indices(
             decoder, frame_indices=[0, 180], stream_index=3
         )
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
-        reference_frame6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
+        reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frames1and6[0], reference_frame1)
         assert_equal(frames1and6[1], reference_frame6)
 
@@ -145,7 +140,7 @@ class TestOps:
         add_video_stream(decoder)
         seek_to_pts(decoder, 12.979633)
         last_frame = get_next_frame(decoder)
-        reference_last_frame = get_image_as_tensor("nasa_13013.mp4.time12.979633.bmp")
+        reference_last_frame = load_tensor_from_file("nasa_13013.mp4.time12.979633.pt")
         assert_equal(last_frame, reference_last_frame)
         with pytest.raises(RuntimeError, match="End of file"):
             get_next_frame(decoder)
@@ -174,8 +169,8 @@ class TestOps:
         # for now. Otherwise torch.compile constant-props it.
         decoder = create_from_file(str(get_reference_video_path()))
         frame1, frame_time6 = get_frame1_and_frame_time6(decoder)
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
-        reference_frame_time6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
+        reference_frame_time6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame1, reference_frame1)
         assert_equal(frame_time6, reference_frame_time6)
 
@@ -192,8 +187,8 @@ class TestOps:
 
         decoder = ReferenceDecoder()
         frame1, frame_time6 = class_based_get_frame1_and_frame_time6(decoder)
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
-        reference_frame_time6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
+        reference_frame_time6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame1, reference_frame1)
         assert_equal(frame_time6, reference_frame_time6)
 
@@ -213,14 +208,14 @@ class TestOps:
 
         add_video_stream(decoder)
         frame1 = get_next_frame(decoder)
-        reference_frame1 = get_image_as_tensor("nasa_13013.mp4.frame000001.bmp")
+        reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
         assert_equal(frame1, reference_frame1)
-        reference_frame2 = get_image_as_tensor("nasa_13013.mp4.frame000002.bmp")
+        reference_frame2 = load_tensor_from_file("nasa_13013.mp4.frame000002.pt")
         img2 = get_next_frame(decoder)
         assert_equal(img2, reference_frame2)
         seek_to_pts(decoder, 6.0)
         frame_time6 = get_next_frame(decoder)
-        reference_frame_time6 = get_image_as_tensor("nasa_13013.mp4.time6.000000.bmp")
+        reference_frame_time6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame_time6, reference_frame_time6)
 
     def test_video_get_json_metadata(self):
