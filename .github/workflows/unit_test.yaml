@@ -39,7 +39,7 @@ jobs:
           # sure it's not using GPL stuff by e.g. building from source like
           # in torchaudio.
           # TODO: Make this work with ffmpeg > 4. The default conda-forge ffmpeg version is 7 ATM.
-          conda install "ffmpeg<5.0" pkg-config -c conda-forge
+          conda install "ffmpeg<7.0" pkg-config -c conda-forge
           ffmpeg -version
       - name: Build and install torchcodec
         run: |
