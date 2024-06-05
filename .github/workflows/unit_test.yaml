@@ -43,11 +43,27 @@ jobs:
           ffmpeg -version
       - name: Build and install torchcodec
         run: |
+          # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
+          # do for the C++ tests.
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Smoke test
         run: |
           python test/decoders/manual_smoke_test.py
           # TODO: diff the output frame with its expeceted value
-      - name: Run tests
+      - name: Run Python tests
         run: |
           pytest test
+
+      - name: Build and run C++ tests
+        run: |
+          # TODO: This is building libtorchcodec.so a second time. We should try
+          # to avoid that. Maybe we should add a 'build test' option to the
+          # `pip install ...` step?
+          mkdir -p build
+          pushd build
+          TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
+          Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
+          cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
+          cmake --build .
+          ctest
+          popd
