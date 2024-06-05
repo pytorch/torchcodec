@@ -10,6 +10,18 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
   return std::string(errorBuffer);
 }
 
+int64_t getDuration(const UniqueAVFrame& frame) {
+  return getDuration(frame.get());
+}
+
+int64_t getDuration(const AVFrame* frame) {
+#if LIBAVUTIL_VERSION_MAJOR < 59
+  return frame->pkt_duration;
+#else
+  return frame->duration;
+#endif
+}
+
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
     size_t data_size,

@@ -73,6 +73,12 @@ const int AVSUCCESS = 0;
 // Returns the FFMPEG error as a string using the provided `errorCode`.
 std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 
+// Returns duration from the frame. Abstracted into a function because the
+// struct member representing duration has changed across the versions we
+// support.
+int64_t getDuration(const UniqueAVFrame& frame);
+int64_t getDuration(const AVFrame* frame);
+
 // A struct that holds state for reading bytes from an IO context.
 // We give this to FFMPEG and it will pass it back to us when it needs to read
 // or seek in the memory buffer.
