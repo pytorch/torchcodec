@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 
 #ifdef FBCODE_BUILD
