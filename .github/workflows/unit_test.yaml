@@ -17,6 +17,7 @@ jobs:
   unit_tests:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.11']
         ffmpeg-version: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
