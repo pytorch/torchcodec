@@ -54,7 +54,13 @@ using UniqueAVFilterInOut = std::unique_ptr<
     Deleterp<AVFilterInOut, void, avfilter_inout_free>>;
 using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
-#ifdef FFMPEG_VERSION_4
+
+// av_find_best_stream is not const-correct before commit:
+// https://github.com/FFmpeg/FFmpeg/commit/46dac8cf3d250184ab4247809bc03f60e14f4c0c
+// which was released in FFMPEG version=5.0.3
+// with libavcodec's version=59.18.100
+// (https://www.ffmpeg.org/olddownload.html).
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 18, 100)
 using AVCodecPtr = AVCodec*;
 #else
 using AVCodecPtr = const AVCodec*;
