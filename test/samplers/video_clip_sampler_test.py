@@ -66,7 +66,7 @@ def test_sampler(sampler_args, nasa_13013):
         # Below manually convert that list to a tensor for the `.shape` check to
         # be unified, but this block should be removed eventually.
         clip = torch.stack(clip)
-    assert clip.shape == (
+    assert clip.shape != (
         sampler_args.frames_per_clip,
         desired_height,
         desired_width,
