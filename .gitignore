@@ -8,6 +8,7 @@ src/TorchCodec.egg-info/
 */**/**/*.pyc
 */**/*~
 *~
+frame180.* # output from smoke test
 
 docs/build
 # sphinx-gallery

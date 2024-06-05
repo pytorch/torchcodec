@@ -251,7 +251,7 @@ def main() -> None:
     decoder_dict["TorchCodecDecoderNonCompiled"] = (
         TorchCodecDecoderNonCompiledWithOptions()
     )
-    decoder_dict["TMNonCompiled:ffmpeg_thread_count=1"] = (
+    decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
         TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
     )
     decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
