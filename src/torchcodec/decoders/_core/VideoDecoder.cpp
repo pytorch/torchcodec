@@ -694,7 +694,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   // the file and that will flush the decoder.
   StreamInfo& activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
-  activeStream.currentDuration = frame->pkt_duration;
+  activeStream.currentDuration = getDuration(frame);
   VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
           << " pts=" << frame->pts << " stats=" << decodeStats_;
   // Convert the frame to tensor.
@@ -741,7 +741,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
         StreamInfo& stream = streams_[frameStreamIndex];
         double frameStartTime = 1.0 * frame->pts / stream.timeBase.den;
         double frameEndTime =
-            1.0 * (frame->pts + frame->pkt_duration) / stream.timeBase.den;
+            1.0 * (frame->pts + getDuration(frame)) / stream.timeBase.den;
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
 }
