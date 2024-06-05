@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.11']
+        ffmpeg-version: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3
@@ -39,7 +40,7 @@ jobs:
           # sure it's not using GPL stuff by e.g. building from source like
           # in torchaudio.
           # TODO: Make this work with ffmpeg 4 to 7 inclusive.
-          conda install "ffmpeg<7.0" pkg-config -c conda-forge
+          conda install "ffmpeg=${{ matrix.ffmpeg-version }}" pkg-config -c conda-forge
           ffmpeg -version
       - name: Build and install torchcodec
         run: |
