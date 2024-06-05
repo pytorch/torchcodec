@@ -74,7 +74,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_NEAR(*videoStream.bitRate, 128783, 1e-1);
   EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
   EXPECT_EQ(videoStream.numFrames, 390);
-  EXPECT_FALSE(videoStream.minPtsSecondsFromScan.has_value());
+  EXPECT_TRUE(videoStream.minPtsSecondsFromScan.has_value());
   EXPECT_FALSE(videoStream.maxPtsSecondsFromScan.has_value());
   EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
