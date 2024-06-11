@@ -93,6 +93,6 @@ extensions = [
         name=f"torchcodec.libtorchcodec{ffmpeg_version}",
         sources=[],
     )
-    for ffmpeg_version in (4, 5, 6)
+    for ffmpeg_version in (4, 5, 6, 7)
 ]
 setup(ext_modules=extensions, cmdclass={"build_ext": CMakeBuild})

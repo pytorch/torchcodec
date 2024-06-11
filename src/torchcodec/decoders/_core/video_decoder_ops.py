@@ -9,7 +9,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
 
 # TODO: cleanup, don't print stuff, raise better error messages.
 # TODO: I think we need `""` for fbcode, need to check
-for ffmpeg_version in (6, 5, 4, ""):
+for ffmpeg_version in (7, 6, 5, 4, ""):
     libtorchcodec = f"libtorchcodec{ffmpeg_version}"
     print(f"Trying to load {libtorchcodec}")
     try:

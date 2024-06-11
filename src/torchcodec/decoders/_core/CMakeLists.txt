@@ -8,30 +8,38 @@ find_package(Torch REQUIRED)
 add_library(ffmpeg4 INTERFACE)
 add_library(ffmpeg5 INTERFACE)
 add_library(ffmpeg6 INTERFACE)
+add_library(ffmpeg7 INTERFACE)
 
 include(FetchContent)
-set(base_url https://pytorch.s3.amazonaws.com/torchaudio/ffmpeg)
+set(base_url https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2024-06-11/linux_x86_64)
 FetchContent_Declare(
     f4
-    URL ${base_url}/2023-08-14/linux_x86_64/4.4.4.tar.gz
-    URL_HASH SHA256=9b87eeba9b6975e25f28ba12163bd713228ed84f4c2b3721bc5ebe92055edb51
+    URL ${base_url}/ffmpeg_4.4.4.tar.gz
+    URL_HASH SHA256=a564721e51038d01ead4bbc7a482398929101ca4c80e5ce5c42042637235a297
 )
 FetchContent_Declare(
     f5
-    URL ${base_url}/2023-07-06/linux_x86_64/5.0.3.tar.gz
-    URL_HASH SHA256=de3c75c99b9ce33de7efdc144566804ae5880457ce71e185b3f592dc452edce7
+    URL ${base_url}/ffmpeg_5.1.4.tar.gz
+    URL_HASH SHA256=d9c2d3a355c091ddc3205ae73426d0d6402ad8a31212dc920daabbaa5fdae944
 )
 FetchContent_Declare(
     f6
-    URL ${base_url}/2023-07-06/linux_x86_64/6.0.tar.gz
-    URL_HASH SHA256=04d3916404bab5efadd29f68361b7d13ea71e6242c6473edcb747a41a9fb97a6
+    URL ${base_url}/ffmpeg_6.1.1.tar.gz
+    URL_HASH SHA256=7ee5830dc09fed7270aa575650474ab16e18477551e5511f256ce92daa30b136
 )
-FetchContent_MakeAvailable(f4 f5 f6)
+FetchContent_Declare(
+    f7
+    URL ${base_url}/ffmpeg_7.0.1.tar.gz
+    URL_HASH SHA256=fa4cda7aa67fcd58428017f7ebd2a981b0c6babba7ec89f71d6840877712ddcd
+)
+
+FetchContent_MakeAvailable(f4 f5 f6 f7)
 
 # Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
 target_include_directories(ffmpeg4 INTERFACE ${f4_SOURCE_DIR}/include)
 target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
 target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
+target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
 
 target_link_libraries(
     ffmpeg4
@@ -59,6 +67,15 @@ target_link_libraries(
     ${f6_SOURCE_DIR}/lib/libavformat.so.60
     ${f6_SOURCE_DIR}/lib/libavdevice.so.60
     ${f6_SOURCE_DIR}/lib/libavfilter.so.9
+)
+target_link_libraries(
+    ffmpeg7
+    INTERFACE
+    ${f7_SOURCE_DIR}/lib/libavutil.so.59
+    ${f7_SOURCE_DIR}/lib/libavcodec.so.61
+    ${f7_SOURCE_DIR}/lib/libavformat.so.61
+    ${f7_SOURCE_DIR}/lib/libavdevice.so.61
+    ${f7_SOURCE_DIR}/lib/libavfilter.so.10
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
@@ -105,3 +122,4 @@ endfunction()
 make_torchcodec_extension(libtorchcodec4 ffmpeg4)
 make_torchcodec_extension(libtorchcodec5 ffmpeg5)
 make_torchcodec_extension(libtorchcodec6 ffmpeg6)
+make_torchcodec_extension(libtorchcodec7 ffmpeg7)
