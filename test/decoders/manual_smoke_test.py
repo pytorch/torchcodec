@@ -1,7 +1,7 @@
 import os
 
-import cv2
 import torchcodec
+import cv2
 
 decoder = torchcodec.decoders._core.create_from_file(
     os.path.dirname(__file__) + "/resources/nasa_13013.mp4"
