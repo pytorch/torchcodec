@@ -28,6 +28,8 @@ jobs:
       matrix:
         ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
     steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
       - name: Build FFmpeg
         run: |
           export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
