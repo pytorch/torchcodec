@@ -7,20 +7,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
     _get_extension_path,
 )
 
-# TODO: cleanup, don't print stuff, raise better error messages.
-# TODO: I think we need `""` for fbcode, need to check
-for ffmpeg_version in (6, 5, 4, ""):
-    libtorchcodec = f"libtorchcodec{ffmpeg_version}"
-    print(f"Trying to load {libtorchcodec}")
-    try:
-        torch.ops.load_library(_get_extension_path(libtorchcodec))
-        print("SUCCESS!!!")
-        break
-    except Exception as e:
-        print(e)
-        continue  # Try lower version of ffmpeg
-    
-    raise RuntimeError("Could not load libtorchcodec.")
+torch.ops.load_library(_get_extension_path("libtorchcodec"))
 
 # TODO: PyTorch team needs to figure out how to not constant prop factory functions
 create_from_file = torch._dynamo.disallow_in_graph(
