@@ -88,8 +88,8 @@ class CMakeBuild(build_ext):
 
 extensions = [
     Extension(
-        # Note: the names here must be kept in sync with the target names in the Cmake file:
-        # libtorchcodec4, libtorchcodec5, etc.
+        # The names here must be kept in sync with the target names in the
+        # CMakeLists file. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
         name=f"torchcodec.libtorchcodec{ffmpeg_version}",
         sources=[],
     )
