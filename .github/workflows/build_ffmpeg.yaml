@@ -39,11 +39,9 @@ jobs:
 
           tar -czf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
 
-          artifact_dir="$(date +%Y-%m-%d)/linux_x86_64/"
-          mkdir -p "${artifact_dir}"
-
-          mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+          mkdir -p artifact_dir
+          mv ffmpeg.tar.gz artifact_dir/ffmpeg_${FFMPEG_VERSION}.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
           name: "ffmpeg_${{ matrix.ffmpeg-version }}_linux_x86_64"
-          path: "${artifact_dir}"
+          path: artifact_dir
