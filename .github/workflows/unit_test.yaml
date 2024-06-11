@@ -38,6 +38,11 @@ jobs:
           python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Build and install torchcodec
         run: |
+          if command -v "ffmpeg" &> /dev/null
+          then
+            echo "ffmpeg is installed, exiting!!"
+            exit 1
+          fi
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
