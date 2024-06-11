@@ -13,8 +13,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0'  # on sunday
-  pull_request:  # TODO REMOVE!! This is just for testing.
-
 
 defaults:
   run:
