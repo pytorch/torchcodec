@@ -1,0 +1,47 @@
+# Taken and adapted from torchaudio.
+# Ref: https://github.com/pytorch/audio/blob/main/.github/workflows/ffmpeg.yml
+# This job is not directly related to regular CI pipeline.
+# It is intended to create FFmpeg binaries that we upload on S3,
+# which then will be used during all the build process in CI or local.
+#
+# This job does not include the uploading part.
+# Upload needs to be done manually, and it should be done only once
+# par new major release of FFmepg.
+name: Build non-GPL FFmpeg from source
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # on sunday
+  pull_request:  # TODO REMOVE!! This is just for testing.
+
+
+defaults:
+  run:
+    shell: bash -l -eo pipefail {0}
+
+jobs:
+  LGPL-Linux-x86_64:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
+    steps:
+      - name: Build FFmpeg
+        run: |
+          export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
+          export FFMPEG_ROOT="${PWD}/ffmpeg"
+
+          .github/scripts/ffmpeg/build_ffmpeg.sh
+
+          tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
+
+          artifact_dir="$(date +%Y-%m-%d)/linux_x86_64/"
+          mkdir -p "${artifact_dir}"
+
+          mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "ffmpeg_${{ matrix.ffmpeg-version }}_linux_x86_64"
+          path: "${artifact_dir}"
