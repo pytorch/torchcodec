@@ -18,7 +18,6 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/version.h>
-#include <libswresample/swresample.h>
 }
 
 namespace facebook::torchcodec {

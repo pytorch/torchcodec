@@ -14,7 +14,6 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
-#include <libswscale/swscale.h>
 }
 
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
