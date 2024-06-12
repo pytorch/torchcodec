@@ -49,10 +49,7 @@ jobs:
 
           # list the built so files, for debugging.
           find src | grep ".so"
-      - name: Install ffmpeg, post build
-        run: |
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ffmpeg -version
+
       - name: Smoke test
         run: |
           python test/decoders/manual_smoke_test.py
