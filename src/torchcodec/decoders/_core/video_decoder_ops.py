@@ -29,9 +29,9 @@ def load_torchcodec_extension():
             exceptions.append(e)
 
     traceback = (
-        "\n[start of libtorchcodec loading traceback]\n" +
-        "\n".join(str(e) for e in exceptions) +
-        "\n[end of libtorchcodec loading traceback]."
+        "\n[start of libtorchcodec loading traceback]\n"
+        + "\n".join(str(e) for e in exceptions)
+        + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
         "Could not load libtorchcodec. "
