@@ -7,19 +7,42 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
     _get_extension_path,
 )
 
-# TODO: cleanup, don't print stuff, raise better error messages.
-for ffmpeg_version in (7, 6, 5, 4):
-    libtorchcodec = f"libtorchcodec{ffmpeg_version}"
-    print(f"Trying to load {libtorchcodec}")
-    try:
-        torch.ops.load_library(_get_extension_path(libtorchcodec))
-        print("SUCCESS!!!")
-        break
-    except Exception as e:
-        print(e)
-        continue  # Try lower version of ffmpeg
-    
-    raise RuntimeError("Could not load libtorchcodec.")
+
+def load_torchcodec_extension():
+    # Successively try to load libtorchcodec7.so, libtorchcodec6.so,
+    # libtorchcodec5.so, and libtorchcodec4.so. Each of these correspond to an
+    # ffmpeg major version. This should cover all potential ffmpeg versions
+    # installed on the user's machine.
+    #
+    # On fbcode, _get_extension_path() is overridden and directly points to the
+    # correct .so file, so this for-loop succeeds on the first iteration.
+
+    exceptions = []
+    for ffmpeg_major_version in (7, 6, 5, 4):
+        library_name = f"libtorchcodec{ffmpeg_major_version}"
+        try:
+            torch.ops.load_library(_get_extension_path(library_name))
+            return
+        except Exception as e:
+            # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
+            # but we should probably handle that via a proper logging mechanism.
+            exceptions.append(e)
+
+    traceback = (
+        "\n[start of libtorchcodec loading traceback]\n" +
+        "\n".join(str(e) for e in exceptions) +
+        "\n[end of libtorchcodec loading traceback]."
+    )
+    raise RuntimeError(
+        "Could not load libtorchcodec. "
+        "Is FFmpeg (4, 5, 6, or 7) properly installed in your environment? "
+        "The following exceptions were raised as we tried to load libtorchcodec: "
+        f"{traceback}"
+    )
+
+
+load_torchcodec_extension()
+
 
 # TODO: PyTorch team needs to figure out how to not constant prop factory functions
 create_from_file = torch._dynamo.disallow_in_graph(

@@ -47,7 +47,7 @@ jobs:
           # do for the C++ tests.
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
 
-          # list the build so files, for debugging if needed.
+          # list the built so files, for debugging.
           find src | grep ".so"
       - name: Install ffmpeg, post build
         run: |
