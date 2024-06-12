@@ -2,6 +2,11 @@
 # and exposes them as CMake targets so we can dynamically link against them.
 # These libraries were built on the CI via the build_ffmpeg.yaml workflow.
 
+# Avoid warning: see https://cmake.org/cmake/help/latest/policy/CMP0135.html
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 include(FetchContent)
 set(
     base_url
