@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.8', '3.12']
-        ffmpeg-test-version: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3
@@ -40,16 +40,18 @@ jobs:
         run: |
           if command -v "ffmpeg" &> /dev/null
           then
-            echo "ffmpeg is installed, exiting!!"
+            echo "ffmpeg is installed, but it shouldn't! Exiting!!"
             exit 1
           fi
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
+
+          # list the build so files, for debugging if needed.
           find src | grep ".so"
       - name: Install ffmpeg, post build
         run: |
-          conda install "ffmpeg=${{ matrix.ffmpeg-test-version }}" -c conda-forge
+          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
       - name: Smoke test
         run: |
