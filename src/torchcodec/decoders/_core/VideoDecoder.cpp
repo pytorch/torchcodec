@@ -28,9 +28,12 @@ struct AVInput {
 
 AVInput createAVFormatContextFromFilePath(const std::string& videoFilePath) {
   AVFormatContext* formatContext = nullptr;
-  if (avformat_open_input(
-          &formatContext, videoFilePath.c_str(), nullptr, nullptr) != 0) {
-    throw std::invalid_argument("Could not open input file: " + videoFilePath);
+  int open_ret = avformat_open_input(
+      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
+  if (open_ret != 0) {
+    throw std::invalid_argument(
+        "Could not open input file: " + videoFilePath + " " +
+        getFFMPEGErrorStringFromErrorCode(open_ret));
   }
   TORCH_CHECK(formatContext != nullptr);
   AVInput toReturn;
