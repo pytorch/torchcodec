@@ -11,26 +11,33 @@ add_library(ffmpeg6 INTERFACE)
 add_library(ffmpeg7 INTERFACE)
 
 include(FetchContent)
-set(base_url https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2024-06-11/linux_x86_64)
+set(
+    base_url
+    https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2024-06-11/linux_x86_64
+)
 FetchContent_Declare(
     f4
     URL ${base_url}/ffmpeg_4.4.4.tar.gz
-    URL_HASH SHA256=a564721e51038d01ead4bbc7a482398929101ca4c80e5ce5c42042637235a297
+    URL_HASH
+    SHA256=a564721e51038d01ead4bbc7a482398929101ca4c80e5ce5c42042637235a297
 )
 FetchContent_Declare(
     f5
     URL ${base_url}/ffmpeg_5.1.4.tar.gz
-    URL_HASH SHA256=d9c2d3a355c091ddc3205ae73426d0d6402ad8a31212dc920daabbaa5fdae944
+    URL_HASH
+    SHA256=d9c2d3a355c091ddc3205ae73426d0d6402ad8a31212dc920daabbaa5fdae944
 )
 FetchContent_Declare(
     f6
     URL ${base_url}/ffmpeg_6.1.1.tar.gz
-    URL_HASH SHA256=7ee5830dc09fed7270aa575650474ab16e18477551e5511f256ce92daa30b136
+    URL_HASH
+    SHA256=7ee5830dc09fed7270aa575650474ab16e18477551e5511f256ce92daa30b136
 )
 FetchContent_Declare(
     f7
     URL ${base_url}/ffmpeg_7.0.1.tar.gz
-    URL_HASH SHA256=fa4cda7aa67fcd58428017f7ebd2a981b0c6babba7ec89f71d6840877712ddcd
+    URL_HASH
+    SHA256=fa4cda7aa67fcd58428017f7ebd2a981b0c6babba7ec89f71d6840877712ddcd
 )
 
 FetchContent_MakeAvailable(f4 f5 f6 f7)
@@ -106,9 +113,9 @@ function(make_torchcodec_extension name ffmpeg_target)
         ${TORCH_LIBRARIES}
     )
 
-    # We already set the name to be libtorchcodecX, so we don't want cmake to add
-    # another "lib" prefix. We do it this way because it makes it easier to find
-    # references to libtorchcodec in the code (e.g. via `git grep`)
+    # We already set the name to be libtorchcodecX, so we don't want cmake to
+    # add another "lib" prefix. We do it this way because it makes it easier to
+    # find references to libtorchcodec in the code (e.g. via `git grep`)
     set_target_properties(${name} PROPERTIES PREFIX "")
 
     install(
