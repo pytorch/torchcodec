@@ -63,6 +63,7 @@ jobs:
 
       - name: Build and run C++ tests
         run: |
+          conda install pkg-config -c conda-forge
           mkdir -p build
           pushd build
           TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
