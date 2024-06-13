@@ -64,11 +64,34 @@ jobs:
       - name: Build and run C++ tests
         run: |
           conda install pkg-config -c conda-forge
+          export BUILD_AGAINST_INSTALLED_FFMPEG=1
+
+          # Why we need BUILD_AGAINST_INSTALLED_FFMPEG and pkg-config:
+          # The C++ tests decode x264 files which is not supported by our
+          # pre-built non-GPL FFmpeg libraries. Unfortunately, that's what our
+          # C++ tests currently link against by default, which would lead to
+          # test failures. To remediate that, we have to tell the C++ tests to
+          # build against the FFmpeg that we installed from conda-forge (which
+          # is able to decode x264).
+          # Note: The Python tests are also decoding x264 files. The Python
+          # tests work fine because even though the library was built against
+          # our pre-built non-GPL at build time, at run time (during test
+          # execution), it's the installed FFmpeg version that is found.
+          #
+          # TODO: We should fix that and
+          # a) build the C++ tests against our pre-built non-GPL FFmpeg, like
+          #    for the Python package
+          # b) make sure that the C++ tests can dynamically load the installed
+          #    FFmpeg version.
+          # c) ideally, we should avoid re-building the entire libtorchcodec
+          #    library just for building the C++ tests. We should be able to
+          #    re-use the build that was done when we installed the Python
+          #    library and avoid recompilation.
+
           mkdir -p build
           pushd build
           TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
           Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
-          export BUILD_AGAINST_INSTALLED_FFMPEG=1
           cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
           cmake --build .
           ctest
