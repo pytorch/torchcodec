@@ -33,14 +33,14 @@ target_include_directories(VideoDecoderOpsTest PRIVATE ../../)
 
 target_link_libraries(
   VideoDecoderTest
-  torchcodec
+  libtorchcodec
   GTest::gtest_main
   "${TORCH_LIBRARIES}"
 )
 
 target_link_libraries(
   VideoDecoderOpsTest
-  torchcodec
+  libtorchcodec
   GTest::gtest_main
   "${TORCH_LIBRARIES}"
 )

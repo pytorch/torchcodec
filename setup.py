@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -84,6 +85,11 @@ class CMakeBuild(build_ext):
         return ext_filename
 
 
+# If BUILD_AGAINST_INSTALLED_FFMPEG is set, we build against the installed
+# FFmpeg libraries. We don't know what version of FFmpeg they correspond to (for
+# now, this is a TODO). So we build `libtorchcodec.so` without any version
+# suffix.
+FFMPEG_MAJOR_VERSIONS = ("",) if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is not None else (4, 5, 6, 7)
 extensions = [
     Extension(
         # The names here must be kept in sync with the target names in the
@@ -100,6 +106,6 @@ extensions = [
         # CMakeLists.txt file.
         sources=[],
     )
-    for ffmpeg_major_version in (4, 5, 6, 7)
+    for ffmpeg_major_version in FFMPEG_MAJOR_VERSIONS
 ]
 setup(ext_modules=extensions, cmdclass={"build_ext": CMakeBuild})
