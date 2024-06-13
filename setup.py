@@ -90,7 +90,9 @@ class CMakeBuild(build_ext):
 # `libtorchcodec.so` without any version suffix.
 # If BUILD_AGAINST_INSTALLED_FFMPEG is not set then we want to build against all
 # ffmpeg major version.
-FFMPEG_MAJOR_VERSIONS = ("",) if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is not None else (4, 5, 6, 7)
+FFMPEG_MAJOR_VERSIONS = (
+    ("",) if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is not None else (4, 5, 6, 7)
+)
 extensions = [
     Extension(
         # The names here must be kept in sync with the target names in the
