@@ -40,8 +40,6 @@ specifying torch as a build-time dependency, this fails loudly as torch can't be
 found. That's why we're passing `--no-build-isolation`: this tells pip to build
 the package within the current virtual env, where torch would have already been
 installed.
-
-Does packaging suck? Yes.
 """
 
 
@@ -76,8 +74,8 @@ class CMakeBuild(build_ext):
     def get_ext_filename(self, fullname):
         # When copying the .so files from the build tmp dir to the actual
         # package dir, this tells setuptools to look for a .so file without the
-        # Python ABI suffix, i.e. "libtorchcodec.so" instead of e.g.
-        # "libtorchcodec.cpython-38-x86_64-linux-gnu.so", which is what
+        # Python ABI suffix, i.e. "libtorchcodec4.so" instead of e.g.
+        # "libtorchcodec4.cpython-38-x86_64-linux-gnu.so", which is what
         # setuptools looks for by default.
         ext_filename = super().get_ext_filename(fullname)
         ext_filename_parts = ext_filename.split(".")
@@ -86,17 +84,22 @@ class CMakeBuild(build_ext):
         return ext_filename
 
 
-video_library = Extension(
-    # The name parameter specifies not just the name but mainly *where* the .so
-    # file should be copied to. By setting the name this way, we're telling
-    # `libtorchcodec.so` to be copied at the root of the torchcodec package
-    # (next to the __init__.py file). This is where it's expected to be when we
-    # call torch.ops.load_library().
-    name="torchcodec.libtorchcodec",
-    # sources is a mandatory parameter so we have to pass it, but we leave it
-    # empty because we'll be building the extension with our custom CMakeBuild
-    # class, and the sources are specified within CMakeFiles.txt.
-    sources=[],
-)
-
-setup(ext_modules=[video_library], cmdclass={"build_ext": CMakeBuild})
+extensions = [
+    Extension(
+        # The names here must be kept in sync with the target names in the
+        # CMakeLists file. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ].  The name
+        # parameter specifies not just the name but mainly *where* the .so file
+        # should be copied to. By setting the name this way, we're telling
+        # `libtorchcodec{ffmpeg_major_version}.so` to be copied at the root of
+        # the torchcodec package (next to the __init__.py file). This is where
+        # it's expected to be when we call torch.ops.load_library().
+        name=f"torchcodec.libtorchcodec{ffmpeg_major_version}",
+        # sources is a mandatory parameter so we have to pass it, but we leave
+        # it empty because we'll be building the extensions with our custom
+        # CMakeBuild class, and the sources are specified within the
+        # CMakeLists.txt file.
+        sources=[],
+    )
+    for ffmpeg_major_version in (4, 5, 6, 7)
+]
+setup(ext_modules=extensions, cmdclass={"build_ext": CMakeBuild})

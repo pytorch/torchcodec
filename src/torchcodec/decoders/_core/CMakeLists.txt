@@ -4,49 +4,56 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Torch REQUIRED)
-find_package(PkgConfig REQUIRED)
-
-set(LIBRARY_NAME "torchcodec")
-
-pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
-    libavdevice
-    libavfilter
-    libavformat
-    libavcodec
-    libswresample
-    libswscale
-    libavutil
-)
-
-set(
-  sources
-  FFMPEGCommon.h
-  FFMPEGCommon.cpp
-  VideoDecoder.h
-  VideoDecoder.cpp
-  VideoDecoderOps.h
-  VideoDecoderOps.cpp
-  )
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-add_library(${LIBRARY_NAME}
-    SHARED
-    "${sources}"
-)
+include(${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake)
 
-set_property(TARGET ${LIBRARY_NAME} PROPERTY CXX_STANDARD 17)
+function(make_torchcodec_library library_name ffmpeg_target)
+    set(
+        sources
+        FFMPEGCommon.h
+        FFMPEGCommon.cpp
+        VideoDecoder.h
+        VideoDecoder.cpp
+        VideoDecoderOps.h
+        VideoDecoderOps.cpp
+    )
+    add_library(${library_name} SHARED ${sources})
+    set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
 
-target_include_directories(${LIBRARY_NAME} PRIVATE ./../../../../)
+    target_include_directories(
+        ${library_name}
+        PRIVATE
+        ./../../../../
+        "${TORCH_INSTALL_PREFIX}/include"
+    )
 
-target_link_libraries(${LIBRARY_NAME}
-    PkgConfig::LIBAV
-    "${TORCH_LIBRARIES}"
-)
+    target_link_libraries(
+        ${library_name}
+        ${ffmpeg_target}
+        ${TORCH_LIBRARIES}
+    )
 
-# The install step is invoked within CMakeBuild.build_extension() and just
-# copies the built .so files from the temp cmake/setuptools build folder into
-# the CMAKE_INSTALL_PREFIX folder.
-# We still need to manually pass "DESTINATION ..." for cmake to copy those files
-# in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
-install(TARGETS ${LIBRARY_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX})
+    # We already set the library_name to be libtorchcodecN, so we don't want
+    # cmake to add another "lib" prefix. We do it this way because it makes it
+    # easier to find references to libtorchcodec in the code (e.g. via `git
+    # grep`)
+    set_target_properties(${library_name} PROPERTIES PREFIX "")
+
+    # The install step is invoked within CMakeBuild.build_library() in
+    # setup.py and just copies the built .so files from the temp
+    # cmake/setuptools build folder into the CMAKE_INSTALL_PREFIX folder. We
+    # still need to manually pass "DESTINATION ..." for cmake to copy those
+    # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
+    install(
+        TARGETS ${library_name}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
+    )
+endfunction()
+
+# The libtorchcodec names here must be kept in sync with the library names in
+# setup.py.  Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
+make_torchcodec_library(libtorchcodec4 ffmpeg4)
+make_torchcodec_library(libtorchcodec5 ffmpeg5)
+make_torchcodec_library(libtorchcodec6 ffmpeg6)
+make_torchcodec_library(libtorchcodec7 ffmpeg7)

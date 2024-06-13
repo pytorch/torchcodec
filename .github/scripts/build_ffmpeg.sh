@@ -60,12 +60,7 @@ tar -xf ffmpeg.tar.gz --strip-components 1
     --enable-avdevice \
     --enable-avfilter \
     --enable-avformat \
-    --enable-avutil \
-    --enable-swresample \
-    --enable-swscale
-
-# All flags come from torchaudio. We added swresample and swscale.
-# TODO: Make sure this is not GPL.
+    --enable-avutil
 
 make -j install
 ls ${prefix}/*
