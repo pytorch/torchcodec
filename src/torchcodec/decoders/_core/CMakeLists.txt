@@ -80,10 +80,17 @@ if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
     elseif (${libavcodec_major_version} STREQUAL "61")
         set(ffmpeg_major_version "7")
     else()
-        message(FATAL_ERROR "Unsupported libavcodec version: ${libavcodec_major_version}")
+        message(
+            FATAL_ERROR
+            "Unsupported libavcodec version: ${libavcodec_major_version}"
+        )
     endif()
 
-    set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
+    set(
+        libtorchcodec_target_name
+        libtorchcodec${ffmpeg_major_version}
+        PARENT_SCOPE  # the variable may be needed in the test's CMakeLists.txt
+    )
 
     make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
 else()
