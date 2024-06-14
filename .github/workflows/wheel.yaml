@@ -85,7 +85,10 @@ jobs:
             echo "ffmpeg is installed, but it shouldn't! Exiting!!"
             exit 1
           fi
-          python -m pip install dist/*
+
+          wheel=`ls dist/*.whl`
+          echo Installing $wheel
+          python -m pip install $wheel
 
       - name: Install ffmpeg, post build
         run: |
