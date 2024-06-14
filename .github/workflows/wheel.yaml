@@ -57,10 +57,9 @@ jobs:
       matrix:
         python-version: ['3.8', '3.12']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+    if: ${{ always() }}
     needs: build
     steps:
-      - name: Check out repo
-        uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
         with:
           name: sdist-linux_x86_${{ matrix.python-version }}
@@ -85,6 +84,8 @@ jobs:
             exit 1
           fi
 
+          echo "PWD"
+          echo $PWD
           echo "LS"
           ls
           echo "LS DIST"
@@ -102,8 +103,16 @@ jobs:
         run: |
           python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           python -m pip install numpy pytest pillow opencv-python
+      
+      - name: Check out repo
+        uses: actions/checkout@v3
       - name: Smoke test
         run: |
+          echo "PWD"
+          echo $PWD
+          echo "LS"
+          ls
+          rm -r src/  # we just want the tests, we don't care about the rest
           python test/decoders/manual_smoke_test.py
           # TODO: diff the output frame with its expeceted value
       - name: Run Python tests
