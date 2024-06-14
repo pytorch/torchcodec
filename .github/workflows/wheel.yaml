@@ -37,6 +37,7 @@ jobs:
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Build the torchcodec wheel
         run: |
+          # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
           .github/scripts/assert_ffmpeg_not_installed.sh
 
           # TODO: Need to make sure the wheel only contains torchcodec and not
@@ -103,7 +104,7 @@ jobs:
           python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           # TODO: Find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow opencv-python
-      
+
       - name: Delete the src/ folder just for fun
         run: |
           # The only reason we checked-out the repo is to get access to the
