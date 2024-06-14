@@ -75,7 +75,8 @@ else()
     message(
         STATUS
         "Building and dynamically linking libtorchcodec against our pre-built
-        non-GPL FFmpeg libraries"
+        non-GPL FFmpeg libraries. These libraries are only used at build time,
+        you still a different need FFmpeg to be installed for run time!"
     )
 
     # This will expose the ffmpeg4, ffmpeg5, ffmpeg6, and ffmpeg7 targets
