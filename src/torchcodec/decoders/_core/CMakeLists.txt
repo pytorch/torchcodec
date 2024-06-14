@@ -86,11 +86,10 @@ if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
         )
     endif()
 
-    set(
-        libtorchcodec_target_name
-        libtorchcodec${ffmpeg_major_version}
-        PARENT_SCOPE  # the variable may be needed in the test's CMakeLists.txt
-    )
+    set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
+    # Make libtorchcodec_target_name available in the parent's scope, for the
+    # test's CMakeLists.txt
+    set(libtorchcodec_target_name ${libtorchcodec_target_name} PARENT_SCOPE)
 
     make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
 else()
