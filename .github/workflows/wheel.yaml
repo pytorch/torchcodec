@@ -40,7 +40,9 @@ jobs:
             echo "ffmpeg is installed, but it shouldn't! Exiting!!"
             exit 1
           fi
-          python -m build . --wheel -vvv --no-isolation
+
+          python -m pip install build
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
 
           wheel=`ls dist/*.whl`
           unzip -l $wheel
