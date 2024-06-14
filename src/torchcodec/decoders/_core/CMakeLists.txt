@@ -6,8 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake)
-
 function(make_torchcodec_library library_name ffmpeg_target)
     set(
         sources
@@ -51,9 +49,45 @@ function(make_torchcodec_library library_name ffmpeg_target)
     )
 endfunction()
 
-# The libtorchcodec names here must be kept in sync with the library names in
-# setup.py.  Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
-make_torchcodec_library(libtorchcodec4 ffmpeg4)
-make_torchcodec_library(libtorchcodec5 ffmpeg5)
-make_torchcodec_library(libtorchcodec6 ffmpeg6)
-make_torchcodec_library(libtorchcodec7 ffmpeg7)
+if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
+    message(
+        STATUS
+        "Building and dynamically linking libtorchcodec against the installed
+        FFmpeg libraries. This require pkg-config to be installed. If you have
+        installed FFmpeg from conda, make sure pkg-config is installed from
+        conda as well."
+    )
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavdevice
+        libavfilter
+        libavformat
+        libavcodec
+        libavutil
+    )
+
+    # TODO: To be pedantic, find what version of ffmpeg is installed and name
+    # the libtorchcodec library "libtorchcodec{ffmpeg_major_version}" for
+    # consistency with the other targets. This can slightly simplify the Python
+    # loading and building code as well.
+    make_torchcodec_library(libtorchcodec PkgConfig::LIBAV)
+else()
+    message(
+        STATUS
+        "Building and dynamically linking libtorchcodec against our pre-built
+        non-GPL FFmpeg libraries. These libraries are only used at build time,
+        you still a different need FFmpeg to be installed for run time!"
+    )
+
+    # This will expose the ffmpeg4, ffmpeg5, ffmpeg6, and ffmpeg7 targets
+    include(
+        ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
+    )
+
+    # The libtorchcodec names here must be kept in sync with the library names
+    # in setup.py. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
+    make_torchcodec_library(libtorchcodec4 ffmpeg4)
+    make_torchcodec_library(libtorchcodec5 ffmpeg5)
+    make_torchcodec_library(libtorchcodec6 ffmpeg6)
+    make_torchcodec_library(libtorchcodec7 ffmpeg7)
+endif()
