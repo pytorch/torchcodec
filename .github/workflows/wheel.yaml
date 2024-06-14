@@ -60,12 +60,12 @@ jobs:
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     needs: build
     steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
         with:
           name: the-sdist
           path: dist/
-      - name: Check out repo
-        uses: actions/checkout@v3
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
         with:
