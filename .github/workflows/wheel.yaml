@@ -39,8 +39,15 @@ jobs:
         run: |
           .github/scripts/assert_ffmpeg_not_installed.sh
 
+          # TODO: Need to make sure the wheel only contains torchcodec and not
+          # the other folders (tests, docs, etc.)
           python -m pip install build
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
+      - name: Show the .so files in the wheel
+        run: |
+          # This should show libtorchcodec4.so, libtorchcodec5.so, etc.
+          wheel_path=`find dist -type f`
+          unzip -l $wheel_path | grep .so
       - uses: actions/upload-artifact@v4
         with:
           name: sdist-linux_x86_${{ matrix.python-version }}
@@ -97,21 +104,23 @@ jobs:
           # TODO: Find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow opencv-python
       
-      - name: Delete src folder
+      - name: Delete the src/ folder just for fun
         run: |
           # The only reason we checked-out the repo is to get access to the
           # tests. We don't care about the rest. Out of precaution, we delete
           # the src/ folder to be extra sure that we're running the code from
           # the installed wheel rather than from the source.
-          # Note that in theory, running the code from the sources should a)
-          # never happen and b) fail loudly because the built .so files aren't
-          # present there.
+          # This is just to be extra cautious and very overkill because a)
+          # there's no way the `torchcodec` package from src/ can be found from
+          # the PythonPath: the main point of `src/` is precisely to protect
+          # against that and b) if we ever were to execute code from
+          # `src/torchcodec`, it would fail loudly because the built .so files
+          # aren't present there.
           rm -r src/
           ls
       - name: Smoke test
         run: |
           python test/decoders/manual_smoke_test.py
-          # TODO: diff the output frame with its expeceted value
       - name: Run Python tests
         run: |
           pytest test
