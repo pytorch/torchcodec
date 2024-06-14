@@ -47,7 +47,7 @@ jobs:
       - name: Show the .so files in the wheel
         run: |
           # This should show libtorchcodec4.so, libtorchcodec5.so, etc.
-          wheel_path=`find dist -type f`
+          wheel_path=`find dist -type f -name "*.whl"`
           unzip -l $wheel_path | grep .so
       - uses: actions/upload-artifact@v4
         with:
