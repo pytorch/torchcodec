@@ -31,6 +31,8 @@ target_include_directories(VideoDecoderTest PRIVATE ../../)
 target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
 target_include_directories(VideoDecoderOpsTest PRIVATE ../../)
 
+message(STATUS "AAA " ${libtorchcodec_target_name})
+
 target_link_libraries(
   VideoDecoderTest
   ${libtorchcodec_target_name}
