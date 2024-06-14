@@ -66,11 +66,26 @@ if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
         libavutil
     )
 
-    # TODO: To be pedantic, find what version of ffmpeg is installed and name
-    # the libtorchcodec library "libtorchcodec{ffmpeg_major_version}" for
-    # consistency with the other targets. This can slightly simplify the Python
-    # loading and building code as well.
-    make_torchcodec_library(libtorchcodec PkgConfig::LIBAV)
+    # Split libavcodec's version string by '.' and convert it to a list
+    string(REPLACE "." ";" libavcodec_version_list ${LIBAV_libavcodec_VERSION})
+    # Get the first element of the list, which is the major version
+    list(GET libavcodec_version_list 0 libavcodec_major_version)
+
+    if (${libavcodec_major_version} STREQUAL "58")
+        set(ffmpeg_major_version "4")
+    elseif (${libavcodec_major_version} STREQUAL "59")
+        set(ffmpeg_major_version "5")
+    elseif (${libavcodec_major_version} STREQUAL "60")
+        set(ffmpeg_major_version "6")
+    elseif (${libavcodec_major_version} STREQUAL "61")
+        set(ffmpeg_major_version "7")
+    else()
+        message(FATAL_ERROR "Unsupported libavcodec version: ${libavcodec_major_version}")
+    endif()
+
+    set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
+
+    make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
 else()
     message(
         STATUS

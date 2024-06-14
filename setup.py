@@ -89,14 +89,24 @@ class CMakeBuild(build_ext):
         return ext_filename
 
 
-# If BUILD_AGAINST_INSTALLED_FFMPEG is set, we only build against the installed
-# FFmpeg. We don't know what FFmpeg version that is, so we build
-# `libtorchcodec.so` without any version suffix.
-# If BUILD_AGAINST_INSTALLED_FFMPEG is not set then we want to build against all
-# ffmpeg major version that are available on our S3 bucket.
-FFMPEG_MAJOR_VERSIONS = (
-    ("",) if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is not None else (4, 5, 6, 7)
-)
+if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is None:
+    # If BUILD_AGAINST_INSTALLED_FFMPEG is not set then we want to build against
+    # all ffmpeg major version that are available on our S3 bucket.
+    FFMPEG_MAJOR_VERSIONS = (4, 5, 6, 7)
+else:
+    # If BUILD_AGAINST_INSTALLED_FFMPEG is set, we only build against the
+    # installed FFmpeg. We need to figure out the major ffmpeg version from
+    # pkg-config.
+    pkg_config_output = subprocess.check_output(["pkg-config", "--modversion", "libavcodec"]).decode("utf-8")
+    libavcodec_major_version = int(pkg_config_output.split(".")[0])
+    ffmpeg_major_version = {
+        58: 4,
+        59: 5,
+        60: 6,
+        61: 7,
+    }[libavcodec_major_version]
+    FFMPEG_MAJOR_VERSIONS = (ffmpeg_major_version,)
+
 extensions = [
     Extension(
         # The names here must be kept in sync with the target names in the

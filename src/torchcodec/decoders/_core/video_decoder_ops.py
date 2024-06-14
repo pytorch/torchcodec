@@ -17,9 +17,8 @@ def load_torchcodec_extension():
     # On fbcode, _get_extension_path() is overridden and directly points to the
     # correct .so file, so this for-loop succeeds on the first iteration.
 
-    # grep for BUILD_AGAINST_INSTALLED_FFMPEG to explain the `""` part.
     exceptions = []
-    for ffmpeg_major_version in (7, 6, 5, 4, ""):
+    for ffmpeg_major_version in (7, 6, 5, 4):
         library_name = f"libtorchcodec{ffmpeg_major_version}"
         try:
             torch.ops.load_library(_get_extension_path(library_name))
