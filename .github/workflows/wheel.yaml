@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.12']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3
@@ -27,7 +29,7 @@ jobs:
           auto-update-conda: true
           miniconda-version: "latest"
           activate-environment: test
-          python-version: '3.8'
+          python-version: ${{ matrix.python-version }}
       - name: Update pip
         run: python -m pip install --upgrade pip
       - name: Install Pytorch
@@ -43,12 +45,9 @@ jobs:
 
           python -m pip install build
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
-
-          wheel=`ls dist/*.whl`
-          unzip -l $wheel
       - uses: actions/upload-artifact@v4
         with:
-          name: the-sdist
+          name: sdist-linux_x86_${{ matrix.python-version }}
           path: dist/*
 
   install-and-test:
@@ -64,7 +63,7 @@ jobs:
         uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
         with:
-          name: the-sdist
+          name: sdist-linux_x86_${{ matrix.python-version }}
           path: dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
