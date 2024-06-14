@@ -85,6 +85,11 @@ if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
 
     set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
 
+    message(STATUS a ${LIBAV_libavcodec_VERSION})
+    message(STATUS b ${libavcodec_major_version})
+    message(STATUS c ${ffmpeg_major_version})
+    message(STATUS d ${libtorchcodec_target_name})
+
     make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
 else()
     message(
