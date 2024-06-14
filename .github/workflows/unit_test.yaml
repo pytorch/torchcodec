@@ -45,7 +45,7 @@ jobs:
           fi
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.
-          python -m pip install -e ".[dev]" --no-build-isolation -vvv
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
 
           # list the built so files, for debugging.
           find src | grep ".so"
@@ -87,29 +87,26 @@ jobs:
           ffmpeg -version
       - name: Build and run C++ tests
         run: |
-          export BUILD_AGAINST_INSTALLED_FFMPEG=1
-
-          # Why we need BUILD_AGAINST_INSTALLED_FFMPEG and pkg-config:
-          # The C++ tests decode x264 files which is not supported by our
-          # pre-built non-GPL FFmpeg libraries. Unfortunately, that's what our
-          # C++ tests currently link against by default, which would lead to
-          # test failures. To remediate that, we have to tell the C++ tests to
-          # build against the FFmpeg that we installed from conda-forge (which
-          # is able to decode x264).
-          # Note: The Python tests are also decoding x264 files. The Python
-          # tests work fine because even though the library was built against
-          # our pre-built non-GPL at build time, at run time (during test
-          # execution), it's the installed FFmpeg version that is found.
+          # Note: we're not setting BUILD_AGAINST_ALL_FFMPEG_FROM_S3 here, so
+          # we're building libtorchcodec against the installed FFmpeg version
+          # (from conda-forge) instead of building against our pre-built non-GPL
+          # FFmpeg libraries.
+          # The reason we need this is because the C++ tests decode x264 files.
+          # x264 support is not LGPL, os it is not supported by our
+          # pre-built non-GPL FFmpeg libraries. And if we were to build against
+          # those, this is also what the tests would be loading at run time,
+          # then failing when we try to decode x264.
+          # To remediate that, we build against the FFmpeg that we installed
+          # from conda-forge (which is able to decode x264), and that's also
+          # what gets loaded at run time.
+          # The Python tests are also decoding x264 files, and are built against
+          # our non-GPL FFmpeg. And yet they pass. This is because in Python
+          # we're able to distinguish between build-time (non-GPL FFmpeg) and
+          # run time (conda-forge FFmpeg).
           #
-          # TODO: We should fix that and
-          # a) build the C++ tests against our pre-built non-GPL FFmpeg, like
-          #    for the Python package
-          # b) make sure that the C++ tests can dynamically load the installed
-          #    FFmpeg version.
-          # c) ideally, we should avoid re-building the entire libtorchcodec
-          #    library just for building the C++ tests. We should be able to
-          #    re-use the build that was done when we installed the Python
-          #    library and avoid recompilation.
+          # TODO: Ideally, we should find a way to make the same distinction
+          # between build time and run time for those C++ tests, and build them
+          # against our non-GPL FFmpeg libraries.
 
           build_tests_dir="${PWD}/build_tests"
           mkdir $build_tests_dir
