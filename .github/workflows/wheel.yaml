@@ -37,11 +37,7 @@ jobs:
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Build the torchcodec wheel
         run: |
-          if command -v "ffmpeg" &> /dev/null
-          then
-            echo "ffmpeg is installed, but it shouldn't! Exiting!!"
-            exit 1
-          fi
+          .github/scripts/assert_ffmpeg_not_installed.sh
 
           python -m pip install build
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
@@ -73,46 +69,47 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Update pip
         run: python -m pip install --upgrade pip
-      - name: Install dependencies
+      - name: Install PyTorch
         run: |
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
-      - name: Install torchcodec wheel
+      - name: Install torchcodec from the wheel
         run: |
-          if command -v "ffmpeg" &> /dev/null
-          then
-            echo "ffmpeg is installed, but it shouldn't! Exiting!!"
-            exit 1
-          fi
+          wheel_path=`find dist -type f`
+          echo Installing $wheel_path
+          python -m pip install $wheel_path
 
-          echo "PWD"
-          echo $PWD
-          echo "LS"
-          ls
-          echo "LS DIST"
-          ls dist
-          wheel=`ls dist`
-          echo Installing dist/$wheel
-          python -m pip install dist/$wheel
-
+      - name: Check out repo
+        uses: actions/checkout@v3
       - name: Install ffmpeg, post build
         run: |
+          # Ideally we would have checked for that before installing the wheel,
+          # but we need to checkout the repo to access this file, and we don't
+          # want to checkout the repo before installing the wheel to avoid any
+          # side-effect. It's OK.
+          .github/scripts/assert_ffmpeg_not_installed.sh
+
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
 
       - name: Install test dependencies
         run: |
           python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+          # TODO: Find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow opencv-python
       
-      - name: Check out repo
-        uses: actions/checkout@v3
+      - name: Delete src folder
+        run: |
+          # The only reason we checked-out the repo is to get access to the
+          # tests. We don't care about the rest. Out of precaution, we delete
+          # the src/ folder to be extra sure that we're running the code from
+          # the installed wheel rather than from the source.
+          # Note that in theory, running the code from the sources should a)
+          # never happen and b) fail loudly because the built .so files aren't
+          # present there.
+          rm -r src/
+          ls
       - name: Smoke test
         run: |
-          echo "PWD"
-          echo $PWD
-          echo "LS"
-          ls
-          rm -r src/  # we just want the tests, we don't care about the rest
           python test/decoders/manual_smoke_test.py
           # TODO: diff the output frame with its expeceted value
       - name: Run Python tests
