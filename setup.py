@@ -1,6 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
+import sys
 
 import torch
 from setuptools import Extension, setup
@@ -87,7 +88,18 @@ class CMakeBuild(build_ext):
         without_abi = ext_filename_parts[:-2] + ext_filename_parts[-1:]
         ext_filename = ".".join(without_abi)
         return ext_filename
+ 
 
+I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR = "I_SWEAR_I_KNOW_WHAT_IM_DOING"
+BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR = "BUILD_AGAINST_ALL_FFMPEG_FROM_S3"
+i_swear_i_know_what_im_doing = os.getenv(I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR) is not None
+build_against_all_ffmpeg_from_s3 = os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
+if "bdist_wheel" in sys.argv and not (build_against_all_ffmpeg_from_s3 or i_swear_i_know_what_im_doing):
+    raise ValueError(
+        "It looks like you're trying to build a wheel. "
+        f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
+        f"If you have a good reason *not* to, then set {I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR}."
+    )
 
 # If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is set then we want to build against all
 # ffmpeg major version that are available on our S3 bucket.
@@ -96,7 +108,7 @@ class CMakeBuild(build_ext):
 # `libtorchcodec.so` without any version suffix. We could probably figure out
 # the version number by invoking `pkg-config --modversion`.
 FFMPEG_MAJOR_VERSIONS = (
-    (4, 5, 6, 7) if os.getenv("BUILD_AGAINST_ALL_FFMPEG_FROM_S3") is not None else ("",)
+    (4, 5, 6, 7) if build_against_all_ffmpeg_from_s3 else ("",)
 )
 extensions = [
     Extension(
