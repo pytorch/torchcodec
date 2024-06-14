@@ -45,7 +45,7 @@ jobs:
           fi
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.
-          python -m pip install -e ".[dev]" --no-build-isolation -vvv
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
 
           # list the built so files, for debugging.
           find src | grep ".so"
@@ -87,9 +87,9 @@ jobs:
           ffmpeg -version
       - name: Build and run C++ tests
         run: |
-          export BUILD_AGAINST_INSTALLED_FFMPEG=1
+          unset BUILD_AGAINST_ALL_FFMPEG_FROM_S3
 
-          # Why we need BUILD_AGAINST_INSTALLED_FFMPEG and pkg-config:
+          # Why we're not setting BUILD_AGAINST_ALL_FFMPEG_FROM_S3 here:
           # The C++ tests decode x264 files which is not supported by our
           # pre-built non-GPL FFmpeg libraries. Unfortunately, that's what our
           # C++ tests currently link against by default, which would lead to
