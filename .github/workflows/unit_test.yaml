@@ -88,8 +88,9 @@ jobs:
           #    re-use the build that was done when we installed the Python
           #    library and avoid recompilation.
 
-          mkdir -p build
-          pushd build
+          build_tests_dir="${PWD}/build_tests"
+          mkdir $build_tests_dir
+          pushd $build_tests_dir
           TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
           Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
           cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
