@@ -45,6 +45,7 @@ jobs:
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
       - name: Validate wheel content
         run: |
+          source .github/scripts/helpers.sh
           wheel_path=`find dist -type f`
           echo "Wheel content:"
           unzip -l $wheel_path
