@@ -62,8 +62,6 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-    # The libtorchcodec names here must be kept in sync with the library names
-    # in setup.py. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
     make_torchcodec_library(libtorchcodec4 ffmpeg4)
     make_torchcodec_library(libtorchcodec5 ffmpeg5)
     make_torchcodec_library(libtorchcodec6 ffmpeg6)

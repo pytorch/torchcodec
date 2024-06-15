@@ -5,7 +5,6 @@ from pathlib import Path
 import torch
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
-from setuptools.command.install_lib import install_lib
 
 """
 Build / install instructions:
@@ -66,7 +65,16 @@ class CMakeBuild(build_ext):
         # method for each Extension object. We're using a CMake-based build
         # where all our extensions are built together at once, so we only need a
         # fake extension to trigger the build.
-        assert ext.name == "FAKE_NAME"
+        assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
+        # install_prefix is a temp directory where the built extension(s) will
+        # be "installed" by CMake. Once they're copied to install_prefix, the
+        # built .so files still need to be copied back into:
+        # - the source tree (for editable installs) - this is handled in
+        #   copy_extensions_to_source()
+        # - the (temp) wheel directory (when building a wheel). I cannot tell
+        #   exactly *where* this is handled, but for this to work we must
+        #   prepend the "/torchcodec" folder to install_prefix: this tells
+        #   setuptools to eventually move those .so files into `torchcodec/`.
         self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
         self._build_all_extensions_with_cmake()
 
@@ -91,8 +99,10 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
 
     def copy_extensions_to_source(self):
-        """Copy built extensions from temporary folder back into source tree."""
-        # This is called by setuptools during editable (-e) install.
+        """Copy built extensions from temporary folder back into source tree.
+
+        This is called by setuptools during editable (-e) install.
+        """
         self.get_finalized_command('build_py')
 
         for so_file in self._install_prefix.glob("*.so"):
