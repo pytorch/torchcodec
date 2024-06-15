@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
+from setuptools.command.install_lib import install_lib
 
 """
 Build / install instructions:
@@ -48,6 +49,11 @@ _ROOT_DIR = Path(__file__).parent.resolve()
 
 
 class CMakeBuild(build_ext):
+
+    def __init__(self, *args, **kwargs):
+        self._install_prefix = None
+        super().__init__(*args, **kwargs)
+
     def run(self):
         try:
             subprocess.check_output(["cmake", "--version"])
@@ -60,7 +66,8 @@ class CMakeBuild(build_ext):
         # method for each Extension object. We're using a CMake-based build
         # where all our extensions are built together at once, so we only need a
         # fake extension to trigger the build.
-        assert ext.name == "FAKE_EXTENSION"
+        assert ext.name == "FAKE_NAME"
+        self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
         self._build_all_extensions_with_cmake()
 
     def _build_all_extensions_with_cmake(self):
@@ -69,7 +76,7 @@ class CMakeBuild(build_ext):
         build_type = "Debug" if self.debug else "Release"
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_args = [
-            f"-DCMAKE_INSTALL_PREFIX={self.build_lib}",
+            f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
             f"-DCMAKE_BUILD_TYPE={build_type}",
@@ -85,21 +92,16 @@ class CMakeBuild(build_ext):
 
     def copy_extensions_to_source(self):
         """Copy built extensions from temporary folder back into source tree."""
-        # Setuptools expects to find the built extensions in its self.build_lib
-        # temprory directory, that's why we set CMAKE_INSTALL_PREFIX to that.
-        # We still need to copy the build .so files back to the source tree.
-        # Usually this is handled by setuptools on each Extension object based
-        # on their name attribute, but since we only have a fake Extension we
-        # need to override it.
+        # This is called by setuptools during editable (-e) install.
         self.get_finalized_command('build_py')
- 
-        for so_file in Path(self.build_lib).glob("*.so"):
+
+        for so_file in self._install_prefix.glob("*.so"):
             assert "libtorchcodec" in so_file.name
             destination = Path("src/torchcodec/") / so_file.name
+            print(f"Copying {so_file} to {destination}")
             self.copy_file(so_file, destination, level=self.verbose)
 
 
 # See `CMakeBuild.build_extension()`.
-fake_extension = Extension(name="FAKE_EXTENSION", sources=[])
-
+fake_extension = Extension(name="FAKE_NAME", sources=[])
 setup(ext_modules=[fake_extension], cmdclass={"build_ext": CMakeBuild})
