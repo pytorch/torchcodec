@@ -51,4 +51,6 @@ Then, still from within the `docs` directory:
 make html
 ```
 
+The built docs will be in `build/html`. Open in your browser to view them.
+
 Run `make clean` from time to time if you encounter issues.
