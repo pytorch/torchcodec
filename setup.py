@@ -56,13 +56,20 @@ class CMakeBuild(build_ext):
         super().run()
 
     def build_extension(self, ext):
-        install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute()
+        # Setuptools was designed to build one extension at a time, calling this
+        # method for each Extension object. We're using a CMake-based build
+        # where all our extensions are built together at once, so we only need a
+        # fake extension to trigger the build.
+        assert ext.name == "FAKE_EXTENSION"
+        self._build_all_extensions_with_cmake()
+
+    def _build_all_extensions_with_cmake(self):
         # Note that self.debug is True when you invoke setup.py like this:
         # python setup.py build_ext --debug install
         build_type = "Debug" if self.debug else "Release"
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_args = [
-            f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
+            f"-DCMAKE_INSTALL_PREFIX={self.build_lib}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
             f"-DCMAKE_BUILD_TYPE={build_type}",
@@ -76,44 +83,23 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--build", "."], cwd=self.build_temp)
         subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
 
-    def get_ext_filename(self, fullname):
-        # When copying the .so files from the build tmp dir to the actual
-        # package dir, this tells setuptools to look for a .so file without the
-        # Python ABI suffix, i.e. "libtorchcodec4.so" instead of e.g.
-        # "libtorchcodec4.cpython-38-x86_64-linux-gnu.so", which is what
-        # setuptools looks for by default.
-        ext_filename = super().get_ext_filename(fullname)
-        ext_filename_parts = ext_filename.split(".")
-        without_abi = ext_filename_parts[:-2] + ext_filename_parts[-1:]
-        ext_filename = ".".join(without_abi)
-        return ext_filename
+    def copy_extensions_to_source(self):
+        """Copy built extensions from temporary folder back into source tree."""
+        # Setuptools expects to find the built extensions in its self.build_lib
+        # temprory directory, that's why we set CMAKE_INSTALL_PREFIX to that.
+        # We still need to copy the build .so files back to the source tree.
+        # Usually this is handled by setuptools on each Extension object based
+        # on their name attribute, but since we only have a fake Extension we
+        # need to override it.
+        self.get_finalized_command('build_py')
+ 
+        for so_file in Path(self.build_lib).glob("*.so"):
+            assert "libtorchcodec" in so_file.name
+            destination = Path("src/torchcodec/") / so_file.name
+            self.copy_file(so_file, destination, level=self.verbose)
 
 
-# If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is set then we want to build against all
-# ffmpeg major version that are available on our S3 bucket.
-# If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is not set, we only build against the
-# installed FFmpeg. We don't know what FFmpeg version that is, so we build
-# `libtorchcodec.so` without any version suffix. We could probably figure out
-# the version number by invoking `pkg-config --modversion`.
-FFMPEG_MAJOR_VERSIONS = (
-    (4, 5, 6, 7) if os.getenv("BUILD_AGAINST_ALL_FFMPEG_FROM_S3") is not None else ("",)
-)
-extensions = [
-    Extension(
-        # The names here must be kept in sync with the target names in the
-        # CMakeLists file. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ].  The name
-        # parameter specifies not just the name but mainly *where* the .so file
-        # should be copied to. By setting the name this way, we're telling
-        # `libtorchcodec{ffmpeg_major_version}.so` to be copied at the root of
-        # the torchcodec package (next to the __init__.py file). This is where
-        # it's expected to be when we call torch.ops.load_library().
-        name=f"torchcodec.libtorchcodec{ffmpeg_major_version}",
-        # sources is a mandatory parameter so we have to pass it, but we leave
-        # it empty because we'll be building the extensions with our custom
-        # CMakeBuild class, and the sources are specified within the
-        # CMakeLists.txt file.
-        sources=[],
-    )
-    for ffmpeg_major_version in FFMPEG_MAJOR_VERSIONS
-]
-setup(ext_modules=extensions, cmdclass={"build_ext": CMakeBuild})
+# See `CMakeBuild.build_extension()`.
+fake_extension = Extension(name="FAKE_EXTENSION", sources=[])
+
+setup(ext_modules=[fake_extension], cmdclass={"build_ext": CMakeBuild})
