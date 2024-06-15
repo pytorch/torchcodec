@@ -38,17 +38,28 @@ jobs:
       - name: Build the torchcodec wheel
         run: |
           # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
-          .github/scripts/assert_ffmpeg_not_installed.sh
+          source .github/scripts/helpers.sh
+          assert_ffmpeg_not_installed
 
-          # TODO: Need to make sure the wheel only contains torchcodec and not
-          # the other folders (tests, docs, etc.)
           python -m pip install build
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
-      - name: Show the .so files in the wheel
+      - name: Validate wheel content
         run: |
-          # This should show libtorchcodec4.so, libtorchcodec5.so, etc.
-          wheel_path=`find dist -type f`
-          unzip -l $wheel_path | grep .so
+          wheel_path=`find dist -type f | grep .whl`
+          echo "Wheel content:"
+          unzip -l $wheel_path
+
+          for ffmpeg_major_version in 4 5 6 7; do
+            assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.so
+          done
+
+          for ffmpeg_so in libavcodec.so libavfilter.so libavformat.so libavutil.so libavdevice.so ; do
+            assert_not_in_wheel $wheel_path $ffmpeg_so
+          done
+
+          assert_not_in_wheel $wheel_path "^test"
+          assert_not_in_wheel $wheel_path "^doc"
+          assert_not_in_wheel $wheel_path "^benchmarks"
       - uses: actions/upload-artifact@v4
         with:
           name: sdist-linux_x86_${{ matrix.python-version }}
@@ -94,7 +105,8 @@ jobs:
           # but we need to checkout the repo to access this file, and we don't
           # want to checkout the repo before installing the wheel to avoid any
           # side-effect. It's OK.
-          .github/scripts/assert_ffmpeg_not_installed.sh
+          source .github/scripts/helpers.sh
+          assert_ffmpeg_not_installed
 
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
