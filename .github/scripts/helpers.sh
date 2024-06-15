@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 
-assert_ffmpeg_not_installed() {
-    if command -v "ffmpeg" &> /dev/null
-    then
-        echo "ffmpeg is installed, but it shouldn't! Exiting!!"
-        exit 1
-    fi
-}
-
 _list_wheel_files() {
     unzip -l "$1" | awk '{print $4}'
 }

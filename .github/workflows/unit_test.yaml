@@ -38,8 +38,7 @@ jobs:
           python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Build and install torchcodec
         run: |
-          source .github/scripts/helpers.sh
-          assert_ffmpeg_not_installed
+          .github/scripts/assert_ffmpeg_not_installed.sh
 
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.

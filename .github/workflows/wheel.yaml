@@ -38,8 +38,7 @@ jobs:
       - name: Build the torchcodec wheel
         run: |
           # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
-          source .github/scripts/helpers.sh
-          assert_ffmpeg_not_installed
+          .github/scripts/assert_ffmpeg_not_installed.sh
 
           python -m pip install build
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
@@ -106,8 +105,7 @@ jobs:
           # but we need to checkout the repo to access this file, and we don't
           # want to checkout the repo before installing the wheel to avoid any
           # side-effect. It's OK.
-          source .github/scripts/helpers.sh
-          assert_ffmpeg_not_installed
+          .github/scripts/assert_ffmpeg_not_installed.sh
 
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
