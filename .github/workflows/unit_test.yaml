@@ -39,7 +39,6 @@ jobs:
       - name: Build and install torchcodec
         run: |
           .github/scripts/assert_ffmpeg_not_installed.sh
-
           # TODO: should we pass -DCMAKE_BUILD_TYPE=Debug here? That's what we
           # do for the C++ tests.
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
