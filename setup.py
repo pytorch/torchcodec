@@ -66,7 +66,7 @@ class CMakeBuild(build_ext):
         # method for each Extension object. We're using a CMake-based build
         # where all our extensions are built together at once, so we only need a
         # fake extension to trigger the build.
-        assert ext.name == "FAKE_EXTENSION"
+        assert ext.name == "FAKE_NAME"
         self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
         self._build_all_extensions_with_cmake()
 
