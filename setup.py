@@ -93,10 +93,14 @@ class CMakeBuild(build_ext):
         """Copy built extensions from temporary folder back into source tree."""
         # This is called by setuptools during editable (-e) install.
         self.get_finalized_command('build_py')
+        print("A" * 1000)
+        print("IN copy_extensions_to_source")
+        print(self._install_prefix.glob("*.so"))
  
         for so_file in self._install_prefix.glob("*.so"):
             assert "libtorchcodec" in so_file.name
             destination = Path("src/torchcodec/") / so_file.name
+            print(f"Copying {so_file} to {destination}")
             self.copy_file(so_file, destination, level=self.verbose)
 
 

@@ -42,7 +42,7 @@ jobs:
 
           # TODO: Need to make sure the wheel only contains torchcodec and not
           # the other folders (tests, docs, etc.)
-          python -m pip install build
+          python -m pip install build -vvv
           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
       - name: Show the .so files in the wheel
         run: |
