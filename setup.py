@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
+from setuptools.command.install_lib import install_lib
 
 """
 Build / install instructions:
@@ -66,7 +67,7 @@ class CMakeBuild(build_ext):
         # where all our extensions are built together at once, so we only need a
         # fake extension to trigger the build.
         assert ext.name == "FAKE_EXTENSION"
-        self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute()
+        self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
         self._build_all_extensions_with_cmake()
 
     def _build_all_extensions_with_cmake(self):
@@ -93,10 +94,7 @@ class CMakeBuild(build_ext):
         """Copy built extensions from temporary folder back into source tree."""
         # This is called by setuptools during editable (-e) install.
         self.get_finalized_command('build_py')
-        print("A" * 1000)
-        print("IN copy_extensions_to_source")
-        print(self._install_prefix.glob("*.so"))
- 
+
         for so_file in self._install_prefix.glob("*.so"):
             assert "libtorchcodec" in so_file.name
             destination = Path("src/torchcodec/") / so_file.name
@@ -105,5 +103,5 @@ class CMakeBuild(build_ext):
 
 
 # See `CMakeBuild.build_extension()`.
-fake_extension = Extension(name="FAKE_EXTENSION", sources=[])
+fake_extension = Extension(name="FAKE_NAME", sources=[])
 setup(ext_modules=[fake_extension], cmdclass={"build_ext": CMakeBuild})
