@@ -61,10 +61,24 @@ class CMakeBuild(build_ext):
         super().run()
 
     def build_extension(self, ext):
-        # Setuptools was designed to build one extension at a time, calling this
-        # method for each Extension object. We're using a CMake-based build
-        # where all our extensions are built together at once, so we only need a
-        # fake extension to trigger the build.
+        """Call our CMake build system to build libtorchcodec?.so"""
+        # Setuptools was designed to build one extension (.so file) at a time,
+        # calling this method for each Extension object. We're using a
+        # CMake-based build where all our extensions are built together at once.
+        # If we were to create one Extension object per .so file as usually
+        # expected, a) we'd have to keep the extensions names in sync with the
+        # CMake targets, and b) we would be calling into CMake for every single
+        # extension (overkill, since CMake builds all the extensions at once).
+        # To avoid all that we create a *single* fake Extension that triggers
+        # the CMake build only once.
+        # The price to pay for that non-standard setup is that we have to tell
+        # setuptools *where* those extensions are expected to be within the
+        # source tree (for sdists or editable installs) or in the wheel.
+        # Normally, setuptools relies on the extension's name to figure that
+        # out, e.g. an extension named `torchcodec.libtorchcodec.so` would be
+        # placed in `torchcodec/` and importable from `torchcoec.`. Our fake
+        # extension's name is just a placeholder, so we have to handle that
+        # 'relocation' logic ourselves - see `install_prefix` below.
         assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
         # install_prefix is a temp directory where the built extension(s) will
         # be "installed" by CMake. Once they're copied to install_prefix, the
@@ -75,6 +89,9 @@ class CMakeBuild(build_ext):
         #   exactly *where* this is handled, but for this to work we must
         #   prepend the "/torchcodec" folder to install_prefix: this tells
         #   setuptools to eventually move those .so files into `torchcodec/`.
+        # It may seem overkill to 'cmake install' the extensions in a temp
+        # directory and move them back to another dir, but this is what
+        # setuptools would do and expect even in a standard build setup.
         self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
         self._build_all_extensions_with_cmake()
 
@@ -101,7 +118,7 @@ class CMakeBuild(build_ext):
     def copy_extensions_to_source(self):
         """Copy built extensions from temporary folder back into source tree.
 
-        This is called by setuptools during editable (-e) install.
+        This is called by setuptools at the end of .run() during editable installs.
         """
         self.get_finalized_command('build_py')
 
