@@ -3,7 +3,7 @@ TorchCodec
 
 Welcome to TorchCodec!
 
-TODO: Write a decent readme. For now I'm just writing basic info for OSS 
+TODO: Write a decent readme. For now I'm just writing basic info for OSS
 development.
 
 
