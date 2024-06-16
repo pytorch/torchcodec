@@ -65,29 +65,31 @@ class CMakeBuild(build_ext):
         # Setuptools was designed to build one extension (.so file) at a time,
         # calling this method for each Extension object. We're using a
         # CMake-based build where all our extensions are built together at once.
-        # If we were to create one Extension object per .so file as usually
-        # expected, a) we'd have to keep the extensions names in sync with the
-        # CMake targets, and b) we would be calling into CMake for every single
-        # extension (overkill, since CMake builds all the extensions at once).
-        # To avoid all that we create a *single* fake Extension that triggers
-        # the CMake build only once.
-        # The price to pay for that non-standard setup is that we have to tell
+        # If we were to declare one Extension object per .so file as in a
+        # standard setup, a) we'd have to keep the Extensions names in sync with
+        # the CMake targets, and b) we would be calling into CMake for every
+        # single extension: that's overkill, since CMake builds all the
+        # extensions at once. To avoid all that we create a *single* fake
+        # Extension which triggers the CMake build only once.
+        assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
+        # The price to pay for our non-standard setup is that we have to tell
         # setuptools *where* those extensions are expected to be within the
-        # source tree (for sdists or editable installs) or in the wheel.
+        # source tree (for sdists or editable installs) or within the wheel.
         # Normally, setuptools relies on the extension's name to figure that
         # out, e.g. an extension named `torchcodec.libtorchcodec.so` would be
-        # placed in `torchcodec/` and importable from `torchcoec.`. Our fake
-        # extension's name is just a placeholder, so we have to handle that
-        # 'relocation' logic ourselves - see `install_prefix` below.
-        assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
-        # install_prefix is a temp directory where the built extension(s) will
-        # be "installed" by CMake. Once they're copied to install_prefix, the
-        # built .so files still need to be copied back into:
+        # placed in `torchcodec/` and importable from `torchcodec.`. From that,
+        # setuptools knows how to move the extensions from their temp build
+        # directories back into the proper dir.
+        # Our fake extension's name is just a placeholder, so we have to handle
+        # that relocation logic ourselves.
+        # _install_prefix is the temp directory where the built extension(s)
+        # will be "installed" by CMake. Once they're copied to install_prefix,
+        # the built .so files still need to be copied back into:
         # - the source tree (for editable installs) - this is handled in
         #   copy_extensions_to_source()
         # - the (temp) wheel directory (when building a wheel). I cannot tell
         #   exactly *where* this is handled, but for this to work we must
-        #   prepend the "/torchcodec" folder to install_prefix: this tells
+        #   prepend the "/torchcodec" folder to _install_prefix: this tells
         #   setuptools to eventually move those .so files into `torchcodec/`.
         # It may seem overkill to 'cmake install' the extensions in a temp
         # directory and move them back to another dir, but this is what
