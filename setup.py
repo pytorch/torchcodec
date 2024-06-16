@@ -94,7 +94,9 @@ class CMakeBuild(build_ext):
         # It may seem overkill to 'cmake install' the extensions in a temp
         # directory and move them back to another dir, but this is what
         # setuptools would do and expect even in a standard build setup.
-        self._install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
+        self._install_prefix = (
+            Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
+        )
         self._build_all_extensions_with_cmake()
 
     def _build_all_extensions_with_cmake(self):
@@ -122,7 +124,7 @@ class CMakeBuild(build_ext):
 
         This is called by setuptools at the end of .run() during editable installs.
         """
-        self.get_finalized_command('build_py')
+        self.get_finalized_command("build_py")
 
         for so_file in self._install_prefix.glob("*.so"):
             assert "libtorchcodec" in so_file.name
