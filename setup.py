@@ -69,9 +69,9 @@ class CMakeBuild(build_ext):
         # If we were to declare one Extension object per .so file as in a
         # standard setup, a) we'd have to keep the Extensions names in sync with
         # the CMake targets, and b) we would be calling into CMake for every
-        # single extension: that's overkill, since CMake builds all the
-        # extensions at once. To avoid all that we create a *single* fake
-        # Extension which triggers the CMake build only once.
+        # single extension: that's overkill and inefficient, since CMake builds
+        # all the extensions at once. To avoid all that we create a *single*
+        # fake Extension which triggers the CMake build only once.
         assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
         # The price to pay for our non-standard setup is that we have to tell
         # setuptools *where* those extensions are expected to be within the
