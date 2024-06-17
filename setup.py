@@ -90,19 +90,19 @@ class CMakeBuild(build_ext):
         return ext_filename
 
 
-I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR = "I_SWEAR_I_KNOW_WHAT_IM_DOING"
+NOT_A_LICENSE_VIOLATION_VAR = "I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION"
 BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR = "BUILD_AGAINST_ALL_FFMPEG_FROM_S3"
-i_swear_i_know_what_im_doing = os.getenv(I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR) is not None
+not_a_license_violation = os.getenv(NOT_A_LICENSE_VIOLATION_VAR) is not None
 build_against_all_ffmpeg_from_s3 = (
     os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
 )
 if "bdist_wheel" in sys.argv and not (
-    build_against_all_ffmpeg_from_s3 or i_swear_i_know_what_im_doing
+    build_against_all_ffmpeg_from_s3 or not_a_license_violation
 ):
     raise ValueError(
         "It looks like you're trying to build a wheel. "
         f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
-        f"If you have a good reason *not* to, then set {I_SWEAR_I_KNOW_WHAT_IM_DOING_VAR}."
+        f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
     )
 
 # If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is set then we want to build against all
