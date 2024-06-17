@@ -41,7 +41,7 @@ jobs:
           .github/scripts/assert_ffmpeg_not_installed.sh
 
           python -m pip install build
-          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . -vvv --no-isolation
       - name: Validate wheel content
         run: |
           source .github/scripts/helpers.sh
@@ -63,7 +63,7 @@ jobs:
           assert_not_in_wheel $wheel_path "^benchmarks"
       - uses: actions/upload-artifact@v4
         with:
-          name: sdist-linux_x86_${{ matrix.python-version }}
+          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
           path: dist/*
 
   install-and-test:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: sdist-linux_x86_${{ matrix.python-version }}
+          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
           path: dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
@@ -94,7 +94,7 @@ jobs:
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install torchcodec from the wheel
         run: |
-          wheel_path=`find dist -type f`
+          wheel_path=`find dist -type f -name "*.whl"`
           echo Installing $wheel_path
           python -m pip install $wheel_path
 
