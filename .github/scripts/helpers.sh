@@ -9,7 +9,7 @@ _list_wheel_files() {
 # If files matching $2 are found in the wheel, the function errors.
 assert_not_in_wheel() {
     wheel_files=$(_list_wheel_files "$1")
-    if grep "$2" <<< "$wheel_files"  &> /dev/null
+    if grep -q "$2" <<< "$wheel_files"
     then
         echo "Found files in $1 that start with $2. Exiting!!"
         exit 1
@@ -19,7 +19,7 @@ assert_not_in_wheel() {
 # See assert_not_in_wheel
 assert_in_wheel() {
     wheel_files=$(_list_wheel_files "$1")
-    if ! grep "$2" <<< "$wheel_files"  &> /dev/null
+    if ! grep -q "$2" <<< "$wheel_files"
     then
         echo "Did not find files in $1 that start with $2. Exiting!!"
         exit 1
