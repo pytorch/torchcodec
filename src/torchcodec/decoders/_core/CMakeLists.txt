@@ -49,7 +49,24 @@ function(make_torchcodec_library library_name ffmpeg_target)
     )
 endfunction()
 
-if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
+if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
+    message(
+        STATUS
+        "Building and dynamically linking libtorchcodec against our pre-built
+        non-GPL FFmpeg libraries. These libraries are only used at build time,
+        you still need a different FFmpeg to be installed for run time!"
+    )
+
+    # This will expose the ffmpeg4, ffmpeg5, ffmpeg6, and ffmpeg7 targets
+    include(
+        ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
+    )
+
+    make_torchcodec_library(libtorchcodec4 ffmpeg4)
+    make_torchcodec_library(libtorchcodec5 ffmpeg5)
+    make_torchcodec_library(libtorchcodec6 ffmpeg6)
+    make_torchcodec_library(libtorchcodec7 ffmpeg7)
+else()
     message(
         STATUS
         "Building and dynamically linking libtorchcodec against the installed
@@ -92,23 +109,4 @@ if(DEFINED ENV{BUILD_AGAINST_INSTALLED_FFMPEG})
     set(libtorchcodec_target_name ${libtorchcodec_target_name} PARENT_SCOPE)
 
     make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
-else()
-    message(
-        STATUS
-        "Building and dynamically linking libtorchcodec against our pre-built
-        non-GPL FFmpeg libraries. These libraries are only used at build time,
-        you still a different need FFmpeg to be installed for run time!"
-    )
-
-    # This will expose the ffmpeg4, ffmpeg5, ffmpeg6, and ffmpeg7 targets
-    include(
-        ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
-    )
-
-    # The libtorchcodec names here must be kept in sync with the library names
-    # in setup.py. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ]
-    make_torchcodec_library(libtorchcodec4 ffmpeg4)
-    make_torchcodec_library(libtorchcodec5 ffmpeg5)
-    make_torchcodec_library(libtorchcodec6 ffmpeg6)
-    make_torchcodec_library(libtorchcodec7 ffmpeg7)
 endif()

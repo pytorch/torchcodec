@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+
+include CMakeLists.txt
+recursive-include src *
+
+recursive-exclude * __pycache__
+recursive-exclude src *.py[co]
+recursive-exclude src *.so

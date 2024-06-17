@@ -1,11 +1,3 @@
-import os
-import subprocess
-from pathlib import Path
-
-import torch
-from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext
-
 """
 Build / install instructions:
 
@@ -43,11 +35,25 @@ the package within the current virtual env, where torch would have already been
 installed.
 """
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import torch
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
+
 
 _ROOT_DIR = Path(__file__).parent.resolve()
 
 
 class CMakeBuild(build_ext):
+
+    def __init__(self, *args, **kwargs):
+        self._install_prefix = None
+        super().__init__(*args, **kwargs)
+
     def run(self):
         try:
             subprocess.check_output(["cmake", "--version"])
@@ -56,13 +62,51 @@ class CMakeBuild(build_ext):
         super().run()
 
     def build_extension(self, ext):
-        install_prefix = Path(self.get_ext_fullpath(ext.name)).parent.absolute()
+        """Call our CMake build system to build libtorchcodec?.so"""
+        # Setuptools was designed to build one extension (.so file) at a time,
+        # calling this method for each Extension object. We're using a
+        # CMake-based build where all our extensions are built together at once.
+        # If we were to declare one Extension object per .so file as in a
+        # standard setup, a) we'd have to keep the Extensions names in sync with
+        # the CMake targets, and b) we would be calling into CMake for every
+        # single extension: that's overkill and inefficient, since CMake builds
+        # all the extensions at once. To avoid all that we create a *single*
+        # fake Extension which triggers the CMake build only once.
+        assert ext.name == "FAKE_NAME", f"Unexpected extension name: {ext.name}"
+        # The price to pay for our non-standard setup is that we have to tell
+        # setuptools *where* those extensions are expected to be within the
+        # source tree (for sdists or editable installs) or within the wheel.
+        # Normally, setuptools relies on the extension's name to figure that
+        # out, e.g. an extension named `torchcodec.libtorchcodec.so` would be
+        # placed in `torchcodec/` and importable from `torchcodec.`. From that,
+        # setuptools knows how to move the extensions from their temp build
+        # directories back into the proper dir.
+        # Our fake extension's name is just a placeholder, so we have to handle
+        # that relocation logic ourselves.
+        # _install_prefix is the temp directory where the built extension(s)
+        # will be "installed" by CMake. Once they're copied to install_prefix,
+        # the built .so files still need to be copied back into:
+        # - the source tree (for editable installs) - this is handled in
+        #   copy_extensions_to_source()
+        # - the (temp) wheel directory (when building a wheel). I cannot tell
+        #   exactly *where* this is handled, but for this to work we must
+        #   prepend the "/torchcodec" folder to _install_prefix: this tells
+        #   setuptools to eventually move those .so files into `torchcodec/`.
+        # It may seem overkill to 'cmake install' the extensions in a temp
+        # directory and move them back to another dir, but this is what
+        # setuptools would do and expect even in a standard build setup.
+        self._install_prefix = (
+            Path(self.get_ext_fullpath(ext.name)).parent.absolute() / "torchcodec"
+        )
+        self._build_all_extensions_with_cmake()
+
+    def _build_all_extensions_with_cmake(self):
         # Note that self.debug is True when you invoke setup.py like this:
         # python setup.py build_ext --debug install
         build_type = "Debug" if self.debug else "Release"
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_args = [
-            f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
+            f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
             f"-DCMAKE_BUILD_TYPE={build_type}",
@@ -76,53 +120,35 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", "--build", "."], cwd=self.build_temp)
         subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
 
-    def get_ext_filename(self, fullname):
-        # When copying the .so files from the build tmp dir to the actual
-        # package dir, this tells setuptools to look for a .so file without the
-        # Python ABI suffix, i.e. "libtorchcodec4.so" instead of e.g.
-        # "libtorchcodec4.cpython-38-x86_64-linux-gnu.so", which is what
-        # setuptools looks for by default.
-        ext_filename = super().get_ext_filename(fullname)
-        ext_filename_parts = ext_filename.split(".")
-        without_abi = ext_filename_parts[:-2] + ext_filename_parts[-1:]
-        ext_filename = ".".join(without_abi)
-        return ext_filename
+    def copy_extensions_to_source(self):
+        """Copy built extensions from temporary folder back into source tree.
+
+        This is called by setuptools at the end of .run() during editable installs.
+        """
+        self.get_finalized_command("build_py")
+
+        for so_file in self._install_prefix.glob("*.so"):
+            assert "libtorchcodec" in so_file.name
+            destination = Path("src/torchcodec/") / so_file.name
+            print(f"Copying {so_file} to {destination}")
+            self.copy_file(so_file, destination, level=self.verbose)
 
 
-if os.getenv("BUILD_AGAINST_INSTALLED_FFMPEG") is None:
-    # If BUILD_AGAINST_INSTALLED_FFMPEG is not set then we want to build against
-    # all ffmpeg major version that are available on our S3 bucket.
-    FFMPEG_MAJOR_VERSIONS = (4, 5, 6, 7)
-else:
-    # If BUILD_AGAINST_INSTALLED_FFMPEG is set, we only build against the
-    # installed FFmpeg. We need to figure out the major ffmpeg version from
-    # pkg-config.
-    pkg_config_output = subprocess.check_output(["pkg-config", "--modversion", "libavcodec"]).decode("utf-8")
-    libavcodec_major_version = int(pkg_config_output.split(".")[0])
-    ffmpeg_major_version = {
-        58: 4,
-        59: 5,
-        60: 6,
-        61: 7,
-    }[libavcodec_major_version]
-    FFMPEG_MAJOR_VERSIONS = (ffmpeg_major_version,)
-
-extensions = [
-    Extension(
-        # The names here must be kept in sync with the target names in the
-        # CMakeLists file. Grep for [ LIBTORCHCODEC_KEEP_IN_SYNC ].  The name
-        # parameter specifies not just the name but mainly *where* the .so file
-        # should be copied to. By setting the name this way, we're telling
-        # `libtorchcodec{ffmpeg_major_version}.so` to be copied at the root of
-        # the torchcodec package (next to the __init__.py file). This is where
-        # it's expected to be when we call torch.ops.load_library().
-        name=f"torchcodec.libtorchcodec{ffmpeg_major_version}",
-        # sources is a mandatory parameter so we have to pass it, but we leave
-        # it empty because we'll be building the extensions with our custom
-        # CMakeBuild class, and the sources are specified within the
-        # CMakeLists.txt file.
-        sources=[],
+NOT_A_LICENSE_VIOLATION_VAR = "I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION"
+BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR = "BUILD_AGAINST_ALL_FFMPEG_FROM_S3"
+not_a_license_violation = os.getenv(NOT_A_LICENSE_VIOLATION_VAR) is not None
+build_against_all_ffmpeg_from_s3 = (
+    os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
+)
+if "bdist_wheel" in sys.argv and not (
+    build_against_all_ffmpeg_from_s3 or not_a_license_violation
+):
+    raise ValueError(
+        "It looks like you're trying to build a wheel. "
+        f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
+        f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
     )
-    for ffmpeg_major_version in FFMPEG_MAJOR_VERSIONS
-]
-setup(ext_modules=extensions, cmdclass={"build_ext": CMakeBuild})
+
+# See `CMakeBuild.build_extension()`.
+fake_extension = Extension(name="FAKE_NAME", sources=[])
+setup(ext_modules=[fake_extension], cmdclass={"build_ext": CMakeBuild})

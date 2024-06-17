@@ -10,8 +10,6 @@ import numpy as np
 import pytest
 
 import torch
-import torchvision.transforms as transforms
-from PIL import Image
 
 from torchcodec.decoders._core import (
     add_video_stream,
