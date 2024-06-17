@@ -45,7 +45,7 @@ jobs:
       - name: Validate wheel content
         run: |
           source .github/scripts/helpers.sh
-          wheel_path=`find dist -type f`
+          wheel_path=`find dist -type f -name "*.whl"`
           echo "Wheel content:"
           unzip -l $wheel_path
 
