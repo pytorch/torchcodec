@@ -96,7 +96,7 @@ jobs:
         run: |
           wheel_path=`find dist -type f -name "*.whl"`
           echo Installing $wheel_path
-          python -m pip install $wheel_path
+          python -m pip install $wheel_path -vvv
 
       - name: Check out repo
         uses: actions/checkout@v3
