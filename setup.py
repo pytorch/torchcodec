@@ -1,11 +1,3 @@
-import os
-import subprocess
-from pathlib import Path
-
-import torch
-from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext
-
 """
 Build / install instructions:
 
@@ -42,6 +34,15 @@ found. That's why we're passing `--no-build-isolation`: this tells pip to build
 the package within the current virtual env, where torch would have already been
 installed.
 """
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import torch
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 
 _ROOT_DIR = Path(__file__).parent.resolve()
@@ -132,6 +133,21 @@ class CMakeBuild(build_ext):
             print(f"Copying {so_file} to {destination}")
             self.copy_file(so_file, destination, level=self.verbose)
 
+
+NOT_A_LICENSE_VIOLATION_VAR = "I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION"
+BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR = "BUILD_AGAINST_ALL_FFMPEG_FROM_S3"
+not_a_license_violation = os.getenv(NOT_A_LICENSE_VIOLATION_VAR) is not None
+build_against_all_ffmpeg_from_s3 = (
+    os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
+)
+if "bdist_wheel" in sys.argv and not (
+    build_against_all_ffmpeg_from_s3 or not_a_license_violation
+):
+    raise ValueError(
+        "It looks like you're trying to build a wheel. "
+        f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
+        f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
+    )
 
 # See `CMakeBuild.build_extension()`.
 fake_extension = Extension(name="FAKE_NAME", sources=[])
