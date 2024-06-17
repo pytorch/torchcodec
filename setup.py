@@ -1,12 +1,3 @@
-import os
-import subprocess
-import sys
-from pathlib import Path
-
-import torch
-from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext
-
 """
 Build / install instructions:
 
@@ -43,6 +34,15 @@ found. That's why we're passing `--no-build-isolation`: this tells pip to build
 the package within the current virtual env, where torch would have already been
 installed.
 """
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import torch
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 
 _ROOT_DIR = Path(__file__).parent.resolve()

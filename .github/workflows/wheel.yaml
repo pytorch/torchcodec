@@ -43,15 +43,15 @@ jobs:
           # TODO: Need to make sure the wheel only contains torchcodec and not
           # the other folders (tests, docs, etc.)
           python -m pip install build
-          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . --wheel -vvv --no-isolation
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . -vvv --no-isolation
       - name: Show the .so files in the wheel
         run: |
           # This should show libtorchcodec4.so, libtorchcodec5.so, etc.
-          wheel_path=`find dist -type f`
+          wheel_path=`find dist -type f -name "*.whl"`
           unzip -l $wheel_path | grep .so
       - uses: actions/upload-artifact@v4
         with:
-          name: sdist-linux_x86_${{ matrix.python-version }}
+          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
           path: dist/*
 
   install-and-test:
@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: sdist-linux_x86_${{ matrix.python-version }}
+          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
           path: dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
@@ -82,7 +82,7 @@ jobs:
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install torchcodec from the wheel
         run: |
-          wheel_path=`find dist -type f`
+          wheel_path=`find dist -type f -name "*.whl"`
           echo Installing $wheel_path
           python -m pip install $wheel_path
 
