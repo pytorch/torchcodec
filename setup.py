@@ -37,6 +37,7 @@ installed.
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import torch
@@ -89,15 +90,28 @@ class CMakeBuild(build_ext):
         return ext_filename
 
 
+NOT_A_LICENSE_VIOLATION_VAR = "I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION"
+BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR = "BUILD_AGAINST_ALL_FFMPEG_FROM_S3"
+not_a_license_violation = os.getenv(NOT_A_LICENSE_VIOLATION_VAR) is not None
+build_against_all_ffmpeg_from_s3 = (
+    os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
+)
+if "bdist_wheel" in sys.argv and not (
+    build_against_all_ffmpeg_from_s3 or not_a_license_violation
+):
+    raise ValueError(
+        "It looks like you're trying to build a wheel. "
+        f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
+        f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
+    )
+
 # If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is set then we want to build against all
 # ffmpeg major version that are available on our S3 bucket.
 # If BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is not set, we only build against the
 # installed FFmpeg. We don't know what FFmpeg version that is, so we build
 # `libtorchcodec.so` without any version suffix. We could probably figure out
 # the version number by invoking `pkg-config --modversion`.
-FFMPEG_MAJOR_VERSIONS = (
-    (4, 5, 6, 7) if os.getenv("BUILD_AGAINST_ALL_FFMPEG_FROM_S3") is not None else ("",)
-)
+FFMPEG_MAJOR_VERSIONS = (4, 5, 6, 7) if build_against_all_ffmpeg_from_s3 else ("",)
 extensions = [
     Extension(
         # The names here must be kept in sync with the target names in the
