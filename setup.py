@@ -1,7 +1,7 @@
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import torch
 from setuptools import Extension, setup
