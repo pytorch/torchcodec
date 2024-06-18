@@ -62,10 +62,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
-#ifdef FBCODE_BUILD
-  // TODO: Investigate why this is broken with ffmpeg=6.
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
-#endif
   EXPECT_EQ(metadata.streams.size(), 6);
   const auto& videoStream = metadata.streams[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
