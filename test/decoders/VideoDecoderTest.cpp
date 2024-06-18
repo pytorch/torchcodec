@@ -24,13 +24,12 @@ namespace facebook::torchcodec {
 
 std::string getResourcePath(const std::string& filename) {
 #ifdef FBCODE_BUILD
-  std::string filepath =
-      "pytorch/torchcodec/test/decoders/resources/" + filename;
+  std::string filepath = "pytorch/torchcodec/test/resources/" + filename;
   filepath = build::getResourcePath(filepath).string();
 #else
   std::filesystem::path dirPath = std::filesystem::path(__FILE__);
   std::string filepath =
-      dirPath.parent_path().string() + "/resources/" + filename;
+      dirPath.parent_path().string() + "/../resources/" + filename;
 #endif
   return filepath;
 }

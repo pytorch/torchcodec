@@ -1,9 +1,7 @@
 import os
 
 os.environ["TORCH_LOGS"] = "output_code"
-import importlib
 import json
-import pathlib
 from typing import Tuple
 
 import numpy as np
@@ -24,42 +22,14 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
+from ..test_utils import (
+    assert_equal,
+    get_reference_audio_path,
+    get_reference_video_path,
+    load_tensor_from_file,
+)
+
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
-IN_FBCODE = os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
-
-
-# TODO: Eventually move that as a common test util
-def assert_equal(*args, **kwargs):
-    torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
-
-
-# TODO: Eventually move that as a common test util
-def get_video_path(filename: str) -> pathlib.Path:
-    if IN_FBCODE:
-        resource = (
-            importlib.resources.files(__package__)
-            .joinpath("resources")
-            .joinpath(filename)
-        )
-        with importlib.resources.as_file(resource) as path:
-            return path
-    else:
-        return pathlib.Path(__file__).parent / "resources" / filename
-
-
-# TODO: make this a fixture or wrap with @functools.lru_cache to avoid
-# re-computing?
-def load_tensor_from_file(filename: str) -> torch.Tensor:
-    file_path = get_video_path(filename)
-    return torch.load(file_path)
-
-
-def get_reference_video_path() -> pathlib.Path:
-    return get_video_path("nasa_13013.mp4")
-
-
-def get_reference_audio_path() -> pathlib.Path:
-    return get_video_path("nasa_13013.mp4.audio.mp3")
 
 
 class ReferenceDecoder:
