@@ -114,7 +114,7 @@ def get_frame_at_pts_abstract(decoder: torch.Tensor, seconds: float) -> torch.Te
 
 @register_fake("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
-    decoder: torch.Tensor, *, frame_index: int, stream_index: Optional[int] = None
+    decoder: torch.Tensor, *, frame_index: int, stream_index: int
 ) -> torch.Tensor:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
     return torch.empty(image_size)
@@ -125,7 +125,7 @@ def get_frames_at_indices_abstract(
     decoder: torch.Tensor,
     *,
     frame_indices: List[int],
-    stream_index: Optional[int] = None,
+    stream_index: int,
 ) -> torch.Tensor:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return torch.empty(image_size)
