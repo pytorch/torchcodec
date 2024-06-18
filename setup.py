@@ -103,13 +103,13 @@ class CMakeBuild(build_ext):
     def _build_all_extensions_with_cmake(self):
         # Note that self.debug is True when you invoke setup.py like this:
         # python setup.py build_ext --debug install
-        build_type = "Debug" if self.debug else "Release"
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
+        cmake_build_type = os.environ.get("CMAKE_BUILD_TYPE", "Release")
         cmake_args = [
             f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
-            f"-DCMAKE_BUILD_TYPE={build_type}",
+            f"-DCMAKE_BUILD_TYPE={cmake_build_type}",
         ]
 
         Path(self.build_temp).mkdir(parents=True, exist_ok=True)
