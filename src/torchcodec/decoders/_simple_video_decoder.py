@@ -2,6 +2,7 @@ import json
 from typing import Union
 
 import torch
+
 from torchcodec.decoders import _core as core
 
 
