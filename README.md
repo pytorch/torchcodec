@@ -53,4 +53,9 @@ make html
 
 The built docs will be in `build/html`. Open in your browser to view them.
 
+To avoid building the examples (which execute python code and can take time) you
+can use `make html-noplot`. To build a subset of specific examples instead of
+all of them, you can use a regex like `EXAMPLES_PATTERN="plot_the_best_example*"
+make html`.
+
 Run `make clean` from time to time if you encounter issues.

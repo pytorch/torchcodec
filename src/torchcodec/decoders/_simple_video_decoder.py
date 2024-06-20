@@ -6,6 +6,7 @@ from torchcodec.decoders import _core as core
 
 
 class SimpleVideoDecoder:
+    """TODO: Add docstring."""
 
     def __init__(self, source: Union[str, bytes, torch.Tensor]):
         # TODO: support Path objects.
