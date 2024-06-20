@@ -94,7 +94,7 @@ def add_video_stream_abstract(
 
 
 @register_fake("torchcodec_ns::seek_to_pts")
-def seek_abstract(decoder: torch.Tensor, seconds: float) -> torch.Tensor:
+def seek_abstract(decoder: torch.Tensor, seconds: float) -> None:
     return
 
 
