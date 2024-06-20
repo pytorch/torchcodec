@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 import torch.utils.benchmark as benchmark
-from torchcodec.samplers import (
+from torchcodec.samplers._video_clip_sampler import (
     IndexBasedSamplerArgs,
     TimeBasedSamplerArgs,
     VideoArgs,
