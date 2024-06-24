@@ -71,11 +71,11 @@ class SimpleVideoMetadata:
 
     @property
     def duration_seconds(self) -> Optional[float]:
-        return self.stream.duration_seconds
+        return self.stream.duration_seconds or self.container.duration_seconds
 
     @property
     def bit_rate(self) -> Optional[float]:
-        return self.stream.bit_rate
+        return self.stream.bit_rate or self.container.bit_rate
 
 
 def _get_and_validate_simple_video_metadata(
