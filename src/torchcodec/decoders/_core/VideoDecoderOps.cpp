@@ -40,6 +40,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frame_at_index(Tensor(a!) decoder, *, int frame_index, int stream_index) -> Tensor");
   m.def(
       "get_frames_at_indices(Tensor(a!) decoder, *, int[] frame_indices, int stream_index) -> Tensor");
+  m.def(
+      "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
 }
 
@@ -148,6 +150,18 @@ at::Tensor get_frames_at_indices(
   return result.frames;
 }
 
+at::Tensor get_frames_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t start,
+    int64_t stop,
+    std::optional<int64_t> step = std::nullopt) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
+  auto result = videoDecoder->getFramesInRange(
+      stream_index, start, stop, step.value_or(1));
+  return result.frames;
+}
+
 std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
@@ -249,6 +263,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
+  m.impl("get_frames_in_range", &get_frames_in_range);
 }
 
 } // namespace facebook::torchcodec

@@ -17,6 +17,7 @@ from torchcodec.decoders._core import (
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
+    get_frames_in_range,
     get_json_metadata,
     get_next_frame,
     seek_to_pts,
@@ -102,6 +103,64 @@ class TestOps:
         reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frames1and6[0], reference_frame1)
         assert_equal(frames1and6[1], reference_frame6)
+
+    def test_get_frames_in_range(self):
+        decoder = create_from_file(str(get_reference_video_path()))
+        add_video_stream(decoder)
+
+        ref_frames0_9 = [
+            load_tensor_from_file(f"nasa_13013.mp4.frame{i + 1:06d}.pt")
+            for i in range(0, 9)
+        ]
+        ref_frame180 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
+        ref_frame_last = load_tensor_from_file("nasa_13013.mp4.time12.979633.pt")
+
+        # ensure that the degenerate case of a range of size 1 works
+        bulk_frame0 = get_frames_in_range(decoder, stream_index=3, start=0, stop=1)
+        assert_equal(bulk_frame0[0], ref_frames0_9[0])
+
+        bulk_frame1 = get_frames_in_range(decoder, stream_index=3, start=1, stop=2)
+        assert_equal(bulk_frame1[0], ref_frames0_9[1])
+
+        bulk_frame180 = get_frames_in_range(
+            decoder, stream_index=3, start=180, stop=181
+        )
+        assert_equal(bulk_frame180[0], ref_frame180)
+
+        bulk_frame_last = get_frames_in_range(
+            decoder, stream_index=3, start=389, stop=390
+        )
+        assert_equal(bulk_frame_last[0], ref_frame_last)
+
+        # contiguous ranges
+        bulk_frames0_9 = get_frames_in_range(decoder, stream_index=3, start=0, stop=9)
+        for i in range(0, 9):
+            assert_equal(ref_frames0_9[i], bulk_frames0_9[i])
+
+        bulk_frames4_8 = get_frames_in_range(decoder, stream_index=3, start=4, stop=8)
+        for i, bulk_frame in enumerate(bulk_frames4_8):
+            assert_equal(ref_frames0_9[i + 4], bulk_frame)
+
+        # ranges with a stride
+        ref_frames15_35 = [
+            load_tensor_from_file(f"nasa_13013.mp4.frame{i:06d}.pt")
+            for i in range(15, 36, 5)
+        ]
+        bulk_frames15_35 = get_frames_in_range(
+            decoder, stream_index=3, start=15, stop=36, step=5
+        )
+        for i, bulk_frame in enumerate(bulk_frames15_35):
+            assert_equal(ref_frames15_35[i], bulk_frame)
+
+        bulk_frames0_9_2 = get_frames_in_range(
+            decoder, stream_index=3, start=0, stop=9, step=2
+        )
+        for i, bulk_frame in enumerate(bulk_frames0_9_2):
+            assert_equal(ref_frames0_9[i * 2], bulk_frame)
+
+        # an empty range is valid!
+        empty_frame = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
+        assert_equal(empty_frame, torch.empty((0, 270, 480, 3), dtype=torch.uint8))
 
     def test_throws_exception_at_eof(self):
         decoder = create_from_file(str(get_reference_video_path()))

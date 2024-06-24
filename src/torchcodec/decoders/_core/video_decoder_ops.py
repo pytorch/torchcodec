@@ -57,6 +57,7 @@ get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
+get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 
 
@@ -126,6 +127,19 @@ def get_frames_at_indices_abstract(
     *,
     frame_indices: List[int],
     stream_index: int,
+) -> torch.Tensor:
+    image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
+    return torch.empty(image_size)
+
+
+@register_fake("torchcodec_ns::get_frames_in_range")
+def get_frames_in_range_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    start: int,
+    stop: int,
+    step: Optional[int] = None,
 ) -> torch.Tensor:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return torch.empty(image_size)

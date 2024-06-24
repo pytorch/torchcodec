@@ -183,6 +183,13 @@ class VideoDecoder {
   BatchDecodedOutput getFramesAtIndexes(
       int streamIndex,
       const std::vector<int64_t>& frameIndexes);
+  // Returns frames within a given range for a given stream as a single stacked
+  // Tensor. The range is defined by [start, stop). The values retrieved from
+  // the range are:
+  //    [start, start+step, start+(2*step), start+(3*step), ..., stop)
+  // The default for step is 1.
+  BatchDecodedOutput
+  getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
@@ -273,6 +280,10 @@ class VideoDecoder {
   DecodedOutput convertAVFrameToDecodedOutput(
       int streamIndex,
       UniqueAVFrame frame);
+  torch::Tensor getEmptyTensorForBatch(
+      int64_t numFrames,
+      const VideoStreamDecoderOptions& options,
+      const StreamMetadata& metadata);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
