@@ -12,14 +12,6 @@ namespace facebook::torchcodec {
 // Define the operators
 // ==============================
 
-torch::Tensor plus_one(torch::Tensor t) {
-  return t + 1;
-}
-
-TORCH_LIBRARY(plusoneops, m) {
-  m.def("plus_one", plus_one);
-}
-
 // All instances of accepting the decoder as a tensor must be annotated with
 // `Tensor(a!)`. The `(a!)` part normally indicates that the tensor is being
 // mutated in place. We need it to make sure that torch.compile does not reorder
