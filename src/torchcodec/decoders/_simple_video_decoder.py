@@ -1,7 +1,8 @@
-import json
-from typing import Union
+from dataclasses import dataclass
+from typing import Optional, Union
 
 import torch
+
 from torchcodec.decoders import _core as core
 
 
@@ -24,12 +25,10 @@ class SimpleVideoDecoder:
 
         core.add_video_stream(self._decoder)
 
-        # TODO: We should either implement specific core library function to
-        # retrieve these values, or replace this with a non-JSON metadata
-        # retrieval.
-        metadata_json = json.loads(core.get_json_metadata(self._decoder))
-        self._num_frames = metadata_json["numFrames"]
-        self._stream_index = metadata_json["bestVideoStreamIndex"]
+        self.metadata = _get_and_validate_simple_video_metadata(self._decoder)
+        # Note: these fields exist and are not None, as validated in _get_and_validate_simple_video_metadata().
+        self._num_frames = self.metadata.stream.num_frames_computed
+        self._stream_index = self.metadata.container.best_video_stream_index
 
     def __len__(self) -> int:
         return self._num_frames
@@ -61,3 +60,42 @@ class SimpleVideoDecoder:
             return core.get_next_frame(self._decoder)
         except RuntimeError:
             raise StopIteration()
+
+
+@dataclass
+class SimpleVideoMetadata:
+    # TODO: ContainerMetadata and StreamMetadata should be publicly available.
+    # Right now they're only exposed in _core.
+    container: core.ContainerMetadata
+    stream: core.StreamMetadata
+
+    # TODO: is the return really supposed to be Optional
+    @property
+    def duration_seconds(self) -> Optional[float]:
+        return self.stream.duration_seconds
+
+    @property
+    def bit_rate(self) -> Optional[float]:
+        return self.stream.bit_rate
+
+
+def _get_and_validate_simple_video_metadata(
+    decoder: torch.Tensor,
+) -> SimpleVideoMetadata:
+    video_metadata = core.get_video_metadata(decoder)
+    container_metadata = video_metadata.container
+
+    if container_metadata.best_video_stream_index is None:
+        raise ValueError(
+            "The best video stream is unknown. This should never happen. "
+            "Please report an issue following the steps on <TODO>"
+        )
+
+    stream_metadata = video_metadata.streams[container_metadata.best_video_stream_index]
+    if stream_metadata.num_frames_computed is None:
+        raise ValueError(
+            "The number of frames is unknown. This should never happen. "
+            "Please report an issue following the steps on <TODO>"
+        )
+
+    return SimpleVideoMetadata(container=container_metadata, stream=stream_metadata)

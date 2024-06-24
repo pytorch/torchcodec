@@ -60,4 +60,10 @@ at::Tensor get_next_frame(at::Tensor& decoder);
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 
+// Get the container metadata as a string.
+std::string get_container_json_metadata(at::Tensor& decoder);
+
+// Get the stream metadata as a string.
+std::string get_stream_json_metadata(at::Tensor& decoder);
+
 } // namespace facebook::torchcodec

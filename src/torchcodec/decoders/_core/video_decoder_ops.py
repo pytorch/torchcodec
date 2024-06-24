@@ -58,6 +58,10 @@ get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
+_get_container_json_metadata = (
+    torch.ops.torchcodec_ns.get_container_json_metadata.default
+)
+_get_stream_json_metadata = torch.ops.torchcodec_ns.get_stream_json_metadata.default
 
 
 # =============================
@@ -133,4 +137,14 @@ def get_frames_at_indices_abstract(
 
 @register_fake("torchcodec_ns::get_json_metadata")
 def get_json_metadata_abstract(decoder: torch.Tensor) -> str:
+    return torch.empty_like("")
+
+
+@register_fake("torchcodec_ns::get_container_json_metadata")
+def get_container_json_metadata_abstract(decoder: torch.Tensor) -> str:
+    return torch.empty_like("")
+
+
+@register_fake("torchcodec_ns::get_stream_json_metadata")
+def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> str:
     return torch.empty_like("")

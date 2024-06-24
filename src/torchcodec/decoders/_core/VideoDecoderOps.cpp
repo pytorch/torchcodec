@@ -11,15 +11,6 @@ namespace facebook::torchcodec {
 // ==============================
 // Define the operators
 // ==============================
-
-torch::Tensor plus_one(torch::Tensor t) {
-  return t + 1;
-}
-
-TORCH_LIBRARY(plusoneops, m) {
-  m.def("plus_one", plus_one);
-}
-
 // All instances of accepting the decoder as a tensor must be annotated with
 // `Tensor(a!)`. The `(a!)` part normally indicates that the tensor is being
 // mutated in place. We need it to make sure that torch.compile does not reorder
@@ -41,6 +32,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frames_at_indices(Tensor(a!) decoder, *, int[] frame_indices, int stream_index) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
+  m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
+  m.def("get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
 }
 
 // ==============================
@@ -152,6 +145,25 @@ std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
 
+std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
+
+  std::stringstream ss;
+  ss << "{\n";
+  auto it = metadataMap.begin();
+  while (it != metadataMap.end()) {
+    ss << "\"" << it->first << "\": " << it->second;
+    ++it;
+    if (it != metadataMap.end()) {
+      ss << ",\n";
+    } else {
+      ss << "\n";
+    }
+  }
+  ss << "}";
+
+  return ss.str();
+}
+
 std::string get_json_metadata(at::Tensor& decoder) {
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
 
@@ -219,22 +231,86 @@ std::string get_json_metadata(at::Tensor& decoder) {
         std::to_string(*videoMetadata.bestAudioStreamIndex);
   }
 
-  std::stringstream ss;
-  ss << "{\n";
-  auto it = metadataMap.begin();
-  while (it != metadataMap.end()) {
-    ss << "\"" << it->first << "\": " << it->second;
-    ++it;
-    if (it != metadataMap.end()) {
-      ss << ",\n";
-    } else {
-      ss << "\n";
-    }
-  }
-  ss << "}";
-
-  return ss.str();
+  return mapToJson(metadataMap);
 }
+
+std::string get_container_json_metadata(at::Tensor &decoder) {
+  auto videoDecoder = static_cast<VideoDecoder *>(decoder.mutable_data_ptr());
+
+  auto containerMetadata = videoDecoder->getContainerMetadata();
+
+  std::map<std::string, std::string> map;
+
+  if (containerMetadata.durationSeconds.has_value()) {
+    map["durationSeconds"] = std::to_string(*containerMetadata.durationSeconds);
+  }
+
+  if (containerMetadata.bitRate.has_value()) {
+    map["bitRate"] = std::to_string(*containerMetadata.bitRate);
+  }
+
+  if (containerMetadata.bestVideoStreamIndex.has_value()) {
+    map["bestVideoStreamIndex"] =
+        std::to_string(*containerMetadata.bestVideoStreamIndex);
+  }
+  if (containerMetadata.bestAudioStreamIndex.has_value()) {
+    map["bestAudioStreamIndex"] =
+        std::to_string(*containerMetadata.bestAudioStreamIndex);
+  }
+
+  // TODO: Q from Nicolas - is there a better way to retrieve and propagate the
+  // number of streams?
+  map["numStreams"] = std::to_string(containerMetadata.streams.size());
+
+  return mapToJson(map);
+}
+
+
+std::string get_stream_json_metadata(at::Tensor &decoder,
+                                     int64_t stream_index) {
+  auto videoDecoder = static_cast<VideoDecoder *>(decoder.mutable_data_ptr());
+  auto streamMetadata =
+      videoDecoder->getContainerMetadata().streams[stream_index];
+
+  std::map<std::string, std::string> map;
+
+  if (streamMetadata.durationSeconds.has_value()) {
+    map["durationSeconds"] = std::to_string(*streamMetadata.durationSeconds);
+  }
+  if (streamMetadata.bitRate.has_value()) {
+    map["bitRate"] = std::to_string(*streamMetadata.bitRate);
+  }
+  if (streamMetadata.numFramesFromScan.has_value()) {
+    map["numFramesFromScan"] =
+        std::to_string(*streamMetadata.numFramesFromScan);
+  }
+  if (streamMetadata.numFrames.has_value()) {
+    map["numFrames"] = std::to_string(*streamMetadata.numFrames);
+  }
+  if (streamMetadata.minPtsSecondsFromScan.has_value()) {
+    map["minPtsSecondsFromScan"] =
+        std::to_string(*streamMetadata.minPtsSecondsFromScan);
+  }
+  if (streamMetadata.maxPtsSecondsFromScan.has_value()) {
+    map["maxPtsSecondsFromScan"] =
+        std::to_string(*streamMetadata.maxPtsSecondsFromScan);
+  }
+  if (streamMetadata.codecName.has_value()) {
+    map["codec"] = quoteValue(streamMetadata.codecName.value());
+  }
+  if (streamMetadata.width.has_value()) {
+    map["width"] = std::to_string(*streamMetadata.width);
+  }
+  if (streamMetadata.height.has_value()) {
+    map["height"] = std::to_string(*streamMetadata.height);
+  }
+  if (streamMetadata.averageFps.has_value()) {
+    map["averageFps"] = std::to_string(*streamMetadata.averageFps);
+  }
+  return mapToJson(map);
+}
+
+
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
@@ -246,6 +322,8 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("add_video_stream", &add_video_stream);
   m.impl("get_next_frame", &get_next_frame);
   m.impl("get_json_metadata", &get_json_metadata);
+  m.impl("get_container_json_metadata", &get_container_json_metadata);
+  m.impl("get_stream_json_metadata", &get_stream_json_metadata);
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);

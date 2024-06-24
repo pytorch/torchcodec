@@ -3,3 +3,10 @@
 # TODO: Don't use import *
 
 from .video_decoder_ops import *  # noqa
+
+from ._metadata import (
+    ContainerMetadata,
+    get_video_metadata,
+    StreamMetadata,
+    VideoMetadata,
+)
