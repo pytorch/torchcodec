@@ -69,7 +69,6 @@ class SimpleVideoMetadata:
     container: core.ContainerMetadata
     stream: core.StreamMetadata
 
-    # TODO: is the return really supposed to be Optional
     @property
     def duration_seconds(self) -> Optional[float]:
         return self.stream.duration_seconds
@@ -88,14 +87,14 @@ def _get_and_validate_simple_video_metadata(
     if container_metadata.best_video_stream_index is None:
         raise ValueError(
             "The best video stream is unknown. This should never happen. "
-            "Please report an issue following the steps on <TODO>"
+            "Please report an issue following the steps in <TODO>"
         )
 
     stream_metadata = video_metadata.streams[container_metadata.best_video_stream_index]
     if stream_metadata.num_frames_computed is None:
         raise ValueError(
             "The number of frames is unknown. This should never happen. "
-            "Please report an issue following the steps on <TODO>"
+            "Please report an issue following the steps in <TODO>"
         )
 
     return SimpleVideoMetadata(container=container_metadata, stream=stream_metadata)

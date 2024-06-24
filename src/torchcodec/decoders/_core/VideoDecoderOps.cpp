@@ -265,7 +265,6 @@ std::string get_container_json_metadata(at::Tensor &decoder) {
   return mapToJson(map);
 }
 
-
 std::string get_stream_json_metadata(at::Tensor &decoder,
                                      int64_t stream_index) {
   auto videoDecoder = static_cast<VideoDecoder *>(decoder.mutable_data_ptr());
@@ -309,8 +308,6 @@ std::string get_stream_json_metadata(at::Tensor &decoder,
   }
   return mapToJson(map);
 }
-
-
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
