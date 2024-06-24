@@ -85,11 +85,11 @@ class TestOps:
     def test_get_frame_at_index(self):
         decoder = create_from_file(str(get_reference_video_path()))
         add_video_stream(decoder)
-        frame1 = get_frame_at_index(decoder, frame_index=0, stream_index=3)
+        frame1 = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
         assert_equal(frame1, reference_frame1)
         # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
-        frame6 = get_frame_at_index(decoder, frame_index=180, stream_index=3)
+        frame6 = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")
         assert_equal(frame6, reference_frame6)
 
@@ -97,7 +97,7 @@ class TestOps:
         decoder = create_from_file(str(get_reference_video_path()))
         add_video_stream(decoder)
         frames1and6 = get_frames_at_indices(
-            decoder, frame_indices=[0, 180], stream_index=3
+            decoder, stream_index=3, frame_indices=[0, 180]
         )
         reference_frame1 = load_tensor_from_file("nasa_13013.mp4.frame000001.pt")
         reference_frame6 = load_tensor_from_file("nasa_13013.mp4.time6.000000.pt")

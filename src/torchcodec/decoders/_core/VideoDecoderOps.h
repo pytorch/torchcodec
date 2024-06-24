@@ -44,15 +44,15 @@ at::Tensor get_frame_at_pts(at::Tensor& decoder, double seconds);
 // Return the frame that is visible at a given index in the video.
 at::Tensor get_frame_at_index(
     at::Tensor& decoder,
-    int64_t frame_index,
-    int64_t stream_index);
+    int64_t stream_index,
+    int64_t frame_index);
 
 // Return the frames at a given index for a given stream as a single stacked
 // Tensor.
 at::Tensor get_frames_at_indices(
     at::Tensor& decoder,
-    at::IntArrayRef frame_indices,
-    int64_t stream_index);
+    int64_t stream_index,
+    at::IntArrayRef frame_indices);
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
