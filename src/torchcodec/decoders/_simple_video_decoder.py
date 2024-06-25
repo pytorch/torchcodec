@@ -24,10 +24,10 @@ class SimpleVideoDecoder:
 
         core.add_video_stream(self._decoder)
 
-        self.metadata = _get_and_validate_simple_video_metadata(self._decoder)
+        self.stream_metadata = _get_and_validate_stream_metadata(self._decoder)
         # Note: these fields exist and are not None, as validated in _get_and_validate_simple_video_metadata().
-        self._num_frames = self.metadata.num_frames_computed
-        self._stream_index = self.metadata.stream_index
+        self._num_frames = self.stream_metadata.num_frames_computed
+        self._stream_index = self.stream_metadata.stream_index
 
     def __len__(self) -> int:
         return self._num_frames
@@ -61,9 +61,7 @@ class SimpleVideoDecoder:
             raise StopIteration()
 
 
-def _get_and_validate_simple_video_metadata(
-    decoder: torch.Tensor,
-) -> core.StreamMetadata:
+def _get_and_validate_stream_metadata(decoder: torch.Tensor) -> core.StreamMetadata:
     video_metadata = core.get_video_metadata(decoder)
 
     if video_metadata.best_video_stream_index is None:
@@ -72,7 +70,9 @@ def _get_and_validate_simple_video_metadata(
             "Please report an issue following the steps in <TODO>"
         )
 
-    best_stream_metadata = video_metadata.streams[video_metadata.best_video_stream_index]
+    best_stream_metadata = video_metadata.streams[
+        video_metadata.best_video_stream_index
+    ]
     if best_stream_metadata.num_frames_computed is None:
         raise ValueError(
             "The number of frames is unknown. This should never happen. "
