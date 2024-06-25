@@ -12,14 +12,6 @@ from torchcodec.decoders._core.video_decoder_ops import (
 
 
 @dataclass
-class ContainerMetadata:
-    duration_seconds: Optional[float]
-    bit_rate: Optional[float]
-    best_video_stream_index: Optional[int]
-    best_audio_stream_index: Optional[int]
-
-
-@dataclass
 class StreamMetadata:
     duration_seconds: Optional[float]
     bit_rate: Optional[float]
@@ -35,6 +27,7 @@ class StreamMetadata:
     width: Optional[int]
     height: Optional[int]
     average_fps: Optional[float]
+    stream_index: int
 
     @property
     def num_frames(self) -> Optional[int]:
@@ -46,30 +39,33 @@ class StreamMetadata:
 
 @dataclass
 class VideoMetadata:
-    container: ContainerMetadata
+    # TODO: Is 'container' an FFmpeg term?
+    container_duration_seconds: Optional[float]
+    container_bit_rate: Optional[float]
+    best_video_stream_index: Optional[int]
+    best_audio_stream_index: Optional[int]
+
     streams: List[StreamMetadata]
 
     @property
     def duration_seconds(self) -> Optional[float]:
         if (
-            self.container.best_video_stream_index is not None
-            and self.streams[self.container.best_video_stream_index].duration_seconds
-            is not None
+            self.best_video_stream_index is not None
+            and self.streams[self.best_video_stream_index].duration_seconds is not None
         ):
-            return self.streams[self.container.best_video_stream_index].duration_seconds
+            return self.streams[self.best_video_stream_index].duration_seconds
         else:
-            return self.container.duration_seconds
+            return self.container_duration_seconds
 
     @property
     def bit_rate(self) -> Optional[float]:
         if (
-            self.container.best_video_stream_index is not None
-            and self.streams[self.container.best_video_stream_index].bit_rate
-            is not None
+            self.best_video_stream_index is not None
+            and self.streams[self.best_video_stream_index].bit_rate is not None
         ):
-            return self.streams[self.container.best_video_stream_index].bit_rate
+            return self.streams[self.best_video_stream_index].bit_rate
         else:
-            return self.contain.bit_rate
+            return self.container_bit_rate
 
     @property
     def best_video_stream(self) -> StreamMetadata:
@@ -80,13 +76,6 @@ class VideoMetadata:
 def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
 
     container_dict = json.loads(_get_container_json_metadata(decoder))
-    container_metadata = ContainerMetadata(
-        duration_seconds=container_dict.get("durationSeconds"),
-        bit_rate=container_dict.get("bitRate"),
-        best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
-        best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
-    )
-
     streams_metadata = []
     for stream_index in range(container_dict["numStreams"]):
         stream_dict = json.loads(_get_stream_json_metadata(decoder, stream_index))
@@ -103,7 +92,14 @@ def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
                 width=stream_dict.get("width"),
                 height=stream_dict.get("height"),
                 average_fps=stream_dict.get("averageFps"),
+                stream_index=stream_index,
             )
         )
 
-    return VideoMetadata(container=container_metadata, streams=streams_metadata)
+    return VideoMetadata(
+        container_duration_seconds=container_dict.get("durationSeconds"),
+        container_bit_rate=container_dict.get("bitRate"),
+        best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
+        best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
+        streams=streams_metadata,
+    )

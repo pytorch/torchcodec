@@ -101,11 +101,6 @@ class VideoDecoder {
     std::optional<int64_t> height;
   };
   struct ContainerMetadata {
-    // TODO: in C++ the StreamMetadata vec is part of the ContainerMetadata. In
-    // Python, the equivalent list isn't part of the containers' metadata: it is
-    // a separate attribute of the VideoMetaData dataclass, next to the
-    // container metadata. We can probably align the C++ structure to reflect
-    // the Python one?
     std::vector<StreamMetadata> streams;
     int numAudioStreams = 0;
     int numVideoStreams = 0;
