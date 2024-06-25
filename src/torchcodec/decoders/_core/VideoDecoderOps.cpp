@@ -28,9 +28,11 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("get_next_frame(Tensor(a!) decoder) -> Tensor");
   m.def("get_frame_at_pts(Tensor(a!) decoder, float seconds) -> Tensor");
   m.def(
-      "get_frame_at_index(Tensor(a!) decoder, *, int frame_index, int stream_index) -> Tensor");
+      "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> Tensor");
   m.def(
-      "get_frames_at_indices(Tensor(a!) decoder, *, int[] frame_indices, int stream_index) -> Tensor");
+      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
+  m.def(
+      "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -124,8 +126,8 @@ at::Tensor get_frame_at_pts(at::Tensor& decoder, double seconds) {
 
 at::Tensor get_frame_at_index(
     at::Tensor& decoder,
-    int64_t frame_index,
-    int64_t stream_index) {
+    int64_t stream_index,
+    int64_t frame_index) {
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
   return result.frame;
@@ -133,12 +135,24 @@ at::Tensor get_frame_at_index(
 
 at::Tensor get_frames_at_indices(
     at::Tensor& decoder,
-    at::IntArrayRef frame_indices,
-    int64_t stream_index) {
+    int64_t stream_index,
+    at::IntArrayRef frame_indices) {
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
   auto result = videoDecoder->getFramesAtIndexes(stream_index, frameIndicesVec);
+  return result.frames;
+}
+
+at::Tensor get_frames_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t start,
+    int64_t stop,
+    std::optional<int64_t> step = std::nullopt) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
+  auto result = videoDecoder->getFramesInRange(
+      stream_index, start, stop, step.value_or(1));
   return result.frames;
 }
 
@@ -330,6 +344,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
+  m.impl("get_frames_in_range", &get_frames_in_range);
 }
 
 } // namespace facebook::torchcodec

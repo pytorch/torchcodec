@@ -238,8 +238,8 @@ class VideoClipSampler(nn.Module):
             ]
             frames = get_frames_at_indices(
                 video_decoder,
-                frame_indices=batch_indexes,
                 stream_index=metadata_json["bestVideoStreamIndex"],
+                frame_indices=batch_indexes,
             )
             clips.append(frames)
 
