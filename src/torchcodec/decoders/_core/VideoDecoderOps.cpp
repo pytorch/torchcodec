@@ -33,7 +33,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_at_indices(Tensor(a!) decoder, *, int[] frame_indices, int stream_index) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
-  m.def("get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
+  m.def(
+      "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
 }
 
 // ==============================
@@ -145,8 +146,12 @@ std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
 
+// TODO: we should use a more robust way to serialize the metadata. There are a
+// few alternatives, but ultimately we are limited to what custom ops allow us
+// to return. Current ideas are to use a proper JSON library, or to pack all the
+// info into tensors. *If* we're OK to drop the export support for metadata, we
+// could also easily bind the C++ structs to Python with pybind11.
 std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
-
   std::stringstream ss;
   ss << "{\n";
   auto it = metadataMap.begin();
@@ -234,8 +239,8 @@ std::string get_json_metadata(at::Tensor& decoder) {
   return mapToJson(metadataMap);
 }
 
-std::string get_container_json_metadata(at::Tensor &decoder) {
-  auto videoDecoder = static_cast<VideoDecoder *>(decoder.mutable_data_ptr());
+std::string get_container_json_metadata(at::Tensor& decoder) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
 
   auto containerMetadata = videoDecoder->getContainerMetadata();
 
@@ -265,9 +270,10 @@ std::string get_container_json_metadata(at::Tensor &decoder) {
   return mapToJson(map);
 }
 
-std::string get_stream_json_metadata(at::Tensor &decoder,
-                                     int64_t stream_index) {
-  auto videoDecoder = static_cast<VideoDecoder *>(decoder.mutable_data_ptr());
+std::string get_stream_json_metadata(
+    at::Tensor& decoder,
+    int64_t stream_index) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   auto streamMetadata =
       videoDecoder->getContainerMetadata().streams[stream_index];
 

@@ -1,9 +1,6 @@
 import pytest
 
-from torchcodec.decoders._core import (
-    create_from_file,
-    get_video_metadata,
-)
+from torchcodec.decoders._core import create_from_file, get_video_metadata
 
 from ..test_utils import get_reference_video_path
 
