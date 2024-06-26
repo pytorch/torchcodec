@@ -46,28 +46,17 @@ class VideoMetadata:
 
     @property
     def duration_seconds(self) -> Optional[float]:
-        if (
-            self.best_video_stream_index is not None
-            and self.streams[self.best_video_stream_index].duration_seconds is not None
-        ):
-            return self.streams[self.best_video_stream_index].duration_seconds
-        else:
-            return self.duration_seconds_container
+        raise NotImplementedError("TODO: decide on logic and implement this!")
 
     @property
     def bit_rate(self) -> Optional[float]:
-        if (
-            self.best_video_stream_index is not None
-            and self.streams[self.best_video_stream_index].bit_rate is not None
-        ):
-            return self.streams[self.best_video_stream_index].bit_rate
-        else:
-            return self.bit_rate_container
+        raise NotImplementedError("TODO: decide on logic and implement this!")
 
     @property
     def best_video_stream(self) -> StreamMetadata:
-        assert self.container.best_video_stream_index is not None
-        return self.container.streams[self.container.best_video_stream_index]
+        if self.best_video_stream_index is None:
+            raise ValueError("The best video stream is unknown.")
+        return self.streams[self.best_video_stream_index]
 
 
 def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
