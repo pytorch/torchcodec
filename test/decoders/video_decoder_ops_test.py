@@ -26,6 +26,7 @@ from torchcodec.decoders._core import (
 
 from ..test_utils import (
     assert_equal,
+    EMPTY_REF_TENSOR,
     get_reference_audio_path,
     get_reference_video_path,
     load_tensor_from_file,
@@ -161,7 +162,7 @@ class TestOps:
 
         # an empty range is valid!
         empty_frame = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
-        assert_equal(empty_frame, torch.empty((0, 270, 480, 3), dtype=torch.uint8))
+        assert_equal(empty_frame, EMPTY_REF_TENSOR)
 
     def test_throws_exception_at_eof(self):
         decoder = create_from_file(str(get_reference_video_path()))

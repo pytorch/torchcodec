@@ -34,11 +34,8 @@ class SimpleVideoDecoder:
     def __len__(self) -> int:
         return self._num_frames
 
-    def __getitem__(self, key: int) -> torch.Tensor:
-        if not isinstance(key, int):
-            raise TypeError(
-                f"Unsupported key type: {type(key)}. Supported type is int."
-            )
+    def _getitem_int(self, key: int) -> torch.Tensor:
+        assert isinstance(key, int)
 
         if key < 0:
             key += self._num_frames
@@ -49,6 +46,28 @@ class SimpleVideoDecoder:
 
         return core.get_frame_at_index(
             self._decoder, frame_index=key, stream_index=self._stream_index
+        )
+
+    def _getitem_slice(self, key: slice) -> torch.Tensor:
+        assert isinstance(key, slice)
+
+        start, stop, step = key.indices(len(self))
+        return core.get_frames_in_range(
+            self._decoder,
+            stream_index=self._stream_index,
+            start=start,
+            stop=stop,
+            step=step,
+        )
+
+    def __getitem__(self, key: Union[int, slice]) -> torch.Tensor:
+        if isinstance(key, int):
+            return self._getitem_int(key)
+        elif isinstance(key, slice):
+            return self._getitem_slice(key)
+
+        raise TypeError(
+            f"Unsupported key type: {type(key)}. Supported types are int and slice."
         )
 
     def __iter__(self) -> "SimpleVideoDecoder":
