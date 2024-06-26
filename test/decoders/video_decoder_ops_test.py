@@ -14,6 +14,7 @@ from torchcodec.decoders._core import (
     create_from_bytes,
     create_from_file,
     create_from_tensor,
+    get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
@@ -255,7 +256,11 @@ class TestOps:
         assert metadata_dict["numFrames"] == 390
         assert metadata_dict["averageFps"] == pytest.approx(29.97, abs=0.001)
         assert metadata_dict["codec"] == "h264"
-        assert metadata_dict["bitRate"] == 128783.0
+        ffmpeg_dict = get_ffmpeg_library_versions()
+        if ffmpeg_dict["libavformat"][0] >= 60:
+            assert metadata_dict["bitRate"] == 412365.0
+        else:
+            assert metadata_dict["bitRate"] == 324915.0
 
     def test_video_get_json_metadata_with_stream(self):
         decoder = create_from_file(str(get_reference_video_path()))
@@ -272,6 +277,19 @@ class TestOps:
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
         assert metadata_dict["durationSeconds"] == pytest.approx(13.25, abs=0.01)
+
+    def test_get_ffmpeg_version(self):
+        ffmpeg_dict = get_ffmpeg_library_versions()
+        assert len(ffmpeg_dict["libavcodec"]) == 3
+        assert len(ffmpeg_dict["libavfilter"]) == 3
+        assert len(ffmpeg_dict["libavformat"]) == 3
+        assert len(ffmpeg_dict["libavutil"]) == 3
+        # The earliest libavutil version is 50 as per:
+        # https://www.ffmpeg.org/olddownload.html
+        assert ffmpeg_dict["libavutil"][0] > 50
+        ffmpeg_version = ffmpeg_dict["ffmpeg_version"]
+        split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
+        assert len(split_ffmpeg_version) == 3
 
 
 if __name__ == "__main__":

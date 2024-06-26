@@ -69,4 +69,8 @@ at::Tensor get_next_frame(at::Tensor& decoder);
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 
+// Returns version information about the various FFMPEG libraries that are
+// loaded in the program's address space.
+std::string _get_json_ffmpeg_library_versions();
+
 } // namespace facebook::torchcodec

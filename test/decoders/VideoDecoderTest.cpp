@@ -61,8 +61,10 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
-#ifdef FBCODE_BUILD
+#if LIBAVFORMAT_VERSION_MAJOR >= 60
   // TODO: Investigate why this is broken with ffmpeg=6.
+  EXPECT_NEAR(metadata.bitRate.value(), 412365, 1e-1);
+#else
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
 #endif
   EXPECT_EQ(metadata.streams.size(), 6);

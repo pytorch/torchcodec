@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional
 
 import torch
@@ -59,6 +60,9 @@ get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
+_get_json_ffmpeg_library_versions = (
+    torch.ops.torchcodec_ns._get_json_ffmpeg_library_versions.default
+)
 
 
 # =============================
@@ -148,3 +152,13 @@ def get_frames_in_range_abstract(
 @register_fake("torchcodec_ns::get_json_metadata")
 def get_json_metadata_abstract(decoder: torch.Tensor) -> str:
     return torch.empty_like("")
+
+
+@register_fake("torchcodec_ns::_get_json_ffmpeg_library_versions")
+def _get_json_ffmpeg_library_versions_abstract() -> str:
+    return torch.empty_like("")
+
+
+def get_ffmpeg_library_versions():
+    versions_json = _get_json_ffmpeg_library_versions()
+    return json.loads(versions_json)
