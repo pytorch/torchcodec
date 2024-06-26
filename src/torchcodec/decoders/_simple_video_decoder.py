@@ -25,7 +25,6 @@ class SimpleVideoDecoder:
         core.add_video_stream(self._decoder)
 
         self.stream_metadata = _get_and_validate_stream_metadata(self._decoder)
-        # Note: these fields exist and are not None, as validated in _get_and_validate_simple_video_metadata().
         self._num_frames = self.stream_metadata.num_frames_computed
         self._stream_index = self.stream_metadata.stream_index
 

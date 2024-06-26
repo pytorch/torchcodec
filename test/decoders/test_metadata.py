@@ -12,8 +12,8 @@ def test_get_video_metadata():
     assert metadata.best_video_stream_index == 3
     assert metadata.best_audio_stream_index == 3
 
-    assert metadata.container_duration_seconds == pytest.approx(16.57, abs=0.001)
-    assert metadata.container_bit_rate == 324915
+    assert metadata.duration_seconds_container == pytest.approx(16.57, abs=0.001)
+    assert metadata.bit_rate_container == 324915
 
     best_stream_metadata = metadata.streams[metadata.best_video_stream_index]
     assert best_stream_metadata.duration_seconds == pytest.approx(13.013, abs=0.001)

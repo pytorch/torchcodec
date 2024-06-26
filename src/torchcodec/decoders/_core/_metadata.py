@@ -15,10 +15,8 @@ from torchcodec.decoders._core.video_decoder_ops import (
 class StreamMetadata:
     duration_seconds: Optional[float]
     bit_rate: Optional[float]
-    # TODO Comment from Nicolas:
-    # Looking at this, it's not immediately obvious to me that "retrieved" means
-    # "less accurate than 'computed'".
-    # Are we open to different names? E.g. "num_frames_from_header" and "num_frames_accurate"?
+    # TODO: Before release, we should come up with names that better convey the
+    # " 'fast and potentially inaccurate' vs 'slower but accurate' " tradeoff.
     num_frames_retrieved: Optional[int]
     num_frames_computed: Optional[int]
     min_pts_seconds: Optional[float]
@@ -39,9 +37,8 @@ class StreamMetadata:
 
 @dataclass
 class VideoMetadata:
-    # TODO: Is 'container' an FFmpeg term?
-    container_duration_seconds: Optional[float]
-    container_bit_rate: Optional[float]
+    duration_seconds_container: Optional[float]
+    bit_rate_container: Optional[float]
     best_video_stream_index: Optional[int]
     best_audio_stream_index: Optional[int]
 
@@ -55,7 +52,7 @@ class VideoMetadata:
         ):
             return self.streams[self.best_video_stream_index].duration_seconds
         else:
-            return self.container_duration_seconds
+            return self.duration_seconds_container
 
     @property
     def bit_rate(self) -> Optional[float]:
@@ -65,7 +62,7 @@ class VideoMetadata:
         ):
             return self.streams[self.best_video_stream_index].bit_rate
         else:
-            return self.container_bit_rate
+            return self.bit_rate_container
 
     @property
     def best_video_stream(self) -> StreamMetadata:
@@ -97,8 +94,8 @@ def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
         )
 
     return VideoMetadata(
-        container_duration_seconds=container_dict.get("durationSeconds"),
-        container_bit_rate=container_dict.get("bitRate"),
+        duration_seconds_container=container_dict.get("durationSeconds"),
+        bit_rate_container=container_dict.get("bitRate"),
         best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
         best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
         streams=streams_metadata,

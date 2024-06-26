@@ -277,8 +277,6 @@ std::string get_container_json_metadata(at::Tensor& decoder) {
         std::to_string(*containerMetadata.bestAudioStreamIndex);
   }
 
-  // TODO: Q from Nicolas - is there a better way to retrieve and propagate the
-  // number of streams?
   map["numStreams"] = std::to_string(containerMetadata.streams.size());
 
   return mapToJson(map);
