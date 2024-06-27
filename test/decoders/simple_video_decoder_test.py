@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from torchcodec.decoders import SimpleVideoDecoder
+from torchcodec.decoders import _core, SimpleVideoDecoder
 
 from ..test_utils import (
     assert_equal,
@@ -14,25 +14,28 @@ from ..test_utils import (
 
 
 class TestSimpleDecoder:
+    @pytest.mark.parametrize("source_kind", ("path", "tensor", "bytes"))
+    def test_create(self, source_kind):
+        if source_kind == "path":
+            source = str(get_reference_video_path())
+        elif source_kind == "tensor":
+            source = get_reference_video_tensor()
+        elif source_kind == "bytes":
+            path = str(get_reference_video_path())
+            with open(path, "rb") as f:
+                source = f.read()
+        else:
+            raise ValueError("Oops, double check the parametrization of this test!")
 
-    def test_create_from_file(self):
-        decoder = SimpleVideoDecoder(str(get_reference_video_path()))
-        assert len(decoder) == 390
-        assert decoder._stream_index == 3
-
-    def test_create_from_tensor(self):
-        decoder = SimpleVideoDecoder(get_reference_video_tensor())
-        assert len(decoder) == 390
-        assert decoder._stream_index == 3
-
-    def test_create_from_bytes(self):
-        path = str(get_reference_video_path())
-        with open(path, "rb") as f:
-            video_bytes = f.read()
-
-        decoder = SimpleVideoDecoder(video_bytes)
-        assert len(decoder) == 390
-        assert decoder._stream_index == 3
+        decoder = SimpleVideoDecoder(source)
+        assert isinstance(decoder.stream_metadata, _core.StreamMetadata)
+        assert (
+            len(decoder)
+            == decoder._num_frames
+            == decoder.stream_metadata.num_frames_computed
+            == 390
+        )
+        assert decoder._stream_index == decoder.stream_metadata.stream_index == 3
 
     def test_create_fails(self):
         with pytest.raises(TypeError, match="Unknown source type"):
