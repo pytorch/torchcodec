@@ -35,6 +35,7 @@ class StreamMetadata:
             return self.num_frames_retrieved
 
 
+# This may be renamed into e.g. ContainerMetadata in the future to be more generic.
 @dataclass
 class VideoMetadata:
     duration_seconds_container: Optional[float]

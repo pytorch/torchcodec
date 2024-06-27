@@ -286,8 +286,12 @@ std::string get_stream_json_metadata(
     at::Tensor& decoder,
     int64_t stream_index) {
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
-  auto streamMetadata =
-      videoDecoder->getContainerMetadata().streams[stream_index];
+  auto streams = videoDecoder->getContainerMetadata().streams;
+  if (stream_index < 0 || stream_index >= streams.size()) {
+    throw std::out_of_range(
+        "stream_index out of bounds: " + std::to_string(stream_index));
+  }
+  auto streamMetadata = streams[stream_index];
 
   std::map<std::string, std::string> map;
 
