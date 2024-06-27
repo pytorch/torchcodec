@@ -82,13 +82,13 @@ class TestSimpleDecoder:
         # contiguous ranges
         slice_frames0_9 = decoder[0:9]
         assert slice_frames0_9.shape == torch.Size([9, *REF_DIMS])
-        for i, slice_frame in enumerate(slice_frames0_9):
-            assert_equal(ref_frames0_9[i], slice_frame)
+        for ref_frame, slice_frame in zip(ref_frames0_9, slice_frames0_9):
+            assert_equal(ref_frame, slice_frame)
 
         slice_frames4_8 = decoder[4:8]
         assert slice_frames4_8.shape == torch.Size([4, *REF_DIMS])
-        for i, slice_frame in enumerate(slice_frames4_8):
-            assert_equal(ref_frames0_9[i + 4], slice_frame)
+        for ref_frame, slice_frame in zip(ref_frames0_9[4:8], slice_frames4_8):
+            assert_equal(ref_frame, slice_frame)
 
         # ranges with a stride
         ref_frames15_35 = [
@@ -97,13 +97,13 @@ class TestSimpleDecoder:
         ]
         slice_frames15_35 = decoder[15:36:5]
         assert slice_frames15_35.shape == torch.Size([5, *REF_DIMS])
-        for i, slice_frame in enumerate(slice_frames15_35):
-            assert_equal(ref_frames15_35[i], slice_frame)
+        for ref_frame, slice_frame in zip(ref_frames15_35, slice_frames15_35):
+            assert_equal(ref_frame, slice_frame)
 
         slice_frames0_9_2 = decoder[0:9:2]
         assert slice_frames0_9_2.shape == torch.Size([5, *REF_DIMS])
-        for i, slice_frame in enumerate(slice_frames0_9_2):
-            assert_equal(ref_frames0_9[i * 2], slice_frame)
+        for ref_frame, slice_frame in zip(ref_frames0_9[0:0:2], slice_frames0_9_2):
+            assert_equal(ref_frame, slice_frame)
 
         # negative numbers in the slice
         ref_frames386_389 = [
@@ -113,8 +113,8 @@ class TestSimpleDecoder:
 
         slice_frames386_389 = decoder[-4:]
         assert slice_frames386_389.shape == torch.Size([4, *REF_DIMS])
-        for i, slice_frame in enumerate(slice_frames386_389):
-            assert_equal(ref_frames386_389[i], slice_frame)
+        for ref_frame, slice_frame in zip(ref_frames386_389[-4:], slice_frames386_389):
+            assert_equal(ref_frame, slice_frame)
 
         # an empty range is valid!
         empty_frame = decoder[5:5]
