@@ -14,13 +14,13 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=1000']
 
-          #  - repo: https://github.com/omnilib/ufmt
-          #    rev: v2.6.0
-          #    hooks:
-          #    -   id: ufmt
-          #        additional_dependencies:
-          #          - black == 24.4.2
-          #          - usort == 1.0.5
+  # - repo: https://github.com/omnilib/ufmt
+  #   rev: v2.6.0
+  #   hooks:
+  #   -   id: ufmt
+  #       additional_dependencies:
+  #         - black == 24.4.2
+  #         - usort == 1.0.5
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.0
