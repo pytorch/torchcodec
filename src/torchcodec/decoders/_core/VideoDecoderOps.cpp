@@ -37,6 +37,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
+  m.def("_get_json_ffmpeg_library_versions() -> str");
 }
 
 // ==============================
@@ -236,10 +237,6 @@ std::string get_json_metadata(at::Tensor& decoder) {
     if (streamMetadata.averageFps.has_value()) {
       metadataMap["averageFps"] = std::to_string(*streamMetadata.averageFps);
     }
-    // Just overwrite has we have a better definition for video
-    if (streamMetadata.bitRate.has_value()) {
-      metadataMap["bitRate"] = std::to_string(*streamMetadata.bitRate);
-    }
   }
   if (videoMetadata.bestVideoStreamIndex.has_value()) {
     metadataMap["bestVideoStreamIndex"] =
@@ -331,9 +328,37 @@ std::string get_stream_json_metadata(
   return mapToJson(map);
 }
 
+std::string _get_json_ffmpeg_library_versions() {
+  std::stringstream ss;
+  ss << "{\n";
+
+  unsigned int version = avfilter_version();
+  ss << "\"libavfilter\": [" << AV_VERSION_MAJOR(version) << ", "
+     << AV_VERSION_MINOR(version) << ", " << AV_VERSION_MICRO(version)
+     << "],\n";
+  version = avutil_version();
+  ss << "\"libavutil\": [" << AV_VERSION_MAJOR(version) << ", "
+     << AV_VERSION_MINOR(version) << ", " << AV_VERSION_MICRO(version)
+     << "],\n";
+  version = avcodec_version();
+  ss << "\"libavcodec\": [" << AV_VERSION_MAJOR(version) << ", "
+     << AV_VERSION_MINOR(version) << ", " << AV_VERSION_MICRO(version)
+     << "],\n";
+  version = avformat_version();
+  ss << "\"libavformat\": [" << AV_VERSION_MAJOR(version) << ", "
+     << AV_VERSION_MINOR(version) << ", " << AV_VERSION_MICRO(version)
+     << "],\n";
+  ss << "\"ffmpeg_version\": \"" << av_version_info() << "\"\n";
+  ss << "}\n";
+
+  return ss.str();
+}
+
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
   m.impl("create_from_tensor", &create_from_tensor);
+  m.impl(
+      "_get_json_ffmpeg_library_versions", &_get_json_ffmpeg_library_versions);
 }
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {

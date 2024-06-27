@@ -7,6 +7,10 @@ import pytest
 
 import torch
 
+# The dimensions and type have to match the frames in our reference video.
+REF_DIMS = (270, 480, 3)
+EMPTY_REF_TENSOR = torch.empty([0, *REF_DIMS], dtype=torch.uint8)
+
 
 def in_fbcode() -> bool:
     return os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
