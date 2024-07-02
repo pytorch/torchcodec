@@ -166,35 +166,35 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
   auto output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor1FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
+  torch::Tensor tensor0FromOurDecoder = output.frame;
+  EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
   EXPECT_EQ(output.pts, 0);
   output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor2FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor2FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
+  torch::Tensor tensor1FromOurDecoder = output.frame;
+  EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
   EXPECT_EQ(output.pts, 1001);
 
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
   torch::Tensor tensor1FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000002.pt");
 
   EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({270, 480, 3}));
+  EXPECT_TRUE(torch::equal(tensor0FromOurDecoder, tensor0FromFFMPEG));
   EXPECT_TRUE(torch::equal(tensor1FromOurDecoder, tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor2FromOurDecoder, tensor2FromFFMPEG));
+  EXPECT_TRUE(
+      torch::allclose(tensor0FromOurDecoder, tensor0FromFFMPEG, 0.1, 20));
+  EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({270, 480, 3}));
   EXPECT_TRUE(
       torch::allclose(tensor1FromOurDecoder, tensor1FromFFMPEG, 0.1, 20));
-  EXPECT_EQ(tensor2FromFFMPEG.sizes(), std::vector<long>({270, 480, 3}));
-  EXPECT_TRUE(
-      torch::allclose(tensor2FromOurDecoder, tensor2FromFFMPEG, 0.1, 20));
 
   if (FLAGS_dump_frames_for_debugging) {
+    dumpTensorToDisk(tensor0FromFFMPEG, "tensor0FromFFMPEG.pt");
     dumpTensorToDisk(tensor1FromFFMPEG, "tensor1FromFFMPEG.pt");
-    dumpTensorToDisk(tensor2FromFFMPEG, "tensor2FromFFMPEG.pt");
+    dumpTensorToDisk(tensor0FromOurDecoder, "tensor0FromOurDecoder.pt");
     dumpTensorToDisk(tensor1FromOurDecoder, "tensor1FromOurDecoder.pt");
-    dumpTensorToDisk(tensor2FromOurDecoder, "tensor2FromOurDecoder.pt");
   }
 }
 
@@ -211,13 +211,13 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   auto tensor = output.frames;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
-  torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+  torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
-  EXPECT_TRUE(torch::equal(tensor[0], tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor[1], tensor2FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[0], tensor0FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
 TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
@@ -235,14 +235,14 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   auto tensor = output.frames;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
-  torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+  torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
   tensor = tensor.permute({0, 2, 3, 1});
-  EXPECT_TRUE(torch::equal(tensor[0], tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor[1], tensor2FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[0], tensor0FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
 TEST_P(VideoDecoderTest, SeeksCloseToEof) {

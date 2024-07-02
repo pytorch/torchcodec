@@ -11,22 +11,21 @@ TORCHCODEC_PATH=$HOME/fbsource/fbcode/pytorch/torchcodec
 RESOURCES_DIR=$TORCHCODEC_PATH/test/resources
 VIDEO_PATH=$RESOURCES_DIR/nasa_13013.mp4
 
-# Important note: I used ffmpeg version 6.1.1 to generate these images. We
-# must have the version that matches the one that we link against in the test.
-# TODO: The first 10 frames are numbered starting from 1, so their name is one more
-#       than their index. This is confusing. We should unify the naming so files are
-#       named by their index. This will inovlve also updating the tests that load
-#       these files.
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,0)+eq(n\,1)+eq(n\,2)+eq(n\,3)+eq(n\,4)+eq(n\,5)+eq(n\,6)+eq(n\,7)+eq(n\,8)+eq(n\,9)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame%06d.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,15)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000015.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,20)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000020.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,25)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000025.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,30)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000030.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,35)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000035.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,386)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000386.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,387)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000387.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,388)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000388.bmp"
-ffmpeg -y -i "$VIDEO_PATH" -vf select='eq(n\,389)' -vsync vfr -q:v 2 "$VIDEO_PATH.frame000389.bmp"
+# Last generated with ffmpeg version 4.3
+#
+# Note: The naming scheme used here must match the naming scheme used to load
+# tensors in test_utils.py.
+FRAMES=(0 1 2 3 4 5 6 7 8 9)
+FRAMES+=(15 20 25 30 35)
+FRAMES+=(386 387 388 389)
+for frame in "${FRAMES[@]}"; do
+  # Note that we are using 0-based index naming. Asking ffmpeg to number output
+  # frames would result in 1-based index naming. We enforce 0-based index naming
+  # so that the name of reference frames matches the index when accessing that
+  # frame in the Python decoder.
+  frame_name=$(printf "%06d" "$frame")
+  ffmpeg -y -i "$VIDEO_PATH" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.frame$frame_name.bmp"
+done
 ffmpeg -y -ss 6.0 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time6.000000.bmp"
 ffmpeg -y -ss 6.1 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time6.100000.bmp"
 ffmpeg -y -ss 10.0 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time10.000000.bmp"

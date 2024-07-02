@@ -11,7 +11,7 @@ from torchcodec.samplers import (
 )
 
 from ..test_utils import (  # noqa: F401; see use in test_sampler
-    assert_equal,
+    assert_tensor_equal,
     reference_video_tensor,
 )
 
@@ -42,7 +42,7 @@ def test_sampler(
     video_args = VideoArgs(desired_width=desired_width, desired_height=desired_height)
     sampler = VideoClipSampler(video_args, sampler_args)
     clips = sampler(reference_video_tensor)
-    assert_equal(len(clips), sampler_args.clips_per_video)
+    assert_tensor_equal(len(clips), sampler_args.clips_per_video)
     clip = clips[0]
     if isinstance(sampler_args, TimeBasedSamplerArgs):
         # TODO FIXME: Looks like we have an API inconsistency.
