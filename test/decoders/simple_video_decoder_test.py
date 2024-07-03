@@ -7,10 +7,12 @@ from ..test_utils import assert_tensor_equal, NASA_VIDEO
 
 
 class TestSimpleDecoder:
-    @pytest.mark.parametrize("source_kind", ("path", "tensor", "bytes"))
+    @pytest.mark.parametrize("source_kind", ("str", "path", "tensor", "bytes"))
     def test_create(self, source_kind):
-        if source_kind == "path":
+        if source_kind == "str":
             source = str(NASA_VIDEO.path)
+        elif source_kind == "path":
+            source = NASA_VIDEO.path
         elif source_kind == "tensor":
             source = NASA_VIDEO.to_tensor()
         elif source_kind == "bytes":
@@ -35,7 +37,7 @@ class TestSimpleDecoder:
             decoder = SimpleVideoDecoder(123)  # noqa
 
     def test_getitem_int(self):
-        decoder = SimpleVideoDecoder(str(NASA_VIDEO.path))
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         ref_frame1 = NASA_VIDEO.get_tensor_by_index(1)
@@ -48,7 +50,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame_last, decoder[-1])
 
     def test_getitem_slice(self):
-        decoder = SimpleVideoDecoder(str(NASA_VIDEO.path))
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -185,7 +187,7 @@ class TestSimpleDecoder:
             assert_tensor_equal(sliced, ref)
 
     def test_getitem_fails(self):
-        decoder = SimpleVideoDecoder(str(NASA_VIDEO.path))
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder[1000]  # noqa
@@ -197,7 +199,7 @@ class TestSimpleDecoder:
             frame = decoder["0"]  # noqa
 
     def test_iteration(self):
-        decoder = SimpleVideoDecoder(str(NASA_VIDEO.path))
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         ref_frame1 = NASA_VIDEO.get_tensor_by_index(1)

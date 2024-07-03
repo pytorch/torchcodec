@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union
 
 import torch
@@ -9,9 +10,10 @@ class SimpleVideoDecoder:
     """TODO: Add docstring."""
 
     def __init__(self, source: Union[str, bytes, torch.Tensor]):
-        # TODO: support Path objects.
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
+        elif isinstance(source, Path):
+            self._decoder = core.create_from_file(str(source))
         elif isinstance(source, bytes):
             self._decoder = core.create_from_bytes(source)
         elif isinstance(source, torch.Tensor):
@@ -19,7 +21,7 @@ class SimpleVideoDecoder:
         else:
             raise TypeError(
                 f"Unknown source type: {type(source)}. "
-                "Supported types are str, bytes and Tensor."
+                "Supported types are str, Path, bytes and Tensor."
             )
 
         core.add_video_stream(self._decoder)
