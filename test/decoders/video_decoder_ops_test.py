@@ -17,6 +17,7 @@ from torchcodec.decoders._core import (
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
+    get_frame_with_info_at_index,
     get_frames_at_indices,
     get_frames_in_range,
     get_json_metadata,
@@ -88,6 +89,17 @@ class TestOps:
         frame6 = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
+
+    def test_get_frame_with_info_at_index(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder)
+        frame6, pts, duration = get_frame_with_info_at_index(
+            decoder, stream_index=3, frame_index=180
+        )
+        reference_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
+        assert_tensor_equal(frame6, reference_frame6)
+        assert pts == 6.006
+        assert duration == pytest.approx(0.03337, rel=1e-3)
 
     def test_get_frames_at_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))

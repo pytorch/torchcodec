@@ -38,6 +38,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
   m.def("_get_json_ffmpeg_library_versions() -> str");
+  m.def(
+      "get_frame_with_info_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, float, float)");
 }
 
 // ==============================
@@ -132,6 +134,16 @@ at::Tensor get_frame_at_index(
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
   return result.frame;
+}
+
+std::tuple<at::Tensor, double, double> get_frame_with_info_at_index(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
+  auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
+  return std::make_tuple(
+      result.frame, result.ptsSeconds, result.durationSeconds);
 }
 
 at::Tensor get_frames_at_indices(
@@ -370,6 +382,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_stream_json_metadata", &get_stream_json_metadata);
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
+  m.impl("get_frame_with_info_at_index", &get_frame_with_info_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
 }

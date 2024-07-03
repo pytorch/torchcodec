@@ -47,6 +47,13 @@ at::Tensor get_frame_at_index(
     int64_t stream_index,
     int64_t frame_index);
 
+// Return the frame along with pts and duration that is visible at a given index
+// in the video.
+std::tuple<at::Tensor, double, double> get_frame_with_info_at_index(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index);
+
 // Return the frames at a given index for a given stream as a single stacked
 // Tensor.
 at::Tensor get_frames_at_indices(
