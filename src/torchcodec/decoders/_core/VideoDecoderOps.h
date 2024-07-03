@@ -86,4 +86,10 @@ std::string get_stream_json_metadata(at::Tensor& decoder);
 // loaded in the program's address space.
 std::string _get_json_ffmpeg_library_versions();
 
+// Scans video packets to get more accurate metadata like frame count, exact
+// keyframe positions, etc. Exact keyframe positions are useful for efficient
+// accurate seeking. Note that this function reads the entire video but it does
+// not decode frames. Reading a video file is much cheaper than decoding it.
+void scan_all_streams_to_update_metadata(at::Tensor& decoder);
+
 } // namespace facebook::torchcodec

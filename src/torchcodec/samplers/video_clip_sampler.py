@@ -15,6 +15,7 @@ from torchcodec.decoders._core import (
     get_frames_at_indices,
     get_json_metadata,
     get_next_frame,
+    scan_all_streams_to_update_metadata,
     seek_to_pts,
 )
 
@@ -145,6 +146,7 @@ class VideoClipSampler(nn.Module):
         """
 
         video_decoder = create_from_tensor(video_data)
+        scan_all_streams_to_update_metadata(video_decoder)
         add_video_stream(video_decoder)
         metadata_json = json.loads(get_json_metadata(video_decoder))
         target_width, target_height = self._compute_frame_width_height(
@@ -152,6 +154,7 @@ class VideoClipSampler(nn.Module):
         )
 
         video_decoder = create_from_tensor(video_data)
+        scan_all_streams_to_update_metadata(video_decoder)
         add_video_stream(
             video_decoder,
             width=target_width,

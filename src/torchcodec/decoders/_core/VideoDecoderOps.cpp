@@ -40,6 +40,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("_get_json_ffmpeg_library_versions() -> str");
   m.def(
       "get_frame_with_info_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, float, float)");
+  m.def("scan_all_streams_to_update_metadata(Tensor(a!) decoder) -> ()");
 }
 
 // ==============================
@@ -62,7 +63,6 @@ at::Tensor create_from_file(c10::string_view filename) {
   std::string filenameStr(filename);
   std::unique_ptr<VideoDecoder> uniqueDecoder =
       VideoDecoder::createFromFilePath(filenameStr);
-  uniqueDecoder->scanFileAndUpdateMetadataAndIndex();
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -72,14 +72,12 @@ at::Tensor create_from_tensor(at::Tensor video_tensor) {
   size_t length = video_tensor.numel();
   std::unique_ptr<VideoDecoder> videoDecoder =
       VideoDecoder::createFromBuffer(buffer, length);
-  videoDecoder->scanFileAndUpdateMetadataAndIndex();
   return wrapDecoderPointerToTensor(std::move(videoDecoder));
 }
 
 at::Tensor create_from_buffer(const void* buffer, size_t length) {
   std::unique_ptr<VideoDecoder> uniqueDecoder =
       VideoDecoder::createFromBuffer(buffer, length);
-  uniqueDecoder->scanFileAndUpdateMetadataAndIndex();
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -366,6 +364,11 @@ std::string _get_json_ffmpeg_library_versions() {
   return ss.str();
 }
 
+void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
+  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
+  videoDecoder->scanFileAndUpdateMetadataAndIndex();
+}
+
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
   m.impl("create_from_tensor", &create_from_tensor);
@@ -385,6 +388,9 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_with_info_at_index", &get_frame_with_info_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
+  m.impl(
+      "scan_all_streams_to_update_metadata",
+      &scan_all_streams_to_update_metadata);
 }
 
 } // namespace facebook::torchcodec

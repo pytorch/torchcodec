@@ -22,6 +22,7 @@ from torchcodec.decoders._core import (
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,
+    scan_all_streams_to_update_metadata,
     seek_to_pts,
 )
 
@@ -81,6 +82,7 @@ class TestOps:
 
     def test_get_frame_at_index(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         frame0 = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_tensor_by_index(0)
@@ -92,6 +94,7 @@ class TestOps:
 
     def test_get_frame_with_info_at_index(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         frame6, pts, duration = get_frame_with_info_at_index(
             decoder, stream_index=3, frame_index=180
@@ -103,6 +106,7 @@ class TestOps:
 
     def test_get_frames_at_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         frames0and180 = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
@@ -114,6 +118,7 @@ class TestOps:
 
     def test_get_frames_in_range(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
 
         # ensure that the degenerate case of a range of size 1 works
@@ -265,6 +270,7 @@ class TestOps:
 
     def test_video_get_json_metadata_with_stream(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)

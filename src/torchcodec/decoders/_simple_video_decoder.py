@@ -23,7 +23,7 @@ class SimpleVideoDecoder:
                 f"Unknown source type: {type(source)}. "
                 "Supported types are str, Path, bytes and Tensor."
             )
-
+        core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(self._decoder)
 
         self.stream_metadata = _get_and_validate_stream_metadata(self._decoder)

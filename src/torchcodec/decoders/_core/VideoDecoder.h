@@ -304,6 +304,8 @@ class VideoDecoder {
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  // Whether or not we have already scanned all streams to update the metadata.
+  bool scanned_all_streams_ = false;
 };
 
 // Prints the VideoDecoder::DecodeStats to the ostream.

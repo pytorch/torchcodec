@@ -404,6 +404,9 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
 }
 
 void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
+  if (scanned_all_streams_) {
+    return;
+  }
   while (true) {
     UniqueAVPacket packet(av_packet_alloc());
     int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
@@ -469,6 +472,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
           return frameInfo1.pts < frameInfo2.pts;
         });
   }
+  scanned_all_streams_ = true;
 }
 
 int VideoDecoder::getKeyFrameIndexForPts(
@@ -786,6 +790,10 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     throw std::runtime_error(
         "streamIndex=" + std::to_string(streamIndex) + " not added to decoder");
   }
+  if (!scanned_all_streams_) {
+    throw std::runtime_error(
+        "Must scan all streams to update metadata before calling getFrameAtIndex");
+  }
   const auto& stream = streams_[streamIndex];
   if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
     throw std::runtime_error(
@@ -804,6 +812,10 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
   if (streamIndex < 0 || streamIndex >= containerMetadata_.streams.size()) {
     throw std::runtime_error(
         "Invalid stream index=" + std::to_string(streamIndex));
+  }
+  if (!scanned_all_streams_) {
+    throw std::runtime_error(
+        "Must scan all streams to update metadata before calling getFrameAtIndex");
   }
 
   BatchDecodedOutput output;

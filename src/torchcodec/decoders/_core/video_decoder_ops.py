@@ -66,6 +66,9 @@ get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 _get_container_json_metadata = (
     torch.ops.torchcodec_ns.get_container_json_metadata.default
 )
+scan_all_streams_to_update_metadata = (
+    torch.ops.torchcodec_ns.scan_all_streams_to_update_metadata.default
+)
 _get_stream_json_metadata = torch.ops.torchcodec_ns.get_stream_json_metadata.default
 _get_json_ffmpeg_library_versions = (
     torch.ops.torchcodec_ns._get_json_ffmpeg_library_versions.default
@@ -182,6 +185,11 @@ def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) ->
 @register_fake("torchcodec_ns::_get_json_ffmpeg_library_versions")
 def _get_json_ffmpeg_library_versions_abstract() -> str:
     return torch.empty_like("")
+
+
+@register_fake("torchcodec_ns::scan_all_streams_to_update_metadata")
+def scan_all_streams_to_update_metadata_abstract(decoder: torch.Tensor) -> None:
+    return
 
 
 def get_ffmpeg_library_versions():
