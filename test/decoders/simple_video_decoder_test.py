@@ -201,14 +201,26 @@ class TestSimpleDecoder:
 
         ref_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         ref_frame1 = NASA_VIDEO.get_tensor_by_index(1)
+        ref_frame9 = NASA_VIDEO.get_tensor_by_index(9)
+        ref_frame35 = NASA_VIDEO.get_tensor_by_index(35)
         ref_frame180 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         ref_frame_last = NASA_VIDEO.get_tensor_by_name("time12.979633")
+
+        # Access an arbitrary frame to make sure that the later iteration
+        # still works as expected. The underlying C++ decoder object is
+        # actually stateful, and accessing a frame will move its internal
+        # cursor.
+        assert_tensor_equal(ref_frame35, decoder[35])
 
         for i, frame in enumerate(decoder):
             if i == 0:
                 assert_tensor_equal(ref_frame0, frame)
             elif i == 1:
                 assert_tensor_equal(ref_frame1, frame)
+            elif i == 9:
+                assert_tensor_equal(ref_frame9, frame)
+            elif i == 35:
+                assert_tensor_equal(ref_frame35, frame)
             elif i == 180:
                 assert_tensor_equal(ref_frame180, frame)
             elif i == 389:
