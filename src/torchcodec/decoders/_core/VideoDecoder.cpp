@@ -713,6 +713,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.pts = frame->pts;
   output.ptsSeconds =
       1.0 * frame->pts / formatContext_->streams[streamIndex]->time_base.den;
+  output.duration = getDuration(frame);
+  output.durationSeconds = 1.0 * getDuration(frame) /
+      formatContext_->streams[streamIndex]->time_base.den;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     output.frame =
         convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());

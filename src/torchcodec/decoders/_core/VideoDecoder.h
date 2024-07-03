@@ -164,6 +164,10 @@ class VideoDecoder {
     int64_t pts;
     // The presentation timestamp of the decoded frame in seconds.
     double ptsSeconds;
+    // The duration of the decoded frame in time base.
+    int64_t duration;
+    // The duration of the decoded frame in seconds.
+    double durationSeconds;
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
