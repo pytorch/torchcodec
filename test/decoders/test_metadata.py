@@ -6,11 +6,11 @@ from torchcodec.decoders._core import (
     StreamMetadata,
 )
 
-from ..test_utils import get_reference_video_path
+from ..test_utils import NASA_VIDEO
 
 
 def test_get_video_metadata():
-    decoder = create_from_file(str(get_reference_video_path()))
+    decoder = create_from_file(str(NASA_VIDEO.path))
     metadata = get_video_metadata(decoder)
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
