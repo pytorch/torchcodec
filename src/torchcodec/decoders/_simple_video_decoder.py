@@ -67,17 +67,6 @@ class SimpleVideoDecoder:
             f"Unsupported key type: {type(key)}. Supported types are int and slice."
         )
 
-    def __iter__(self) -> "SimpleVideoDecoder":
-        return self
-
-    def __next__(self) -> torch.Tensor:
-        # TODO: We should distinguish between expected end-of-file and unexpected
-        # runtime error.
-        try:
-            return core.get_next_frame(self._decoder)
-        except RuntimeError:
-            raise StopIteration()
-
 
 def _get_and_validate_stream_metadata(decoder: torch.Tensor) -> core.StreamMetadata:
     video_metadata = core.get_video_metadata(decoder)
