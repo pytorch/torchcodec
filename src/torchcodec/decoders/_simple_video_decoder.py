@@ -9,7 +9,7 @@ from torchcodec.decoders import _core as core
 class SimpleVideoDecoder:
     """TODO: Add docstring."""
 
-    def __init__(self, source: Union[str, bytes, torch.Tensor]):
+    def __init__(self, source: Union[str, Path, bytes, torch.Tensor]):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
         elif isinstance(source, Path):
