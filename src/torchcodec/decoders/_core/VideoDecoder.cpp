@@ -176,7 +176,7 @@ void VideoDecoder::initializeDecoder() {
   if (bestVideoStream >= 0) {
     containerMetadata_.bestVideoStreamIndex = bestVideoStream;
   }
-  int bestAudioStream = getBestStreamIndex(AVMEDIA_TYPE_VIDEO);
+  int bestAudioStream = getBestStreamIndex(AVMEDIA_TYPE_AUDIO);
   if (bestAudioStream >= 0) {
     containerMetadata_.bestAudioStreamIndex = bestAudioStream;
   }

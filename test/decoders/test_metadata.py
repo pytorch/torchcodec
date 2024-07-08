@@ -16,7 +16,7 @@ def test_get_video_metadata():
     metadata = get_video_metadata(decoder)
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
-    assert metadata.best_audio_stream_index == 3
+    assert metadata.best_audio_stream_index == 4
 
     with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
         metadata.duration_seconds
