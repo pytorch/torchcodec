@@ -10,10 +10,7 @@ from torchcodec.samplers import (
     VideoClipSampler,
 )
 
-from ..test_utils import (  # noqa: F401; see use in test_sampler
-    assert_tensor_equal,
-    reference_video_tensor,
-)
+from ..test_utils import assert_tensor_equal, NASA_VIDEO
 
 
 @pytest.mark.parametrize(
@@ -33,15 +30,12 @@ from ..test_utils import (  # noqa: F401; see use in test_sampler
         ),
     ],
 )
-def test_sampler(
-    sampler_args,
-    reference_video_tensor,  # noqa: F811; linter does not see this as a use
-):
+def test_sampler(sampler_args):
     torch.manual_seed(0)
     desired_width, desired_height = 320, 240
     video_args = VideoArgs(desired_width=desired_width, desired_height=desired_height)
     sampler = VideoClipSampler(video_args, sampler_args)
-    clips = sampler(reference_video_tensor)
+    clips = sampler(NASA_VIDEO.to_tensor())
     assert_tensor_equal(len(clips), sampler_args.clips_per_video)
     clip = clips[0]
     if isinstance(sampler_args, TimeBasedSamplerArgs):
