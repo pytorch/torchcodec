@@ -5,7 +5,6 @@ import pathlib
 from dataclasses import dataclass
 
 import numpy as np
-import pytest
 
 import torch
 
@@ -34,11 +33,6 @@ def _get_file_path(filename: str) -> pathlib.Path:
 def _load_tensor_from_file(filename: str) -> torch.Tensor:
     file_path = _get_file_path(filename)
     return torch.load(file_path, weights_only=True)
-
-
-@pytest.fixture()
-def reference_video_tensor() -> torch.Tensor:
-    return NASA_VIDEO.to_tensor()
 
 
 @dataclass
