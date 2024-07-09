@@ -1,3 +1,5 @@
+import functools
+
 import pytest
 
 from torchcodec.decoders._core import (
@@ -11,24 +13,29 @@ from torchcodec.decoders._core import (
 from ..test_utils import NASA_VIDEO
 
 
+def _get_video_metadata(path, with_scan: bool):
+    decoder = create_from_file(str(path))
+    if with_scan:
+        scan_all_streams_to_update_metadata(decoder)
+    return get_video_metadata(decoder)
+
+
 @pytest.mark.parametrize(
-    "technique",
+    "metadata_getter",
     (
-        "probe_video_metadata_from_header",
-        "get_video_metadata_with_scan",
-        "get_video_metadata_without_scan",
+        probe_video_metadata_headers,
+        functools.partial(_get_video_metadata, with_scan=False),
+        functools.partial(_get_video_metadata, with_scan=True),
     ),
 )
-def test_get_metadata(technique):
-    with_scan = technique == "get_video_metadata_with_scan"
+def test_get_metadata(metadata_getter):
+    with_scan = (
+        metadata_getter.keywords["with_scan"]
+        if isinstance(metadata_getter, functools.partial)
+        else False
+    )
 
-    if technique == "probe_video_metadata_from_header":
-        metadata = probe_video_metadata_headers(NASA_VIDEO.path)
-    else:
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        if with_scan:
-            scan_all_streams_to_update_metadata(decoder)
-        metadata = get_video_metadata(decoder)
+    metadata = metadata_getter(NASA_VIDEO.path)
 
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
