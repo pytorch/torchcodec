@@ -10,7 +10,7 @@ from torchcodec.samplers import (
     VideoClipSampler,
 )
 
-from ..test_utils import assert_tensor_equal, NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
 @pytest.mark.parametrize(

@@ -26,7 +26,7 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
-from ..test_utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
