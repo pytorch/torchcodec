@@ -1,13 +1,15 @@
 import json
+import pathlib
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 
 from torchcodec.decoders._core.video_decoder_ops import (
     _get_container_json_metadata,
     _get_stream_json_metadata,
+    create_from_file,
 )
 
 
@@ -90,3 +92,7 @@ def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
         best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
         streams=streams_metadata,
     )
+
+
+def probe_video_metadata_headers(filename: Union[str, pathlib.Path]) -> VideoMetadata:
+    return get_video_metadata(create_from_file(str(filename)))

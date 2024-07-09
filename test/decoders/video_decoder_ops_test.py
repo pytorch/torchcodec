@@ -247,11 +247,6 @@ class TestOps:
 
     # TODO: Keeping the metadata tests below for now, but we should remove them
     # once we remove get_json_metadata().
-    # Note that the distinction made between test_video_get_json_metadata and
-    # test_video_get_json_metadata_with_stream is misleading: all of the stream
-    # metadata are available even without adding a video stream, because we
-    # always call scanFileAndUpdateMetadataAndIndex() when creating a decoder
-    # from the core API.
     def test_video_get_json_metadata(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         metadata = get_json_metadata(decoder)

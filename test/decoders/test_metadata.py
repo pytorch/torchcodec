@@ -3,6 +3,7 @@ import pytest
 from torchcodec.decoders._core import (
     create_from_file,
     get_video_metadata,
+    probe_video_metadata_headers,
     scan_all_streams_to_update_metadata,
     StreamMetadata,
 )
@@ -10,10 +11,25 @@ from torchcodec.decoders._core import (
 from ..test_utils import NASA_VIDEO
 
 
-def test_get_video_metadata():
-    decoder = create_from_file(str(NASA_VIDEO.path))
-    scan_all_streams_to_update_metadata(decoder)
-    metadata = get_video_metadata(decoder)
+@pytest.mark.parametrize(
+    "technique",
+    (
+        "probe_video_metadata_from_header",
+        "get_video_metadata_with_scan",
+        "get_video_metadata_without_scan",
+    ),
+)
+def test_get_metadata(technique):
+    with_scan = technique == "get_video_metadata_with_scan"
+
+    if technique == "probe_video_metadata_from_header":
+        metadata = probe_video_metadata_headers(NASA_VIDEO.path)
+    else:
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        if with_scan:
+            scan_all_streams_to_update_metadata(decoder)
+        metadata = get_video_metadata(decoder)
+
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
     assert metadata.best_audio_stream_index == 4
@@ -34,8 +50,9 @@ def test_get_video_metadata():
     assert best_stream_metadata.bit_rate == 128783
     assert best_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
     assert best_stream_metadata.codec == "h264"
-    assert best_stream_metadata.num_frames_computed == 390
+    assert best_stream_metadata.num_frames_computed == (390 if with_scan else None)
     assert best_stream_metadata.num_frames_retrieved == 390
+    assert best_stream_metadata.num_frames == 390
 
 
 @pytest.mark.parametrize(
