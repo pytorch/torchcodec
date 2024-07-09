@@ -14,7 +14,7 @@ VIDEO_PATH=$RESOURCES_DIR/nasa_13013.mp4
 # Last generated with ffmpeg version 4.3
 #
 # Note: The naming scheme used here must match the naming scheme used to load
-# tensors in test_utils.py.
+# tensors in ./utils.py.
 FRAMES=(0 1 2 3 4 5 6 7 8 9)
 FRAMES+=(15 20 25 30 35)
 FRAMES+=(386 387 388 389)

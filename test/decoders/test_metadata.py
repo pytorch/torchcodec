@@ -7,7 +7,7 @@ from torchcodec.decoders._core import (
     StreamMetadata,
 )
 
-from ..test_utils import NASA_VIDEO
+from ..utils import NASA_VIDEO
 
 
 def test_get_video_metadata():

@@ -3,7 +3,7 @@ import torch
 
 from torchcodec.decoders import _core, SimpleVideoDecoder
 
-from ..test_utils import assert_tensor_equal, NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
 class TestSimpleDecoder:
