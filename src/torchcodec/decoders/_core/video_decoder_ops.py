@@ -186,7 +186,9 @@ def get_container_json_metadata_abstract(decoder: torch.Tensor) -> torch.Tensor:
 
 
 @impl_abstract("torchcodec_ns::get_stream_json_metadata")
-def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> torch.Tensor:
+def get_stream_json_metadata_abstract(
+    decoder: torch.Tensor, stream_idx: int
+) -> torch.Tensor:
     return torch.empty_like("")  # type: ignore[arg-type]
 
 
