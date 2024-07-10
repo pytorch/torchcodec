@@ -176,23 +176,25 @@ def get_frames_in_range_abstract(
 
 
 @impl_abstract("torchcodec_ns::get_json_metadata")
-def get_json_metadata_abstract(decoder: torch.Tensor) -> str:
-    return torch.empty_like("")
+def get_json_metadata_abstract(decoder: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like("")  # type: ignore[arg-type]
 
 
 @impl_abstract("torchcodec_ns::get_container_json_metadata")
-def get_container_json_metadata_abstract(decoder: torch.Tensor) -> str:
-    return torch.empty_like("")
+def get_container_json_metadata_abstract(decoder: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like("")  # type: ignore[arg-type]
 
 
 @impl_abstract("torchcodec_ns::get_stream_json_metadata")
-def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> str:
-    return torch.empty_like("")
+def get_stream_json_metadata_abstract(
+    decoder: torch.Tensor, stream_idx: int
+) -> torch.Tensor:
+    return torch.empty_like("")  # type: ignore[arg-type]
 
 
 @impl_abstract("torchcodec_ns::_get_json_ffmpeg_library_versions")
-def _get_json_ffmpeg_library_versions_abstract() -> str:
-    return torch.empty_like("")
+def _get_json_ffmpeg_library_versions_abstract() -> torch.Tensor:
+    return torch.empty_like("")  # type: ignore[arg-type]
 
 
 @impl_abstract("torchcodec_ns::scan_all_streams_to_update_metadata")

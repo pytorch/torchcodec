@@ -60,7 +60,7 @@ class VideoMetadata:
         return self.streams[self.best_video_stream_index]
 
 
-def get_video_metadata(decoder: torch.tensor) -> VideoMetadata:
+def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
 
     container_dict = json.loads(_get_container_json_metadata(decoder))
     streams_metadata = []
