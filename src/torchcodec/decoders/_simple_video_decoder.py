@@ -27,7 +27,7 @@ class SimpleVideoDecoder:
         core.add_video_stream(self._decoder)
 
         self.stream_metadata = _get_and_validate_stream_metadata(self._decoder)
-        self._num_frames = self.stream_metadata.num_frames_computed
+        self._num_frames: int = self.stream_metadata.num_frames_computed  # type: ignore[assignment]
         self._stream_index = self.stream_metadata.stream_index
 
     def __len__(self) -> int:

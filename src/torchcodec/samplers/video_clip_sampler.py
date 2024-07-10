@@ -134,7 +134,7 @@ class VideoClipSampler(nn.Module):
         self.sampler_args = sampler_args
         self.decorder_args = DecoderArgs() if decorder_args is None else decorder_args
 
-    def forward(self, video_data: Tensor) -> Union[List[List[Tensor]], List[Tensor]]:
+    def forward(self, video_data: Tensor) -> Union[List[Any]]:
         """Sample video clips from the video data
 
         Args:
@@ -162,8 +162,7 @@ class VideoClipSampler(nn.Module):
             num_threads=self.decorder_args.num_threads,
         )
 
-        clips = []
-
+        clips: List[Any] = []
         # Cast sampler args to be time based or index based
         if isinstance(self.sampler_args, TimeBasedSamplerArgs):
             time_based_sampler_args = self.sampler_args
@@ -218,7 +217,6 @@ class VideoClipSampler(nn.Module):
         )
         sampler_type = index_based_sampler_args.sampler_type
 
-        clip_start_idxs = []
         if sampler_type == "random":
             clip_start_idxs = torch.randint(
                 sample_start_index,
@@ -252,7 +250,7 @@ class VideoClipSampler(nn.Module):
         self,
         metadata_json: Dict[str, Any],
         time_based_sampler_args: TimeBasedSamplerArgs,
-    ):
+    ) -> List[float]:
         """Get start seconds for each clip.
         Given different sampler type, the API returns different clip start seconds.
 
