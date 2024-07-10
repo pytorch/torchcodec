@@ -68,7 +68,7 @@ TBD
 
 ### Code formatting and typing
 
-TBD
+TODO: instructions for pre-commit and mypy
 
 ## License
 
