@@ -45,7 +45,7 @@ class SimpleVideoDecoder:
 
         return core.get_frame_at_index(
             self._decoder, frame_index=key, stream_index=self._stream_index
-        )
+        )[0]
 
     def _getitem_slice(self, key: slice) -> torch.Tensor:
         assert isinstance(key, slice)

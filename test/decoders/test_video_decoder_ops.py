@@ -17,7 +17,6 @@ from torchcodec.decoders._core import (
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
-    get_frame_with_info_at_index,
     get_frames_at_indices,
     get_frames_in_range,
     get_json_metadata,
@@ -36,7 +35,7 @@ class ReferenceDecoder:
         self.decoder: torch.Tensor = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(self.decoder)
 
-    def get_next_frame(self) -> torch.Tensor:
+    def get_next_frame(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         assert self.decoder is not None
         return get_next_frame(self.decoder)
 
@@ -50,14 +49,14 @@ class TestOps:
     def test_seek_and_next(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder)
-        frame0 = get_next_frame(decoder)
+        frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
         reference_frame1 = NASA_VIDEO.get_tensor_by_index(1)
-        frame1 = get_next_frame(decoder)
+        frame1, _, _ = get_next_frame(decoder)
         assert_tensor_equal(frame1, reference_frame1)
         seek_to_pts(decoder, 6.0)
-        frame_time6 = get_next_frame(decoder)
+        frame_time6, _, _ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
@@ -66,17 +65,17 @@ class TestOps:
         add_video_stream(decoder)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
-        frame6 = get_frame_at_pts(decoder, 6.006)
+        frame6, _, _ = get_frame_at_pts(decoder, 6.006)
         reference_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
-        frame6 = get_frame_at_pts(decoder, 6.02)
+        frame6, _, _ = get_frame_at_pts(decoder, 6.02)
         assert_tensor_equal(frame6, reference_frame6)
-        frame6 = get_frame_at_pts(decoder, 6.039366)
+        frame6, _, _ = get_frame_at_pts(decoder, 6.039366)
         assert_tensor_equal(frame6, reference_frame6)
         # Note that this timestamp is exactly on a frame boundary, so it should
         # return the next frame since the right boundary of the interval is
         # open.
-        next_frame = get_frame_at_pts(decoder, 6.039367)
+        next_frame, _, _ = get_frame_at_pts(decoder, 6.039367)
         with pytest.raises(AssertionError):
             assert_tensor_equal(next_frame, reference_frame6)
 
@@ -84,11 +83,11 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
-        frame0 = get_frame_at_index(decoder, stream_index=3, frame_index=0)
+        frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
         # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
-        frame6 = get_frame_at_index(decoder, stream_index=3, frame_index=180)
+        frame6, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
 
@@ -96,13 +95,13 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
-        frame6, pts, duration = get_frame_with_info_at_index(
+        frame6, pts, duration = get_frame_at_index(
             decoder, stream_index=3, frame_index=180
         )
         reference_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
-        assert pts == 6.006
-        assert duration == pytest.approx(0.03337, rel=1e-3)
+        assert pts.item() == pytest.approx(6.006, rel=1e-3)
+        assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
     def test_get_frames_at_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -166,7 +165,7 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder)
         seek_to_pts(decoder, 12.979633)
-        last_frame = get_next_frame(decoder)
+        last_frame, _, _ = get_next_frame(decoder)
         reference_last_frame = NASA_VIDEO.get_tensor_by_name("time12.979633")
         assert_tensor_equal(last_frame, reference_last_frame)
         with pytest.raises(RuntimeError, match="End of file"):
@@ -187,9 +186,9 @@ class TestOps:
         @torch.compile(fullgraph=True, backend="eager")
         def get_frame1_and_frame_time6(decoder):
             add_video_stream(decoder)
-            frame0 = get_next_frame(decoder)
+            frame0, _, _ = get_next_frame(decoder)
             seek_to_pts(decoder, 6.0)
-            frame_time6 = get_next_frame(decoder)
+            frame_time6, _, _ = get_next_frame(decoder)
             return frame0, frame_time6
 
         # NB: create needs to happen outside the torch.compile region,
@@ -207,9 +206,9 @@ class TestOps:
         def class_based_get_frame1_and_frame_time6(
             decoder: ReferenceDecoder,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
-            frame0 = decoder.get_next_frame()
+            frame0, _, _ = decoder.get_next_frame()
             decoder.seek(6.0)
-            frame_time6 = decoder.get_next_frame()
+            frame_time6, _, _ = decoder.get_next_frame()
             return frame0, frame_time6
 
         decoder = ReferenceDecoder()
@@ -234,14 +233,14 @@ class TestOps:
             decoder = create_from_bytes(video_bytes)
 
         add_video_stream(decoder)
-        frame0 = get_next_frame(decoder)
+        frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_tensor_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
         reference_frame1 = NASA_VIDEO.get_tensor_by_index(1)
-        frame1 = get_next_frame(decoder)
+        frame1, _, _ = get_next_frame(decoder)
         assert_tensor_equal(frame1, reference_frame1)
         seek_to_pts(decoder, 6.0)
-        frame_time6 = get_next_frame(decoder)
+        frame_time6, _, _ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
