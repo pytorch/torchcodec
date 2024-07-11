@@ -21,7 +21,7 @@ print(f"The max minor version is {max_minor_version}")
 
 if max_minor_version > MAX_MINOR_ALLOWED:
     raise AssertionError(
-        f"The max minor version {max_minor_version} is greater than {MAX_MINOR_ALLOWED = }. "
+        f"The max minor version {max_minor_version} is greater than {MAX_MINOR_ALLOWED=}. "
         "That may leads to compatibility issues. Was the wheel compiled with an old-enough toolchain?"
     )
 
