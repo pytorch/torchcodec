@@ -64,8 +64,6 @@ jobs:
           assert_not_in_wheel $wheel_path "^test"
           assert_not_in_wheel $wheel_path "^doc"
           assert_not_in_wheel $wheel_path "^benchmarks"
-
-          find . | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.
       - uses: actions/upload-artifact@v4
         with:
           name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
