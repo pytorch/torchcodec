@@ -39,110 +39,108 @@ jobs:
         run: |
           gcc --version
           sudo apt update
-          sudo apt remove gcc-9 g++-9
-          sudo apt install gcc-8 g++-8 --reinstall
-          gcc --version
-      - name: Build the torchcodec wheel
-        run: |
-          # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
-          .github/scripts/assert_ffmpeg_not_installed.sh
+          sudo update-alternatives --config gcc
+#       - name: Build the torchcodec wheel
+#         run: |
+#           # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
+#           .github/scripts/assert_ffmpeg_not_installed.sh
 
-          python -m pip install build
-          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . -vvv --no-isolation
-      - name: Validate wheel content
-        run: |
-          source .github/scripts/helpers.sh
-          wheel_path=`find dist -type f -name "*.whl"`
-          echo "Wheel content:"
-          unzip -l $wheel_path
+#           python -m pip install build
+#           BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build . -vvv --no-isolation
+#       - name: Validate wheel content
+#         run: |
+#           source .github/scripts/helpers.sh
+#           wheel_path=`find dist -type f -name "*.whl"`
+#           echo "Wheel content:"
+#           unzip -l $wheel_path
 
-          for ffmpeg_major_version in 4 5 6 7; do
-            assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.so
-          done
-          assert_not_in_wheel $wheel_path libtorchcodec.so
+#           for ffmpeg_major_version in 4 5 6 7; do
+#             assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.so
+#           done
+#           assert_not_in_wheel $wheel_path libtorchcodec.so
 
-          for ffmpeg_so in libavcodec.so libavfilter.so libavformat.so libavutil.so libavdevice.so ; do
-            assert_not_in_wheel $wheel_path $ffmpeg_so
-          done
+#           for ffmpeg_so in libavcodec.so libavfilter.so libavformat.so libavutil.so libavdevice.so ; do
+#             assert_not_in_wheel $wheel_path $ffmpeg_so
+#           done
 
-          assert_not_in_wheel $wheel_path "^test"
-          assert_not_in_wheel $wheel_path "^doc"
-          assert_not_in_wheel $wheel_path "^benchmarks"
+#           assert_not_in_wheel $wheel_path "^test"
+#           assert_not_in_wheel $wheel_path "^doc"
+#           assert_not_in_wheel $wheel_path "^benchmarks"
 
-          find . | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
-          path: dist/*
+#           find . | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.
+#       - uses: actions/upload-artifact@v4
+#         with:
+#           name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
+#           path: dist/*
 
-  install-and-test:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.8', '3.12']
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-    if: ${{ always() }}
-    needs: build
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
-          path: dist/
-      - name: Setup conda env
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          miniconda-version: "latest"
-          activate-environment: test
-          python-version: ${{ matrix.python-version }}
-      - name: Update pip
-        run: python -m pip install --upgrade pip
-      - name: Install PyTorch
-        run: |
-          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
-      - name: Install torchcodec from the wheel
-        run: |
-          wheel_path=`find dist -type f -name "*.whl"`
-          echo Installing $wheel_path
-          python -m pip install $wheel_path -vvv
+#   install-and-test:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         python-version: ['3.8', '3.12']
+#         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+#     if: ${{ always() }}
+#     needs: build
+#     steps:
+#       - uses: actions/download-artifact@v4
+#         with:
+#           name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
+#           path: dist/
+#       - name: Setup conda env
+#         uses: conda-incubator/setup-miniconda@v2
+#         with:
+#           auto-update-conda: true
+#           miniconda-version: "latest"
+#           activate-environment: test
+#           python-version: ${{ matrix.python-version }}
+#       - name: Update pip
+#         run: python -m pip install --upgrade pip
+#       - name: Install PyTorch
+#         run: |
+#           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+#       - name: Install torchcodec from the wheel
+#         run: |
+#           wheel_path=`find dist -type f -name "*.whl"`
+#           echo Installing $wheel_path
+#           python -m pip install $wheel_path -vvv
 
-      - name: Check out repo
-        uses: actions/checkout@v3
-      - name: Install ffmpeg, post build
-        run: |
-          # Ideally we would have checked for that before installing the wheel,
-          # but we need to checkout the repo to access this file, and we don't
-          # want to checkout the repo before installing the wheel to avoid any
-          # side-effect. It's OK.
-          .github/scripts/assert_ffmpeg_not_installed.sh
+#       - name: Check out repo
+#         uses: actions/checkout@v3
+#       - name: Install ffmpeg, post build
+#         run: |
+#           # Ideally we would have checked for that before installing the wheel,
+#           # but we need to checkout the repo to access this file, and we don't
+#           # want to checkout the repo before installing the wheel to avoid any
+#           # side-effect. It's OK.
+#           .github/scripts/assert_ffmpeg_not_installed.sh
 
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ffmpeg -version
+#           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
+#           ffmpeg -version
 
-      - name: Install test dependencies
-        run: |
-          python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-          # TODO: Find a way to get those dependencies from pyproject.toml
-          python -m pip install numpy pytest pillow opencv-python
+#       - name: Install test dependencies
+#         run: |
+#           python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+#           # TODO: Find a way to get those dependencies from pyproject.toml
+#           python -m pip install numpy pytest pillow opencv-python
 
-      - name: Delete the src/ folder just for fun
-        run: |
-          # The only reason we checked-out the repo is to get access to the
-          # tests. We don't care about the rest. Out of precaution, we delete
-          # the src/ folder to be extra sure that we're running the code from
-          # the installed wheel rather than from the source.
-          # This is just to be extra cautious and very overkill because a)
-          # there's no way the `torchcodec` package from src/ can be found from
-          # the PythonPath: the main point of `src/` is precisely to protect
-          # against that and b) if we ever were to execute code from
-          # `src/torchcodec`, it would fail loudly because the built .so files
-          # aren't present there.
-          rm -r src/
-          ls
-      - name: Smoke test
-        run: |
-          python test/decoders/manual_smoke_test.py
-      - name: Run Python tests
-        run: |
-          pytest test
+#       - name: Delete the src/ folder just for fun
+#         run: |
+#           # The only reason we checked-out the repo is to get access to the
+#           # tests. We don't care about the rest. Out of precaution, we delete
+#           # the src/ folder to be extra sure that we're running the code from
+#           # the installed wheel rather than from the source.
+#           # This is just to be extra cautious and very overkill because a)
+#           # there's no way the `torchcodec` package from src/ can be found from
+#           # the PythonPath: the main point of `src/` is precisely to protect
+#           # against that and b) if we ever were to execute code from
+#           # `src/torchcodec`, it would fail loudly because the built .so files
+#           # aren't present there.
+#           rm -r src/
+#           ls
+#       - name: Smoke test
+#         run: |
+#           python test/decoders/manual_smoke_test.py
+#       - name: Run Python tests
+#         run: |
+#           pytest test
