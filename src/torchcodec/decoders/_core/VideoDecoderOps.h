@@ -36,23 +36,26 @@ void add_video_stream(
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
 
+// The first element of this tuple has the frame data. The second element is a
+// Tensor that has a single float value for the PTS and the third element is a
+// Tensor that has a single value for the duration.
+// The reason we use Tensors for the second and third value is so we can run
+// under torch.compile().
+using TensorPtsDuration = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
 // given timestamp T has T >= PTS and T < PTS + Duration.
-at::Tensor get_frame_at_pts(at::Tensor& decoder, double seconds);
+TensorPtsDuration get_frame_at_pts(at::Tensor& decoder, double seconds);
 
 // Return the frame that is visible at a given index in the video.
-at::Tensor get_frame_at_index(
+TensorPtsDuration get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index);
 
-// Return the frame along with pts and duration that is visible at a given index
-// in the video.
-std::tuple<at::Tensor, double, double> get_frame_with_info_at_index(
-    at::Tensor& decoder,
-    int64_t stream_index,
-    int64_t frame_index);
+// Get the next frame from the video as a tensor.
+TensorPtsDuration get_next_frame(at::Tensor& decoder);
 
 // Return the frames at a given index for a given stream as a single stacked
 // Tensor.
@@ -70,9 +73,6 @@ at::Tensor get_frames_in_range(
     int64_t stop,
     std::optional<int64_t> step = std::nullopt);
 
-// Get the next frame from the video as a tensor.
-at::Tensor get_next_frame(at::Tensor& decoder);
-
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 
@@ -80,7 +80,7 @@ std::string get_json_metadata(at::Tensor& decoder);
 std::string get_container_json_metadata(at::Tensor& decoder);
 
 // Get the stream metadata as a string.
-std::string get_stream_json_metadata(at::Tensor& decoder);
+std::string get_stream_json_metadata(at::Tensor& decoder, int64_t stream_index);
 
 // Returns version information about the various FFMPEG libraries that are
 // loaded in the program's address space.
