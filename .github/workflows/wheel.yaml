@@ -38,6 +38,8 @@ jobs:
       - name: GCC version
         run: |
           gcc --version
+          sudo apt install gcc-9 g++-9
+          gcc --version
       - name: Build the torchcodec wheel
         run: |
           # Just for sanity, make sure FFmpeg isn't installed or needed for buidling.
