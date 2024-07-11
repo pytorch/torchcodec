@@ -39,6 +39,7 @@ jobs:
         run: |
           gcc --version
           sudo apt update
+          sudo apt remove gcc-9 g++-9
           sudo apt install gcc-9 g++-9 --reinstall
           gcc --version
       - name: Build the torchcodec wheel
