@@ -3,7 +3,7 @@ The goal of this script is to ensure that the .so files we ship do not contain
 symbol versions from libstdc++ that are too recent.
 
 Why this is needed: during development, we observed the following general
-scenario in various local developement setups:
+scenario in various local development setups:
 - torchcodec is compiled with a given (somewhat recent) c++ toolchain (say
   gcc11)
 - because the toolchain is recent, some recent symbol versions from libstdc++
