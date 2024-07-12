@@ -14,12 +14,14 @@ scenario in various local development setups:
   older than the toolchain one, and it doesn't contain the more recent symbols
   that torchcodec?.so depends on, which leads to a runtime error.
 
-The reasons why a different libstdc++.so is loaded at runtime can be various and
-mysterious (https://hackmd.io/@_NznxihTSmC-IgW4cgnlyQ/HJXc4BEHR).
+The reasons why a different libstdc++.so is loaded at runtime can be multiple
+(and mysterious! https://hackmd.io/@_NznxihTSmC-IgW4cgnlyQ/HJXc4BEHR).
 
-This script doesn't try to prevent *that* (it's impossible anyway, we don't
-control users' environments). Instead it prevents the existence of recent symbol
-versions. The most recent symbol on the manylinux torch.2.3.1 wheel is
+This script doesn't try to prevent *that* (it's impossible anyway, as we don't
+control users' environments). Instead, it prevents the dependency of torchcodec
+on recent symbol versions, which ensures that torchcodec can run on both recent
+*and* older runtimes.
+The most recent symbol on the manylinux torch.2.3.1 wheel is
 GLIBCXX_3.4.19, so as long as torchcodec doesn't ship a symbol that is higher
 than that, torchcodec should be fine.
 
