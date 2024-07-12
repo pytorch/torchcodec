@@ -145,7 +145,8 @@ void runNDecodeIterationsWithCustomOps(
 
     for (double pts : ptsList) {
       seekFrameOp.call(decoderTensor, pts);
-      torch::Tensor tensor = getNextFrameOp.call(decoderTensor);
+      auto result = getNextFrameOp.call(decoderTensor);
+      torch::Tensor tensor = std::get<0>(result);
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
