@@ -1,7 +1,7 @@
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Iterator, Tuple, Union
 
 from torch import Tensor
 
@@ -19,6 +19,11 @@ class Frame(Iterable):
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
+
+
+_ERROR_REPORTING_INSTRUCTIONS = """
+This should never happen. Please report an issue following the steps in <TODO>.
+"""
 
 
 class SimpleVideoDecoder:
@@ -41,11 +46,29 @@ class SimpleVideoDecoder:
         core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(self._decoder)
 
-        self.stream_metadata = _get_and_validate_stream_metadata(self._decoder)
-        self._num_frames: int = self.stream_metadata.num_frames_computed  # type: ignore[assignment]
-        self._stream_index = self.stream_metadata.stream_index
-        self._min_pts_seconds: float = self.stream_metadata.min_pts_seconds  # type: ignore[assignment]
-        self._max_pts_seconds: float = self.stream_metadata.max_pts_seconds  # type: ignore[assignment]
+        self.metadata, self._stream_index = _get_and_validate_stream_metadata(
+            self._decoder
+        )
+
+        if self.metadata.num_frames_computed is None:
+            raise ValueError(
+                "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._num_frames = self.metadata.num_frames_computed
+
+        if self.metadata.min_pts_seconds is None:
+            raise ValueError(
+                "The minimum pts value in seconds is unknown. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._min_pts_seconds = self.metadata.min_pts_seconds
+
+        if self.metadata.max_pts_seconds is None:
+            raise ValueError(
+                "The maximum pts value in seconds is unknown. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._max_pts_seconds = self.metadata.max_pts_seconds
 
     def __len__(self) -> int:
         return self._num_frames
@@ -108,13 +131,14 @@ class SimpleVideoDecoder:
         return Frame(*frame)
 
 
-def _get_and_validate_stream_metadata(decoder: Tensor) -> core.StreamMetadata:
+def _get_and_validate_stream_metadata(
+    decoder: Tensor,
+) -> Tuple[core.StreamMetadata, int]:
     video_metadata = core.get_video_metadata(decoder)
 
     if video_metadata.best_video_stream_index is None:
         raise ValueError(
-            "The best video stream is unknown. This should never happen. "
-            "Please report an issue following the steps in <TODO>"
+            "The best video stream is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
         )
 
     best_stream_metadata = video_metadata.streams[
@@ -122,20 +146,7 @@ def _get_and_validate_stream_metadata(decoder: Tensor) -> core.StreamMetadata:
     ]
     if best_stream_metadata.num_frames_computed is None:
         raise ValueError(
-            "The number of frames is unknown. This should never happen. "
-            "Please report an issue following the steps in <TODO>"
+            "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
         )
 
-    if best_stream_metadata.min_pts_seconds is None:
-        raise ValueError(
-            "The minimum pts value in seconds is unknown. This should never happen. "
-            "Please report an issue following the steps in <TODO>"
-        )
-
-    if best_stream_metadata.max_pts_seconds is None:
-        raise ValueError(
-            "The maximum pts value in seconds is unknown. This should never happen. "
-            "Please report an issue following the steps in <TODO>"
-        )
-
-    return best_stream_metadata
+    return (best_stream_metadata, video_metadata.best_video_stream_index)

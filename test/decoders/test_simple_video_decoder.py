@@ -23,14 +23,14 @@ class TestSimpleDecoder:
             raise ValueError("Oops, double check the parametrization of this test!")
 
         decoder = SimpleVideoDecoder(source)
-        assert isinstance(decoder.stream_metadata, _core.StreamMetadata)
+        assert isinstance(decoder.metadata, _core.StreamMetadata)
         assert (
             len(decoder)
             == decoder._num_frames
-            == decoder.stream_metadata.num_frames_computed
+            == decoder.metadata.num_frames_computed
             == 390
         )
-        assert decoder._stream_index == decoder.stream_metadata.stream_index == 3
+        assert decoder._stream_index == decoder.metadata.stream_index == 3
 
     def test_create_fails(self):
         with pytest.raises(TypeError, match="Unknown source type"):
