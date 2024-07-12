@@ -78,7 +78,7 @@ jobs:
           symbols_matches=$(find $extracted_wheel_dir | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.)
           echo "lol"
           echo $symbols_matches
-          python .github/scripts/check_glibcxx.py $symbols_matches
+          python .github/scripts/check_glibcxx.py "$symbols_matches"
       - uses: actions/upload-artifact@v4
         with:
           name: sdist-and-wheel-linux_x86_${{ matrix.python-version }}
