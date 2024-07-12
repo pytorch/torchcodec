@@ -30,8 +30,8 @@ toolchain. In July 2024, pytorch libraries (and torchcodec) are built with gcc
 9.
 """
 
-import sys
 import re
+import sys
 
 if len(sys.argv) != 2:
     raise ValueError("Wrong usage: python check_glibcxx.py <str_with_symbols>.")
