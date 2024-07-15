@@ -40,7 +40,7 @@ jobs:
           # We want to build wheels on gcc 9 to be consistent with the torch
           # binaries, which is why we're using ubuntu-20.04 and not
           # ubuntu-latest. More details below about the GLIBCXX checks.
-          if ! gcc --version | grep -q 9.4.0
+          if ! gcc --version | grep -q -E "9\.[0-9]+\.[0-9]+"
           then
               echo "Wrong GCC version, exiting!"
               gcc --version
