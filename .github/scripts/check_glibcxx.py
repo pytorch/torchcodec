@@ -36,27 +36,27 @@ import sys
 if len(sys.argv) != 2:
     raise ValueError("Wrong usage: python check_glibcxx.py <str_with_symbols>.")
 
-MAX_MINOR_ALLOWED = 19
+MAX_ALLOWED = (3, 4, 19)
 
 all_symbols = set()
-max_minor_version = float("-inf")
 for line in sys.argv[1].split("\n"):
-    # We search for GLIBCXX_3.4.X where X is the minor version with 1 or 2 digits.
-    if match := re.search(r"GLIBCXX_3\.4\.(\d{1,2})", line):
+    # We search for GLIBCXX_major.minor.micro
+    if match := re.search(r"GLIBCXX_\d+\.\d+\.\d+", line):
         all_symbols.add(match.group(0))
-        max_minor_version = max(max_minor_version, int(match.group(1)))
 
 if not all_symbols:
     raise ValueError("No GLIBCXX symbols found. Something is wrong.")
 
-print(f"Found the following GLIBCXX symbol versions: {all_symbols}.")
-print(
-    f"The max minor version is {max_minor_version}. Max allowed is {MAX_MINOR_ALLOWED}."
-)
+all_versions = (symbol.split("_")[1].split(".") for symbol in all_symbols)
+all_versions = (tuple(int(v) for v in version) for version in all_versions)
+max_version = max(all_versions)
 
-if max_minor_version > MAX_MINOR_ALLOWED:
+print(f"Found the following GLIBCXX symbol versions: {all_symbols}.")
+print(f"The max version is {max_version}. Max allowed is {MAX_ALLOWED}.")
+
+if max_version > MAX_ALLOWED:
     raise AssertionError(
-        "The max minor version is greater than the max allowed! "
+        "The max version is greater than the max allowed! "
         "That may leads to compatibility issues. "
         "Was the wheel compiled with an old-enough toolchain?"
     )
