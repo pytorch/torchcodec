@@ -23,14 +23,14 @@ class TestSimpleDecoder:
             raise ValueError("Oops, double check the parametrization of this test!")
 
         decoder = SimpleVideoDecoder(source)
-        assert isinstance(decoder.stream_metadata, _core.StreamMetadata)
+        assert isinstance(decoder.metadata, _core.StreamMetadata)
         assert (
             len(decoder)
             == decoder._num_frames
-            == decoder.stream_metadata.num_frames_computed
+            == decoder.metadata.num_frames_computed
             == 390
         )
-        assert decoder._stream_index == decoder.stream_metadata.stream_index == 3
+        assert decoder._stream_index == decoder.metadata.stream_index == 3
 
     def test_create_fails(self):
         with pytest.raises(TypeError, match="Unknown source type"):
@@ -229,7 +229,7 @@ class TestSimpleDecoder:
                 assert_tensor_equal(ref_frame_last, frame)
 
     def test_iteration_slow(self):
-        decoder = SimpleVideoDecoder(str(NASA_VIDEO.path))
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
         ref_frame_last = NASA_VIDEO.get_tensor_by_index(389)
 
         # Force the decoder to seek around a lot while iterating; this will
@@ -241,6 +241,52 @@ class TestSimpleDecoder:
             iterations += 1
 
         assert iterations == len(decoder) == 390
+
+    def test_get_frame_at(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        ref_frame9 = NASA_VIDEO.get_tensor_by_index(9)
+        frame9 = decoder.get_frame_at(9)
+
+        assert_tensor_equal(ref_frame9, frame9.data)
+        assert frame9.pts_seconds == 0.3003
+        assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
+
+    def test_get_frame_at_tuple_unpacking(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        frame = decoder.get_frame_at(50)
+        data, pts, duration = decoder.get_frame_at(50)
+
+        assert_tensor_equal(frame.data, data)
+        assert frame.pts_seconds == pts
+        assert frame.duration_seconds == duration
+
+    def test_get_frame_at_fails(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(IndexError, match="out of bounds"):
+            frame = decoder.get_frame_at(-1)  # noqa
+
+        with pytest.raises(IndexError, match="out of bounds"):
+            frame = decoder.get_frame_at(10000)  # noqa
+
+    def test_get_frame_displayed_at(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        ref_frame6 = NASA_VIDEO.get_tensor_by_name("time6.000000")
+        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.02).data)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.039366).data)
+
+    def test_get_frame_displayed_at_fails(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(IndexError, match="Invalid pts in seconds"):
+            frame = decoder.get_frame_displayed_at(-1.0)  # noqa
+
+        with pytest.raises(IndexError, match="Invalid pts in seconds"):
+            frame = decoder.get_frame_displayed_at(100.0)  # noqa
 
 
 if __name__ == "__main__":

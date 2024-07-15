@@ -1,1 +1,1 @@
-from ._simple_video_decoder import SimpleVideoDecoder  # noqa
+from ._simple_video_decoder import Frame, SimpleVideoDecoder  # noqa
