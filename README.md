@@ -1,14 +1,33 @@
-TorchCodec
-==========
+# TorchCodec
 
-Welcome to TorchCodec!
+TorchCodec is a Python package with a goal to provide useful and fast APIs to
+decode video frames to Pytorch Tensors. Currently decoding happens on the CPU
+and we plan to add GPU acceleration.
 
-TODO: Write a decent readme. For now I'm just writing basic info for OSS
-development.
+## Installing TorchCodec
 
+```bash
+pip install torchcodec
+```
 
-Installing from source
-----------------------
+## Using TorchCodec
+
+A simple example showing how to decode video frames from a video file:
+
+```python
+# A simple example using TorchCodec
+from torchcodec.decoders import SimpleVideoDecoder
+video = SimpleVideoDecoder("/path/to/video.mp4")
+frame_count = len(video)
+# Returned frames are Pytorch Tensors with shape HWC.
+first_frame = video[0]
+last_frame = video[-1]
+frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
+```
+
+For more examples look at the `examples` directory.
+
+## Installing from source
 
 Use a conda or virtual environment.
 
@@ -35,8 +54,7 @@ conda install ffmpeg pkg-config -c conda-forge
 BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1
 ```
 
-Building the docs
------------------
+## Building the docs
 
 First install from source, then install the doc dependencies:
 
@@ -55,7 +73,7 @@ The built docs will be in `build/html`. Open in your browser to view them.
 
 To avoid building the examples (which execute python code and can take time) you
 can use `make html-noplot`. To build a subset of specific examples instead of
-all of them, you can use a regex like `EXAMPLES_PATTERN="plot_the_best_example*"
-make html`.
+all of them, you can use a regex like
+`EXAMPLES_PATTERN="plot_the_best_example*" make html`.
 
 Run `make clean` from time to time if you encounter issues.
