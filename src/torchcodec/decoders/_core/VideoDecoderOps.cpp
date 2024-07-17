@@ -1,6 +1,7 @@
 // (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
 #include "src/torchcodec/decoders/_core/VideoDecoderOps.h"
+#include <pybind11/pybind11.h>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -127,7 +128,12 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
 
 FramePtsDuration get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getNextDecodedOutput();
+  VideoDecoder::DecodedOutput result;
+  try {
+    result = videoDecoder->getNextDecodedOutput();
+  } catch (const VideoDecoder::EndOfFileException& e) {
+    throw pybind11::stop_iteration(e.what());
+  }
   if (result.frame.sizes().size() != 3) {
     throw std::runtime_error(
         "image_size is unexpected. Expected 3, got: " +
