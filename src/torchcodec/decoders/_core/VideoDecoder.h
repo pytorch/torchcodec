@@ -186,6 +186,13 @@ class VideoDecoder {
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
+    torch::Tensor ptsSeconds;
+    torch::Tensor durationSeconds;
+
+    explicit BatchDecodedOutput(
+        int64_t numFrames,
+        const VideoStreamDecoderOptions& options,
+        const StreamMetadata& metadata);
   };
   // Returns frames at the given indexes for a given stream as a single stacked
   // Tensor.

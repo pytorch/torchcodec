@@ -21,6 +21,17 @@ class Frame(Iterable):
             yield getattr(self, field.name)
 
 
+@dataclass
+class FrameBatch(Iterable):
+    data: Tensor
+    pts_seconds: Tensor
+    duration_seconds: Tensor
+
+    def __iter__(self) -> Iterator[Union[Tensor, float]]:
+        for field in dataclasses.fields(self):
+            yield getattr(self, field.name)
+
+
 _ERROR_REPORTING_INSTRUCTIONS = """
 This should never happen. Please report an issue following the steps in <TODO>.
 """
@@ -92,13 +103,14 @@ class SimpleVideoDecoder:
         assert isinstance(key, slice)
 
         start, stop, step = key.indices(len(self))
-        return core.get_frames_in_range(
+        frame_data, *_ = core.get_frames_in_range(
             self._decoder,
             stream_index=self._stream_index,
             start=start,
             stop=stop,
             step=step,
         )
+        return frame_data
 
     def __getitem__(self, key: Union[int, slice]) -> Tensor:
         if isinstance(key, int):
@@ -119,6 +131,26 @@ class SimpleVideoDecoder:
             self._decoder, frame_index=index, stream_index=self._stream_index
         )
         return Frame(*frame)
+
+    def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
+        if not 0 <= start < self._num_frames:
+            raise IndexError(
+                f"Start index {start} is out of bounds; must be in the range [0, {self._num_frames})."
+            )
+        if stop < start:
+            raise IndexError(
+                f"Stop index ({stop}) must not be less than the start index ({start})."
+            )
+        if not step > 0:
+            raise IndexError(f"Step ({step}) must be greater than 0.")
+        frames = core.get_frames_in_range(
+            self._decoder,
+            stream_index=self._stream_index,
+            start=start,
+            stop=stop,
+            step=step,
+        )
+        return FrameBatch(*frames)
 
     def get_frame_displayed_at(self, pts_seconds: float) -> Frame:
         if not self._min_pts_seconds <= pts_seconds < self._max_pts_seconds:
