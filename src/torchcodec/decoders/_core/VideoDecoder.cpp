@@ -688,6 +688,10 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     }
   }
   if (ffmpegStatus < AVSUCCESS) {
+    if (reachedEOF || ffmpegStatus == AVERROR_EOF) {
+      throw VideoDecoder::EndOfFileException(
+          "Requested next frame while there are no more frames left to decode.");
+    }
     throw std::runtime_error(
         "Could not receive frame from decoder: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));

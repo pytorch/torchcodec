@@ -105,11 +105,13 @@ class CMakeBuild(build_ext):
         # python setup.py build_ext --debug install
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_build_type = os.environ.get("CMAKE_BUILD_TYPE", "Release")
+        python_version = sys.version_info
         cmake_args = [
             f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
             f"-DCMAKE_BUILD_TYPE={cmake_build_type}",
+            f"-DPYTHON_VERSION={python_version.major}.{python_version.minor}",
         ]
 
         Path(self.build_temp).mkdir(parents=True, exist_ok=True)

@@ -169,6 +169,11 @@ class VideoDecoder {
     // The duration of the decoded frame in seconds.
     double durationSeconds;
   };
+  class EndOfFileException : public std::runtime_error {
+   public:
+    explicit EndOfFileException(const std::string& msg)
+        : std::runtime_error(msg) {}
+  };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
   DecodedOutput getNextDecodedOutput();

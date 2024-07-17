@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
 function(make_torchcodec_library library_name ffmpeg_target)
     set(
@@ -24,12 +25,15 @@ function(make_torchcodec_library library_name ffmpeg_target)
         PRIVATE
         ./../../../../
         "${TORCH_INSTALL_PREFIX}/include"
+        ${Python3_INCLUDE_DIRS}
     )
 
     target_link_libraries(
         ${library_name}
+        PUBLIC
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
+        ${Python3_LIBRARIES}
     )
 
     # We already set the library_name to be libtorchcodecN, so we don't want
