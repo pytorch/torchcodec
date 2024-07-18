@@ -227,7 +227,6 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
-    // TODO: Add duration and dts, etc. as need be.
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;

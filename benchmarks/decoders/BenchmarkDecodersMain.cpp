@@ -169,8 +169,6 @@ void runBenchmark() {
       build::getResourcePath(
           "pytorch/torchcodec/benchmarks/decoders/resources/nasa_13013.mp4")
           .string();
-  // TODO(T180763625): Add more test cases involving random seeks forwards and
-  // backwards.
   std::vector<double> ptsList = {
       0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
   runNDecodeIterations(videoPath, ptsList, 100, 5);

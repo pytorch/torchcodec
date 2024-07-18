@@ -47,8 +47,7 @@ AVInput createAVFormatContextFromBuffer(const void* buffer, size_t length) {
   TORCH_CHECK(
       toReturn.formatContext.get() != nullptr,
       "Unable to alloc avformat context");
-  // TODO(ahmads): Add an option to control this size.
-  constexpr int kAVIOInternalTemporaryBufferSize = 1024 * 1024;
+  constexpr int kAVIOInternalTemporaryBufferSize = 4 * 1024 * 1024;
   toReturn.ioBytesContext.reset(
       new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
   if (!toReturn.ioBytesContext) {
@@ -546,7 +545,8 @@ bool VideoDecoder::canWeAvoidSeekingForStream(
   if (currentPts == targetPts) {
     // We are seeking to the exact same frame as we are currently at. Without
     // caching we have to rewind back and decode the frame again.
-    // TODO(ahmads): We can avoid a seek+decode by caching the previous frame.
+    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // implement caching.
     return false;
   }
   // We are seeking forwards.
@@ -753,7 +753,8 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     output.frame =
         convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: implement audio AVFrame to Tensor conversion here.
+    // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
+    // audio decoding.
     throw std::runtime_error("Audio is not supported yet.");
   }
   return output;
