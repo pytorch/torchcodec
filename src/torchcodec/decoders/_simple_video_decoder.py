@@ -168,17 +168,11 @@ def _get_and_validate_stream_metadata(
 ) -> Tuple[core.StreamMetadata, int]:
     video_metadata = core.get_video_metadata(decoder)
 
-    if video_metadata.best_video_stream_index is None:
+    best_stream_index = video_metadata.best_video_stream_index
+    if best_stream_index is None:
         raise ValueError(
             "The best video stream is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
         )
 
-    best_stream_metadata = video_metadata.streams[
-        video_metadata.best_video_stream_index
-    ]
-    if best_stream_metadata.num_frames_computed is None:
-        raise ValueError(
-            "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
-        )
-
-    return (best_stream_metadata, video_metadata.best_video_stream_index)
+    best_stream_metadata = video_metadata.streams[best_stream_index]
+    return (best_stream_metadata, best_stream_index)
