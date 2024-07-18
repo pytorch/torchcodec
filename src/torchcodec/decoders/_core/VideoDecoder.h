@@ -276,6 +276,8 @@ class VideoDecoder {
   // for more details about the heuristics.
   int getBestStreamIndex(AVMediaType mediaType);
   void initializeDecoder();
+  void validateUserProvidedStreamIndex(uint64_t streamIndex);
+  void validateScannedAllStreams(const std::string& msg);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(
@@ -296,10 +298,6 @@ class VideoDecoder {
   DecodedOutput convertAVFrameToDecodedOutput(
       int streamIndex,
       UniqueAVFrame frame);
-  torch::Tensor getEmptyTensorForBatch(
-      int64_t numFrames,
-      const VideoStreamDecoderOptions& options,
-      const StreamMetadata& metadata);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
