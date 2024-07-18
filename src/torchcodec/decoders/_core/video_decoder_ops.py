@@ -121,7 +121,7 @@ def seek_abstract(decoder: torch.Tensor, seconds: float) -> None:
 @impl_abstract("torchcodec_ns::get_next_frame")
 def get_next_frame_abstract(
     decoder: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     # Images are 3 dimensions: height, width, channels.
     # The exact permutation depends on the constructor options passed in.
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
@@ -129,30 +129,33 @@ def get_next_frame_abstract(
         torch.empty(image_size),
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.int64),
     )
 
 
 @impl_abstract("torchcodec_ns::get_frame_at_pts")
 def get_frame_at_pts_abstract(
     decoder: torch.Tensor, seconds: float
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
     return (
         torch.empty(image_size),
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.int64),
     )
 
 
 @impl_abstract("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
     decoder: torch.Tensor, *, stream_index: int, frame_index: int
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
     return (
         torch.empty(image_size),
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.int64),
     )
 
 
@@ -175,9 +178,10 @@ def get_frames_in_range_abstract(
     start: int,
     stop: int,
     step: Optional[int] = None,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[int, torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return (
+        0,
         torch.empty(image_size),
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),

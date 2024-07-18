@@ -15,6 +15,7 @@ class Frame(Iterable):
     data: Tensor
     pts_seconds: float
     duration_seconds: float
+    stream_index: int
 
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
@@ -26,6 +27,7 @@ class FrameBatch(Iterable):
     data: Tensor
     pts_seconds: Tensor
     duration_seconds: Tensor
+    stream_indices: Tensor
 
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
