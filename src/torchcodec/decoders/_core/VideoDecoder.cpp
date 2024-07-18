@@ -784,21 +784,32 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
       });
 }
 
+void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
+  size_t streamsSize = containerMetadata_.streams.size();
+  TORCH_CHECK(
+      streamIndex >= 0 && streamIndex < streamsSize,
+      "Invalid stream index=" + std::to_string(streamIndex) +
+          "; valid indices are in the range [0, " +
+          std::to_string(streamsSize) + ").");
+  TORCH_CHECK(
+      streams_.count(streamIndex) > 0,
+      "Provided stream index=" + std::to_string(streamIndex) +
+          " was not previously added.");
+}
+
+void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
+  if (!scanned_all_streams_) {
+    throw std::runtime_error(
+        "Must scan all streams to update metadata before calling " + msg);
+  }
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
-  if (streamIndex < 0 || streamIndex >= containerMetadata_.streams.size()) {
-    throw std::runtime_error(
-        "Invalid stream index=" + std::to_string(streamIndex));
-  }
-  if (streams_.count(streamIndex) == 0) {
-    throw std::runtime_error(
-        "streamIndex=" + std::to_string(streamIndex) + " not added to decoder");
-  }
-  if (!scanned_all_streams_) {
-    throw std::runtime_error(
-        "Must scan all streams to update metadata before calling getFrameAtIndex");
-  }
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFrameAtIndex");
+
   const auto& stream = streams_[streamIndex];
   if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
     throw std::runtime_error(
@@ -814,24 +825,14 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
     int streamIndex,
     const std::vector<int64_t>& frameIndexes) {
-  if (streamIndex < 0 || streamIndex >= containerMetadata_.streams.size()) {
-    throw std::runtime_error(
-        "Invalid stream index=" + std::to_string(streamIndex));
-  }
-  if (!scanned_all_streams_) {
-    throw std::runtime_error(
-        "Must scan all streams to update metadata before calling getFrameAtIndex");
-  }
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesAtIndexes");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& options = streams_[streamIndex].options;
   BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
 
   int i = 0;
-  if (streams_.count(streamIndex) == 0) {
-    throw std::runtime_error(
-        "Invalid stream index=" + std::to_string(streamIndex));
-  }
   const auto& stream = streams_[streamIndex];
   for (int64_t frameIndex : frameIndexes) {
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
@@ -851,12 +852,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int64_t start,
     int64_t stop,
     int64_t step) {
-  TORCH_CHECK(
-      streamIndex >= 0 || streamIndex < containerMetadata_.streams.size(),
-      "Invalid stream index=" + std::to_string(streamIndex));
-  TORCH_CHECK(
-      streams_.count(streamIndex) > 0,
-      "Invalid stream index=" + std::to_string(streamIndex));
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesInRange");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
