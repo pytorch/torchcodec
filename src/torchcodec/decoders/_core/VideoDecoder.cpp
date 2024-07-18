@@ -124,6 +124,31 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
   }
 }
 
+VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
+    int64_t numFrames,
+    const VideoStreamDecoderOptions& options,
+    const StreamMetadata& metadata)
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
+  if (options.shape == "NHWC") {
+    frames = torch::empty(
+        {numFrames,
+         options.height.value_or(*metadata.height),
+         options.width.value_or(*metadata.width),
+         3},
+        {torch::kUInt8});
+  } else if (options.shape == "NCHW") {
+    frames = torch::empty(
+        {numFrames,
+         3,
+         options.height.value_or(*metadata.height),
+         options.width.value_or(*metadata.width)},
+        {torch::kUInt8});
+  } else {
+    TORCH_CHECK(false, "Unsupported frame shape=" + options.shape)
+  }
+}
+
 VideoDecoder::VideoDecoder() {}
 
 void VideoDecoder::initializeDecoder() {
@@ -734,30 +759,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
-torch::Tensor VideoDecoder::getEmptyTensorForBatch(
-    int64_t numFrames,
-    const VideoStreamDecoderOptions& options,
-    const StreamMetadata& metadata) {
-  if (options.shape == "NHWC") {
-    return torch::empty(
-        {numFrames,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width),
-         3},
-        {torch::kUInt8});
-  } else if (options.shape == "NCHW") {
-    return torch::empty(
-        {numFrames,
-         3,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width)},
-        {torch::kUInt8});
-  } else {
-    // TODO: should this be a TORCH macro of some kind?
-    throw std::runtime_error("Unsupported frame shape=" + options.shape);
-  }
-}
-
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
@@ -822,11 +823,9 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
         "Must scan all streams to update metadata before calling getFrameAtIndex");
   }
 
-  BatchDecodedOutput output;
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& options = streams_[streamIndex].options;
-  output.frames =
-      getEmptyTensorForBatch(frameIndexes.size(), options, streamMetadata);
+  BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
 
   int i = 0;
   if (streams_.count(streamIndex) == 0) {
@@ -873,16 +872,17 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
   const auto& options = stream.options;
-  BatchDecodedOutput output;
-  output.frames =
-      getEmptyTensorForBatch(numOutputFrames, options, streamMetadata);
+  BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
   int64_t f = 0;
   for (int64_t i = start; i < stop; i += step) {
     int64_t pts = stream.allFrames[i].pts;
     setCursorPtsInSeconds(1.0 * pts / stream.timeBase.den);
-    torch::Tensor frame = getNextDecodedOutput().frame;
-    output.frames[f++] = frame;
+    DecodedOutput singleOut = getNextDecodedOutput();
+    output.frames[f] = singleOut.frame;
+    output.ptsSeconds[f] = singleOut.ptsSeconds;
+    output.durationSeconds[f] = singleOut.durationSeconds;
+    ++f;
   }
 
   return output;

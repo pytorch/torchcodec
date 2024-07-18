@@ -36,12 +36,24 @@ void add_video_stream(
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
 
-// The first element of this tuple has the frame data. The second element is a
-// Tensor that has a single float value for the PTS and the third element is a
-// Tensor that has a single value for the duration.
-// The reason we use Tensors for the second and third value is so we can run
+// The elements of this tuple are all tensors that represent a single frame:
+//   1. The frame data, which is a multidimensional tensor.
+//   2. A single float value for the pts in seconds.
+//   3. A single float value for the duration in seconds.
+// The reason we use Tensors for the second and third values is so we can run
 // under torch.compile().
 using FramePtsDuration = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
+// All elements of this tuple are tensors of the same leading dimension. The
+// tuple represents the frames for N total frames, where N is the dimension of
+// each stacked tensor. The elments are:
+//   1. Stacked tensor of data for all N frames. Each frame is also a
+//   multidimensional tensor.
+//   2. Tensor of N pts values in seconds, where each pts is a single
+//   float.
+//   3. Tensor of N durationis in seconds, where each duration is a
+//   single float.
+using BatchedFramesPtsDuration = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
@@ -67,7 +79,7 @@ at::Tensor get_frames_at_indices(
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
-at::Tensor get_frames_in_range(
+BatchedFramesPtsDuration get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,

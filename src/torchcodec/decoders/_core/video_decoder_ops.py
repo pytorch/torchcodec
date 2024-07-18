@@ -175,9 +175,13 @@ def get_frames_in_range_abstract(
     start: int,
     stop: int,
     step: Optional[int] = None,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @impl_abstract("torchcodec_ns::get_json_metadata")
