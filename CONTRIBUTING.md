@@ -12,7 +12,9 @@ guidelines](https://docs.github.com/en/pull-requests/collaborating-with-pull-req
 
 ### Installing dependencies
 
-To build, run and test locally you will need the following dependencies:
+The instructions below assume you are using a conda environment, but the steps
+are easily adaptable to other kind of virtual environments. To build, run and
+test locally you will need the following dependencies:
 
 - A C++ compiler+linker. This is typically available on a baseline Linux
   installation already.
