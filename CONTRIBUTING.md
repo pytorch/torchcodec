@@ -3,45 +3,47 @@
 You can contribute to this project by writing code, fixing issues or simply by
 using the library and reporting your feedback.
 
-## Development installation
+Below are instructions to build TorchCodec from source, as well as the usual
+contribution guidelines (code formatting, testing, etc). To submit a PR, please
+follow the [official GitHub
+guidelines](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
 
-### Dependencies
+## Building TorchCodec from source
+
+### Installing dependencies
+
+To build, run and test locally you will need the following dependencies:
+
+- A C++ compiler+linker. This is typically available on a baseline Linux
+  installation already.
+- cmake
+- pkg-config
+- FFmpeg
+- PyTorch nightly
 
 Start by installing the **nightly** build of PyTorch following the
-[official instructions](https://pytorch.org/get-started/locally/). Note that the
-official instructions may ask you to install TorchCodec itself. If you are doing
-development on TorchCodec, you should not install prebuilt TorchCodec packages.
+[official instructions](https://pytorch.org/get-started/locally/).
 
-To build, run and test locally you will need the following packages
-(dependencies):
-
-1. C++ compiler+linker (g++) and C++ runtime library (libstdc++). This is
-   typically available on a baseline Linux installation already.
-1. python
-1. cmake
-1. pkg-config
-1. libtorch (this is part of Pytorch)
-1. ffmpeg
-1. pytest (for testing)
-
-You can install these using your favorite package manager. Example, for conda
-use:
+Then, the easiest way to install the rest of the dependencies is to run:
 
 ```bash
-# After installing the nightly pytorch version run this:
-conda install cmake pkg-config ffmpeg pytest -c conda-forge
+conda install cmake pkg-config ffmpeg -c conda-forge
 ```
 
-### Clone and build torchcodec
+### Clone and build
+
+To clone and install the repo, run:
 
 ```bash
 git clone https://github.com/pytorch-labs/torchcodec.git
 cd torchcodec
 
 pip install -e ".[dev]" --no-build-isolation -vv
+```
 
-# This should decode the sample video and generate a png file that is a frame in the video.
-python test/decoders/manual_smoke_test.py
+Note that for more advanced you can build against
+```bash
+BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install -e ".[dev]" --no-build-isolation -vvv
 ```
 
 ### Running unit tests
@@ -52,7 +54,9 @@ To run python tests run:
 pytest test -vvv
 ```
 
-To run C++ tests run:
+Tip: use the `-k "not slow"` flag to skip slow tests.
+
+To run the C++ tests run:
 
 ```bash
 mkdir build
@@ -62,13 +66,48 @@ cmake --build . -- VERBOSE=1
 ctest --rerun-failed --output-on-failure
 ```
 
-## Development Process
+### Code formatting and type checking
 
-TBD
+We use `pre-commit` to enforce code formatting and `mypy` for type checking.
+Install both with
 
-### Code formatting and typing
+```bash
+pip install pre-commit mypy
+```
 
-TODO: instructions for pre-commit and mypy
+To run pre-commit hooks before each commit, run `pre-commit install`. You may
+prefer to run these checks manually, in which case you can just use `pre-commit
+run --all-files`.
+
+For `mypy` we recommend the following command:
+
+```bash
+mypy --install-types --non-interactive --config-file mypy.ini
+```
+
+### Building the docs
+
+First install from source, then install the doc dependencies:
+
+```bash
+cd docs
+pip install -r requirements.txt
+```
+
+Then, still from within the `docs` directory:
+
+```bash
+make html
+```
+
+The built docs will be in `build/html`. Open in your browser to view them.
+
+To avoid building the examples (which execute python code and can take time) you
+can use `make html-noplot`. To build a subset of specific examples instead of
+all of them, you can use a regex like
+`EXAMPLES_PATTERN="plot_the_best_example*" make html`.
+
+Run `make clean` from time to time if you encounter issues.
 
 ## License
 

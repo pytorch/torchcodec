@@ -1,79 +1,75 @@
+<!-- TODO_BEFORE_RELEASE Add obvious link to docs and potentially a tag as
+well--> 
+
 # TorchCodec
 
 TorchCodec is a Python package with a goal to provide useful and fast APIs to
-decode video frames to Pytorch Tensors. Currently decoding happens on the CPU
-and we plan to add GPU acceleration.
+decode video frames to PyTorch Tensors.
+
+⚠️ TorchCodec is still in early development stage and we are actively seeking
+feedback. If you have any suggestions or issues, please let us know by opening
+an issue!
+<!-- TODO_UPDATE_LINK add link to issue tracker --> 
+
+## Using TorchCodec
+
+<!-- TODO BEFORE_RELEASE: polish this example -->
+```python
+from torchcodec.decoders import SimpleVideoDecoder
+
+video = SimpleVideoDecoder("/path/to/video.mp4")
+
+# Indexing API:
+first_frame = video[0]
+last_frame = video[-1]
+
+# PTS API:
+frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
+```
+
+<!-- TODO_UPDATE_LINK add link to docs --> 
+For more detailed examples, check out our docs!
 
 ## Installing TorchCodec
+
+First install the latest stable version of PyTorch following the [official
+instructions](https://pytorch.org/get-started/locally/).
+
+Then:
 
 ```bash
 pip install torchcodec
 ```
-
-## Using TorchCodec
-
-A simple example showing how to decode video frames from a video file:
-
-```python
-# A simple example using TorchCodec
-from torchcodec.decoders import SimpleVideoDecoder
-video = SimpleVideoDecoder("/path/to/video.mp4")
-frame_count = len(video)
-# Returned frames are Pytorch Tensors with shape HWC.
-first_frame = video[0]
-last_frame = video[-1]
-frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
-```
-
-For more examples look at the `examples` directory.
-
-## Installing from source
-
-Use a conda or virtual environment.
-
-Install torch nightly, e.g.:
+You will also need FFmpeg installed on your system, and TorchCodec decoding
+capabilities are determined by your underlying FFmpeg installation. There are
+different options to install FFmpeg e.g.:
 
 ```bash
-pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+
+    conda install ffmpeg
+    # or
+    conda install ffmpeg -c conda-forge
 ```
 
-For more options, e.g. if you need CUDA or prefer using `conda`, refer to the
-[official page](https://pytorch.org/get-started/locally/).
+Your Linux distribution probably comes with FFmpeg pre-installed as well.
+TorchCodec supports all major FFmpeg version in [4, 7].
 
-```bash
-BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install -e ".[dev]" --no-build-isolation -vvv
-```
 
-If you prefer building against an installed version of FFmpeg you can ommit the
-`BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1` part. Make sure `pkg-config` is installed
-and able to find your FFmpeg installation. The easiest way to do this is to
-install both from conda:
+## Planned future work
 
-```bash
-conda install ffmpeg pkg-config -c conda-forge
-BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1
-```
+We are actively working on the following features:
 
-## Building the docs
+- MACOS support (currently, only Linux is supported)
+- GPU decoding
+- Audio decoding
 
-First install from source, then install the doc dependencies:
+Let us know if you have any feature requests by opening an issue!
 
-```bash
-cd docs
-pip install -r requirements.txt
-```
+## Contributing
 
-Then, still from within the `docs` directory:
+We welcome contributions to TorchCodec! Please see our [contributing
+guide](CONTRIBUTING.md) for more details.
 
-```bash
-make html
-```
+## License
 
-The built docs will be in `build/html`. Open in your browser to view them.
-
-To avoid building the examples (which execute python code and can take time) you
-can use `make html-noplot`. To build a subset of specific examples instead of
-all of them, you can use a regex like
-`EXAMPLES_PATTERN="plot_the_best_example*" make html`.
-
-Run `make clean` from time to time if you encounter issues.
+TorchCodec is released under the [BSD 3 license](./LICENSE).
