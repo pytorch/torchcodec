@@ -130,7 +130,7 @@ NASA_VIDEO = TestVideo(
     height=270,
     width=480,
     num_color_channels=3,
-    # TODO: improve the testing framework so that these values are loaded from a JSON
+    # TODO_OPEN_ISSUE Scott: improve the testing framework so that these values are loaded from a JSON
     # file and not hardcoded. These values were copied over by hand from the JSON
     # output from the following command:
     #  $ ffprobe -v error -hide_banner -select_streams v:1 -show_frames -of json test/resources/nasa_13013.mp4 > out.json

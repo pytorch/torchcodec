@@ -1,7 +1,7 @@
 Glossary
 ========
 
-.. .. TODO: This doesn't render very well. It's supposed to look more like this
+.. .. TODO_OPEN_ISSUE Nicolas: This doesn't render very well. It's supposed to look more like this
 .. https://scikit-learn.org/stable/glossary.html. The pytorch sphinx theme
 .. should handle this better.
 

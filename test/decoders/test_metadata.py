@@ -18,12 +18,16 @@ def test_get_video_metadata():
     assert metadata.best_video_stream_index == 3
     assert metadata.best_audio_stream_index == 4
 
-    with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
+    with pytest.raises(
+        NotImplementedError, match="TODO_BEFORE_RELEASE"
+    ):
         metadata.duration_seconds
-    with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
+    with pytest.raises(
+        NotImplementedError, match="TODO_BEFORE_RELEASE"
+    ):
         metadata.bit_rate
 
-    # TODO: put these checks back once D58974580 is landed. The expected values
+    # TODO_BEFORE_RELEASE Nicolas: put these checks back once D58974580 is landed. The expected values
     # are different depending on the FFmpeg version.
     # assert metadata.duration_seconds_container == pytest.approx(16.57, abs=0.001)
     # assert metadata.bit_rate_container == 324915

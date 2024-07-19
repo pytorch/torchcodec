@@ -19,16 +19,17 @@ class StreamMetadata:
     """Duration of the stream, in seconds (float or None)."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
-    # TODO: Before release, we should come up with names that better convey the
-    # " 'fast and potentially inaccurate' vs 'slower but accurate' " tradeoff.
+    # TODO_BEFORE_RELEASE BIKESHED: Before release, we should come up with names
+    # that better convey the " 'fast and potentially inaccurate' vs 'slower but
+    # accurate' " tradeoff.
     num_frames_retrieved: Optional[int]
     """Number of frames from stream metadata. This is potentially inaccurate. (int or None)."""
     num_frames_computed: Optional[int]
     """Number of frames computed by TorchCodec. This is more accurate. (int or None)."""
     min_pts_seconds: Optional[float]
-    """TODO"""
+    """Minimum :term:`pts` of any frame in the stream (float or None)."""
     max_pts_seconds: Optional[float]
-    """TODO"""
+    """Maximum :term:`pts` of any frame in the stream (float or None)."""
     codec: Optional[str]
     """Codec (str or None)."""
     width: Optional[int]
@@ -51,7 +52,8 @@ class StreamMetadata:
             return self.num_frames_retrieved
 
 
-# This may be renamed into e.g. ContainerMetadata in the future to be more generic.
+# TODO_BEFORE_RELEASE BIKESHED: This may be renamed into e.g. ContainerMetadata
+# in the future to be more generic.
 @dataclass
 class VideoMetadata:
     duration_seconds_container: Optional[float]
@@ -63,11 +65,15 @@ class VideoMetadata:
 
     @property
     def duration_seconds(self) -> Optional[float]:
-        raise NotImplementedError("TODO: decide on logic and implement this!")
+        raise NotImplementedError(
+            "TODO_BEFORE_RELEASE BIKESHED: decide on logic and implement this!"
+        )
 
     @property
     def bit_rate(self) -> Optional[float]:
-        raise NotImplementedError("TODO: decide on logic and implement this!")
+        raise NotImplementedError(
+            "TODO_BEFORE_RELEASE BIKESHED: decide on logic and implement this!"
+        )
 
     @property
     def best_video_stream(self) -> StreamMetadata:
@@ -86,7 +92,7 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
             StreamMetadata(
                 duration_seconds=stream_dict.get("durationSeconds"),
                 bit_rate=stream_dict.get("bitRate"),
-                # TODO: We should align the C++ names and the json keys with the Python names
+                # TODO_OPEN_ISSUE: We should align the C++ names and the json keys with the Python names
                 num_frames_retrieved=stream_dict.get("numFrames"),
                 num_frames_computed=stream_dict.get("numFramesFromScan"),
                 min_pts_seconds=stream_dict.get("minPtsSecondsFromScan"),

@@ -28,7 +28,6 @@ class AbstractDecoder:
 
     @abc.abstractmethod
     def get_frames_from_video(self, video_file, pts_list):
-        # TODO(ahmads): add support for video from memory instead of a file.
         pass
 
 

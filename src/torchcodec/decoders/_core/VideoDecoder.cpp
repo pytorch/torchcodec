@@ -152,7 +152,7 @@ VideoDecoder::VideoDecoder() {}
 
 void VideoDecoder::initializeDecoder() {
   // Some formats don't store enough info in the header so we read/decode a few
-  // frames to grab that. This is needed for the filter graph. TODO: If this
+  // frames to grab that. This is needed for the filter graph. Note: If this
   // takes a long time, consider initializing the filter graph after the first
   // frame decode.
   int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
@@ -692,7 +692,6 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       continue;
     }
     if (ffmpegStatus < AVSUCCESS) {
-      // TODO: Handle EAGAIN gracefully.
       throw std::runtime_error(
           "Could not read frame from input file: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
@@ -769,7 +768,6 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
     if (seconds >= frameStartTime && seconds < frameEndTime) {
       // We are in the same frame as the one we just returned. However, since we
       // don't cache it locally, we have to rewind back.
-      // TODO: add caching so we don't have to do this.
       seconds = frameStartTime;
       break;
     }

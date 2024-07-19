@@ -1,5 +1,5 @@
 <!-- TODO_BEFORE_RELEASE Add obvious link to docs and potentially a tag as
-well--> 
+well-->
 
 # TorchCodec
 
@@ -9,7 +9,7 @@ decode video frames to PyTorch Tensors.
 ⚠️ TorchCodec is still in early development stage and we are actively seeking
 feedback. If you have any suggestions or issues, please let us know by opening
 an issue!
-<!-- TODO_UPDATE_LINK add link to issue tracker --> 
+<!-- TODO_UPDATE_LINK add link to issue tracker -->
 
 ## Using TorchCodec
 
@@ -27,7 +27,7 @@ last_frame = video[-1]
 frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
 ```
 
-<!-- TODO_UPDATE_LINK add link to docs --> 
+<!-- TODO_UPDATE_LINK add link to docs -->
 For more detailed examples, check out our docs!
 
 ## Installing TorchCodec

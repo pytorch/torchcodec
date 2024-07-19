@@ -188,7 +188,7 @@ std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
 
-// TODO: we should use a more robust way to serialize the metadata. There are a
+// TODO_OPEN_ISSUE Nicolas: we should use a more robust way to serialize the metadata. There are a
 // few alternatives, but ultimately we are limited to what custom ops allow us
 // to return. Current ideas are to use a proper JSON library, or to pack all the
 // info into tensors. *If* we're OK to drop the export support for metadata, we

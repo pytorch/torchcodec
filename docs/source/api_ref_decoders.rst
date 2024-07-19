@@ -15,7 +15,7 @@ torchcodec.decoders
     SimpleVideoDecoder
 
 
-.. TODO The dataclass.rst template renders a bit ugly.
+.. TODO_OPEN_ISSUE Nicolas The dataclass.rst template renders a bit ugly.
 .. autosummary::
     :toctree: generated/
     :nosignatures:
