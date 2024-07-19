@@ -13,22 +13,38 @@ from torchcodec.decoders._core.video_decoder_ops import (
 
 @dataclass
 class StreamMetadata:
+    """Metadata of a single video stream."""
+
     duration_seconds: Optional[float]
+    """Duration of the stream, in seconds (float or None)."""
     bit_rate: Optional[float]
+    """Bit rate of the stream, in seconds (float or None)."""
     # TODO: Before release, we should come up with names that better convey the
     # " 'fast and potentially inaccurate' vs 'slower but accurate' " tradeoff.
     num_frames_retrieved: Optional[int]
+    """Number of frames from stream metadata. This is potentially inaccurate. (int or None)."""
     num_frames_computed: Optional[int]
+    """Number of frames computed by TorchCodec. This is more accurate. (int or None)."""
     min_pts_seconds: Optional[float]
+    """TODO"""
     max_pts_seconds: Optional[float]
+    """TODO"""
     codec: Optional[str]
+    """Codec (str or None)."""
     width: Optional[int]
+    """Width of the frames (int or None)."""
     height: Optional[int]
+    """Height of the frames (int or None)."""
     average_fps: Optional[float]
+    """Averate fps of the stream (float or None)."""
     stream_index: int
+    """Index of the stream within its contains (int)."""
 
     @property
     def num_frames(self) -> Optional[int]:
+        """Number of frames in the stream. This corresponds to ``num_frames_computed`` if
+        it's not None, otherwise it corresponds to ``num_frames_retrieved``.
+        """
         if self.num_frames_computed is not None:
             return self.num_frames_computed
         else:

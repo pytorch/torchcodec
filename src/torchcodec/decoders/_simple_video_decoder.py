@@ -12,9 +12,14 @@ from torchcodec.decoders import _core as core
 #       the core operations to return it.
 @dataclass
 class Frame(Iterable):
+    """A single video frame with associated metadata."""
+
     data: Tensor
+    """The frame data as (3-D ``torch.Tensor``)."""
     pts_seconds: float
+    """The :term:`pts` of the frame, in seconds (float)."""
     duration_seconds: float
+    """The duration of the frame, in seconds (float)."""
 
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
@@ -23,9 +28,14 @@ class Frame(Iterable):
 
 @dataclass
 class FrameBatch(Iterable):
+    """Multiple video frames with associated metadata."""
+
     data: Tensor
+    """The frames data as (4-D ``torch.Tensor``)."""
     pts_seconds: Tensor
+    """The :term:`pts` of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
     duration_seconds: Tensor
+    """The duration of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
 
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
@@ -38,9 +48,21 @@ This should never happen. Please report an issue following the steps in <TODO>.
 
 
 class SimpleVideoDecoder:
-    """TODO: Add docstring."""
+    """A single-stream video decoder.
+
+    Args:
+        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
+
+            - If ``str`` or ``Pathlib.path``: a path to a local video file.
+            - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
+
+    Attributes:
+        metadata (StreamMetadata): Metadata of the video stream.
+    """
 
     def __init__(self, source: Union[str, Path, bytes, Tensor]):
+        # TODO: Add parameter for dimension order.
+        # TODO: Document default dimension order (regardless of whether we add the parameter).
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
         elif isinstance(source, Path):
@@ -113,6 +135,7 @@ class SimpleVideoDecoder:
         return frame_data
 
     def __getitem__(self, key: Union[int, slice]) -> Tensor:
+        """TODO: Document this, looks like our template doesn't show it, aaarrgghhh"""
         if isinstance(key, int):
             return self._getitem_int(key)
         elif isinstance(key, slice):
@@ -123,6 +146,15 @@ class SimpleVideoDecoder:
         )
 
     def get_frame_at(self, index: int) -> Frame:
+        """Return a single frame at the given index.
+
+        Args:
+            index (int): The index of the frame to retrieve.
+
+        Returns:
+            Frame: The frame at the given index.
+        """
+
         if not 0 <= index < self._num_frames:
             raise IndexError(
                 f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
@@ -133,6 +165,19 @@ class SimpleVideoDecoder:
         return Frame(*frame)
 
     def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
+        """Return multiple frames at the given index range.
+
+        Frames are in [start, stop).
+
+        Args:
+            start (int): Index of the first frame to retrieve.
+            stop (int): End of indexing range (exclusive, as per Python
+                conventions).
+            step (int, optional): Step size between frames. Default: 1.
+
+        Returns:
+            FrameBatch: The frames within the specified range.
+        """
         if not 0 <= start < self._num_frames:
             raise IndexError(
                 f"Start index {start} is out of bounds; must be in the range [0, {self._num_frames})."
@@ -153,6 +198,14 @@ class SimpleVideoDecoder:
         return FrameBatch(*frames)
 
     def get_frame_displayed_at(self, pts_seconds: float) -> Frame:
+        """Return a single frame displayed at the given :term:`pts`, in seconds.
+
+        Args:
+            pts (float): The :term:`pts` of the frame to retrieve, in seconds.
+
+        Returns:
+            Frame: The frame at the given :term:`pts`.
+        """
         if not self._min_pts_seconds <= pts_seconds < self._max_pts_seconds:
             raise IndexError(
                 f"Invalid pts in seconds: {pts_seconds}. "

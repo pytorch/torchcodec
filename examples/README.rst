@@ -1,4 +1,4 @@
 .. _gallery:
 
-Examples and tutorials
-======================
+Interactive examples
+====================
