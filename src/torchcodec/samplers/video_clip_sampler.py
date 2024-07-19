@@ -334,7 +334,7 @@ class VideoClipSampler(nn.Module):
         ) * video_frame_dilation + 1
         clip = []
         for _ in range(frames_needed_per_clip):
-            frame, _, _ = get_next_frame(video_decoder)
+            frame, _, _, _ = get_next_frame(video_decoder)
             clip.append(frame)
 
         # slice the list of tensor with frame_dilation and stack to tensor

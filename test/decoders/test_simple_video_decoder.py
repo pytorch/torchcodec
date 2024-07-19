@@ -256,11 +256,12 @@ class TestSimpleDecoder:
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         frame = decoder.get_frame_at(50)
-        data, pts, duration = decoder.get_frame_at(50)
+        data, pts, duration, stream_index = decoder.get_frame_at(50)
 
         assert_tensor_equal(frame.data, data)
         assert frame.pts_seconds == pts
         assert frame.duration_seconds == duration
+        assert frame.stream_index == stream_index
 
     def test_get_frame_at_fails(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)

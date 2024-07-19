@@ -185,11 +185,13 @@ class VideoDecoder {
   DecodedOutput getFrameDisplayedAtTimestamp(double seconds);
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
+    torch::Tensor streamIndices;
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
     torch::Tensor durationSeconds;
 
     explicit BatchDecodedOutput(
+        int inStreamIndex,
         int64_t numFrames,
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);

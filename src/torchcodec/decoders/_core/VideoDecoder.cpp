@@ -124,11 +124,13 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
 }
 
 VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
+    int streamIndex,
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
+  streamIndices = torch::full({numFrames}, {streamIndex}, {torch::kInt64});
   if (options.shape == "NHWC") {
     frames = torch::empty(
         {numFrames,
@@ -831,7 +833,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& options = streams_[streamIndex].options;
-  BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
+  BatchDecodedOutput output(
+      streamIndex, frameIndexes.size(), options, streamMetadata);
 
   int i = 0;
   const auto& stream = streams_[streamIndex];
@@ -870,7 +873,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
   const auto& options = stream.options;
-  BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
+  BatchDecodedOutput output(
+      streamIndex, numOutputFrames, options, streamMetadata);
 
   int64_t f = 0;
   for (int64_t i = start; i < stop; i += step) {
