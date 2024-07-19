@@ -6,7 +6,7 @@ using the library and reporting your feedback.
 Below are instructions to build TorchCodec from source, as well as the usual
 contribution guidelines (code formatting, testing, etc). To submit a PR, please
 follow the [official GitHub
-guidelines](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
+guidelines](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork).
 
 ## Building TorchCodec from source
 
@@ -41,11 +41,6 @@ git clone https://github.com/pytorch-labs/torchcodec.git
 cd torchcodec
 
 pip install -e ".[dev]" --no-build-isolation -vv
-```
-
-Note that for more advanced you can build against
-```bash
-BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install -e ".[dev]" --no-build-isolation -vvv
 ```
 
 ### Running unit tests
