@@ -20,9 +20,13 @@ class VideoStreamMetadata:
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
     num_frames_from_header: Optional[int]
-    """Number of frames, from the stream's metadata. This is potentially inaccurate. (int or None)."""
+    """Number of frames, from the stream's metadata. This is potentially 
+    inaccurate. We recommend using the ``num_frames`` attribute instead.
+    (int or None)."""
     num_frames_from_content: Optional[int]
-    """Number of frames computed by TorchCodec by scanning the stream's content. This is more accurate. (int or None)."""
+    """Number of frames computed by TorchCodec by scanning the stream's
+    content. This is more accurate than ``num_frames_from_header``. We
+    recommend using the ``num_frames`` attribute instead. (int or None)."""
     min_pts_seconds: Optional[float]
     """Minimum :term:`pts` of any frame in the stream (float or None)."""
     max_pts_seconds: Optional[float]
@@ -40,8 +44,9 @@ class VideoStreamMetadata:
 
     @property
     def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to ``num_frames_from_content`` if
-        it's not None, otherwise it corresponds to ``num_frames_from_header``.
+        """Number of frames in the stream. This corresponds to
+        ``num_frames_from_content`` if it's not None, otherwise it corresponds
+        to ``num_frames_from_header``.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
