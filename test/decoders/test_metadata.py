@@ -23,10 +23,8 @@ def test_get_video_metadata():
     with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
         metadata.bit_rate
 
-    # TODO: put these checks back once D58974580 is landed. The expected values
-    # are different depending on the FFmpeg version.
-    # assert metadata.duration_seconds_container == pytest.approx(16.57, abs=0.001)
-    # assert metadata.bit_rate_container == 324915
+    assert metadata.duration_seconds_container == pytest.approx(16.57, abs=0.001)
+    assert metadata.bit_rate_container == 324915
 
     best_stream_metadata = metadata.streams[metadata.best_video_stream_index]
     assert best_stream_metadata is metadata.best_video_stream
