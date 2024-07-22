@@ -247,7 +247,7 @@ class TestOps:
         reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
-    # TODO_OPEN_ISSUE Nicolas: Keeping the metadata tests below for now, but we should remove them
+    # Keeping the metadata tests below for now, but we should remove them
     # once we remove get_json_metadata().
     # Note that the distinction made between test_video_get_json_metadata and
     # test_video_get_json_metadata_with_stream is misleading: all of the stream
