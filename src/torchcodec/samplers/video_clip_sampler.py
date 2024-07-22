@@ -202,7 +202,7 @@ class VideoClipSampler(nn.Module):
             metadata_json (`Dict[str, Any]`): The metadata of the video in json format
 
         Returns:
-            clips (` List[Tensor]`): List of clips, where each clip is a Tensor represents list of frames, Tensor shape default is NHWC.
+            clips (` List[Tensor]`): List of clips, where each clip is a Tensor represents list of frames, Tensor shape default is NCHW.
         """
 
         sample_start_index = max(0, index_based_sampler_args.sample_start_index)

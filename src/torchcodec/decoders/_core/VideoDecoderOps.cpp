@@ -116,7 +116,7 @@ void add_video_stream(
   options.ffmpegThreadCount = num_threads;
 
   if (dimension_order.has_value()) {
-    std::string stdDimensionOrder{dimensionOrder.value()};
+    std::string stdDimensionOrder{dimension_order.value()};
     TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
     options.dimensionOrder = stdDimensionOrder;
   }
