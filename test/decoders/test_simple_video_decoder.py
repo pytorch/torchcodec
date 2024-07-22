@@ -2,7 +2,6 @@ import pytest
 import torch
 
 from torchcodec.decoders import _core, SimpleVideoDecoder
-from torchcodec.decoders._simple_video_decoder import _hwc_to_chw
 
 from ..utils import assert_tensor_close, assert_tensor_equal, NASA_VIDEO
 
@@ -353,36 +352,6 @@ class TestSimpleDecoder:
     def test_dimension_order(self):
         # TODO: Add this test. Will address in this PR.
         pass
-
-
-@pytest.mark.parametrize("num_leading_dimension", (0, 1, 2))
-def test_hwc_to_chw(num_leading_dimension):
-    N2, N1, C, H, W = 1, 2, 3, 4, 5
-
-    if num_leading_dimension == 0:
-        inpt = torch.rand(H, W, C)
-        expected_output_shape = (C, H, W)
-    elif num_leading_dimension == 1:
-        inpt = torch.rand(N1, H, W, C)
-        expected_output_shape = (N1, C, H, W)
-    elif num_leading_dimension == 2:
-        inpt = torch.rand(N2, N1, H, W, C)
-        expected_output_shape = (N2, N1, C, H, W)
-    else:
-        raise ValueError("Wrong test parametrization.")
-
-    out = _hwc_to_chw(inpt)
-    assert inpt.data_ptr() == out.data_ptr()  # Make sure op is O(1)
-    assert out.shape == expected_output_shape
-
-    # Need to add/remove leading dimensions to check for channels-last
-    # contiguity. This is more of a limitation of the is_contiguous() API rather
-    # than an indication of the actual layout.
-    if num_leading_dimension == 0:
-        out = out[None]
-    elif num_leading_dimension == 2:
-        out = out[0]
-    assert out.is_contiguous(memory_format=torch.channels_last)
 
 
 if __name__ == "__main__":

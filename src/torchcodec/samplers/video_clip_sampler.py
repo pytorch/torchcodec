@@ -74,7 +74,6 @@ class TimeBasedSamplerArgs(SamplerArgs):
         target_sample_start_second (`float`): Start second of the target sampling range, applies to target sampling
     """
 
-    # TODO: Replace video_frame_dilation with FPS
     video_frame_dilation: int = 1
     sample_start_second: float = 0.0
     sample_end_second: float = float("inf")
@@ -263,7 +262,6 @@ class VideoClipSampler(nn.Module):
         """
         video_duration_in_seconds = metadata_json["durationSeconds"]
 
-        # TODO: T186096971
         clip_duration_in_seconds = (
             time_based_sampler_args.frames_per_clip
             * time_based_sampler_args.video_frame_dilation

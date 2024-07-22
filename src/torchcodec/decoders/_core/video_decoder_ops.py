@@ -9,7 +9,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
     _get_extension_path,
 )
 
-# TODO: Remove this warning filter and use @register_fake once pytorch 2.4 is released
+# TODO_BEFORE_RELEASE: Remove this warning filter and use @register_fake once pytorch 2.4 is released
 warnings.filterwarnings(
     "ignore",
     category=FutureWarning,
@@ -53,7 +53,8 @@ def load_torchcodec_extension():
 load_torchcodec_extension()
 
 
-# TODO: PyTorch team needs to figure out how to not constant prop factory functions
+# Note: We use disallow_in_graph because PyTorch does constant propagation of
+# factory functions.
 create_from_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_file.default
 )
@@ -107,7 +108,7 @@ def add_video_stream_abstract(
     width: Optional[int] = None,
     height: Optional[int] = None,
     num_threads: Optional[int] = None,
-    shape: Optional[str] = None,
+    dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
 ) -> None:
     return

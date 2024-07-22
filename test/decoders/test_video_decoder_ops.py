@@ -44,7 +44,6 @@ class ReferenceDecoder:
         seek_to_pts(self.decoder, pts)
 
 
-# TODO: Some of these tests could probably be unified and parametrized?
 class TestOps:
     def test_seek_and_next(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -184,7 +183,7 @@ class TestOps:
             get_next_frame(decoder)
 
     def test_compile_seek_and_next(self):
-        # TODO(T180277797): Get this to work with the inductor stack. Right now
+        # TODO_OPEN_ISSUE Scott (T180277797): Get this to work with the inductor stack. Right now
         # compilation fails because it can't handle tensors of size unknown at
         # compile-time.
         @torch.compile(fullgraph=True, backend="eager")
@@ -205,7 +204,7 @@ class TestOps:
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
     def test_class_based_compile_seek_and_next(self):
-        # TODO(T180277797): Ditto as above.
+        # TODO_OPEN_ISSUE Scott (T180277797): Ditto as above.
         @torch.compile(fullgraph=True, backend="eager")
         def class_based_get_frame1_and_frame_time6(
             decoder: ReferenceDecoder,
@@ -248,7 +247,7 @@ class TestOps:
         reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
-    # TODO: Keeping the metadata tests below for now, but we should remove them
+    # Keeping the metadata tests below for now, but we should remove them
     # once we remove get_json_metadata().
     # Note that the distinction made between test_video_get_json_metadata and
     # test_video_get_json_metadata_with_stream is misleading: all of the stream

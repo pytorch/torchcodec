@@ -2,6 +2,7 @@ import pytest
 
 from torchcodec.decoders._core import (
     create_from_file,
+    get_ffmpeg_library_versions,
     get_video_metadata,
     scan_all_streams_to_update_metadata,
     StreamMetadata,
@@ -18,15 +19,23 @@ def test_get_video_metadata():
     assert metadata.best_video_stream_index == 3
     assert metadata.best_audio_stream_index == 4
 
-    with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
+    with pytest.raises(NotImplementedError, match="TODO_BEFORE_RELEASE"):
         metadata.duration_seconds
-    with pytest.raises(NotImplementedError, match="TODO: decide on logic"):
+    with pytest.raises(NotImplementedError, match="TODO_BEFORE_RELEASE"):
         metadata.bit_rate
 
-    # TODO: put these checks back once D58974580 is landed. The expected values
-    # are different depending on the FFmpeg version.
-    # assert metadata.duration_seconds_container == pytest.approx(16.57, abs=0.001)
-    # assert metadata.bit_rate_container == 324915
+    ffmpeg_major_version = int(
+        get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0]
+    )
+    if ffmpeg_major_version <= 5:
+        expected_duration_seconds_container = 16.57
+        expected_bit_rate_container = 324915
+    else:
+        expected_duration_seconds_container = 13.056
+        expected_bit_rate_container = 412365
+
+    assert metadata.duration_seconds_container == expected_duration_seconds_container
+    assert metadata.bit_rate_container == expected_bit_rate_container
 
     best_stream_metadata = metadata.streams[metadata.best_video_stream_index]
     assert best_stream_metadata is metadata.best_video_stream

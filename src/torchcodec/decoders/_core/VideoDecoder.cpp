@@ -113,12 +113,12 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
             "Invalid ffmpeg_thread_count=" + value +
             ". ffmpeg_thread_count must be >= 0.");
       }
-    } else if (key == "shape") {
+    } else if (key == "dimension_order") {
       if (value != "NHWC" && value != "NCHW") {
         throw std::runtime_error(
-            "Invalid shape=" + value + ". shape must be either NHWC or NCHW.");
+            "Invalid dimension_order=" + value + ". dimensionOrder must be either NHWC or NCHW.");
       }
-      shape = value;
+      dimensionOrder = value;
     } else if (key == "width") {
       width = std::stoi(value);
     } else if (key == "height") {
@@ -126,7 +126,7 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
     } else {
       throw std::runtime_error(
           "Invalid option: " + key +
-          ". Valid options are: ffmpeg_thread_count=<int>,shape=<string>");
+          ". Valid options are: ffmpeg_thread_count=<int>,dimension_order=<string>");
     }
   }
 }
@@ -137,14 +137,14 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
-  if (options.shape == "NHWC") {
+  if (options.dimensionOrder== "NHWC") {
     frames = torch::empty(
         {numFrames,
          options.height.value_or(*metadata.height),
          options.width.value_or(*metadata.width),
          3},
         {torch::kUInt8});
-  } else if (options.shape == "NCHW") {
+  } else if (options.dimensionOrder== "NCHW") {
     frames = torch::empty(
         {numFrames,
          3,
@@ -152,7 +152,7 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
          options.width.value_or(*metadata.width)},
         {torch::kUInt8});
   } else {
-    TORCH_CHECK(false, "Unsupported frame shape=" + options.shape)
+    TORCH_CHECK(false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
   }
 }
 
@@ -160,7 +160,7 @@ VideoDecoder::VideoDecoder() {}
 
 void VideoDecoder::initializeDecoder() {
   // Some formats don't store enough info in the header so we read/decode a few
-  // frames to grab that. This is needed for the filter graph. TODO: If this
+  // frames to grab that. This is needed for the filter graph. Note: If this
   // takes a long time, consider initializing the filter graph after the first
   // frame decode.
   int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
@@ -700,7 +700,6 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       continue;
     }
     if (ffmpegStatus < AVSUCCESS) {
-      // TODO: Handle EAGAIN gracefully.
       throw std::runtime_error(
           "Could not read frame from input file: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
@@ -777,7 +776,6 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
     if (seconds >= frameStartTime && seconds < frameEndTime) {
       // We are in the same frame as the one we just returned. However, since we
       // don't cache it locally, we have to rewind back.
-      // TODO: add caching so we don't have to do this.
       seconds = frameStartTime;
       break;
     }
@@ -936,7 +934,9 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
   StreamInfo& activeStream = streams_[streamIndex];
-  if (activeStream.options.shape == "NCHW") {
+  if (activeStream.options.dimensionOrder == "NCHW") {
+    // The docs guaranty this to return a view:
+    // https://pytorch.org/docs/stable/generated/torch.permute.html
     tensor = tensor.permute({2, 0, 1});
   }
   return tensor;
