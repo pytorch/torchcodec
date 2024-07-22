@@ -27,9 +27,15 @@ def test_get_video_metadata():
     ffmpeg_major_version = int(
         get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0]
     )
-    expected_duration_seconds_container = 16.57 if ffmpeg_major_version <= 5 else 13.056
+    if ffmpeg_major_version <= 5:
+        expected_duration_seconds_container = 16.57
+        expected_bit_rate_container = 324915
+    else:
+        expected_duration_seconds_container = 13.056
+        expected_bit_rate_container = 412365
+
     assert metadata.duration_seconds_container == expected_duration_seconds_container
-    assert metadata.bit_rate_container == 324915
+    assert metadata.bit_rate_container == expected_bit_rate_container
 
     best_stream_metadata = metadata.streams[metadata.best_video_stream_index]
     assert best_stream_metadata is metadata.best_video_stream
