@@ -137,8 +137,7 @@ class VideoDecoder {
     std::optional<int> width;
     std::optional<int> height;
   };
-  struct AudioStreamDecoderOptions {
-  };
+  struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
       const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());
