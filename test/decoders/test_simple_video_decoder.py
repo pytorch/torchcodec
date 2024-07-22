@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from torchcodec.decoders import _core, SimpleVideoDecoder
+from torchcodec.decoders._simple_video_decoder import _hwc_to_chw
 
 from ..utils import assert_tensor_close, assert_tensor_equal, NASA_VIDEO
 
@@ -37,7 +38,7 @@ class TestSimpleDecoder:
             decoder = SimpleVideoDecoder(123)  # noqa
 
     def test_getitem_int(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -50,7 +51,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame_last, decoder[-1])
 
     def test_getitem_slice(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -199,7 +200,7 @@ class TestSimpleDecoder:
             frame = decoder["0"]  # noqa
 
     def test_iteration(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -229,7 +230,7 @@ class TestSimpleDecoder:
                 assert_tensor_equal(ref_frame_last, frame)
 
     def test_iteration_slow(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
 
         # Force the decoder to seek around a lot while iterating; this will
@@ -243,7 +244,7 @@ class TestSimpleDecoder:
         assert iterations == len(decoder) == 390
 
     def test_get_frame_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9)
         frame9 = decoder.get_frame_at(9)
@@ -253,7 +254,7 @@ class TestSimpleDecoder:
         assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
 
     def test_get_frame_at_tuple_unpacking(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         frame = decoder.get_frame_at(50)
         data, pts, duration = decoder.get_frame_at(50)
@@ -272,7 +273,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_at(10000)  # noqa
 
     def test_get_frame_displayed_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
@@ -289,7 +290,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_displayed_at(100.0)  # noqa
 
     def test_get_frames_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(start=9, stop=10)
@@ -348,6 +349,40 @@ class TestSimpleDecoder:
         assert_tensor_equal(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+    def test_dimension_order(self):
+        # TODO: Add this test. Will address in this PR.
+        pass
+
+
+@pytest.mark.parametrize("num_leading_dimension", (0, 1, 2))
+def test_hwc_to_chw(num_leading_dimension):
+    N2, N1, C, H, W = 1, 2, 3, 4, 5
+
+    if num_leading_dimension == 0:
+        inpt = torch.rand(H, W, C)
+        expected_output_shape = (C, H, W)
+    elif num_leading_dimension == 1:
+        inpt = torch.rand(N1, H, W, C)
+        expected_output_shape = (N1, C, H, W)
+    elif num_leading_dimension == 2:
+        inpt = torch.rand(N2, N1, H, W, C)
+        expected_output_shape = (N2, N1, C, H, W)
+    else:
+        raise ValueError("Wrong test parametrization.")
+
+    out = _hwc_to_chw(inpt)
+    assert inpt.data_ptr() == out.data_ptr()  # Make sure op is O(1)
+    assert out.shape == expected_output_shape
+
+    # Need to add/remove leading dimensions to check for channels-last
+    # contiguity. This is more of a limitation of the is_contiguous() API rather
+    # than an indication of the actual layout.
+    if num_leading_dimension == 0:
+        out = out[None]
+    elif num_leading_dimension == 2:
+        out = out[0]
+    assert out.is_contiguous(memory_format=torch.channels_last)
 
 
 if __name__ == "__main__":

@@ -55,14 +55,26 @@ class SimpleVideoDecoder:
 
             - If ``str`` or ``Pathlib.path``: a path to a local video file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
+        dimension_order(str, optional): The dimension order of the decoded frames.
+            This can be either "NCHW" (default) or "NHWC", where N is the batch
+            size, C is the number of channels, H is the height, and W is the
+            width of the frames.
+
+            .. note::
+
+                Frames are natively decoded in NHWC format by the underlying
+                FFmpeg implementation. Converting those into NCHW format is a
+                cheap no-copy operation that allows these frames to be
+                transformed using the `torchvision transforms
+                <https://pytorch.org/vision/stable/transforms.html>`_.
 
     Attributes:
         metadata (StreamMetadata): Metadata of the video stream.
     """
 
-    def __init__(self, source: Union[str, Path, bytes, Tensor]):
-        # TODO: Add parameter for dimension order.
-        # TODO: Document default dimension order (regardless of whether we add the parameter).
+    def __init__(
+        self, source: Union[str, Path, bytes, Tensor], dimension_order: str = "NCHW"
+    ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
         elif isinstance(source, Path):
@@ -76,6 +88,15 @@ class SimpleVideoDecoder:
                 f"Unknown source type: {type(source)}. "
                 "Supported types are str, Path, bytes and Tensor."
             )
+
+        allowed_dimension_orders = ("NCHW", "NHWC")
+        if dimension_order.upper() not in allowed_dimension_orders:
+            raise ValueError(
+                f"Invalid dimension order ({dimension_order}). "
+                f"Supported values are {', '.join(allowed_dimension_orders)}."
+            )
+        self._dimension_order = dimension_order
+
         core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(self._decoder)
 
@@ -106,6 +127,11 @@ class SimpleVideoDecoder:
     def __len__(self) -> int:
         return self._num_frames
 
+    def _maybe_reshape_frame(self, frame_data: Tensor) -> Tensor:
+        return (
+            _hwc_to_chw(frame_data) if self._dimension_order == "NCHW" else frame_data
+        )
+
     def _getitem_int(self, key: int) -> Tensor:
         assert isinstance(key, int)
 
@@ -119,7 +145,7 @@ class SimpleVideoDecoder:
         frame_data, *_ = core.get_frame_at_index(
             self._decoder, frame_index=key, stream_index=self._stream_index
         )
-        return frame_data
+        return self._maybe_reshape_frame(frame_data)
 
     def _getitem_slice(self, key: slice) -> Tensor:
         assert isinstance(key, slice)
@@ -132,7 +158,7 @@ class SimpleVideoDecoder:
             stop=stop,
             step=step,
         )
-        return frame_data
+        return self._maybe_reshape_frame(frame_data)
 
     def __getitem__(self, key: Union[int, slice]) -> Tensor:
         """TODO: Document this, looks like our template doesn't show it, aaarrgghhh"""
@@ -159,10 +185,11 @@ class SimpleVideoDecoder:
             raise IndexError(
                 f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
             )
-        frame = core.get_frame_at_index(
+        frame_data, *rest = core.get_frame_at_index(
             self._decoder, frame_index=index, stream_index=self._stream_index
         )
-        return Frame(*frame)
+        frame_data = self._maybe_reshape_frame(frame_data)
+        return Frame(frame_data, *rest)
 
     def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
         """Return multiple frames at the given index range.
@@ -188,14 +215,15 @@ class SimpleVideoDecoder:
             )
         if not step > 0:
             raise IndexError(f"Step ({step}) must be greater than 0.")
-        frames = core.get_frames_in_range(
+        frames_data, *rest = core.get_frames_in_range(
             self._decoder,
             stream_index=self._stream_index,
             start=start,
             stop=stop,
             step=step,
         )
-        return FrameBatch(*frames)
+        frames_data = self._maybe_reshape_frame(frames_data)
+        return FrameBatch(frames_data, *rest)
 
     def get_frame_displayed_at(self, pts_seconds: float) -> Frame:
         """Return a single frame displayed at the given :term:`pts`, in seconds.
@@ -212,8 +240,9 @@ class SimpleVideoDecoder:
                 f"It must be greater than or equal to {self._min_pts_seconds} "
                 f"and less than or equal to {self._max_pts_seconds}."
             )
-        frame = core.get_frame_at_pts(self._decoder, pts_seconds)
-        return Frame(*frame)
+        frame_data, *rest = core.get_frame_at_pts(self._decoder, pts_seconds)
+        frame_data = self._maybe_reshape_frame(frame_data)
+        return Frame(frame_data, *rest)
 
 
 def _get_and_validate_stream_metadata(
@@ -229,3 +258,11 @@ def _get_and_validate_stream_metadata(
 
     best_stream_metadata = video_metadata.streams[best_stream_index]
     return (best_stream_metadata, best_stream_index)
+
+
+def _hwc_to_chw(t):
+    # Reshape a tensor of shape [..., H, W, C] to [..., C, H, W] where ... can
+    # be any number of dimensions: no dimension, one dimension, or more.
+    # This operation should be O(1) and keeps the data as channels-last (this is
+    # tested).
+    return t.permute(*range(t.ndim - 3), -1, -3, -2)
