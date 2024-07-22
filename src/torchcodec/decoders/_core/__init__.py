@@ -2,4 +2,9 @@
 
 from .video_decoder_ops import *  # noqa
 
-from ._metadata import get_video_metadata, StreamMetadata, VideoMetadata
+from ._metadata import (
+    get_video_metadata,
+    get_video_metadata_from_header,
+    StreamMetadata,
+    VideoMetadata,
+)
