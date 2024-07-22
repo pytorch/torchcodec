@@ -65,15 +65,11 @@ class VideoMetadata:
 
     @property
     def duration_seconds(self) -> Optional[float]:
-        raise NotImplementedError(
-            "Decide on logic and implement this!"
-        )
+        raise NotImplementedError("Decide on logic and implement this!")
 
     @property
     def bit_rate(self) -> Optional[float]:
-        raise NotImplementedError(
-            "Decide on logic and implement this!"
-        )
+        raise NotImplementedError("Decide on logic and implement this!")
 
     @property
     def best_video_stream(self) -> VideoStreamMetadata:
