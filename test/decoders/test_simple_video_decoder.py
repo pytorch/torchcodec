@@ -23,11 +23,11 @@ class TestSimpleDecoder:
             raise ValueError("Oops, double check the parametrization of this test!")
 
         decoder = SimpleVideoDecoder(source)
-        assert isinstance(decoder.metadata, _core.StreamMetadata)
+        assert isinstance(decoder.metadata, _core.VideoStreamMetadata)
         assert (
             len(decoder)
             == decoder._num_frames
-            == decoder.metadata.num_frames_computed
+            == decoder.metadata.num_frames_from_content
             == 390
         )
         assert decoder._stream_index == decoder.metadata.stream_index == 3
