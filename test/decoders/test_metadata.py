@@ -6,7 +6,7 @@ from torchcodec.decoders._core import (
     create_from_file,
     get_ffmpeg_library_versions,
     get_video_metadata,
-    probe_video_metadata_headers,
+    get_video_metadata_from_header,
     scan_all_streams_to_update_metadata,
     StreamMetadata,
 )
@@ -24,7 +24,7 @@ def _get_video_metadata(path, with_scan: bool):
 @pytest.mark.parametrize(
     "metadata_getter",
     (
-        probe_video_metadata_headers,
+        get_video_metadata_from_header,
         functools.partial(_get_video_metadata, with_scan=False),
         functools.partial(_get_video_metadata, with_scan=True),
     ),

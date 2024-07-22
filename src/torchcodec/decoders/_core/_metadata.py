@@ -85,6 +85,11 @@ class VideoMetadata:
 
 
 def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
+    """Return video metadata from a video decoder.
+
+    The accuracy of the metadata and the availability of some returned fields
+    depends on whether a full scan was performed by the decoder.
+    """
 
     container_dict = json.loads(_get_container_json_metadata(decoder))
     streams_metadata = []
@@ -94,7 +99,8 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
             StreamMetadata(
                 duration_seconds=stream_dict.get("durationSeconds"),
                 bit_rate=stream_dict.get("bitRate"),
-                # TODO_OPEN_ISSUE: We should align the C++ names and the json keys with the Python names
+                # TODO_OPEN_ISSUE: We should align the C++ names and the json
+                # keys with the Python names
                 num_frames_retrieved=stream_dict.get("numFrames"),
                 num_frames_computed=stream_dict.get("numFramesFromScan"),
                 min_pts_seconds=stream_dict.get("minPtsSecondsFromScan"),
@@ -116,5 +122,5 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
     )
 
 
-def probe_video_metadata_headers(filename: Union[str, pathlib.Path]) -> VideoMetadata:
+def get_video_metadata_from_header(filename: Union[str, pathlib.Path]) -> VideoMetadata:
     return get_video_metadata(create_from_file(str(filename)))
