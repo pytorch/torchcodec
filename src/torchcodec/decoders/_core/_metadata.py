@@ -20,7 +20,7 @@ class VideoStreamMetadata:
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
     num_frames_from_header: Optional[int]
-    """Number of frames, from the stream's metadata. This is potentially 
+    """Number of frames, from the stream's metadata. This is potentially
     inaccurate. We recommend using the ``num_frames`` attribute instead.
     (int or None)."""
     num_frames_from_content: Optional[int]
