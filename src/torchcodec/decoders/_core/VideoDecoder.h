@@ -29,7 +29,7 @@ video_decoder.addVideoStreamDecoder(-1);
 // API for seeking and frame extraction:
 // Let's extract the first frame at or after pts=5.0 seconds.
 video_decoder.setCursorPtsInSeconds(5.0);
-auto output = video_decoder->getNextDecodedFrame();
+auto output = video_decoder->getNextDecodedOutput();
 torch::Tensor frame = output.frame;
 double presentation_timestamp = output.ptsSeconds;
 // Note that presentation_timestamp can be any timestamp at 5.0 or above

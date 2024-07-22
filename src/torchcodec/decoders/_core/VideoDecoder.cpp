@@ -21,6 +21,14 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
+double ptsToSeconds(int64_t pts, int den) {
+  return static_cast<double>(pts) / den;
+}
+
+double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
+  return ptsToSeconds(pts, timeBase.den);
+}
+
 struct AVInput {
   UniqueAVFormatContext formatContext;
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
@@ -191,7 +199,7 @@ void VideoDecoder::initializeDecoder() {
   }
   if (formatContext_->duration > 0) {
     containerMetadata_.durationSeconds =
-        1.0 * formatContext_->duration / AV_TIME_BASE;
+        ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
   }
   if (formatContext_->bit_rate > 0) {
     containerMetadata_.bitRate = formatContext_->bit_rate;
@@ -744,10 +752,10 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
   output.pts = frame->pts;
   output.ptsSeconds =
-      1.0 * frame->pts / formatContext_->streams[streamIndex]->time_base.den;
+      ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
   output.duration = getDuration(frame);
-  output.durationSeconds = 1.0 * getDuration(frame) /
-      formatContext_->streams[streamIndex]->time_base.den;
+  output.durationSeconds = ptsToSeconds(
+      getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     output.frame =
         convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
@@ -762,9 +770,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
-    double frameStartTime = 1.0 * stream.currentPts / stream.timeBase.den;
-    double frameEndTime = 1.0 * (stream.currentPts + stream.currentDuration) /
-        stream.timeBase.den;
+    double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
+    double frameEndTime = ptsToSeconds(
+        stream.currentPts + stream.currentDuration, stream.timeBase);
     if (seconds >= frameStartTime && seconds < frameEndTime) {
       // We are in the same frame as the one we just returned. However, since we
       // don't cache it locally, we have to rewind back.
@@ -776,9 +784,9 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
   return getDecodedOutputWithFilter(
       [seconds, this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& stream = streams_[frameStreamIndex];
-        double frameStartTime = 1.0 * frame->pts / stream.timeBase.den;
+        double frameStartTime = ptsToSeconds(frame->pts, stream.timeBase);
         double frameEndTime =
-            1.0 * (frame->pts + getDuration(frame)) / stream.timeBase.den;
+            ptsToSeconds(frame->pts + getDuration(frame), stream.timeBase);
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
 }
@@ -817,7 +825,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
         " numFrames=" + std::to_string(streams_[streamIndex].allFrames.size()));
   }
   int64_t pts = stream.allFrames[frameIndex].pts;
-  setCursorPtsInSeconds(1.0 * pts / stream.timeBase.den);
+  setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
   return getNextDecodedOutput();
 }
 
@@ -839,7 +847,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
     int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(1.0 * pts / stream.timeBase.den);
+    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
     torch::Tensor frame = getNextDecodedOutput().frame;
     output.frames[i++] = frame;
   }
@@ -873,7 +881,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   int64_t f = 0;
   for (int64_t i = start; i < stop; i += step) {
     int64_t pts = stream.allFrames[i].pts;
-    setCursorPtsInSeconds(1.0 * pts / stream.timeBase.den);
+    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
     DecodedOutput singleOut = getNextDecodedOutput();
     output.frames[f] = singleOut.frame;
     output.ptsSeconds[f] = singleOut.ptsSeconds;
