@@ -74,7 +74,6 @@ class TimeBasedSamplerArgs(SamplerArgs):
         target_sample_start_second (`float`): Start second of the target sampling range, applies to target sampling
     """
 
-    # TODO: Replace video_frame_dilation with FPS
     video_frame_dilation: int = 1
     sample_start_second: float = 0.0
     sample_end_second: float = float("inf")
@@ -134,7 +133,7 @@ class VideoClipSampler(nn.Module):
         self.sampler_args = sampler_args
         self.decorder_args = DecoderArgs() if decorder_args is None else decorder_args
 
-    def forward(self, video_data: Tensor) -> Union[List[List[Tensor]], List[Tensor]]:
+    def forward(self, video_data: Tensor) -> Union[List[Any]]:
         """Sample video clips from the video data
 
         Args:
@@ -162,8 +161,7 @@ class VideoClipSampler(nn.Module):
             num_threads=self.decorder_args.num_threads,
         )
 
-        clips = []
-
+        clips: List[Any] = []
         # Cast sampler args to be time based or index based
         if isinstance(self.sampler_args, TimeBasedSamplerArgs):
             time_based_sampler_args = self.sampler_args
@@ -218,7 +216,6 @@ class VideoClipSampler(nn.Module):
         )
         sampler_type = index_based_sampler_args.sampler_type
 
-        clip_start_idxs = []
         if sampler_type == "random":
             clip_start_idxs = torch.randint(
                 sample_start_index,
@@ -252,7 +249,7 @@ class VideoClipSampler(nn.Module):
         self,
         metadata_json: Dict[str, Any],
         time_based_sampler_args: TimeBasedSamplerArgs,
-    ):
+    ) -> List[float]:
         """Get start seconds for each clip.
         Given different sampler type, the API returns different clip start seconds.
 
@@ -265,7 +262,6 @@ class VideoClipSampler(nn.Module):
         """
         video_duration_in_seconds = metadata_json["durationSeconds"]
 
-        # TODO: T186096971
         clip_duration_in_seconds = (
             time_based_sampler_args.frames_per_clip
             * time_based_sampler_args.video_frame_dilation
@@ -336,7 +332,7 @@ class VideoClipSampler(nn.Module):
         ) * video_frame_dilation + 1
         clip = []
         for _ in range(frames_needed_per_clip):
-            frame = get_next_frame(video_decoder)
+            frame, _, _ = get_next_frame(video_decoder)
             clip.append(frame)
 
         # slice the list of tensor with frame_dilation and stack to tensor

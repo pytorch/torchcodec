@@ -1,5 +1,7 @@
 // (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
+#include "src/torchcodec/decoders/_core/VideoDecoderOps.h"
+#include <pybind11/pybind11.h>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -25,21 +27,20 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? shape=None, int? stream_index=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
-  m.def("get_next_frame(Tensor(a!) decoder) -> Tensor");
-  m.def("get_frame_at_pts(Tensor(a!) decoder, float seconds) -> Tensor");
+  m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> Tensor");
+      "get_frame_at_pts(Tensor(a!) decoder, float seconds) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
   m.def(
-      "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> Tensor");
+      "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
   m.def("_get_json_ffmpeg_library_versions() -> str");
-  m.def(
-      "get_frame_with_info_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, float, float)");
   m.def("scan_all_streams_to_update_metadata(Tensor(a!) decoder) -> ()");
 }
 
@@ -61,6 +62,18 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   void* buffer = tensor.mutable_data_ptr();
   VideoDecoder* decoder = static_cast<VideoDecoder*>(buffer);
   return decoder;
+}
+
+OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
+  return std::make_tuple(
+      frame.frame,
+      torch::tensor(frame.ptsSeconds),
+      torch::tensor(frame.durationSeconds));
+}
+
+OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
+    VideoDecoder::BatchDecodedOutput& batch) {
+  return std::make_tuple(batch.frames, batch.ptsSeconds, batch.durationSeconds);
 }
 } // namespace
 
@@ -92,11 +105,11 @@ at::Tensor create_from_buffer(const void* buffer, size_t length) {
 
 void add_video_stream(
     at::Tensor& decoder,
-    std::optional<int64_t> width = std::nullopt,
-    std::optional<int64_t> height = std::nullopt,
-    std::optional<int64_t> num_threads = std::nullopt,
-    std::optional<c10::string_view> shape = std::nullopt,
-    std::optional<int64_t> stream_index = std::nullopt) {
+    std::optional<int64_t> width,
+    std::optional<int64_t> height,
+    std::optional<int64_t> num_threads,
+    std::optional<c10::string_view> shape,
+    std::optional<int64_t> stream_index) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
@@ -117,40 +130,35 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
   videoDecoder->setCursorPtsInSeconds(seconds);
 }
 
-at::Tensor get_next_frame(at::Tensor& decoder) {
+OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getNextDecodedOutput().frame;
-  if (result.sizes().size() != 3) {
+  VideoDecoder::DecodedOutput result;
+  try {
+    result = videoDecoder->getNextDecodedOutput();
+  } catch (const VideoDecoder::EndOfFileException& e) {
+    throw pybind11::stop_iteration(e.what());
+  }
+  if (result.frame.sizes().size() != 3) {
     throw std::runtime_error(
         "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.sizes().size()));
+        std::to_string(result.frame.sizes().size()));
   }
-  return result;
+  return makeOpsDecodedOutput(result);
 }
 
-at::Tensor get_frame_at_pts(at::Tensor& decoder, double seconds) {
+OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameDisplayedAtTimestamp(seconds);
-  return result.frame;
+  return makeOpsDecodedOutput(result);
 }
 
-at::Tensor get_frame_at_index(
+OpsDecodedOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
-  return result.frame;
-}
-
-std::tuple<at::Tensor, double, double> get_frame_with_info_at_index(
-    at::Tensor& decoder,
-    int64_t stream_index,
-    int64_t frame_index) {
-  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
-  auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
-  return std::make_tuple(
-      result.frame, result.ptsSeconds, result.durationSeconds);
+  return makeOpsDecodedOutput(result);
 }
 
 at::Tensor get_frames_at_indices(
@@ -164,27 +172,22 @@ at::Tensor get_frames_at_indices(
   return result.frames;
 }
 
-at::Tensor get_frames_in_range(
+OpsBatchDecodedOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,
     int64_t stop,
-    std::optional<int64_t> step = std::nullopt) {
+    std::optional<int64_t> step) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesInRange(
       stream_index, start, stop, step.value_or(1));
-  return result.frames;
+  return makeOpsBatchDecodedOutput(result);
 }
 
 std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
 
-// TODO: we should use a more robust way to serialize the metadata. There are a
-// few alternatives, but ultimately we are limited to what custom ops allow us
-// to return. Current ideas are to use a proper JSON library, or to pack all the
-// info into tensors. *If* we're OK to drop the export support for metadata, we
-// could also easily bind the C++ structs to Python with pybind11.
 std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   std::stringstream ss;
   ss << "{\n";
@@ -394,7 +397,6 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_stream_json_metadata", &get_stream_json_metadata);
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
-  m.impl("get_frame_with_info_at_index", &get_frame_with_info_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl(

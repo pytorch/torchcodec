@@ -97,7 +97,7 @@ templates_path = ["_templates"]
 #
 source_suffix = [".rst"]
 
-# TODO: Indicate version number here
+# TODO_BEFORE_RELEASE: Indicate version number here
 html_title = "TorchCodec Documentation"
 
 # The master toctree document.

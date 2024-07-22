@@ -29,23 +29,23 @@ video_decoder.addVideoStreamDecoder(-1);
 // API for seeking and frame extraction:
 // Let's extract the first frame at or after pts=5.0 seconds.
 video_decoder.setCursorPtsInSeconds(5.0);
-auto output = video_decoder->getNextDecodedFrame();
+auto output = video_decoder->getNextDecodedOutput();
 torch::Tensor frame = output.frame;
 double presentation_timestamp = output.ptsSeconds;
 // Note that presentation_timestamp can be any timestamp at 5.0 or above
 // because the frame time may not align exactly with the seek time.
 CHECK_GE(presentation_timestamp, 5.0);
 */
+// TODO_BEFORE_RELEASE Ahmad: block comment is wrong
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
-// TODO: Rename this to be VideoReader.
 class VideoDecoder {
  public:
   ~VideoDecoder() = default;
 
   struct DecoderOptions {
     DecoderOptions() {}
-    // TODO: Add options for the entire decoder here.
+    // TODO: Add options for the entire decoder here, or remove if not needed.
   };
 
   // --------------------------------------------------------------------------
@@ -137,9 +137,7 @@ class VideoDecoder {
     std::optional<int> width;
     std::optional<int> height;
   };
-  struct AudioStreamDecoderOptions {
-    // TODO: Add channels, shape, sample options, etc.
-  };
+  struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
       const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());
@@ -169,6 +167,11 @@ class VideoDecoder {
     // The duration of the decoded frame in seconds.
     double durationSeconds;
   };
+  class EndOfFileException : public std::runtime_error {
+   public:
+    explicit EndOfFileException(const std::string& msg)
+        : std::runtime_error(msg) {}
+  };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
   DecodedOutput getNextDecodedOutput();
@@ -181,6 +184,13 @@ class VideoDecoder {
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
+    torch::Tensor ptsSeconds;
+    torch::Tensor durationSeconds;
+
+    explicit BatchDecodedOutput(
+        int64_t numFrames,
+        const VideoStreamDecoderOptions& options,
+        const StreamMetadata& metadata);
   };
   // Returns frames at the given indexes for a given stream as a single stacked
   // Tensor.
@@ -215,7 +225,6 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
-    // TODO: Add duration and dts, etc. as need be.
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;
@@ -264,6 +273,8 @@ class VideoDecoder {
   // for more details about the heuristics.
   int getBestStreamIndex(AVMediaType mediaType);
   void initializeDecoder();
+  void validateUserProvidedStreamIndex(uint64_t streamIndex);
+  void validateScannedAllStreams(const std::string& msg);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(
@@ -284,10 +295,6 @@ class VideoDecoder {
   DecodedOutput convertAVFrameToDecodedOutput(
       int streamIndex,
       UniqueAVFrame frame);
-  torch::Tensor getEmptyTensorForBatch(
-      int64_t numFrames,
-      const VideoStreamDecoderOptions& options,
-      const StreamMetadata& metadata);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

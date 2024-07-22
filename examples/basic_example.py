@@ -43,4 +43,4 @@ print(f"{first_frame.dtype=}")
 last_frame = simple_decoder[-1]
 print(f"{last_frame.shape=}")
 
-# TODO: add documentation for slices and metadata.
+# TODO_BEFORE_RELEASE: add documentation for slices and metadata.

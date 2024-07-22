@@ -1,11 +1,19 @@
 import json
+import warnings
 from typing import List, Optional, Tuple
 
 import torch
-from torch.library import get_ctx, register_fake
+from torch.library import get_ctx, impl_abstract
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
+)
+
+# TODO_BEFORE_RELEASE: Remove this warning filter and use @register_fake once pytorch 2.4 is released
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message="`torch.library.impl_abstract` was renamed to `torch.library.register_fake`. Please use that instead; we will remove `torch.library.impl_abstract` in a future version of PyTorch",
 )
 
 
@@ -45,7 +53,8 @@ def load_torchcodec_extension():
 load_torchcodec_extension()
 
 
-# TODO: PyTorch team needs to figure out how to not constant prop factory functions
+# Note: We use disallow_in_graph because PyTorch does constant propagation of
+# factory functions.
 create_from_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_file.default
 )
@@ -57,9 +66,6 @@ seek_to_pts = torch.ops.torchcodec_ns.seek_to_pts.default
 get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
-get_frame_with_info_at_index = (
-    torch.ops.torchcodec_ns.get_frame_with_info_at_index.default
-)
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
@@ -85,17 +91,17 @@ def create_from_bytes(video_bytes: bytes) -> torch.Tensor:
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
-@register_fake("torchcodec_ns::create_from_file")
+@impl_abstract("torchcodec_ns::create_from_file")
 def create_from_file_abstract(filename: str) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
-@register_fake("torchcodec_ns::create_from_tensor")
+@impl_abstract("torchcodec_ns::create_from_tensor")
 def create_from_tensor_abstract(video_tensor: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
-@register_fake("torchcodec_ns::add_video_stream")
+@impl_abstract("torchcodec_ns::add_video_stream")
 def add_video_stream_abstract(
     decoder: torch.Tensor,
     *,
@@ -108,42 +114,50 @@ def add_video_stream_abstract(
     return
 
 
-@register_fake("torchcodec_ns::seek_to_pts")
+@impl_abstract("torchcodec_ns::seek_to_pts")
 def seek_abstract(decoder: torch.Tensor, seconds: float) -> None:
     return
 
 
-@register_fake("torchcodec_ns::get_next_frame")
-def get_next_frame_abstract(decoder: torch.Tensor) -> torch.Tensor:
+@impl_abstract("torchcodec_ns::get_next_frame")
+def get_next_frame_abstract(
+    decoder: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     # Images are 3 dimensions: height, width, channels.
     # The exact permutation depends on the constructor options passed in.
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
-@register_fake("torchcodec_ns::get_frame_at_pts")
-def get_frame_at_pts_abstract(decoder: torch.Tensor, seconds: float) -> torch.Tensor:
+@impl_abstract("torchcodec_ns::get_frame_at_pts")
+def get_frame_at_pts_abstract(
+    decoder: torch.Tensor, seconds: float
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
-@register_fake("torchcodec_ns::get_frame_at_index")
+@impl_abstract("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
     decoder: torch.Tensor, *, stream_index: int, frame_index: int
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
-@register_fake("torchcodec_ns::get_frame_with_info_at_index")
-def get_frame_with_info_at_index_abstract(
-    decoder: torch.Tensor, *, stream_index: int, frame_index: int
-) -> Tuple[torch.Tensor, float, float]:
-    image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return (torch.empty(image_size), 0, 0)
-
-
-@register_fake("torchcodec_ns::get_frames_at_indices")
+@impl_abstract("torchcodec_ns::get_frames_at_indices")
 def get_frames_at_indices_abstract(
     decoder: torch.Tensor,
     *,
@@ -154,7 +168,7 @@ def get_frames_at_indices_abstract(
     return torch.empty(image_size)
 
 
-@register_fake("torchcodec_ns::get_frames_in_range")
+@impl_abstract("torchcodec_ns::get_frames_in_range")
 def get_frames_in_range_abstract(
     decoder: torch.Tensor,
     *,
@@ -162,32 +176,36 @@ def get_frames_in_range_abstract(
     start: int,
     stop: int,
     step: Optional[int] = None,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
-@register_fake("torchcodec_ns::get_json_metadata")
+@impl_abstract("torchcodec_ns::get_json_metadata")
 def get_json_metadata_abstract(decoder: torch.Tensor) -> str:
-    return torch.empty_like("")
+    return ""
 
 
-@register_fake("torchcodec_ns::get_container_json_metadata")
+@impl_abstract("torchcodec_ns::get_container_json_metadata")
 def get_container_json_metadata_abstract(decoder: torch.Tensor) -> str:
-    return torch.empty_like("")
+    return ""
 
 
-@register_fake("torchcodec_ns::get_stream_json_metadata")
+@impl_abstract("torchcodec_ns::get_stream_json_metadata")
 def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> str:
-    return torch.empty_like("")
+    return ""
 
 
-@register_fake("torchcodec_ns::_get_json_ffmpeg_library_versions")
+@impl_abstract("torchcodec_ns::_get_json_ffmpeg_library_versions")
 def _get_json_ffmpeg_library_versions_abstract() -> str:
-    return torch.empty_like("")
+    return ""
 
 
-@register_fake("torchcodec_ns::scan_all_streams_to_update_metadata")
+@impl_abstract("torchcodec_ns::scan_all_streams_to_update_metadata")
 def scan_all_streams_to_update_metadata_abstract(decoder: torch.Tensor) -> None:
     return
 

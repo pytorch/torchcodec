@@ -36,23 +36,39 @@ void add_video_stream(
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
 
+// The elements of this tuple are all tensors that represent a single frame:
+//   1. The frame data, which is a multidimensional tensor.
+//   2. A single float value for the pts in seconds.
+//   3. A single float value for the duration in seconds.
+// The reason we use Tensors for the second and third values is so we can run
+// under torch.compile().
+using OpsDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
+// All elements of this tuple are tensors of the same leading dimension. The
+// tuple represents the frames for N total frames, where N is the dimension of
+// each stacked tensor. The elments are:
+//   1. Stacked tensor of data for all N frames. Each frame is also a
+//   multidimensional tensor.
+//   2. Tensor of N pts values in seconds, where each pts is a single
+//   float.
+//   3. Tensor of N durationis in seconds, where each duration is a
+//   single float.
+using OpsBatchDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
 // given timestamp T has T >= PTS and T < PTS + Duration.
-at::Tensor get_frame_at_pts(at::Tensor& decoder, double seconds);
+OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 
 // Return the frame that is visible at a given index in the video.
-at::Tensor get_frame_at_index(
+OpsDecodedOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index);
 
-// Return the frame along with pts and duration that is visible at a given index
-// in the video.
-std::tuple<at::Tensor, double, double> get_frame_with_info_at_index(
-    at::Tensor& decoder,
-    int64_t stream_index,
-    int64_t frame_index);
+// Get the next frame from the video as a tuple that has the frame data, pts and
+// duration as tensors.
+OpsDecodedOutput get_next_frame(at::Tensor& decoder);
 
 // Return the frames at a given index for a given stream as a single stacked
 // Tensor.
@@ -63,15 +79,12 @@ at::Tensor get_frames_at_indices(
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
-at::Tensor get_frames_in_range(
+OpsBatchDecodedOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,
     int64_t stop,
     std::optional<int64_t> step = std::nullopt);
-
-// Get the next frame from the video as a tensor.
-at::Tensor get_next_frame(at::Tensor& decoder);
 
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
@@ -80,7 +93,7 @@ std::string get_json_metadata(at::Tensor& decoder);
 std::string get_container_json_metadata(at::Tensor& decoder);
 
 // Get the stream metadata as a string.
-std::string get_stream_json_metadata(at::Tensor& decoder);
+std::string get_stream_json_metadata(at::Tensor& decoder, int64_t stream_index);
 
 // Returns version information about the various FFMPEG libraries that are
 // loaded in the program's address space.

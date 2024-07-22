@@ -62,7 +62,6 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
 #if LIBAVFORMAT_VERSION_MAJOR >= 60
-  // TODO: Investigate why this is broken with ffmpeg=6.
   EXPECT_NEAR(metadata.bitRate.value(), 412365, 1e-1);
 #else
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
