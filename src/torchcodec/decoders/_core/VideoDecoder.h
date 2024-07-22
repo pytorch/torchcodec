@@ -36,6 +36,7 @@ double presentation_timestamp = output.ptsSeconds;
 // because the frame time may not align exactly with the seek time.
 CHECK_GE(presentation_timestamp, 5.0);
 */
+// TODO_BEFORE_RELEASE Ahmad: block comment is wrong
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
 class VideoDecoder {
@@ -44,7 +45,7 @@ class VideoDecoder {
 
   struct DecoderOptions {
     DecoderOptions() {}
-    // TODO: Add options for the entire decoder here.
+    // TODO: Add options for the entire decoder here, or remove if not needed.
   };
 
   // --------------------------------------------------------------------------
@@ -136,9 +137,7 @@ class VideoDecoder {
     std::optional<int> width;
     std::optional<int> height;
   };
-  struct AudioStreamDecoderOptions {
-    // TODO: Add channels, shape, sample options, etc.
-  };
+  struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
       const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());

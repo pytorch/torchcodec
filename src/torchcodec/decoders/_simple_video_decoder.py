@@ -8,8 +8,6 @@ from torch import Tensor
 from torchcodec.decoders import _core as core
 
 
-# TODO: we want to add index as well, but we need
-#       the core operations to return it.
 @dataclass
 class Frame(Iterable):
     """A single video frame with associated metadata."""
@@ -43,7 +41,7 @@ class FrameBatch(Iterable):
 
 
 _ERROR_REPORTING_INSTRUCTIONS = """
-This should never happen. Please report an issue following the steps in <TODO>.
+This should never happen. Please report an issue following the steps in <TODO_UPDATE_LINK>.
 """
 
 
@@ -61,8 +59,8 @@ class SimpleVideoDecoder:
     """
 
     def __init__(self, source: Union[str, Path, bytes, Tensor]):
-        # TODO: Add parameter for dimension order.
-        # TODO: Document default dimension order (regardless of whether we add the parameter).
+        # TODO_BEFORE_RELEASE: Add parameter for dimension order.
+        # TODO_BEFORE_RELEASE: Document default dimension order (regardless of whether we add the parameter).
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
         elif isinstance(source, Path):
@@ -135,7 +133,7 @@ class SimpleVideoDecoder:
         return frame_data
 
     def __getitem__(self, key: Union[int, slice]) -> Tensor:
-        """TODO: Document this, looks like our template doesn't show it, aaarrgghhh"""
+        """TODO_BEFORE_RELEASE: Nicolas Document this, looks like our template doesn't show it, aaarrgghhh"""
         if isinstance(key, int):
             return self._getitem_int(key)
         elif isinstance(key, slice):

@@ -39,7 +39,7 @@ def test_sampler(sampler_args):
     assert_tensor_equal(len(clips), sampler_args.clips_per_video)
     clip = clips[0]
     if isinstance(sampler_args, TimeBasedSamplerArgs):
-        # TODO FIXME: Looks like we have an API inconsistency.
+        # Note: Looks like we have an API inconsistency.
         # With time-based sampler, `clip` is a tensor but with index-based
         # samplers `clip` is a list.
         # Below manually convert that list to a tensor for the `.shape` check to

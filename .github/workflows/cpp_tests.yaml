@@ -57,10 +57,6 @@ jobs:
           # our non-GPL FFmpeg. And yet they pass. This is because in Python
           # we're able to distinguish between build-time (non-GPL FFmpeg) and
           # run time (conda-forge FFmpeg).
-          #
-          # TODO: Ideally, we should find a way to make the same distinction
-          # between build time and run time for those C++ tests, and build them
-          # against our non-GPL FFmpeg libraries.
 
           build_tests_dir="${PWD}/build_tests"
           mkdir $build_tests_dir

@@ -27,5 +27,5 @@ different options to install FFmpeg e.g.:
 Your Linux distribution probably comes with FFmpeg pre-installed as well.
 TorchCodec supports all major FFmpeg version in [4, 7].
 
-.. .. TODO add link
+.. .. TODO_UPDATE_LINK add link
 .. For more advanced installation instructions and details, please refer to the guidelines in our GitHub repo.

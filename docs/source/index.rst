@@ -3,7 +3,7 @@ Welcome to the TorchCodec documentation!
 
 TorchCodec provides utilities for decoding videos into PyTorch tensors.
 
-.. TODO Add link to GH repo below
+.. TODO_UPDATE_LINKE Add link to GH repo below
 .. note::
 
    TorchCodec is still in early development stage and we are actively seeking
