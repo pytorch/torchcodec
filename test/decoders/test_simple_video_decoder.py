@@ -37,7 +37,7 @@ class TestSimpleDecoder:
             decoder = SimpleVideoDecoder(123)  # noqa
 
     def test_getitem_int(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -50,7 +50,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame_last, decoder[-1])
 
     def test_getitem_slice(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -59,9 +59,9 @@ class TestSimpleDecoder:
         assert slice0.shape == torch.Size(
             [
                 1,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref0, slice0)
@@ -71,9 +71,9 @@ class TestSimpleDecoder:
         assert slice4.shape == torch.Size(
             [
                 1,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref4, slice4)
@@ -83,9 +83,9 @@ class TestSimpleDecoder:
         assert slice8.shape == torch.Size(
             [
                 1,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref8, slice8)
@@ -95,9 +95,9 @@ class TestSimpleDecoder:
         assert slice180.shape == torch.Size(
             [
                 1,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref180, slice180[0])
@@ -108,9 +108,9 @@ class TestSimpleDecoder:
         assert slice0_9.shape == torch.Size(
             [
                 9,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref0_9, slice0_9)
@@ -120,9 +120,9 @@ class TestSimpleDecoder:
         assert slice4_8.shape == torch.Size(
             [
                 4,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref4_8, slice4_8)
@@ -133,9 +133,9 @@ class TestSimpleDecoder:
         assert slice15_35.shape == torch.Size(
             [
                 5,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref15_35, slice15_35)
@@ -145,9 +145,9 @@ class TestSimpleDecoder:
         assert slice0_9_2.shape == torch.Size(
             [
                 5,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref0_9_2, slice0_9_2)
@@ -158,29 +158,29 @@ class TestSimpleDecoder:
         assert slice386_389.shape == torch.Size(
             [
                 4,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref386_389, slice386_389)
 
         # an empty range is valid!
         empty_frame = decoder[5:5]
-        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_hwc_tensor)
+        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_chw_tensor)
 
         # slices that are out-of-range are also valid - they return an empty tensor
         also_empty = decoder[10000:]
-        assert_tensor_equal(also_empty, NASA_VIDEO.empty_hwc_tensor)
+        assert_tensor_equal(also_empty, NASA_VIDEO.empty_chw_tensor)
 
         # should be just a copy
         all_frames = decoder[:]
         assert all_frames.shape == torch.Size(
             [
                 len(decoder),
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         for sliced, ref in zip(all_frames, decoder):
@@ -199,7 +199,7 @@ class TestSimpleDecoder:
             frame = decoder["0"]  # noqa
 
     def test_iteration(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -229,7 +229,7 @@ class TestSimpleDecoder:
                 assert_tensor_equal(ref_frame_last, frame)
 
     def test_iteration_slow(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
 
         # Force the decoder to seek around a lot while iterating; this will
@@ -243,7 +243,7 @@ class TestSimpleDecoder:
         assert iterations == len(decoder) == 390
 
     def test_get_frame_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9)
         frame9 = decoder.get_frame_at(9)
@@ -253,7 +253,7 @@ class TestSimpleDecoder:
         assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
 
     def test_get_frame_at_tuple_unpacking(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         frame = decoder.get_frame_at(50)
         data, pts, duration = decoder.get_frame_at(50)
@@ -272,7 +272,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_at(10000)  # noqa
 
     def test_get_frame_displayed_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
@@ -289,7 +289,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_displayed_at(100.0)  # noqa
 
     def test_get_frames_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NHWC")
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(start=9, stop=10)
@@ -305,9 +305,9 @@ class TestSimpleDecoder:
         assert frames0_9.data.shape == torch.Size(
             [
                 10,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref_frames0_9, frames0_9.data)
@@ -326,9 +326,9 @@ class TestSimpleDecoder:
         assert frames0_8_2.data.shape == torch.Size(
             [
                 5,
+                NASA_VIDEO.num_color_channels,
                 NASA_VIDEO.height,
                 NASA_VIDEO.width,
-                NASA_VIDEO.num_color_channels,
             ]
         )
         assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
@@ -343,7 +343,7 @@ class TestSimpleDecoder:
 
         # an empty range is valid!
         empty_frames = decoder.get_frames_at(5, 5)
-        assert_tensor_equal(empty_frames.data, NASA_VIDEO.empty_hwc_tensor)
+        assert_tensor_equal(empty_frames.data, NASA_VIDEO.empty_chw_tensor)
         assert_tensor_equal(empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds)
         assert_tensor_equal(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
