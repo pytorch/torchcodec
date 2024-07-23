@@ -59,7 +59,7 @@ To run the C++ tests run:
 ```bash
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=1 -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)) ..
+cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=1 -DCMAKE_PREFIX_PATH=$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)') ..
 cmake --build . -- VERBOSE=1
 ctest --rerun-failed --output-on-failure
 ```

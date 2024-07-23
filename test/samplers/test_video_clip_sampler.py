@@ -47,9 +47,9 @@ def test_sampler(sampler_args):
         clip = torch.stack(clip)
     assert clip.shape == (
         sampler_args.frames_per_clip,
+        3,
         desired_height,
         desired_width,
-        3,
     )
 
 

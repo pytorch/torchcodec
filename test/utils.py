@@ -46,7 +46,7 @@ def _get_file_path(filename: str) -> pathlib.Path:
 
 def _load_tensor_from_file(filename: str) -> torch.Tensor:
     file_path = _get_file_path(filename)
-    return torch.load(file_path, weights_only=True)
+    return torch.load(file_path, weights_only=True).permute(2, 0, 1)
 
 
 @dataclass
@@ -119,9 +119,9 @@ class TestVideo(TestContainerFile):
     num_color_channels: int
 
     @property
-    def empty_hwc_tensor(self) -> torch.Tensor:
+    def empty_chw_tensor(self) -> torch.Tensor:
         return torch.empty(
-            [0, self.height, self.width, self.num_color_channels], dtype=torch.uint8
+            [0, self.num_color_channels, self.height, self.width], dtype=torch.uint8
         )
 
 

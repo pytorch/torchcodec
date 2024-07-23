@@ -162,7 +162,7 @@ class TestOps:
 
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
-        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_hwc_tensor)
+        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_chw_tensor)
 
     def test_throws_exception_at_eof(self):
         decoder = create_from_file(str(NASA_VIDEO.path))

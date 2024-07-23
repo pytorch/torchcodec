@@ -140,7 +140,7 @@ void runNDecodeIterationsWithCustomOps(
         /*width=*/std::nullopt,
         /*height=*/std::nullopt,
         /*thread_count=*/std::nullopt,
-        /*shape=*/std::nullopt,
+        /*dimension_order=*/std::nullopt,
         /*stream_index=*/std::nullopt);
 
     for (double pts : ptsList) {

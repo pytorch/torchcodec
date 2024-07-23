@@ -53,14 +53,26 @@ class SimpleVideoDecoder:
 
             - If ``str`` or ``Pathlib.path``: a path to a local video file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
+        dimension_order(str, optional): The dimension order of the decoded frames.
+            This can be either "NCHW" (default) or "NHWC", where N is the batch
+            size, C is the number of channels, H is the height, and W is the
+            width of the frames.
+
+            .. note::
+
+                Frames are natively decoded in NHWC format by the underlying
+                FFmpeg implementation. Converting those into NCHW format is a
+                cheap no-copy operation that allows these frames to be
+                transformed using the `torchvision transforms
+                <https://pytorch.org/vision/stable/transforms.html>`_.
 
     Attributes:
         metadata (StreamMetadata): Metadata of the video stream.
     """
 
-    def __init__(self, source: Union[str, Path, bytes, Tensor]):
-        # TODO_BEFORE_RELEASE: Add parameter for dimension order.
-        # TODO_BEFORE_RELEASE: Document default dimension order (regardless of whether we add the parameter).
+    def __init__(
+        self, source: Union[str, Path, bytes, Tensor], dimension_order: str = "NCHW"
+    ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
         elif isinstance(source, Path):
@@ -74,8 +86,16 @@ class SimpleVideoDecoder:
                 f"Unknown source type: {type(source)}. "
                 "Supported types are str, Path, bytes and Tensor."
             )
+
+        allowed_dimension_orders = ("NCHW", "NHWC")
+        if dimension_order not in allowed_dimension_orders:
+            raise ValueError(
+                f"Invalid dimension order ({dimension_order}). "
+                f"Supported values are {', '.join(allowed_dimension_orders)}."
+            )
+
         core.scan_all_streams_to_update_metadata(self._decoder)
-        core.add_video_stream(self._decoder)
+        core.add_video_stream(self._decoder, dimension_order=dimension_order)
 
         self.metadata, self._stream_index = _get_and_validate_stream_metadata(
             self._decoder
