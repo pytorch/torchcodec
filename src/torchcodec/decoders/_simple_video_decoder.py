@@ -67,7 +67,7 @@ class SimpleVideoDecoder:
                 <https://pytorch.org/vision/stable/transforms.html>`_.
 
     Attributes:
-        metadata (StreamMetadata): Metadata of the video stream.
+        metadata (VideoStreamMetadata): Metadata of the video stream.
     """
 
     def __init__(
@@ -103,11 +103,11 @@ class SimpleVideoDecoder:
             self._decoder
         )
 
-        if self.metadata.num_frames_computed is None:
+        if self.metadata.num_frames_from_content is None:
             raise ValueError(
                 "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._num_frames = self.metadata.num_frames_computed
+        self._num_frames = self.metadata.num_frames_from_content
 
         if self.metadata.min_pts_seconds is None:
             raise ValueError(
@@ -238,7 +238,7 @@ class SimpleVideoDecoder:
 
 def _get_and_validate_stream_metadata(
     decoder: Tensor,
-) -> Tuple[core.StreamMetadata, int]:
+) -> Tuple[core.VideoStreamMetadata, int]:
     video_metadata = core.get_video_metadata(decoder)
 
     best_stream_index = video_metadata.best_video_stream_index

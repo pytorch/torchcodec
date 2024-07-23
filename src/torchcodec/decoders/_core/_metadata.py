@@ -14,20 +14,22 @@ from torchcodec.decoders._core.video_decoder_ops import (
 
 
 @dataclass
-class StreamMetadata:
+class VideoStreamMetadata:
     """Metadata of a single video stream."""
 
     duration_seconds: Optional[float]
     """Duration of the stream, in seconds (float or None)."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
-    # TODO_BEFORE_RELEASE BIKESHED: Before release, we should come up with names
-    # that better convey the " 'fast and potentially inaccurate' vs 'slower but
-    # accurate' " tradeoff.
-    num_frames_retrieved: Optional[int]
-    """Number of frames from stream metadata. This is potentially inaccurate. (int or None)."""
-    num_frames_computed: Optional[int]
-    """Number of frames computed by TorchCodec. This is more accurate. (int or None)."""
+    num_frames_from_header: Optional[int]
+    """Number of frames, from the stream's metadata. This is potentially
+    inaccurate. We recommend using the ``num_frames`` attribute instead.
+    (int or None)."""
+    num_frames_from_content: Optional[int]
+    """Number of frames computed by TorchCodec by scanning the stream's
+    content (the scan doesn't involve decoding). This is more accurate
+    than ``num_frames_from_header``. We recommend using the
+    ``num_frames`` attribute instead. (int or None)."""
     min_pts_seconds: Optional[float]
     """Minimum :term:`pts` of any frame in the stream (float or None)."""
     max_pts_seconds: Optional[float]
@@ -41,44 +43,39 @@ class StreamMetadata:
     average_fps: Optional[float]
     """Averate fps of the stream (float or None)."""
     stream_index: int
-    """Index of the stream within its contains (int)."""
+    """Index of the stream within the video (int)."""
 
     @property
     def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to ``num_frames_computed`` if
-        it's not None, otherwise it corresponds to ``num_frames_retrieved``.
+        """Number of frames in the stream. This corresponds to
+        ``num_frames_from_content`` if it's not None, otherwise it corresponds
+        to ``num_frames_from_header``.
         """
-        if self.num_frames_computed is not None:
-            return self.num_frames_computed
+        if self.num_frames_from_content is not None:
+            return self.num_frames_from_content
         else:
-            return self.num_frames_retrieved
+            return self.num_frames_from_header
 
 
-# TODO_BEFORE_RELEASE BIKESHED: This may be renamed into e.g. ContainerMetadata
-# in the future to be more generic.
 @dataclass
 class VideoMetadata:
-    duration_seconds_container: Optional[float]
-    bit_rate_container: Optional[float]
+    duration_seconds_from_header: Optional[float]
+    bit_rate_from_header: Optional[float]
     best_video_stream_index: Optional[int]
     best_audio_stream_index: Optional[int]
 
-    streams: List[StreamMetadata]
+    streams: List[VideoStreamMetadata]
 
     @property
     def duration_seconds(self) -> Optional[float]:
-        raise NotImplementedError(
-            "TODO_BEFORE_RELEASE BIKESHED: decide on logic and implement this!"
-        )
+        raise NotImplementedError("Decide on logic and implement this!")
 
     @property
     def bit_rate(self) -> Optional[float]:
-        raise NotImplementedError(
-            "TODO_BEFORE_RELEASE BIKESHED: decide on logic and implement this!"
-        )
+        raise NotImplementedError("Decide on logic and implement this!")
 
     @property
-    def best_video_stream(self) -> StreamMetadata:
+    def best_video_stream(self) -> VideoStreamMetadata:
         if self.best_video_stream_index is None:
             raise ValueError("The best video stream is unknown.")
         return self.streams[self.best_video_stream_index]
@@ -96,13 +93,13 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
     for stream_index in range(container_dict["numStreams"]):
         stream_dict = json.loads(_get_stream_json_metadata(decoder, stream_index))
         streams_metadata.append(
-            StreamMetadata(
+            VideoStreamMetadata(
                 duration_seconds=stream_dict.get("durationSeconds"),
                 bit_rate=stream_dict.get("bitRate"),
                 # TODO_OPEN_ISSUE: We should align the C++ names and the json
                 # keys with the Python names
-                num_frames_retrieved=stream_dict.get("numFrames"),
-                num_frames_computed=stream_dict.get("numFramesFromScan"),
+                num_frames_from_header=stream_dict.get("numFrames"),
+                num_frames_from_content=stream_dict.get("numFramesFromScan"),
                 min_pts_seconds=stream_dict.get("minPtsSecondsFromScan"),
                 max_pts_seconds=stream_dict.get("maxPtsSecondsFromScan"),
                 codec=stream_dict.get("codec"),
@@ -114,8 +111,8 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
         )
 
     return VideoMetadata(
-        duration_seconds_container=container_dict.get("durationSeconds"),
-        bit_rate_container=container_dict.get("bitRate"),
+        duration_seconds_from_header=container_dict.get("durationSeconds"),
+        bit_rate_from_header=container_dict.get("bitRate"),
         best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
         best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
         streams=streams_metadata,

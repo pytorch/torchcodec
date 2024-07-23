@@ -22,4 +22,4 @@ torchcodec.decoders
 
     Frame
     FrameBatch
-    StreamMetadata
+    VideoStreamMetadata
