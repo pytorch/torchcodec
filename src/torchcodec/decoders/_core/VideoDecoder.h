@@ -36,7 +36,6 @@ double presentation_timestamp = output.ptsSeconds;
 // because the frame time may not align exactly with the seek time.
 CHECK_GE(presentation_timestamp, 5.0);
 */
-// TODO_BEFORE_RELEASE Ahmad: block comment is wrong
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
 class VideoDecoder {
