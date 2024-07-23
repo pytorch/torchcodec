@@ -368,6 +368,15 @@ class TestSimpleDecoder:
         C, H, W = NASA_VIDEO.num_color_channels, NASA_VIDEO.height, NASA_VIDEO.width
         assert frame.shape[-3:] == (C, H, W) if dimension_order == "NCHW" else (H, W, C)
 
+        if frame.ndim == 3:
+            frame = frame[None]  # Add fake batch dim to check contiguity
+        expected_memory_format = (
+            torch.channels_last
+            if dimension_order == "NCHW"
+            else torch.contiguous_format
+        )
+        assert frame.is_contiguous(memory_format=expected_memory_format)
+
     def test_dimension_order_fails(self):
         with pytest.raises(ValueError, match="Invalid dimension order"):
             SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NCDHW")

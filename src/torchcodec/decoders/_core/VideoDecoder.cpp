@@ -150,7 +150,8 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
          3,
          options.height.value_or(*metadata.height),
          options.width.value_or(*metadata.width)},
-        {torch::kUInt8});
+         torch::TensorOptions().memory_format(torch::MemoryFormat::ChannelsLast).dtype({torch::kUInt8})
+         );
   } else {
     TORCH_CHECK(false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
   }
