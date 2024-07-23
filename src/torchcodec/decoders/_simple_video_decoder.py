@@ -213,6 +213,32 @@ class SimpleVideoDecoder:
         frame = core.get_frame_at_pts(self._decoder, pts_seconds)
         return Frame(*frame)
 
+    def get_frames_displayed_at(
+        self, start_seconds: float, stop_seconds: float
+    ) -> FrameBatch:
+        if not start_seconds <= stop_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. It must be less than or equal to stop seconds ({stop_seconds})."
+            )
+        if not self._min_pts_seconds <= start_seconds < self._max_pts_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. "
+                f"It must be greater than or equal to {self._min_pts_seconds} "
+                f"and less than or equal to {self._max_pts_seconds}."
+            )
+        if not stop_seconds <= self._max_pts_seconds:
+            raise ValueError(
+                f"Invalid stop seconds: {stop_seconds}. "
+                f"It must be less than or equal to {self._max_pts_seconds}."
+            )
+        frames = core.get_frames_by_pts_in_range(
+            self._decoder,
+            stream_index=self._stream_index,
+            start_seconds=start_seconds,
+            stop_seconds=stop_seconds,
+        )
+        return FrameBatch(*frames)
+
 
 def _get_and_validate_stream_metadata(
     decoder: Tensor,

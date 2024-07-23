@@ -86,6 +86,12 @@ OpsBatchDecodedOutput get_frames_in_range(
     int64_t stop,
     std::optional<int64_t> step = std::nullopt);
 
+OpsBatchDecodedOutput get_frames_by_pts_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    double start_seconds,
+    double stop_seconds);
+
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 
