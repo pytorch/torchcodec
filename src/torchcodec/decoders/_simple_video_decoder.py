@@ -1,7 +1,7 @@
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Tuple, Union
+from typing import Iterable, Iterator, Literal, Tuple, Union
 
 from torch import Tensor
 
@@ -71,7 +71,9 @@ class SimpleVideoDecoder:
     """
 
     def __init__(
-        self, source: Union[str, Path, bytes, Tensor], dimension_order: str = "NCHW"
+        self,
+        source: Union[str, Path, bytes, Tensor],
+        dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
     ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
