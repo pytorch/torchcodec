@@ -116,7 +116,8 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
     } else if (key == "dimension_order") {
       if (value != "NHWC" && value != "NCHW") {
         throw std::runtime_error(
-            "Invalid dimension_order=" + value + ". dimensionOrder must be either NHWC or NCHW.");
+            "Invalid dimension_order=" + value +
+            ". dimensionOrder must be either NHWC or NCHW.");
       }
       dimensionOrder = value;
     } else if (key == "width") {
@@ -137,23 +138,25 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
-  if (options.dimensionOrder== "NHWC") {
+  if (options.dimensionOrder == "NHWC") {
     frames = torch::empty(
         {numFrames,
          options.height.value_or(*metadata.height),
          options.width.value_or(*metadata.width),
          3},
         {torch::kUInt8});
-  } else if (options.dimensionOrder== "NCHW") {
+  } else if (options.dimensionOrder == "NCHW") {
     frames = torch::empty(
         {numFrames,
          3,
          options.height.value_or(*metadata.height),
          options.width.value_or(*metadata.width)},
-         torch::TensorOptions().memory_format(torch::MemoryFormat::ChannelsLast).dtype({torch::kUInt8})
-         );
+        torch::TensorOptions()
+            .memory_format(torch::MemoryFormat::ChannelsLast)
+            .dtype({torch::kUInt8}));
   } else {
-    TORCH_CHECK(false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
+    TORCH_CHECK(
+        false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
   }
 }
 
