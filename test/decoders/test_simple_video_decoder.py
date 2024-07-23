@@ -349,9 +349,28 @@ class TestSimpleDecoder:
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
 
-    def test_dimension_order(self):
-        # TODO: Add this test. Will address in this PR.
-        pass
+    @pytest.mark.parametrize("dimension_order", ["NCHW", "NHWC"])
+    @pytest.mark.parametrize(
+        "frame_getter",
+        (
+            lambda decoder: decoder[0],
+            lambda decoder: decoder.get_frame_at(0).data,
+            lambda decoder: decoder.get_frames_at(0, 4).data,
+            lambda decoder: decoder.get_frame_displayed_at(0).data,
+            # TODO: uncomment once D60001893 lands
+            # lambda decoder: decoder.get_frames_displayed_at(0, 1).data,
+        ),
+    )
+    def test_dimension_order(self, dimension_order, frame_getter):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order=dimension_order)
+        frame = frame_getter(decoder)
+
+        C, H, W = NASA_VIDEO.num_color_channels, NASA_VIDEO.height, NASA_VIDEO.width
+        assert frame.shape[-3:] == (C, H, W) if dimension_order == "NCHW" else (H, W, C)
+
+    def test_dimension_order_fails(self):
+        with pytest.raises(ValueError, match="Invalid dimension order"):
+            SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NCDHW")
 
 
 if __name__ == "__main__":
