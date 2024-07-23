@@ -71,7 +71,8 @@ class SimpleVideoDecoder:
     """
 
     def __init__(
-        self, source: Union[str, Path, bytes, Tensor],
+        self,
+        source: Union[str, Path, bytes, Tensor],
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
     ):
         if isinstance(source, str):
