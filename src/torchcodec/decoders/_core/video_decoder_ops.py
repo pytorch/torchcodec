@@ -68,6 +68,7 @@ get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
+get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 _get_container_json_metadata = (
     torch.ops.torchcodec_ns.get_container_json_metadata.default
@@ -176,6 +177,22 @@ def get_frames_in_range_abstract(
     start: int,
     stop: int,
     step: Optional[int] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
+
+
+@impl_abstract("torchcodec_ns::get_frames_by_pts_in_range")
+def get_frames_by_pts_in_range_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    start_seconds: float,
+    stop_seconds: float,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return (

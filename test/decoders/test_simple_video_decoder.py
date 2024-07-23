@@ -349,6 +349,74 @@ class TestSimpleDecoder:
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
 
+    def test_get_frames_by_pts_in_range(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        # Note that we are comparing the results of SimpleVideoDecoder's method:
+        #   get_frames_displayed_at()
+        # With the testing framework's method:
+        #   get_frame_data_by_range()
+        # That is, we are testing the correctness of a pts-based range against an
+        # index-based range. We are doing this because we are primarily testing
+        # the range logic in the pts-based method. We ensure it is correct by making
+        # sure it returns the frames at the indices we know the pts-values map to.
+
+        # Range where the stop seconds is roughly halfway between the pts for two frames.
+        frames0_4 = decoder.get_frames_displayed_at(0.0, 0.15)
+        assert frames0_4.data.shape == torch.Size(
+            [
+                5,
+                NASA_VIDEO.height,
+                NASA_VIDEO.width,
+                NASA_VIDEO.num_color_channels,
+            ]
+        )
+        assert_tensor_equal(frames0_4.data, NASA_VIDEO.get_frame_data_by_range(0, 5))
+
+        # Range where the stop seconds is slightly past the pts for a frame.
+        frames5_9 = decoder.get_frames_displayed_at(0.166833, 0.300300 + 0.00001)
+        assert frames5_9.data.shape == torch.Size(
+            [
+                5,
+                NASA_VIDEO.height,
+                NASA_VIDEO.width,
+                NASA_VIDEO.num_color_channels,
+            ]
+        )
+        assert_tensor_equal(frames5_9.data, NASA_VIDEO.get_frame_data_by_range(5, 10))
+
+        # Single frame where the stop seconds is only slightly more than the start seconds.
+        frame6 = decoder.get_frames_displayed_at(0.166833, 0.166833 + 0.00001)
+        assert frame6.data.shape == torch.Size(
+            [
+                1,
+                NASA_VIDEO.height,
+                NASA_VIDEO.width,
+                NASA_VIDEO.num_color_channels,
+            ]
+        )
+        assert_tensor_equal(frame6.data, NASA_VIDEO.get_frame_data_by_range(5, 6))
+
+        # Empty frame because stop seconds and start seconds are equal.
+        empty_frames = decoder.get_frames_displayed_at(0.200200, 0.200200)
+        assert_tensor_equal(empty_frames.data, NASA_VIDEO.empty_hwc_tensor)
+        assert_tensor_equal(empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds)
+        assert_tensor_equal(
+            empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
+        )
+
+    def test_get_frames_by_pts_in_range_fails(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(ValueError, match="Invalid start seconds"):
+            frame = decoder.get_frames_displayed_at(100.0, 1.0)  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start seconds"):
+            frame = decoder.get_frames_displayed_at(20, 23)  # noqa
+
+        with pytest.raises(ValueError, match="Invalid stop seconds"):
+            frame = decoder.get_frames_displayed_at(0, 23)  # noqa
+
 
 if __name__ == "__main__":
     pytest.main()

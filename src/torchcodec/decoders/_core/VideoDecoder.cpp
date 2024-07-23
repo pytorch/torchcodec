@@ -846,9 +846,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    torch::Tensor frame = getNextDecodedOutput().frame;
+    torch::Tensor frame = getFrameAtIndex(streamIndex, frameIndex).frame;
     output.frames[i++] = frame;
   }
   return output;
@@ -878,15 +876,72 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   const auto& options = stream.options;
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
-  int64_t f = 0;
-  for (int64_t i = start; i < stop; i += step) {
-    int64_t pts = stream.allFrames[i].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    DecodedOutput singleOut = getNextDecodedOutput();
+  for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
     output.frames[f] = singleOut.frame;
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
-    ++f;
+  }
+
+  return output;
+}
+
+VideoDecoder::BatchDecodedOutput
+VideoDecoder::getFramesDisplayedByTimestampInRange(
+    int streamIndex,
+    double startSeconds,
+    double stopSeconds) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+  TORCH_CHECK(
+      startSeconds >= minSeconds && startSeconds < maxSeconds,
+      "Start seconds is " + std::to_string(startSeconds) +
+          "; must be in range [" + std::to_string(minSeconds) + ", " +
+          std::to_string(maxSeconds) + ").");
+  TORCH_CHECK(
+      stopSeconds <= maxSeconds,
+      "Stop seconds (" + std::to_string(stopSeconds) +
+          "; must be less than or equal to " + std::to_string(maxSeconds) +
+          ").");
+
+  const auto& stream = streams_[streamIndex];
+
+  // Determine the indices of the frames that match the timestamp range.
+  auto startFrame = std::lower_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      startSeconds,
+      [&stream](const FrameInfo& info, double start) {
+        return ptsToSeconds(info.pts, stream.timeBase) < start;
+      });
+
+  auto stopFrame = std::lower_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      stopSeconds,
+      [&stream](const FrameInfo& info, double stop) {
+        return ptsToSeconds(info.pts, stream.timeBase) < stop;
+      });
+
+  int64_t startFrameIndex = startFrame - stream.allFrames.begin();
+  int64_t stopFrameIndex = stopFrame - stream.allFrames.begin();
+  int64_t numFrames = stopFrameIndex - startFrameIndex;
+  const auto& options = stream.options;
+  BatchDecodedOutput output(numFrames, options, streamMetadata);
+  for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
+    output.frames[f] = singleOut.frame;
+    output.ptsSeconds[f] = singleOut.ptsSeconds;
+    output.durationSeconds[f] = singleOut.durationSeconds;
   }
 
   return output;

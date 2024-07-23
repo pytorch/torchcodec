@@ -205,6 +205,12 @@ class VideoDecoder {
   BatchDecodedOutput
   getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
+  // Returns frames within a given pts range for a given stream as a single
+  // stacked tensor. The range is defined as [startSeconds, stopSeconds).
+  BatchDecodedOutput getFramesDisplayedByTimestampInRange(
+      int streamIndex,
+      double startSeconds,
+      double stopSeconds);
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
   // --------------------------------------------------------------------------
