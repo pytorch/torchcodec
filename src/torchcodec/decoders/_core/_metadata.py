@@ -1,13 +1,15 @@
 import json
+import pathlib
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 
 from torchcodec.decoders._core.video_decoder_ops import (
     _get_container_json_metadata,
     _get_stream_json_metadata,
+    create_from_file,
 )
 
 
@@ -25,8 +27,9 @@ class VideoStreamMetadata:
     (int or None)."""
     num_frames_from_content: Optional[int]
     """Number of frames computed by TorchCodec by scanning the stream's
-    content. This is more accurate than ``num_frames_from_header``. We
-    recommend using the ``num_frames`` attribute instead. (int or None)."""
+    content (the scan doesn't involve decoding). This is more accurate
+    than ``num_frames_from_header``. We recommend using the
+    ``num_frames`` attribute instead. (int or None)."""
     min_pts_seconds: Optional[float]
     """Minimum :term:`pts` of any frame in the stream (float or None)."""
     max_pts_seconds: Optional[float]
@@ -79,6 +82,11 @@ class VideoMetadata:
 
 
 def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
+    """Return video metadata from a video decoder.
+
+    The accuracy of the metadata and the availability of some returned fields
+    depends on whether a full scan was performed by the decoder.
+    """
 
     container_dict = json.loads(_get_container_json_metadata(decoder))
     streams_metadata = []
@@ -88,7 +96,8 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
             VideoStreamMetadata(
                 duration_seconds=stream_dict.get("durationSeconds"),
                 bit_rate=stream_dict.get("bitRate"),
-                # TODO_OPEN_ISSUE: We should align the C++ names and the json keys with the Python names
+                # TODO_OPEN_ISSUE: We should align the C++ names and the json
+                # keys with the Python names
                 num_frames_from_header=stream_dict.get("numFrames"),
                 num_frames_from_content=stream_dict.get("numFramesFromScan"),
                 min_pts_seconds=stream_dict.get("minPtsSecondsFromScan"),
@@ -108,3 +117,7 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
         best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
         streams=streams_metadata,
     )
+
+
+def get_video_metadata_from_header(filename: Union[str, pathlib.Path]) -> VideoMetadata:
+    return get_video_metadata(create_from_file(str(filename)))
