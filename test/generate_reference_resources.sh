@@ -34,6 +34,8 @@ ffmpeg -y -ss 12.979633 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time12.979633.
 # Audio generation in the form of an mp3.
 ffmpeg -y -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
 
+# TODO: Add frames decoded by Nvidia's NVDEC.
+
 for bmp in "$RESOURCES_DIR"/*.bmp
 do
   python3 convert_image_to_tensor.py "$bmp"

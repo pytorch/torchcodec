@@ -4,6 +4,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Torch REQUIRED)
+find_package(CUDA REQUIRED)
+
+file(
+  DOWNLOAD
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+  EXPECTED_HASH SHA256=cc155ce02e7945e7b8967ddfaff0b050e958a723ef7aad3766d368940cb15494
+)
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
+CPMAddPackage(
+    NAME NVTX
+    GITHUB_REPOSITORY NVIDIA/NVTX
+    GIT_TAG v3.1.0-c-cpp
+    GIT_SHALLOW TRUE)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
@@ -19,6 +34,12 @@ function(make_torchcodec_library library_name ffmpeg_target)
     )
     add_library(${library_name} SHARED ${sources})
     set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
+    if(ENABLE_CUDA)
+        target_compile_definitions(${library_name} PRIVATE ENABLE_CUDA=1)
+    endif()
+    if(ENABLE_NVTX)
+        target_compile_definitions(${library_name} PRIVATE ENABLE_NVTX=1)
+    endif()
 
     target_include_directories(
         ${library_name}
@@ -34,6 +55,8 @@ function(make_torchcodec_library library_name ffmpeg_target)
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
         ${Python3_LIBRARIES}
+        ${CUDA_CUDA_LIBRARY}
+        nvtx3-cpp
     )
 
     # We already set the library_name to be libtorchcodecN, so we don't want
