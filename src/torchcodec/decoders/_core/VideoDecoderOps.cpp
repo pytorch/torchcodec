@@ -25,7 +25,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? shape=None, int? stream_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -108,17 +108,17 @@ void add_video_stream(
     std::optional<int64_t> width,
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
-    std::optional<c10::string_view> shape,
+    std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
   options.ffmpegThreadCount = num_threads;
 
-  if (shape.has_value()) {
-    std::string stdShape{shape.value()};
-    TORCH_CHECK(stdShape == "NHWC" || stdShape == "NCHW");
-    options.shape = stdShape;
+  if (dimension_order.has_value()) {
+    std::string stdDimensionOrder{dimension_order.value()};
+    TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
+    options.dimensionOrder = stdDimensionOrder;
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

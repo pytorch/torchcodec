@@ -39,7 +39,7 @@ TEST(VideoDecoderOpsTest, TestCreateDecoderFromBuffer) {
   add_video_stream(decoder);
   auto result = get_next_frame(decoder);
   at::Tensor tensor1 = std::get<0>(result);
-  EXPECT_EQ(tensor1.sizes(), std::vector<long>({270, 480, 3}));
+  EXPECT_EQ(tensor1.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(std::get<1>(result).item<double>(), 0);
   EXPECT_NEAR(std::get<2>(result).item<double>(), 0.033367, 1e-6);
 }

@@ -129,9 +129,9 @@ class VideoDecoder {
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
     // the given codec.
     std::optional<int> ffmpegThreadCount;
-    // Currently the shape can be either NHWC or NCHW.
+    // Currently the dimension order can be either NHWC or NCHW.
     // H=height, W=width, C=channel.
-    std::string shape = "NHWC";
+    std::string dimensionOrder = "NCHW";
     // The output height and width of the frame. If not specified, the output
     // is the same as the original video.
     std::optional<int> width;

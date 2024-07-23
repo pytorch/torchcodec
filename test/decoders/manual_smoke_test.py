@@ -11,5 +11,4 @@ torchcodec.decoders._core.add_video_stream(decoder, stream_index=3)
 frame, _, _ = torchcodec.decoders._core.get_frame_at_index(
     decoder, stream_index=3, frame_index=180
 )
-frame = frame.permute(2, 0, 1)
 write_png(frame, "frame180.png")
