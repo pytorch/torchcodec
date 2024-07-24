@@ -255,7 +255,9 @@ class TestSimpleDecoder:
         frame9 = decoder.get_frame_at(9)
 
         assert_tensor_equal(ref_frame9, frame9.data)
-        assert frame9.pts_seconds == 0.3003
+        assert isinstance(frame9.pts_seconds, float)
+        assert frame9.pts_seconds == pytest.approx(0.3003)
+        assert isinstance(frame9.duration_seconds, float)
         assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
 
     def test_get_frame_at_tuple_unpacking(self):
@@ -284,6 +286,8 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.02).data)
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.039366).data)
+        assert isinstance(decoder.get_frame_displayed_at(6.02).pts_seconds, float)
+        assert isinstance(decoder.get_frame_displayed_at(6.02).duration_seconds, float)
 
     def test_get_frame_displayed_at_fails(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
