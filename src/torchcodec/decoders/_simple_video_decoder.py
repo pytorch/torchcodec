@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
@@ -178,7 +184,14 @@ class SimpleVideoDecoder:
         return frame_data
 
     def __getitem__(self, key: Union[int, slice]) -> Tensor:
-        """TODO_BEFORE_RELEASE: Nicolas Document this, looks like our template doesn't show it, aaarrgghhh"""
+        """Return frame or frames as tensors, at the given index or range.
+
+        Args:
+            key(int or slice): The index or range of frame(s) to retrieve.
+
+        Returns:
+            torch.Tensor: The frame or frames at the given index or range.
+        """
         if isinstance(key, int):
             return self._getitem_int(key)
         elif isinstance(key, slice):

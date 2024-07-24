@@ -1,6 +1,12 @@
-import dataclasses
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 import json
 import pathlib
+import dataclasses
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
