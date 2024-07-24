@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 # Run this script to update the resources used in unit tests. The resources are all derived
 # from source media already checked into the repo.
 
