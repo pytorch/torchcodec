@@ -9,8 +9,8 @@
 Decoding a video with SimpleVideoDecoder
 ========================================
 
-In this example, we'll learn about all the different ways you can use to decode
-a video using the :class:`~torchcodec.decoders.SimpleVideoDecoder` class.
+In this example, we'll learn how to decode a video using the
+:class:`~torchcodec.decoders.SimpleVideoDecoder` class.
 """
 
 # %%
