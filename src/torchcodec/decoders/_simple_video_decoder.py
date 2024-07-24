@@ -158,7 +158,7 @@ class SimpleVideoDecoder:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(int or slice): The index or range of frames to retrieve.
+            key(int or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.
