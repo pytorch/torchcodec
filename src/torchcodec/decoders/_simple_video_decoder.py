@@ -15,10 +15,9 @@ from torchcodec.decoders import _core as core
 
 
 def _frame_str(self):
-    # Utility to replace Frame and Frame's __str__ method.  This prints the
-    # shape of the .data tensor rather than printing the data tensor itself,
-    # which would be very long and not very useful. Users can still print
-    # `frame.data` normally to print the whole tensor.
+    # Utility to replace Frame and FrameBatch __str__ method. This prints the
+    # shape of the .data tensor rather than printing the (potentially very long)
+    # data tensor itself.
     s = self.__class__.__name__ + ":\n"
     spaces = "  "
     for field in dataclasses.fields(self):

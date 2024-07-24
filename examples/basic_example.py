@@ -72,7 +72,7 @@ print(decoder.metadata)
 # Decoding frames by indexing the decoder
 # ---------------------------------------
 
-first_frame = decoder[-1]  # using a single int index
+first_frame = decoder[0]  # using a single int index
 every_twenty_frame = decoder[0 : -1 : 20]  # using slices
 
 print(f"{first_frame.shape = }\n{every_twenty_frame.shape = }")
@@ -130,7 +130,7 @@ print(middle_frames)
 
 # %%
 plot(last_frame.data, "Last frame")
-plot(middle_frames.data, "Middle frame")
+plot(middle_frames.data, "Middle frames")
 
 # %%
 # Both :class:`~torchcodec.decoders.Frame` and
