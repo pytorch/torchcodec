@@ -192,10 +192,14 @@ class SimpleVideoDecoder:
             raise IndexError(
                 f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
             )
-        frame = core.get_frame_at_index(
+        data, pts_seconds, duration_seconds = core.get_frame_at_index(
             self._decoder, frame_index=index, stream_index=self._stream_index
         )
-        return Frame(*frame)
+        return Frame(
+            data=data,
+            pts_seconds=pts_seconds.item(),
+            duration_seconds=duration_seconds.item(),
+        )
 
     def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
         """Return multiple frames at the given index range.
@@ -245,8 +249,14 @@ class SimpleVideoDecoder:
                 f"It must be greater than or equal to {self._min_pts_seconds} "
                 f"and less than or equal to {self._max_pts_seconds}."
             )
-        frame = core.get_frame_at_pts(self._decoder, pts_seconds)
-        return Frame(*frame)
+        data, pts_seconds, duration_seconds = core.get_frame_at_pts(
+            self._decoder, pts_seconds
+        )
+        return Frame(
+            data=data,
+            pts_seconds=pts_seconds.item(),
+            duration_seconds=duration_seconds.item(),
+        )
 
 
 def _get_and_validate_stream_metadata(
