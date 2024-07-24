@@ -1,6 +1,6 @@
+import dataclasses
 import json
 import pathlib
-
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
@@ -55,6 +55,15 @@ class VideoStreamMetadata:
             return self.num_frames_from_content
         else:
             return self.num_frames_from_header
+
+    def __str__(self):
+        # Overridden because `num_frames` wouldn't be printed by default.
+        s = self.__class__.__name__ + ":\n"
+        spaces = "  "
+        s += f"{spaces}num_frames: {self.num_frames}\n"
+        for field in dataclasses.fields(self):
+            s += f"{spaces}{field.name}: {getattr(self, field.name)}\n"
+        return s
 
 
 @dataclass

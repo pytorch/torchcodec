@@ -12,3 +12,9 @@ dev = [
     "pytest",
     "pillow",
 ]
+
+[tool.ufmt]
+
+excludes = [
+    "examples",
+]
