@@ -85,7 +85,13 @@ _get_json_ffmpeg_library_versions = (
 # Functions not related to custom ops, but similar implementation to c++ ops
 # =============================
 def create_from_bytes(video_bytes: bytes) -> torch.Tensor:
-    return create_from_tensor(torch.frombuffer(video_bytes, dtype=torch.uint8))
+    import warnings
+    with warnings.catch_warnings():
+        # Ignore warning stating that the underlying video_bytes buffer is
+        # non-writable.
+        warnings.filterwarnings("ignore", category=UserWarning)
+        buffer = torch.frombuffer(video_bytes, dtype=torch.uint8)
+    return create_from_tensor(buffer)
 
 
 # ==============================
