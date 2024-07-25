@@ -45,7 +45,7 @@ class Frame(Iterable):
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
 
-    def __str__(self):
+    def __repr__(self):
         return _frame_str(self)
 
 
@@ -64,7 +64,7 @@ class FrameBatch(Iterable):
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
 
-    def __str__(self):
+    def __repr__(self):
         return _frame_str(self)
 
 
