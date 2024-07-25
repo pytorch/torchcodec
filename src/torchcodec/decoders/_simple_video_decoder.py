@@ -14,6 +14,22 @@ from torch import Tensor
 from torchcodec.decoders import _core as core
 
 
+def _frame_str(self):
+    # Utility to replace Frame and FrameBatch __str__ method. This prints the
+    # shape of the .data tensor rather than printing the (potentially very long)
+    # data tensor itself.
+    s = self.__class__.__name__ + ":\n"
+    spaces = "  "
+    for field in dataclasses.fields(self):
+        field_name = field.name
+        field_val = getattr(self, field_name)
+        if field_name == "data":
+            field_name = "data (shape)"
+            field_val = field_val.shape
+        s += f"{spaces}{field_name}: {field_val}\n"
+    return s
+
+
 @dataclass
 class Frame(Iterable):
     """A single video frame with associated metadata."""
@@ -28,6 +44,9 @@ class Frame(Iterable):
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
+
+    def __str__(self):
+        return _frame_str(self)
 
 
 @dataclass
@@ -44,6 +63,9 @@ class FrameBatch(Iterable):
     def __iter__(self) -> Iterator[Union[Tensor, float]]:
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
+
+    def __str__(self):
+        return _frame_str(self)
 
 
 _ERROR_REPORTING_INSTRUCTIONS = """

@@ -13,22 +13,62 @@ an issue!
 
 ## Using TorchCodec
 
-<!-- TODO BEFORE_RELEASE: polish this example -->
+Here's a condensed summary of what you can do with TorchCodec. For a more
+detailed example, [check out our
+documentation](https://pytorch.org/torchcodec/main/generated_examples/)!
+
 ```python
 from torchcodec.decoders import SimpleVideoDecoder
 
-video = SimpleVideoDecoder("/path/to/video.mp4")
+# Note: If you don't have a video file at hand, you can generate one using the
+# snippet below
+decoder = SimpleVideoDecoder("/tmp/output_video.mp4")
 
-# Indexing API:
-first_frame = video[0]
-last_frame = video[-1]
+decoder.metadata
+# VideoStreamMetadata:  (Truncated output)
+#   num_frames: 250
+#   duration_seconds: 10.0
+#   bit_rate: 31315.0
+#   codec: h264
+#   average_fps: 25.0
 
-# PTS API:
-frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
+# Indexing API
+decoder[0]  # Tensor of shape [C, H, W]
+decoder[0 : -1 : 20]  # Stacked Tensor of shape [N, C, H, W]
+
+# Indexing, with PTS and duration info
+decoder.get_frame_at(len(decoder) - 1)
+# Frame:
+#   data (shape): torch.Size([3, 400, 640])
+#   pts_seconds: 9.960000038146973
+#   duration_seconds: 0.03999999910593033
+
+decoder.get_frames_at(start=10, stop=30, step=5)
+# FrameBatch:
+#   data (shape): torch.Size([4, 3, 400, 640])
+#   pts_seconds: tensor([0.4000, 0.6000, 0.8000, 1.0000])
+#   duration_seconds: tensor([0.0400, 0.0400, 0.0400, 0.0400])
+
+# Time-based indexing with PTS and duration info
+decoder.get_frame_displayed_at(pts_seconds=2)
+# Frame:
+#   data (shape): torch.Size([3, 400, 640])
+#   pts_seconds: 2.0
+#   duration_seconds: 0.03999999910593033
 ```
 
-<!-- TODO_UPDATE_LINK add link to docs -->
-For more detailed examples, check out our docs!
+You can use the following snippet to generate a video with FFmpeg and tryout
+TorchCodec:
+
+```bash
+fontfile=/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono-Bold.ttf
+output_video_file=/tmp/output_video.mp4
+
+ffmpeg -f lavfi -i \
+    color=size=640x400:duration=10:rate=25:color=blue \
+    -vf "drawtext=fontfile=${fontfile}:fontsize=30:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Frame %{frame_num}'" \
+    ${output_video_file}
+```
 
 ## Installing TorchCodec
 
