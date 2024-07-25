@@ -20,9 +20,7 @@ documentation](https://pytorch.org/torchcodec/main/generated_examples/)!
 ```python
 from torchcodec.decoders import SimpleVideoDecoder
 
-# Note: If you don't have a video file at hand, you can generate one using the
-# snippet below
-decoder = SimpleVideoDecoder("/tmp/output_video.mp4")
+decoder = SimpleVideoDecoder("path/to/video.mp4")
 
 decoder.metadata
 # VideoStreamMetadata:  (Truncated output)
