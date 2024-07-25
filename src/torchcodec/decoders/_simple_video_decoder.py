@@ -47,7 +47,8 @@ class FrameBatch(Iterable):
 
 
 _ERROR_REPORTING_INSTRUCTIONS = """
-This should never happen. Please report an issue following the steps in <TODO_UPDATE_LINK>.
+This should never happen. Please report an issue following the steps in
+https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=bug-report.yml.
 """
 
 

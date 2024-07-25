@@ -7,9 +7,8 @@ TorchCodec is a Python package with a goal to provide useful and fast APIs to
 decode video frames to PyTorch Tensors.
 
 ⚠️ TorchCodec is still in early development stage and we are actively seeking
-feedback. If you have any suggestions or issues, please let us know by opening
-an issue!
-<!-- TODO_UPDATE_LINK add link to issue tracker -->
+feedback. If you have any suggestions or issues, please let us know by [opening
+an issue](https://github.com/pytorch/torchcodec/issues/new/choose)!
 
 ## Using TorchCodec
 
@@ -27,8 +26,7 @@ last_frame = video[-1]
 frame_visible_at_2_seconds = video.get_frame_displayed_at(2)
 ```
 
-<!-- TODO_UPDATE_LINK add link to docs -->
-For more detailed examples, check out our docs!
+For more detailed examples, [check out our docs](https://pytorch.org/torchcodec/stable/index.html)!
 
 ## Installing TorchCodec
 
@@ -59,12 +57,12 @@ TorchCodec supports all major FFmpeg version in [4, 7].
 
 We are actively working on the following features:
 
-<!-- TODO_UPDATE_LINK link to relevant issues-->
-- MacOS support (currently, only Linux is supported)
-- GPU decoding
-- Audio decoding
+- [MacOS support](https://github.com/pytorch/torchcodec/issues/111) (currently, only Linux is supported)
+- [GPU decoding](https://github.com/pytorch/torchcodec/pull/58)
+- [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
 
-Let us know if you have any feature requests by opening an issue!
+Let us know if you have any feature requests by [opening an
+issue](https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=feature-request.yml)!
 
 ## Contributing
 
