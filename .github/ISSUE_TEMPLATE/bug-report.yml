@@ -5,7 +5,7 @@ body:
 - type: markdown
   attributes:
     value: >
-      #### Before submitting a bug, please make sure the issue hasn't been already addressed by searching through [the existing and past issues](TODO_UPDATE_LINK).
+      #### Before submitting a bug, please make sure the issue hasn't been already addressed by searching through [the existing and past issues](https://github.com/pytorch/torchcodec/issues?q=sort%3Aupdated-desc+is%3Aissue).
 - type: textarea
   attributes:
     label: 🐛 Describe the bug
