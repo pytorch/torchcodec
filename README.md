@@ -30,9 +30,13 @@ decoder.metadata
 #   codec: h264
 #   average_fps: 25.0
 
-# Indexing API
-decoder[0]  # Tensor of shape [C, H, W]
-decoder[0 : -1 : 20]  # Stacked Tensor of shape [N, C, H, W]
+# Simple Indexing API
+decoder[0]  # uint8 tensor of shape [C, H, W]
+decoder[0 : -1 : 20]  # uint8 stacked tensor of shape [N, C, H, W]
+
+# Iterate over frames:
+for frame in decoder:
+    pass
 
 # Indexing, with PTS and duration info
 decoder.get_frame_at(len(decoder) - 1)
