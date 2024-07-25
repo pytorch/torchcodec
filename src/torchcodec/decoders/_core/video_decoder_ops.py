@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 import json
 import warnings
 from typing import List, Optional, Tuple
@@ -85,7 +91,12 @@ _get_json_ffmpeg_library_versions = (
 # Functions not related to custom ops, but similar implementation to c++ ops
 # =============================
 def create_from_bytes(video_bytes: bytes) -> torch.Tensor:
-    return create_from_tensor(torch.frombuffer(video_bytes, dtype=torch.uint8))
+    with warnings.catch_warnings():
+        # Ignore warning stating that the underlying video_bytes buffer is
+        # non-writable.
+        warnings.filterwarnings("ignore", category=UserWarning)
+        buffer = torch.frombuffer(video_bytes, dtype=torch.uint8)
+    return create_from_tensor(buffer)
 
 
 # ==============================
