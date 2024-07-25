@@ -3,7 +3,7 @@
 
 import pytest
 import torch
-from torchcodec.samplers import (
+from torchcodec._samplers import (
     IndexBasedSamplerArgs,
     TimeBasedSamplerArgs,
     VideoArgs,
