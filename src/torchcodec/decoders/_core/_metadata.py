@@ -62,7 +62,7 @@ class VideoStreamMetadata:
         else:
             return self.num_frames_from_header
 
-    def __str__(self):
+    def __repr__(self):
         # Overridden because `num_frames` wouldn't be printed by default.
         s = self.__class__.__name__ + ":\n"
         spaces = "  "

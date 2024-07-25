@@ -34,6 +34,9 @@ decoder.metadata
 decoder[0]  # uint8 tensor of shape [C, H, W]
 decoder[0 : -1 : 20]  # uint8 stacked tensor of shape [N, C, H, W]
 
+len(decoder)  # == decoder.metadata.num_frames!
+# 250
+
 # Iterate over frames:
 for frame in decoder:
     pass
