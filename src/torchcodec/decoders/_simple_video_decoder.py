@@ -54,6 +54,8 @@ This should never happen. Please report an issue following the steps in <TODO_UP
 class SimpleVideoDecoder:
     """A single-stream video decoder.
 
+    If the video contains multiple video streams, the :term:`best stream` is used.
+
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
 
