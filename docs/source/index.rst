@@ -3,12 +3,12 @@ Welcome to the TorchCodec documentation!
 
 TorchCodec provides utilities for decoding videos into PyTorch tensors.
 
-.. TODO_UPDATE_LINKE Add link to GH repo below
 .. note::
 
    TorchCodec is still in early development stage and we are actively seeking
    feedback. If you have any suggestions or issues, please let us know by
-   opening an issue on our GitHub repository.
+   `opening an issue <https://github.com/pytorch/torchcodec/issues/new/choose>`_
+   on our `GitHub repository <https://github.com/pytorch/torchcodec/>`_.
 
 .. grid:: 3
 

@@ -14,8 +14,8 @@ from torch import Tensor
 from torchcodec.decoders import _core as core
 
 
-def _frame_str(self):
-    # Utility to replace Frame and FrameBatch __str__ method. This prints the
+def _frame_repr(self):
+    # Utility to replace Frame and FrameBatch __repr__ method. This prints the
     # shape of the .data tensor rather than printing the (potentially very long)
     # data tensor itself.
     s = self.__class__.__name__ + ":\n"
@@ -45,8 +45,8 @@ class Frame(Iterable):
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
 
-    def __str__(self):
-        return _frame_str(self)
+    def __repr__(self):
+        return _frame_repr(self)
 
 
 @dataclass
@@ -64,17 +64,20 @@ class FrameBatch(Iterable):
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
 
-    def __str__(self):
-        return _frame_str(self)
+    def __repr__(self):
+        return _frame_repr(self)
 
 
 _ERROR_REPORTING_INSTRUCTIONS = """
-This should never happen. Please report an issue following the steps in <TODO_UPDATE_LINK>.
+This should never happen. Please report an issue following the steps in
+https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=bug-report.yml.
 """
 
 
 class SimpleVideoDecoder:
     """A single-stream video decoder.
+
+    If the video contains multiple video streams, the :term:`best stream` is used.
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
@@ -256,23 +259,25 @@ class SimpleVideoDecoder:
         )
         return FrameBatch(*frames)
 
-    def get_frame_displayed_at(self, pts_seconds: float) -> Frame:
-        """Return a single frame displayed at the given :term:`pts`, in seconds.
+    def get_frame_displayed_at(self, seconds: float) -> Frame:
+        """Return a single frame displayed at the given timestamp in seconds.
 
         Args:
-            pts (float): The :term:`pts` of the frame to retrieve, in seconds.
+            seconds (float): The time stamp in seconds when the frame is
+                displayed, i.e. seconds is in
+                [:term:`pts`, :term:`pts` + duration).
 
         Returns:
-            Frame: The frame at the given :term:`pts`.
+            Frame: The frame that is displayed at ``seconds``.
         """
-        if not self._min_pts_seconds <= pts_seconds < self._max_pts_seconds:
+        if not self._min_pts_seconds <= seconds < self._max_pts_seconds:
             raise IndexError(
-                f"Invalid pts in seconds: {pts_seconds}. "
+                f"Invalid pts in seconds: {seconds}. "
                 f"It must be greater than or equal to {self._min_pts_seconds} "
                 f"and less than or equal to {self._max_pts_seconds}."
             )
         data, pts_seconds, duration_seconds = core.get_frame_at_pts(
-            self._decoder, pts_seconds
+            self._decoder, seconds
         )
         return Frame(
             data=data,

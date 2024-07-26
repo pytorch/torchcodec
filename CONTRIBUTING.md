@@ -36,9 +36,9 @@ conda install cmake pkg-config ffmpeg -c conda-forge
 
 To clone and install the repo, run:
 
-<!-- TODO_UPDATE_LINK -->
 ```bash
-git clone https://github.com/pytorch-labs/torchcodec.git
+git clone git@github.com:pytorch/torchcodec.git
+# Or, using https instead of ssh: git clone https://github.com/pytorch/torchcodec.git
 cd torchcodec
 
 pip install -e ".[dev]" --no-build-isolation -vv
