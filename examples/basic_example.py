@@ -15,7 +15,8 @@ In this example, we'll learn how to decode a video using the
 
 # %%
 # First, a bit of boilerplate: we'll download a video from the web, and define a
-# plotting utility. You can ignore that part and jump right below.
+# plotting utility. You can ignore that part and jump right below to
+# :ref:`creating_decoder`.
 
 from typing import Optional
 import torch
@@ -51,6 +52,8 @@ def plot(frames: torch.Tensor, title : Optional[str] = None):
 
 
 # %%
+# .. _creating_decoder:
+#
 # Creating a decoder
 # ------------------
 #
@@ -65,7 +68,7 @@ decoder = SimpleVideoDecoder(raw_video_bytes)
 # %%
 # The has not yet been decoded by the decoder, but we already have access to
 # some metadata via the ``metadata`` attribute which is a
-# :class:`~torchcodec.decoders.VideoSteamMetadata` object.
+# :class:`~torchcodec.decoders.VideoStreamMetadata` object.
 print(decoder.metadata)
 
 # %%
@@ -75,8 +78,10 @@ print(decoder.metadata)
 first_frame = decoder[0]  # using a single int index
 every_twenty_frame = decoder[0 : -1 : 20]  # using slices
 
-print(f"{first_frame.shape = }\n{every_twenty_frame.shape = }")
-print(f"{first_frame.dtype = }\n{every_twenty_frame.dtype = }")
+print(f"{first_frame.shape = }")
+print(f"{first_frame.dtype = }")
+print(f"{every_twenty_frame.shape = }")
+print(f"{every_twenty_frame.dtype = }")
 
 # %%
 # Indexing the decoder returns the frames as :class:`torch.Tensor` objects.
