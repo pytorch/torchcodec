@@ -1,4 +1,12 @@
-from typing import List, Optional
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+import json
+import warnings
+from typing import List, Optional, Tuple
 
 import torch
 from torch.library import get_ctx, register_fake
@@ -44,7 +52,8 @@ def load_torchcodec_extension():
 load_torchcodec_extension()
 
 
-# TODO: PyTorch team needs to figure out how to not constant prop factory functions
+# Note: We use disallow_in_graph because PyTorch does constant propagation of
+# factory functions.
 create_from_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_file.default
 )
@@ -57,14 +66,30 @@ get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
+get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
+_get_container_json_metadata = (
+    torch.ops.torchcodec_ns.get_container_json_metadata.default
+)
+scan_all_streams_to_update_metadata = (
+    torch.ops.torchcodec_ns.scan_all_streams_to_update_metadata.default
+)
+_get_stream_json_metadata = torch.ops.torchcodec_ns.get_stream_json_metadata.default
+_get_json_ffmpeg_library_versions = (
+    torch.ops.torchcodec_ns._get_json_ffmpeg_library_versions.default
+)
 
 
 # =============================
 # Functions not related to custom ops, but similar implementation to c++ ops
 # =============================
 def create_from_bytes(video_bytes: bytes) -> torch.Tensor:
-    return create_from_tensor(torch.frombuffer(video_bytes, dtype=torch.uint8))
+    with warnings.catch_warnings():
+        # Ignore warning stating that the underlying video_bytes buffer is
+        # non-writable.
+        warnings.filterwarnings("ignore", category=UserWarning)
+        buffer = torch.frombuffer(video_bytes, dtype=torch.uint8)
+    return create_from_tensor(buffer)
 
 
 # ==============================
@@ -87,50 +112,108 @@ def add_video_stream_abstract(
     width: Optional[int] = None,
     height: Optional[int] = None,
     num_threads: Optional[int] = None,
-    shape: Optional[str] = None,
+    dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
 ) -> None:
     return
 
 
 @register_fake("torchcodec_ns::seek_to_pts")
-def seek_abstract(decoder: torch.Tensor, seconds: float) -> torch.Tensor:
+def seek_abstract(decoder: torch.Tensor, seconds: float) -> None:
     return
 
 
 @register_fake("torchcodec_ns::get_next_frame")
-def get_next_frame_abstract(decoder: torch.Tensor) -> torch.Tensor:
+def get_next_frame_abstract(
+    decoder: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     # Images are 3 dimensions: height, width, channels.
     # The exact permutation depends on the constructor options passed in.
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @register_fake("torchcodec_ns::get_frame_at_pts")
-def get_frame_at_pts_abstract(decoder: torch.Tensor, seconds: float) -> torch.Tensor:
+def get_frame_at_pts_abstract(
+    decoder: torch.Tensor, seconds: float
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @register_fake("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
-    decoder: torch.Tensor, *, frame_index: int, stream_index: int
-) -> torch.Tensor:
+    decoder: torch.Tensor, *, stream_index: int, frame_index: int
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @register_fake("torchcodec_ns::get_frames_at_indices")
 def get_frames_at_indices_abstract(
     decoder: torch.Tensor,
     *,
-    frame_indices: List[int],
     stream_index: int,
+    frame_indices: List[int],
 ) -> torch.Tensor:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return torch.empty(image_size)
 
 
+@register_fake("torchcodec_ns::get_frames_in_range")
+def get_frames_in_range_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    start: int,
+    stop: int,
+    step: Optional[int] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
+
+
 @register_fake("torchcodec_ns::get_json_metadata")
 def get_json_metadata_abstract(decoder: torch.Tensor) -> str:
-    return torch.empty_like("")
+    return ""
+
+
+@register_fake("torchcodec_ns::get_container_json_metadata")
+def get_container_json_metadata_abstract(decoder: torch.Tensor) -> str:
+    return ""
+
+
+@register_fake("torchcodec_ns::get_stream_json_metadata")
+def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> str:
+    return ""
+
+
+@register_fake("torchcodec_ns::_get_json_ffmpeg_library_versions")
+def _get_json_ffmpeg_library_versions_abstract() -> str:
+    return ""
+
+
+@register_fake("torchcodec_ns::scan_all_streams_to_update_metadata")
+def scan_all_streams_to_update_metadata_abstract(decoder: torch.Tensor) -> None:
+    return
+
+
+def get_ffmpeg_library_versions():
+    versions_json = _get_json_ffmpeg_library_versions()
+    return json.loads(versions_json)

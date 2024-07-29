@@ -1,4 +1,8 @@
-// (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -29,7 +33,7 @@ video_decoder.addVideoStreamDecoder(-1);
 // API for seeking and frame extraction:
 // Let's extract the first frame at or after pts=5.0 seconds.
 video_decoder.setCursorPtsInSeconds(5.0);
-auto output = video_decoder->getNextDecodedFrame();
+auto output = video_decoder->getNextDecodedOutput();
 torch::Tensor frame = output.frame;
 double presentation_timestamp = output.ptsSeconds;
 // Note that presentation_timestamp can be any timestamp at 5.0 or above
@@ -38,14 +42,13 @@ CHECK_GE(presentation_timestamp, 5.0);
 */
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
-// TODO: Rename this to be VideoReader.
 class VideoDecoder {
  public:
   ~VideoDecoder() = default;
 
   struct DecoderOptions {
     DecoderOptions() {}
-    // TODO: Add options for the entire decoder here.
+    // TODO: Add options for the entire decoder here, or remove if not needed.
   };
 
   // --------------------------------------------------------------------------
@@ -129,17 +132,15 @@ class VideoDecoder {
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
     // the given codec.
     std::optional<int> ffmpegThreadCount;
-    // Currently the shape can be either NHWC or NCHW.
+    // Currently the dimension order can be either NHWC or NCHW.
     // H=height, W=width, C=channel.
-    std::string shape = "NHWC";
+    std::string dimensionOrder = "NCHW";
     // The output height and width of the frame. If not specified, the output
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
   };
-  struct AudioStreamDecoderOptions {
-    // TODO: Add channels, shape, sample options, etc.
-  };
+  struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
       const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());
@@ -164,6 +165,15 @@ class VideoDecoder {
     int64_t pts;
     // The presentation timestamp of the decoded frame in seconds.
     double ptsSeconds;
+    // The duration of the decoded frame in time base.
+    int64_t duration;
+    // The duration of the decoded frame in seconds.
+    double durationSeconds;
+  };
+  class EndOfFileException : public std::runtime_error {
+   public:
+    explicit EndOfFileException(const std::string& msg)
+        : std::runtime_error(msg) {}
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
@@ -177,12 +187,26 @@ class VideoDecoder {
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
+    torch::Tensor ptsSeconds;
+    torch::Tensor durationSeconds;
+
+    explicit BatchDecodedOutput(
+        int64_t numFrames,
+        const VideoStreamDecoderOptions& options,
+        const StreamMetadata& metadata);
   };
   // Returns frames at the given indexes for a given stream as a single stacked
   // Tensor.
   BatchDecodedOutput getFramesAtIndexes(
       int streamIndex,
       const std::vector<int64_t>& frameIndexes);
+  // Returns frames within a given range for a given stream as a single stacked
+  // Tensor. The range is defined by [start, stop). The values retrieved from
+  // the range are:
+  //    [start, start+step, start+(2*step), start+(3*step), ..., stop)
+  // The default for step is 1.
+  BatchDecodedOutput
+  getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
@@ -204,7 +228,6 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
-    // TODO: Add duration and dts, etc. as need be.
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;
@@ -253,6 +276,8 @@ class VideoDecoder {
   // for more details about the heuristics.
   int getBestStreamIndex(AVMediaType mediaType);
   void initializeDecoder();
+  void validateUserProvidedStreamIndex(uint64_t streamIndex);
+  void validateScannedAllStreams(const std::string& msg);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(
@@ -289,6 +314,8 @@ class VideoDecoder {
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  // Whether or not we have already scanned all streams to update the metadata.
+  bool scanned_all_streams_ = false;
 };
 
 // Prints the VideoDecoder::DecodeStats to the ostream.

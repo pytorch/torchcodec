@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 """
 Build / install instructions:
 
@@ -105,11 +111,13 @@ class CMakeBuild(build_ext):
         # python setup.py build_ext --debug install
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_build_type = os.environ.get("CMAKE_BUILD_TYPE", "Release")
+        python_version = sys.version_info
         cmake_args = [
             f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
             f"-DTorch_DIR={torch_dir}",
             "-DCMAKE_VERBOSE_MAKEFILE=ON",
             f"-DCMAKE_BUILD_TYPE={cmake_build_type}",
+            f"-DPYTHON_VERSION={python_version.major}.{python_version.minor}",
         ]
 
         Path(self.build_temp).mkdir(parents=True, exist_ok=True)
@@ -126,8 +134,17 @@ class CMakeBuild(build_ext):
         This is called by setuptools at the end of .run() during editable installs.
         """
         self.get_finalized_command("build_py")
+        extension = ""
+        if sys.platform == "linux":
+            extension = "so"
+        elif sys.platform == "darwin":
+            extension = "dylib"
+        else:
+            raise NotImplementedError(
+                "Platforms other than linux/darwin are not supported yet"
+            )
 
-        for so_file in self._install_prefix.glob("*.so"):
+        for so_file in self._install_prefix.glob(f"*.{extension}"):
             assert "libtorchcodec" in so_file.name
             destination = Path("src/torchcodec/") / so_file.name
             print(f"Copying {so_file} to {destination}")

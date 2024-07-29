@@ -1,4 +1,8 @@
-// (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
 
 #include <chrono>
 #include <iostream>
@@ -140,12 +144,13 @@ void runNDecodeIterationsWithCustomOps(
         /*width=*/std::nullopt,
         /*height=*/std::nullopt,
         /*thread_count=*/std::nullopt,
-        /*shape=*/std::nullopt,
+        /*dimension_order=*/std::nullopt,
         /*stream_index=*/std::nullopt);
 
     for (double pts : ptsList) {
       seekFrameOp.call(decoderTensor, pts);
-      torch::Tensor tensor = getNextFrameOp.call(decoderTensor);
+      auto result = getNextFrameOp.call(decoderTensor);
+      torch::Tensor tensor = std::get<0>(result);
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
@@ -168,8 +173,6 @@ void runBenchmark() {
       build::getResourcePath(
           "pytorch/torchcodec/benchmarks/decoders/resources/nasa_13013.mp4")
           .string();
-  // TODO(T180763625): Add more test cases involving random seeks forwards and
-  // backwards.
   std::vector<double> ptsList = {
       0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
   runNDecodeIterations(videoPath, ptsList, 100, 5);

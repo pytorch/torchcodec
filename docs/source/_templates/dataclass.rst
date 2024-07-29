@@ -7,3 +7,4 @@
 
 .. autoclass:: {{ name }}
     :members:
+    :undoc-members: __init__

@@ -1,4 +1,8 @@
-// (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
@@ -61,8 +65,9 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
-#ifdef FBCODE_BUILD
-  // TODO: Investigate why this is broken with ffmpeg=6.
+#if LIBAVFORMAT_VERSION_MAJOR >= 60
+  EXPECT_NEAR(metadata.bitRate.value(), 412365, 1e-1);
+#else
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
 #endif
   EXPECT_EQ(metadata.streams.size(), 6);
@@ -107,7 +112,7 @@ torch::Tensor readTensorFromDisk(const std::string& filename) {
       (std::istreambuf_iterator<char>()));
   VLOG(3) << "Read tensor from disk: " << filepath << ": " << data.size()
           << std::endl;
-  return torch::pickle_load(data).toTensor();
+  return torch::pickle_load(data).toTensor().permute({2, 0, 1});
 }
 
 torch::Tensor floatAndNormalizeFrame(const torch::Tensor& frame) {
@@ -129,7 +134,7 @@ double computeAverageCosineSimilarity(
 
 // TEST(DecoderOptionsTest, ConvertsFromStringToOptions) {
 //   std::string optionsString =
-//       "ffmpeg_thread_count=3,shape=NCHW,width=100,height=120";
+//       "ffmpeg_thread_count=3,dimension_order=NCHW,width=100,height=120";
 //   VideoDecoder::DecoderOptions options =
 //       VideoDecoder::DecoderOptions(optionsString);
 //   EXPECT_EQ(options.ffmpegThreadCount, 3);
@@ -144,18 +149,18 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   streamOptions.height = 120;
   decoder->addVideoStreamDecoder(-1, streamOptions);
   torch::Tensor tensor = decoder->getNextDecodedOutput().frame;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({120, 100, 3}));
+  EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
 
-TEST(VideoDecoderTest, RespectsOutputTensorShapeFromOptions) {
+TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> decoder =
       VideoDecoder::createFromFilePath(path);
   VideoDecoder::VideoStreamDecoderOptions streamOptions;
-  streamOptions.shape = "NCHW";
+  streamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStreamDecoder(-1, streamOptions);
   torch::Tensor tensor = decoder->getNextDecodedOutput().frame;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 270, 480}));
+  EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
 
 TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
@@ -164,39 +169,39 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
   auto output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor1FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
+  torch::Tensor tensor0FromOurDecoder = output.frame;
+  EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
   EXPECT_EQ(output.pts, 0);
   output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor2FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor2FromOurDecoder.sizes(), std::vector<long>({270, 480, 3}));
+  torch::Tensor tensor1FromOurDecoder = output.frame;
+  EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
   EXPECT_EQ(output.pts, 1001);
 
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
   torch::Tensor tensor1FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000002.pt");
 
-  EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({270, 480, 3}));
+  EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({3, 270, 480}));
+  EXPECT_TRUE(torch::equal(tensor0FromOurDecoder, tensor0FromFFMPEG));
   EXPECT_TRUE(torch::equal(tensor1FromOurDecoder, tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor2FromOurDecoder, tensor2FromFFMPEG));
+  EXPECT_TRUE(
+      torch::allclose(tensor0FromOurDecoder, tensor0FromFFMPEG, 0.1, 20));
+  EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_TRUE(
       torch::allclose(tensor1FromOurDecoder, tensor1FromFFMPEG, 0.1, 20));
-  EXPECT_EQ(tensor2FromFFMPEG.sizes(), std::vector<long>({270, 480, 3}));
-  EXPECT_TRUE(
-      torch::allclose(tensor2FromOurDecoder, tensor2FromFFMPEG, 0.1, 20));
 
   if (FLAGS_dump_frames_for_debugging) {
+    dumpTensorToDisk(tensor0FromFFMPEG, "tensor0FromFFMPEG.pt");
     dumpTensorToDisk(tensor1FromFFMPEG, "tensor1FromFFMPEG.pt");
-    dumpTensorToDisk(tensor2FromFFMPEG, "tensor2FromFFMPEG.pt");
+    dumpTensorToDisk(tensor0FromOurDecoder, "tensor0FromOurDecoder.pt");
     dumpTensorToDisk(tensor1FromOurDecoder, "tensor1FromOurDecoder.pt");
-    dumpTensorToDisk(tensor2FromOurDecoder, "tensor2FromOurDecoder.pt");
   }
 }
 
-TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
+TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
@@ -207,18 +212,18 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndexes(bestVideoStreamIndex, {0, 180});
   auto tensor = output.frames;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
+  EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
-  torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+  torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
-  EXPECT_TRUE(torch::equal(tensor[0], tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor[1], tensor2FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[0], tensor0FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
-TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
+TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
@@ -227,20 +232,20 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
-      VideoDecoder::VideoStreamDecoderOptions("shape=NCHW"));
+      VideoDecoder::VideoStreamDecoderOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndexes(bestVideoStreamIndex, {0, 180});
   auto tensor = output.frames;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
+  EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
-  torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
-  torch::Tensor tensor2FromFFMPEG =
+  torch::Tensor tensor0FromFFMPEG =
+      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+  torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
-  tensor = tensor.permute({0, 2, 3, 1});
-  EXPECT_TRUE(torch::equal(tensor[0], tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor[1], tensor2FromFFMPEG));
+  tensor = tensor.permute({0, 3, 1, 2});
+  EXPECT_TRUE(torch::equal(tensor[0], tensor0FromFFMPEG));
+  EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
 TEST_P(VideoDecoderTest, SeeksCloseToEof) {

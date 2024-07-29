@@ -3,17 +3,14 @@
 
 import pytest
 import torch
-from torchcodec.samplers import (
+from torchcodec._samplers import (
     IndexBasedSamplerArgs,
     TimeBasedSamplerArgs,
     VideoArgs,
     VideoClipSampler,
 )
 
-from ..test_utils import (  # noqa: F401; see use in test_sampler
-    assert_equal,
-    reference_video_tensor,
-)
+from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
 @pytest.mark.parametrize(
@@ -33,19 +30,16 @@ from ..test_utils import (  # noqa: F401; see use in test_sampler
         ),
     ],
 )
-def test_sampler(
-    sampler_args,
-    reference_video_tensor,  # noqa: F811; linter does not see this as a use
-):
+def test_sampler(sampler_args):
     torch.manual_seed(0)
     desired_width, desired_height = 320, 240
     video_args = VideoArgs(desired_width=desired_width, desired_height=desired_height)
     sampler = VideoClipSampler(video_args, sampler_args)
-    clips = sampler(reference_video_tensor)
-    assert_equal(len(clips), sampler_args.clips_per_video)
+    clips = sampler(NASA_VIDEO.to_tensor())
+    assert_tensor_equal(len(clips), sampler_args.clips_per_video)
     clip = clips[0]
     if isinstance(sampler_args, TimeBasedSamplerArgs):
-        # TODO FIXME: Looks like we have an API inconsistency.
+        # Note: Looks like we have an API inconsistency.
         # With time-based sampler, `clip` is a tensor but with index-based
         # samplers `clip` is a list.
         # Below manually convert that list to a tensor for the `.shape` check to
@@ -53,9 +47,9 @@ def test_sampler(
         clip = torch.stack(clip)
     assert clip.shape == (
         sampler_args.frames_per_clip,
+        3,
         desired_height,
         desired_width,
-        3,
     )
 
 
