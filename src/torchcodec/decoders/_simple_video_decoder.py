@@ -14,8 +14,8 @@ from torch import Tensor
 from torchcodec.decoders import _core as core
 
 
-def _frame_str(self):
-    # Utility to replace Frame and FrameBatch __str__ method. This prints the
+def _frame_repr(self):
+    # Utility to replace Frame and FrameBatch __repr__ method. This prints the
     # shape of the .data tensor rather than printing the (potentially very long)
     # data tensor itself.
     s = self.__class__.__name__ + ":\n"
@@ -46,7 +46,7 @@ class Frame(Iterable):
             yield getattr(self, field.name)
 
     def __repr__(self):
-        return _frame_str(self)
+        return _frame_repr(self)
 
 
 @dataclass
@@ -65,7 +65,7 @@ class FrameBatch(Iterable):
             yield getattr(self, field.name)
 
     def __repr__(self):
-        return _frame_str(self)
+        return _frame_repr(self)
 
 
 _ERROR_REPORTING_INSTRUCTIONS = """

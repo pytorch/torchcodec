@@ -29,3 +29,9 @@ first_party_detection = false
 
 [tool.black]
 target-version = ["py38"]
+
+[tool.ufmt]
+
+excludes = [
+    "examples",
+]
