@@ -5,9 +5,11 @@
 TorchCodec is a Python package with a goal to provide useful and fast APIs to
 decode video frames to PyTorch Tensors.
 
-⚠️ TorchCodec is still in early development stage and we are actively seeking
-feedback. If you have any suggestions or issues, please let us know by [opening
-an issue](https://github.com/pytorch/torchcodec/issues/new/choose)!
+> [!NOTE]
+> ⚠️ TorchCodec is still in early development stage and some APIs may be updated
+> in future versions without a deprecation cycle, depending on user feedback.
+> If you have any suggestions or issues, please let us know by
+> [opening an issue](https://github.com/pytorch/torchcodec/issues/new/choose)!
 
 ## Using TorchCodec
 
@@ -91,10 +93,9 @@ capabilities are determined by your underlying FFmpeg installation. There are
 different options to install FFmpeg e.g.:
 
 ```bash
-
-    conda install ffmpeg
-    # or
-    conda install ffmpeg -c conda-forge
+conda install ffmpeg
+# or
+conda install ffmpeg -c conda-forge
 ```
 
 Your Linux distribution probably comes with FFmpeg pre-installed as well.
