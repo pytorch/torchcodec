@@ -1,6 +1,17 @@
 [project]
 name = "TorchCodec"
-version = "0.0.1"
+version = "0.0.1.dev"
+description = "A video decoder for PyTorch"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+authors = [
+    { name = "PyTorch Team", email = "packages@pytorch.org" },
+]
+
+[project.urls]
+GitHub = "https://github.com/pytorch/torchcodec"
+Documentation = "https://pytorch.org/torchcodec/stable/index.html"
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -12,6 +23,12 @@ dev = [
     "pytest",
     "pillow",
 ]
+
+[tool.usort]
+first_party_detection = false
+
+[tool.black]
+target-version = ["py38"]
 
 [tool.ufmt]
 
