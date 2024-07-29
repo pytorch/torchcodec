@@ -25,6 +25,7 @@ dev = [
 ]
 
 [tool.usort]
+# Needed for compatibility with internal linter
 first_party_detection = false
 
 [tool.black]
