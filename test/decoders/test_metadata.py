@@ -88,16 +88,16 @@ def test_num_frames_fallback(
 ):
     """Check that num_frames_from_content always has priority when accessing `.num_frames`"""
     metadata = VideoStreamMetadata(
-        duration_seconds=4,
+        duration_seconds_from_header=4,
         bit_rate=123,
         num_frames_from_header=num_frames_from_header,
         num_frames_from_content=num_frames_from_content,
-        min_pts_seconds=0,
-        max_pts_seconds=4,
+        begin_stream_from_content_seconds=0,
+        end_stream_from_content_seconds=4,
         codec="whatever",
         width=123,
         height=321,
-        average_fps=30,
+        average_fps_from_header=30,
         stream_index=0,
     )
 

@@ -37,6 +37,9 @@ class TestSimpleDecoder:
             == 390
         )
         assert decoder._stream_index == decoder.metadata.stream_index == 3
+        assert decoder.metadata.duration_seconds == pytest.approx(13.013)
+        assert decoder.metadata.average_fps == pytest.approx(29.970029)
+        assert decoder.metadata.num_frames == 390
 
     def test_create_fails(self):
         with pytest.raises(TypeError, match="Unknown source type"):

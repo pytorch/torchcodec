@@ -140,19 +140,23 @@ class SimpleVideoDecoder:
             )
         self._num_frames = self.metadata.num_frames_from_content
 
-        if self.metadata.min_pts_seconds is None:
+        if self.metadata.begin_stream_from_content_seconds is None:
             raise ValueError(
                 "The minimum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._min_pts_seconds = self.metadata.min_pts_seconds
+        self._begin_stream_from_content_seconds = (
+            self.metadata.begin_stream_from_content_seconds
+        )
 
-        if self.metadata.max_pts_seconds is None:
+        if self.metadata.end_stream_from_content_seconds is None:
             raise ValueError(
                 "The maximum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._max_pts_seconds = self.metadata.max_pts_seconds
+        self._end_stream_from_content_seconds = (
+            self.metadata.end_stream_from_content_seconds
+        )
 
     def __len__(self) -> int:
         return self._num_frames
@@ -270,11 +274,15 @@ class SimpleVideoDecoder:
         Returns:
             Frame: The frame that is displayed at ``seconds``.
         """
-        if not self._min_pts_seconds <= seconds < self._max_pts_seconds:
+        if (
+            not self._begin_stream_from_content_seconds
+            <= seconds
+            < self._end_stream_from_content_seconds
+        ):
             raise IndexError(
                 f"Invalid pts in seconds: {seconds}. "
-                f"It must be greater than or equal to {self._min_pts_seconds} "
-                f"and less than or equal to {self._max_pts_seconds}."
+                f"It must be greater than or equal to {self._begin_stream_from_content_seconds} "
+                f"and less than {self._end_stream_from_content_seconds}."
             )
         data, pts_seconds, duration_seconds = core.get_frame_at_pts(
             self._decoder, seconds
