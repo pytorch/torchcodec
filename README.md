@@ -1,5 +1,4 @@
-<!-- TODO_BEFORE_RELEASE Add obvious link to docs and potentially a tag as
-well-->
+[**Installation**](#installing-torchCodec) | [**Simple Example**](#using-torchcodec) | [**Detailed Example**](https://pytorch.org/torchcodec/stable/generated_examples/) | [**Documentation**](https://pytorch.org/torchcodec) | [Contributing](CONTRIBUTING.md) | [**License**](#license)
 
 # TorchCodec
 
@@ -14,7 +13,7 @@ an issue](https://github.com/pytorch/torchcodec/issues/new/choose)!
 
 Here's a condensed summary of what you can do with TorchCodec. For a more
 detailed example, [check out our
-documentation](https://pytorch.org/torchcodec/main/generated_examples/)!
+documentation](https://pytorch.org/torchcodec/stable/generated_examples/)!
 
 ```python
 from torchcodec.decoders import SimpleVideoDecoder
