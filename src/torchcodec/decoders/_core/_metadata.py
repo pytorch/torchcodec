@@ -157,8 +157,6 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
             VideoStreamMetadata(
                 duration_seconds_from_header=stream_dict.get("durationSeconds"),
                 bit_rate=stream_dict.get("bitRate"),
-                # TODO_OPEN_ISSUE: We should align the C++ names and the json
-                # keys with the Python names
                 num_frames_from_header=stream_dict.get("numFrames"),
                 num_frames_from_content=stream_dict.get("numFramesFromScan"),
                 begin_stream_from_content_seconds=stream_dict.get(
