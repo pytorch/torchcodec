@@ -77,7 +77,8 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 class SimpleVideoDecoder:
     """A single-stream video decoder.
 
-    If the video contains multiple video streams, the :term:`best stream` is used.
+    If the video contains multiple video streams, the :term:`best stream` is
+    used. This decoder always performs a :term:`scan` of the video.
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
@@ -140,23 +141,19 @@ class SimpleVideoDecoder:
             )
         self._num_frames = self.metadata.num_frames_from_content
 
-        if self.metadata.begin_stream_from_content_seconds is None:
+        if self.metadata.begin_stream_seconds is None:
             raise ValueError(
                 "The minimum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._begin_stream_from_content_seconds = (
-            self.metadata.begin_stream_from_content_seconds
-        )
+        self._begin_stream_seconds = self.metadata.begin_stream_seconds
 
-        if self.metadata.end_stream_from_content_seconds is None:
+        if self.metadata.end_stream_seconds is None:
             raise ValueError(
                 "The maximum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._end_stream_from_content_seconds = (
-            self.metadata.end_stream_from_content_seconds
-        )
+        self._end_stream_seconds = self.metadata.end_stream_seconds
 
     def __len__(self) -> int:
         return self._num_frames
@@ -267,22 +264,16 @@ class SimpleVideoDecoder:
         """Return a single frame displayed at the given timestamp in seconds.
 
         Args:
-            seconds (float): The time stamp in seconds when the frame is
-                displayed, i.e. seconds is in
-                [:term:`pts`, :term:`pts` + duration).
+            seconds (float): The time stamp in seconds when the frame is displayed.
 
         Returns:
             Frame: The frame that is displayed at ``seconds``.
         """
-        if (
-            not self._begin_stream_from_content_seconds
-            <= seconds
-            < self._end_stream_from_content_seconds
-        ):
+        if not self._begin_stream_seconds <= seconds < self._end_stream_seconds:
             raise IndexError(
                 f"Invalid pts in seconds: {seconds}. "
-                f"It must be greater than or equal to {self._begin_stream_from_content_seconds} "
-                f"and less than {self._end_stream_from_content_seconds}."
+                f"It must be greater than or equal to {self._begin_stream_seconds} "
+                f"and less than {self._end_stream_seconds}."
             )
         data, pts_seconds, duration_seconds = core.get_frame_at_pts(
             self._decoder, seconds
