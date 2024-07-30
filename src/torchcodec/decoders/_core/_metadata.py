@@ -37,11 +37,11 @@ class VideoStreamMetadata:
     content (the scan doesn't involve decoding). This is more accurate
     than ``num_frames_from_header``. We recommend using the
     ``num_frames`` attribute instead. (int or None)."""
-    begin_stream_from_content_seconds: Optional[float]
+    begin_stream_seconds: Optional[float]
     """Beginning of the stream, in seconds (float or None).
     This corresponds to the first frame's :term:`pts`. Usually, this is equal to
     0."""
-    end_stream_from_content_seconds: Optional[float]
+    end_stream_seconds: Optional[float]
     """End of the stream, in seconds (float or None).
     This is last_frame.pts + last_frame.duration, so according to our
     convention, no frame is displayed at this time: read more in
@@ -79,13 +79,13 @@ class VideoStreamMetadata:
         fall back to ``duration_seconds_from_header``.
         """
         if (
-            self.end_stream_from_content_seconds is None
-            or self.begin_stream_from_content_seconds is None
+            self.end_stream_seconds is None
+            or self.begin_stream_seconds is None
         ):
             return self.duration_seconds_from_header
         return (
-            self.end_stream_from_content_seconds
-            - self.begin_stream_from_content_seconds
+            self.end_stream_seconds
+            - self.begin_stream_seconds
         )
 
     @property
@@ -95,14 +95,14 @@ class VideoStreamMetadata:
         Otherwise we fall back to ``average_fps_from_header``.
         """
         if (
-            self.end_stream_from_content_seconds is None
-            or self.begin_stream_from_content_seconds is None
+            self.end_stream_seconds is None
+            or self.begin_stream_seconds is None
             or self.num_frames is None
         ):
             return self.average_fps_from_header
         return self.num_frames / (
-            self.end_stream_from_content_seconds
-            - self.begin_stream_from_content_seconds
+            self.end_stream_seconds
+            - self.begin_stream_seconds
         )
 
     def __repr__(self):
@@ -160,10 +160,10 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
                 # keys with the Python names
                 num_frames_from_header=stream_dict.get("numFrames"),
                 num_frames_from_content=stream_dict.get("numFramesFromScan"),
-                begin_stream_from_content_seconds=stream_dict.get(
+                begin_stream_seconds=stream_dict.get(
                     "minPtsSecondsFromScan"
                 ),
-                end_stream_from_content_seconds=stream_dict.get(
+                end_stream_seconds=stream_dict.get(
                     "maxPtsSecondsFromScan"
                 ),
                 codec=stream_dict.get("codec"),
