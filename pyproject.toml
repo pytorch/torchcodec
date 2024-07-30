@@ -14,7 +14,7 @@ GitHub = "https://github.com/pytorch/torchcodec"
 Documentation = "https://pytorch.org/torchcodec/stable/index.html"
 
 [tool.setuptools.dynamic]
-version = {attr = "package.__version__"}
+version = {attr = "torchcodec.__version__"}
 
 [build-system]
 requires = ["setuptools>=61.0"]
