@@ -80,6 +80,9 @@ ffmpeg -f lavfi -i \
 
 ## Installing TorchCodec
 
+Note: if you're on MacOS, you'll need to [build from source](./CONTRIBUTING.md).
+Instructions below assume you're on Linux.
+
 First install the latest stable version of PyTorch following the [official
 instructions](https://pytorch.org/get-started/locally/).
 
@@ -106,7 +109,9 @@ TorchCodec supports all major FFmpeg version in [4, 7].
 
 We are actively working on the following features:
 
-- [MacOS support](https://github.com/pytorch/torchcodec/issues/111) (currently, only Linux is supported)
+- [Ship wheels for MacOS](https://github.com/pytorch/torchcodec/issues/111), so
+  that MacOS users can `pip install torchcodec`. For now this is only supported
+  on Linux, but MacOS users can [build from source](./CONTRIBUTING.md).
 - [GPU decoding](https://github.com/pytorch/torchcodec/pull/58)
 - [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
 
