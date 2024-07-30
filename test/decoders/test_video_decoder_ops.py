@@ -297,6 +297,10 @@ class TestOps:
         # The earliest libavutil version is 50 as per:
         # https://www.ffmpeg.org/olddownload.html
         assert ffmpeg_dict["libavutil"][0] > 50
+        version_info = ffmpeg_dict["libavutil"]
+        assert version_info.major > 50
+        assert version_info.minor >= 0
+        assert version_info.micro >= 0
         ffmpeg_version = ffmpeg_dict["ffmpeg_version"]
         split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
         assert len(split_ffmpeg_version) == 3

@@ -6,6 +6,7 @@
 
 import json
 import warnings
+from collections import namedtuple
 from typing import List, Optional, Tuple
 
 import torch
@@ -216,4 +217,22 @@ def scan_all_streams_to_update_metadata_abstract(decoder: torch.Tensor) -> None:
 
 def get_ffmpeg_library_versions():
     versions_json = _get_json_ffmpeg_library_versions()
-    return json.loads(versions_json)
+    versions_dict = json.loads(versions_json)
+    _Version = namedtuple("_Version", ["major", "minor", "micro"])
+    out_dict = {}
+    for library_name, value in versions_dict.items():
+        # "ffmpeg_version" is a string (while it usually takes the form
+        # "x.y.z" there is no guarantee of that. It could just be a commit
+        # hash).
+        # Other library versions are lists.
+        if isinstance(value, str):
+            out_dict[library_name] = value
+        else:
+            assert isinstance(value, list)
+            version_parts = value
+            if len(version_parts) != 3:
+                raise ValueError(
+                    f"Expected 3 parts in ffmpeg version string, got {version_parts}"
+                )
+            out_dict[library_name] = _Version(*map(int, version_parts))
+    return out_dict
