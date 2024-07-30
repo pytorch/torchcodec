@@ -77,7 +77,8 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 class SimpleVideoDecoder:
     """A single-stream video decoder.
 
-    If the video contains multiple video streams, the :term:`best stream` is used.
+    If the video contains multiple video streams, the :term:`best stream` is
+    used. This decoder always performs a :term:`scan` of the video.
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
@@ -265,6 +266,10 @@ class SimpleVideoDecoder:
 
     def get_frame_displayed_at(self, seconds: float) -> Frame:
         """Return a single frame displayed at the given timestamp in seconds.
+
+        Each frame has a :term:`pts` and a duration. The convention is that a
+        given frame is displayed during the [frame_pts, frame_pts +
+        frame_duration) interval.
 
         Args:
             seconds (float): The time stamp in seconds when the frame is

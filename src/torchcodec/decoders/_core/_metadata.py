@@ -24,7 +24,7 @@ class VideoStreamMetadata:
     """Metadata of a single video stream."""
 
     duration_seconds_from_header: Optional[float]
-    """Duration of the stream, in seconds obtained from the header (float or
+    """Duration of the stream, in seconds, obtained from the header (float or
     None). This could be inaccurate."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
@@ -38,19 +38,17 @@ class VideoStreamMetadata:
     than ``num_frames_from_header``. We recommend using the
     ``num_frames`` attribute instead. (int or None)."""
     begin_stream_from_content_seconds: Optional[float]
-    """Beginning of the stream in seconds (float or None).
-    This is min(frame.pts) for all frames in this stream."""
+    """Beginning of the stream, in seconds (float or None).
+    This corresponds to the first frame's :term:`pts`. Usually, this is equal to
+    0."""
     end_stream_from_content_seconds: Optional[float]
-    """End of the stream in seconds (float or None).
-    This is max(frame.pts + frame.duration) for all frames in this stream.
-    Note that frames have a pts and duration and the interval defined by
-    [pts, pts + duration) is a half-open interval (the right boundary is open).
-    Therefore no frame is displayed at this time value.
-    Calling
-    SimpleVideoDecoder.get_frame_displayed_at(end_stream_from_content_seconds)
-    will raise a StopIteration exception.
-    If you want to get the last frame you can use [-1] on a SimpleVideoDecoder
-    object."""
+    """End of the stream, in seconds (float or None).
+    This is last_frame.pts + last_frame.duration, so according to our
+    convention, no frame is displayed at this time: read more in
+    :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frame_displayed_at`.
+    Retrieving the last frame is best done by simply indexing the
+    :class:`~torchcodec.decoders.SimpleVideoDecoder` object with ``[-1]``.
+    """
     codec: Optional[str]
     """Codec (str or None)."""
     width: Optional[int]
@@ -58,15 +56,16 @@ class VideoStreamMetadata:
     height: Optional[int]
     """Height of the frames (int or None)."""
     average_fps_from_header: Optional[float]
-    """Averate fps of the stream (float or None)."""
+    """Averate fps of the stream, obtained from the header (float or None).
+    We recommend using the ``average_fps`` attribute instead."""
     stream_index: int
     """Index of the stream within the video (int)."""
 
     @property
     def num_frames(self) -> Optional[int]:
         """Number of frames in the stream. This corresponds to
-        ``num_frames_from_content`` if it's not None, otherwise it corresponds
-        to ``num_frames_from_header``.
+        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
+        corresponds to ``num_frames_from_header``.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
@@ -76,8 +75,8 @@ class VideoStreamMetadata:
     @property
     def duration_seconds(self) -> Optional[float]:
         """Duration of the stream in seconds. We try to calculate the duration
-        from the actual frames if we scanned the frames. Otherwise we fall back
-        to the duration obtained from the header.
+        from the actual frames if a :term:`scan` wsa performed. Otherwise we
+        fall back to ``duration_seconds_from_header``.
         """
         if (
             self.end_stream_from_content_seconds is None
@@ -91,14 +90,17 @@ class VideoStreamMetadata:
 
     @property
     def average_fps(self) -> Optional[float]:
-        """Average fps of the stream. We try to get the average fps from the
-        actual frames if we scanned the frames. Otherwise we fall back to the
-        fps obtained from the header.
+        """Average fps of the stream. If a :term:`scan` was perfomed, this is
+        computed from the number of frames and the duration of the stream.
+        Otherwise we fall back to ``average_fps_from_header``.
         """
-        if (
-            self.end_stream_from_content_seconds is None
-            or self.begin_stream_from_content_seconds is None
-            or self.num_frames is None
+        if any(
+            attr is None
+            for attr in (
+                self.end_stream_from_content_seconds,
+                self.begin_stream_from_content_seconds,
+                self.num_frames,
+            )
         ):
             return self.average_fps_from_header
         return self.num_frames / (
