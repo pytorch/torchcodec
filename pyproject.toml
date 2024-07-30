@@ -1,6 +1,6 @@
 [project]
 name = "TorchCodec"
-version = "0.0.1.dev"
+version = "0.0.1"
 description = "A video decoder for PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
