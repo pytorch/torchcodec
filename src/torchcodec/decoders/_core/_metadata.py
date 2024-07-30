@@ -94,13 +94,10 @@ class VideoStreamMetadata:
         computed from the number of frames and the duration of the stream.
         Otherwise we fall back to ``average_fps_from_header``.
         """
-        if any(
-            attr is None
-            for attr in (
-                self.end_stream_from_content_seconds,
-                self.begin_stream_from_content_seconds,
-                self.num_frames,
-            )
+        if (
+            self.end_stream_from_content_seconds is None
+            or self.begin_stream_from_content_seconds is None
+            or self.num_frames is None
         ):
             return self.average_fps_from_header
         return self.num_frames / (
