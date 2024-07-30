@@ -237,6 +237,7 @@ std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
     const void* buffer,
     size_t length,
     const VideoDecoder::DecoderOptions& options) {
+  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
   AVInput input = createAVFormatContextFromBuffer(buffer, length);
   std::unique_ptr<VideoDecoder> decoder(new VideoDecoder());
   decoder->formatContext_ = std::move(input.formatContext);
