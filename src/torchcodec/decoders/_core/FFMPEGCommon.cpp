@@ -6,6 +6,8 @@
 
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
+#include <c10/util/Exception.h>
+
 namespace facebook::torchcodec {
 
 std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
@@ -68,6 +70,14 @@ int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
   struct AVIOBufferData* bufferData =
       static_cast<struct AVIOBufferData*>(opaque);
   buf_size = FFMIN(buf_size, bufferData->size - bufferData->current);
+  TORCH_CHECK(
+      buf_size >= 0,
+      "Tried to read negative bytes: buf_size=",
+      buf_size,
+      ", size=",
+      bufferData->size,
+      ", current=",
+      bufferData->current);
   if (!buf_size) {
     return AVERROR_EOF;
   }
