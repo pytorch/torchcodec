@@ -106,7 +106,7 @@ TorchCodec supports all major FFmpeg version in [4, 7].
 
 We are actively working on the following features:
 
-- [MacOS support](https://github.com/pytorch/torchcodec/issues/111) (currently, only Linux is supported)
+- [MacOS support](https://github.com/pytorch/torchcodec/issues/111) (Linux is fully supported and MacOS is experimental)
 - [GPU decoding](https://github.com/pytorch/torchcodec/pull/58)
 - [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
 
