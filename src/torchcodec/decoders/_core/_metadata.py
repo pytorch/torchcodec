@@ -78,7 +78,7 @@ class VideoStreamMetadata:
     @property
     def duration_seconds(self) -> Optional[float]:
         """Duration of the stream in seconds. We try to calculate the duration
-        from the actual frames if a :term:`scan` wsa performed. Otherwise we
+        from the actual frames if a :term:`scan` was performed. Otherwise we
         fall back to ``duration_seconds_from_header``.
         """
         if self.end_stream_seconds is None or self.begin_stream_seconds is None:

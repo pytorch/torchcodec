@@ -152,7 +152,7 @@ plot(middle_frames.data, "Middle frames")
 # So far, we have retrieved frames based on their index. We can also retrieve
 # frames based on *when* they are displayed with
 # :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frame_displayed_at`, which
-# also returns :class:`~torchcodec.decoders.Frame` and
+# also returns :class:`~torchcodec.decoders.Frame`.
 
 frame_at_2_seconds = decoder.get_frame_displayed_at(seconds=2)
 print(f"{type(frame_at_2_seconds) = }")
