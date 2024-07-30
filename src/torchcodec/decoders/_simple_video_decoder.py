@@ -146,18 +146,14 @@ class SimpleVideoDecoder:
                 "The minimum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._begin_stream_seconds = (
-            self.metadata.begin_stream_seconds
-        )
+        self._begin_stream_seconds = self.metadata.begin_stream_seconds
 
         if self.metadata.end_stream_seconds is None:
             raise ValueError(
                 "The maximum pts value in seconds is unknown. "
                 + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._end_stream_seconds = (
-            self.metadata.end_stream_seconds
-        )
+        self._end_stream_seconds = self.metadata.end_stream_seconds
 
     def __len__(self) -> int:
         return self._num_frames
@@ -267,23 +263,13 @@ class SimpleVideoDecoder:
     def get_frame_displayed_at(self, seconds: float) -> Frame:
         """Return a single frame displayed at the given timestamp in seconds.
 
-        Each frame has a :term:`pts` and a duration. The convention is that a
-        given frame is displayed during the [frame_pts, frame_pts +
-        frame_duration) interval.
-
         Args:
-            seconds (float): The time stamp in seconds when the frame is
-                displayed, i.e. seconds is in
-                [:term:`pts`, :term:`pts` + duration).
+            seconds (float): The time stamp in seconds when the frame is displayed.
 
         Returns:
             Frame: The frame that is displayed at ``seconds``.
         """
-        if (
-            not self._begin_stream_seconds
-            <= seconds
-            < self._end_stream_seconds
-        ):
+        if not self._begin_stream_seconds <= seconds < self._end_stream_seconds:
             raise IndexError(
                 f"Invalid pts in seconds: {seconds}. "
                 f"It must be greater than or equal to {self._begin_stream_seconds} "
