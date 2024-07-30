@@ -30,6 +30,7 @@ import os
 import sys
 
 import pytorch_sphinx_theme
+import torchcodec
 
 sys.path.append(os.path.abspath("."))
 
@@ -97,8 +98,7 @@ templates_path = ["_templates"]
 #
 source_suffix = [".rst"]
 
-# TODO_BEFORE_RELEASE: Indicate version number here
-html_title = "TorchCodec Documentation"
+html_title = f"TorchCodec {torchcodec.__version__} Documentation"
 
 # The master toctree document.
 master_doc = "index"
