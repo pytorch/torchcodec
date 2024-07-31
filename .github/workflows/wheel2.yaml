@@ -53,5 +53,6 @@ jobs:
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
-      # For torchcodec's build-time-dependency on libtorch.
+      # For torchcodec's build-time-dependency on libtorch:
+      # https://github.com/pytorch/torchcodec/blob/main/setup.py#L7-L42
       wheel-build-extra-args: "--no-build-isolation"
