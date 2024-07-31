@@ -23,12 +23,13 @@ from torchcodec.decoders import SimpleVideoDecoder
 decoder = SimpleVideoDecoder("path/to/video.mp4")
 
 decoder.metadata
-# VideoStreamMetadata:  (Truncated output)
+# VideoStreamMetadata:
 #   num_frames: 250
 #   duration_seconds: 10.0
 #   bit_rate: 31315.0
 #   codec: h264
 #   average_fps: 25.0
+#   ... (truncated output)
 
 len(decoder)  # == decoder.metadata.num_frames!
 # 250
