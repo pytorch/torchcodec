@@ -39,7 +39,6 @@ jobs:
           - repository: pytorch/torchcodec
             pre-script: packaging/pre_build_script.sh
             env-var-script: packaging/env_var_script.sh
-            smoke-test-script: test/smoke_test/smoke_test_no_ffmpeg.py
             package-name: torchcodec
     name: ${{ matrix.repository }}
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
