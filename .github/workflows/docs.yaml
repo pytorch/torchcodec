@@ -38,6 +38,7 @@ jobs:
         run: |
           cd docs
           python -m pip install -r requirements.txt
+          python -m pip install torchvision matplotlib
       - name: Build docs
         run: |
           cd docs
