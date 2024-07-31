@@ -38,6 +38,7 @@ jobs:
         include:
           - repository: pytorch/torchcodec
             pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_var_script.sh
             smoke-test-script: test/smoke_test/smoke_test_no_ffmpeg.py
             package-name: torchcodec
     name: ${{ matrix.repository }}
@@ -49,6 +50,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
