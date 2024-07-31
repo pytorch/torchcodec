@@ -1,32 +1,30 @@
 Installation Instructions
 =========================
 
-.. note::
-    TorchCodec is only available on Linux for now. We plan to support other
-    platforms in the future.
+We'll be providing wheels in the coming days so that you can just install
+torchcodec using ``pip``. For now, you can just build from source. You will need
+the following dependencies:
 
-Installing torchcodec should be as simple as:
+- A C++ compiler+linker. This is typically available on a baseline Linux
+  installation already.
+- cmake
+- pkg-config
+- FFmpeg
+- PyTorch nightly
 
-.. code:: bash
+Start by installing PyTorch following the `official instructions
+<https://pytorch.org/get-started/locally/>`_.
 
-    pip install torchcodec
+Then, the easiest way to install the rest of the dependencies is to run:
 
-You will need a working PyTorch installation, which you can install following
-the `official instructions <https://pytorch.org/get-started/locally/>`_.
+    conda install cmake pkg-config ffmpeg -c conda-forge
 
-You will also need FFmpeg installed on your system, and TorchCodec decoding
-capabilities are determined by your underlying FFmpeg installation. There are
-different options to install FFmpeg e.g.:
+To clone and install the repo, run:
 
-.. code:: bash
+    git clone git@github.com:pytorch/torchcodec.git
+    # Or, using https instead of ssh: git clone https://github.com/pytorch/torchcodec.git
+    cd torchcodec
 
-    conda install ffmpeg
-    # or
-    conda install ffmpeg -c conda-forge
+    pip install -e ".[dev]" --no-build-isolation -vv
 
-Your Linux distribution probably comes with FFmpeg pre-installed as well.
 TorchCodec supports all major FFmpeg version in [4, 7].
-
-Note that installation instructions may slightly change over time. The most
-up-to-date instructions should be available from the `README
-<https://github.com/pytorch/torchcodec?tab=readme-ov-file#installing-torchcodec>`_.
