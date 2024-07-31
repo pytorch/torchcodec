@@ -5,3 +5,5 @@
 # LICENSE file in the root directory of this source tree.
 
 from . import decoders  # noqa
+
+__version__ = "0.0.1.dev"
