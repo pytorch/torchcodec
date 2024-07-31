@@ -12,8 +12,8 @@ the following dependencies:
 - FFmpeg
 - PyTorch nightly
 
-Start by installing the **nightly** build of PyTorch following the
-`official instructions <https://pytorch.org/get-started/locally/>_.
+Start by installing the **nightly** build of PyTorch following the `official
+instructions <https://pytorch.org/get-started/locally/>`_.
 
 Then, the easiest way to install the rest of the dependencies is to run:
 
