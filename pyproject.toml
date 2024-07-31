@@ -1,6 +1,5 @@
 [project]
 name = "TorchCodec"
-version = "0.0.1.dev"
 description = "A video decoder for PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -8,10 +7,14 @@ license = {file = "LICENSE"}
 authors = [
     { name = "PyTorch Team", email = "packages@pytorch.org" },
 ]
+dynamic = ["version"]
 
 [project.urls]
 GitHub = "https://github.com/pytorch/torchcodec"
 Documentation = "https://pytorch.org/torchcodec/stable/index.html"
+
+[tool.setuptools.dynamic]
+version = {attr = "torchcodec.__version__"}
 
 [build-system]
 requires = ["setuptools>=61.0"]
