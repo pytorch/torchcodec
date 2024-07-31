@@ -35,7 +35,7 @@ jobs:
       - name: Install Pytorch
         run: |
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-          python -c "import torch; print(f'{torch.__version__ = }')"
+          python -c "import torch; print(f'{torch.__version__ = }'); assert torch.__version__ == '2.4.0+cpu'"
       - name: Check GCC version
         run: |
           # We want to build wheels on gcc 9 to be consistent with the torch
@@ -110,12 +110,13 @@ jobs:
       - name: Install PyTorch
         run: |
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-          python -c "import torch; print(f'{torch.__version__ = }')"
+          python -c "import torch; print(f'{torch.__version__ = }'); assert torch.__version__ == '2.4.0+cpu'"
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find dist -type f -name "*.whl"`
           echo Installing $wheel_path
           python -m pip install $wheel_path -vvv
+          python -c "import torchcodec; print(f'{torchcodec.__version__ = }'); assert torchcodec.__version__ == '0.0.1'"
 
       - name: Check out repo
         uses: actions/checkout@v3
