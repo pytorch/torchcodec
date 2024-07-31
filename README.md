@@ -81,38 +81,45 @@ ffmpeg -f lavfi -i \
 
 ## Installing TorchCodec
 
-Note: if you're on MacOS, you'll need to [build from source](./CONTRIBUTING.md).
-Instructions below assume you're on Linux.
+We'll be providing wheels in the coming days so that you can just install
+torchcodec using `pip`. For now, you can just build from source. You will need
+the following dependencies:
 
-First install the latest stable version of PyTorch following the [official
-instructions](https://pytorch.org/get-started/locally/).
+- A C++ compiler+linker. This is typically available on a baseline Linux
+  installation already.
+- cmake
+- pkg-config
+- FFmpeg
+- PyTorch nightly
 
-Then:
+Start by installing the **nightly** build of PyTorch following the
+[official instructions](https://pytorch.org/get-started/locally/).
+
+Then, the easiest way to install the rest of the dependencies is to run:
 
 ```bash
-pip install torchcodec
+conda install cmake pkg-config ffmpeg -c conda-forge
 ```
-You will also need FFmpeg installed on your system, and TorchCodec decoding
-capabilities are determined by your underlying FFmpeg installation. There are
-different options to install FFmpeg e.g.:
+
+To clone and install the repo, run:
 
 ```bash
-conda install ffmpeg
-# or
-conda install ffmpeg -c conda-forge
+git clone git@github.com:pytorch/torchcodec.git
+# Or, using https instead of ssh: git clone https://github.com/pytorch/torchcodec.git
+cd torchcodec
+
+pip install -e ".[dev]" --no-build-isolation -vv
 ```
 
-Your Linux distribution probably comes with FFmpeg pre-installed as well.
 TorchCodec supports all major FFmpeg version in [4, 7].
-
 
 ## Planned future work
 
 We are actively working on the following features:
 
+- Ship wheels for Linux, so that Linux users can `pip install torchcodec`.
 - [Ship wheels for MacOS](https://github.com/pytorch/torchcodec/issues/111), so
-  that MacOS users can `pip install torchcodec`. For now this is only supported
-  on Linux, but MacOS users can [build from source](./CONTRIBUTING.md).
+  that MacOS users can `pip install torchcodec`.
 - [GPU decoding](https://github.com/pytorch/torchcodec/pull/58)
 - [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
 
