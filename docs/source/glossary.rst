@@ -12,3 +12,8 @@ Glossary
        <https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga757780d38f482deb4d809c6c521fbcc2>`_:
 
         *The best stream is determined according to various heuristics as the most likely to be what the user expects.*
+
+    scan
+       A scan corresponds to an entire pass over a video file, with the purpose
+       of retrieving metadata about the different streams and frames. **It does
+       not involve decoding**, so it is a lot cheaper than decoding the file.

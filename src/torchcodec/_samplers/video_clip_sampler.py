@@ -115,7 +115,7 @@ class VideoClipSampler(nn.Module):
     Args:
         video_args (`VideoArgs`): The video args
         sampler_args (`SamplerArgs`): The sampler args. Can be TimeBasedSamplerArgs or IndexBasedSamplerArgs
-        decorder_args (`DecoderArgs`): Decoder args contain value needs for decoder, for example, thread count
+        decoder_args (`DecoderArgs`): Decoder args contain value needs for decoder, for example, thread count
 
     Example:
         >>> video_args = VideoArgs(desired_width=224, desired_height=224)
@@ -130,12 +130,12 @@ class VideoClipSampler(nn.Module):
         self,
         video_args: VideoArgs,
         sampler_args: SamplerArgs,
-        decorder_args: Union[None, DecoderArgs] = None,
+        decoder_args: Union[None, DecoderArgs] = None,
     ) -> None:
         super().__init__()
         self.video_args = video_args
         self.sampler_args = sampler_args
-        self.decorder_args = DecoderArgs() if decorder_args is None else decorder_args
+        self.decoder_args = DecoderArgs() if decoder_args is None else decoder_args
 
     def forward(self, video_data: Tensor) -> Union[List[Any]]:
         """Sample video clips from the video data
@@ -162,7 +162,7 @@ class VideoClipSampler(nn.Module):
             video_decoder,
             width=target_width,
             height=target_height,
-            num_threads=self.decorder_args.num_threads,
+            num_threads=self.decoder_args.num_threads,
         )
 
         clips: List[Any] = []
