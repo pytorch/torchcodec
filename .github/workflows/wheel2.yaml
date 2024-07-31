@@ -50,3 +50,4 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
+      build-platform: "python-build-package"
