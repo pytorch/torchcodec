@@ -191,12 +191,11 @@ one frame. The dimension order can be changed to ``N, H, W, C`` using the
 
 
 
+.. image-sg:: /generated_examples/images/sphx_glr_basic_example_001.png
+   :alt: First frame
+   :srcset: /generated_examples/images/sphx_glr_basic_example_001.png
+   :class: sphx-glr-single-img
 
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    Cannot plot, please run `pip install torchvision matplotlib`
 
 
 
@@ -210,12 +209,11 @@ one frame. The dimension order can be changed to ``N, H, W, C`` using the
 
 
 
+.. image-sg:: /generated_examples/images/sphx_glr_basic_example_002.png
+   :alt: Every 20 frame
+   :srcset: /generated_examples/images/sphx_glr_basic_example_002.png
+   :class: sphx-glr-single-img
 
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    Cannot plot, please run `pip install torchvision matplotlib`
 
 
 
@@ -322,13 +320,23 @@ will return a :class:`~torchcodec.decoders.Frame` and
 
 
 
+.. rst-class:: sphx-glr-horizontal
 
-.. rst-class:: sphx-glr-script-out
 
- .. code-block:: none
+    *
 
-    Cannot plot, please run `pip install torchvision matplotlib`
-    Cannot plot, please run `pip install torchvision matplotlib`
+      .. image-sg:: /generated_examples/images/sphx_glr_basic_example_003.png
+         :alt: Last frame
+         :srcset: /generated_examples/images/sphx_glr_basic_example_003.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /generated_examples/images/sphx_glr_basic_example_004.png
+         :alt: Middle frames
+         :srcset: /generated_examples/images/sphx_glr_basic_example_004.png
+         :class: sphx-glr-multi-img
+
 
 
 
@@ -364,6 +372,11 @@ also returns :class:`~torchcodec.decoders.Frame`.
 
 
 
+.. image-sg:: /generated_examples/images/sphx_glr_basic_example_005.png
+   :alt: Frame displayed at 2 seconds
+   :srcset: /generated_examples/images/sphx_glr_basic_example_005.png
+   :class: sphx-glr-single-img
+
 
 .. rst-class:: sphx-glr-script-out
 
@@ -375,7 +388,6 @@ also returns :class:`~torchcodec.decoders.Frame`.
       pts_seconds: 2.0
       duration_seconds: 0.03999999910593033
 
-    Cannot plot, please run `pip install torchvision matplotlib`
 
 
 
@@ -383,7 +395,7 @@ also returns :class:`~torchcodec.decoders.Frame`.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.636 seconds)
+   **Total running time of the script:** (0 minutes 1.767 seconds)
 
 
 .. _sphx_glr_download_generated_examples_basic_example.py:

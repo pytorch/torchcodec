@@ -490,16 +490,10 @@ one frame. The dimension order can be changed to <code class="docutils literal n
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot</span><span class="p">(</span><a href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="torch.Tensor" class="sphx-glr-backref-module-torch sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">first_frame</span></a><span class="p">,</span> <span class="s2">&quot;First frame&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Cannot plot, please run `pip install torchvision matplotlib`
+<img src="../_images/sphx_glr_basic_example_001.png" srcset="../_images/sphx_glr_basic_example_001.png" alt="First frame" class = "sphx-glr-single-img"/><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot</span><span class="p">(</span><a href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="torch.Tensor" class="sphx-glr-backref-module-torch sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">every_twenty_frame</span></a><span class="p">,</span> <span class="s2">&quot;Every 20 frame&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot</span><span class="p">(</span><a href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="torch.Tensor" class="sphx-glr-backref-module-torch sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">every_twenty_frame</span></a><span class="p">,</span> <span class="s2">&quot;Every 20 frame&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Cannot plot, please run `pip install torchvision matplotlib`
-</pre></div>
-</div>
-</section>
+<img src="../_images/sphx_glr_basic_example_002.png" srcset="../_images/sphx_glr_basic_example_002.png" alt="Every 20 frame" class = "sphx-glr-single-img"/></section>
 <section id="iterating-over-frames">
 <h2>Iterating over frames<a class="headerlink" href="#iterating-over-frames" title="Permalink to this heading">¶</a></h2>
 <p>The decoder is a normal iterable object and can be iterated over like so:</p>
@@ -549,10 +543,10 @@ FrameBatch:
 <span class="n">plot</span><span class="p">(</span><a href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="torch.Tensor" class="sphx-glr-backref-module-torch sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">middle_frames</span><span class="o">.</span><span class="n">data</span></a><span class="p">,</span> <span class="s2">&quot;Middle frames&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Cannot plot, please run `pip install torchvision matplotlib`
-Cannot plot, please run `pip install torchvision matplotlib`
-</pre></div>
-</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_basic_example_003.png" srcset="../_images/sphx_glr_basic_example_003.png" alt="Last frame" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_basic_example_004.png" srcset="../_images/sphx_glr_basic_example_004.png" alt="Middle frames" class = "sphx-glr-multi-img"/></li>
+</ul>
 <p>Both <a class="reference internal" href="../generated/torchcodec.decoders.Frame.html#torchcodec.decoders.Frame" title="torchcodec.decoders.Frame"><code class="xref py py-class docutils literal notranslate"><span class="pre">Frame</span></code></a> and
 <a class="reference internal" href="../generated/torchcodec.decoders.FrameBatch.html#torchcodec.decoders.FrameBatch" title="torchcodec.decoders.FrameBatch"><code class="xref py py-class docutils literal notranslate"><span class="pre">FrameBatch</span></code></a> have a <code class="docutils literal notranslate"><span class="pre">data</span></code> field, which contains
 the decoded tensor data. They also have the <code class="docutils literal notranslate"><span class="pre">pts_seconds</span></code> and
@@ -572,16 +566,14 @@ also returns <a class="reference internal" href="../generated/torchcodec.decoder
 <span class="n">plot</span><span class="p">(</span><a href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="torch.Tensor" class="sphx-glr-backref-module-torch sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">frame_at_2_seconds</span><span class="o">.</span><span class="n">data</span></a><span class="p">,</span> <span class="s2">&quot;Frame displayed at 2 seconds&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>type(frame_at_2_seconds) = &lt;class &#39;torchcodec.decoders._simple_video_decoder.Frame&#39;&gt;
+<img src="../_images/sphx_glr_basic_example_005.png" srcset="../_images/sphx_glr_basic_example_005.png" alt="Frame displayed at 2 seconds" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>type(frame_at_2_seconds) = &lt;class &#39;torchcodec.decoders._simple_video_decoder.Frame&#39;&gt;
 Frame:
   data (shape): torch.Size([3, 360, 640])
   pts_seconds: 2.0
   duration_seconds: 0.03999999910593033
-
-Cannot plot, please run `pip install torchvision matplotlib`
 </pre></div>
 </div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.636 seconds)</p>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 1.767 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-generated-examples-basic-example-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/117889979f66007c4eaab64a535c4f0a/basic_example.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">basic_example.ipynb</span></code></a></p>
