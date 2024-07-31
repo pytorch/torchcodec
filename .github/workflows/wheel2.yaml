@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   generate-matrix:
-    uses: ahmadsharif1/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: ahmadsharif1/test-infra/.github/workflows/generate_binary_build_matrix.yml@extra
     with:
       package-type: wheel
       os: linux
@@ -41,7 +41,7 @@ jobs:
             smoke-test-script: test/smoke_test/smoke_test_no_ffmpeg.py
             package-name: torchcodec
     name: ${{ matrix.repository }}
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    uses: ahmadsharif1/test-infra/.github/workflows/build_wheels_linux.yml@extra
     with:
       repository: ${{ matrix.repository }}
       ref: ""
