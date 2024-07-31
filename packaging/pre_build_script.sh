@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 echo "Installing build pre-requisites from pre_build_script.sh"
