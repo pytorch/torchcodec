@@ -40,6 +40,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
   m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -185,6 +187,17 @@ OpsBatchDecodedOutput get_frames_in_range(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesInRange(
       stream_index, start, stop, step.value_or(1));
+  return makeOpsBatchDecodedOutput(result);
+}
+
+OpsBatchDecodedOutput get_frames_by_pts_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    double start_seconds,
+    double stop_seconds) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  auto result = videoDecoder->getFramesDisplayedByTimestampInRange(
+      stream_index, start_seconds, stop_seconds);
   return makeOpsBatchDecodedOutput(result);
 }
 
@@ -403,6 +416,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
+  m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
   m.impl(
       "scan_all_streams_to_update_metadata",
       &scan_all_streams_to_update_metadata);

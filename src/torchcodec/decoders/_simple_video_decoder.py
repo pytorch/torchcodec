@@ -284,6 +284,47 @@ class SimpleVideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
+    def get_frames_displayed_at(
+        self, start_seconds: float, stop_seconds: float
+    ) -> FrameBatch:
+        """Returns multiple frames in the given range.
+
+        Frames are in the half open range [start_seconds, stop_seconds). Each
+        returned frame's :term`pts`, in seconds, is inside of the half open
+        range.
+
+        Args:
+            start_seconds (float): Time, in seconds, of the start of the
+                range.
+            stop_seconds (float): Time, in seconds, of the end of the
+                range. As a half open range, the end is excluded.
+
+        Returns:
+            FrameBatch: The frames within the specified range.
+        """
+        if not start_seconds <= stop_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. It must be less than or equal to stop seconds ({stop_seconds})."
+            )
+        if not self._begin_stream_seconds <= start_seconds < self._end_stream_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. "
+                f"It must be greater than or equal to {self._begin_stream_seconds} "
+                f"and less than or equal to {self._end_stream_seconds}."
+            )
+        if not stop_seconds <= self._end_stream_seconds:
+            raise ValueError(
+                f"Invalid stop seconds: {stop_seconds}. "
+                f"It must be less than or equal to {self._end_stream_seconds}."
+            )
+        frames = core.get_frames_by_pts_in_range(
+            self._decoder,
+            stream_index=self._stream_index,
+            start_seconds=start_seconds,
+            stop_seconds=stop_seconds,
+        )
+        return FrameBatch(*frames)
+
 
 def _get_and_validate_stream_metadata(
     decoder: Tensor,

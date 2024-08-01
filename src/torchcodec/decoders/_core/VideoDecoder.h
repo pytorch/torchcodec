@@ -208,6 +208,27 @@ class VideoDecoder {
   BatchDecodedOutput
   getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
+  // Returns frames within a given pts range for a given stream as a single
+  // stacked tensor. The range is defined by [startSeconds, stopSeconds) with
+  // respect to the pts values for frames. The returned frames are in pts order.
+  //
+  // Note that while stopSeconds is excluded in the half open range, this really
+  // only makes a difference when stopSeconds is exactly the pts value for a
+  // frame. Otherwise, the moment in time immediately before stopSeconds is in
+  // the range, and that time maps to the same frame as stopSeconds.
+  //
+  // The frames returned are the frames that would be displayed by our abstract
+  // player. Our abstract player displays frames based on pts only. It displays
+  // frame i starting at the pts for frame i, and stops at the pts for frame
+  // i+1. This model ignores a frame's reported duration.
+  //
+  // Valid values for startSeconds and stopSeconds are:
+  //
+  //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
+  BatchDecodedOutput getFramesDisplayedByTimestampInRange(
+      int streamIndex,
+      double startSeconds,
+      double stopSeconds);
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
   // --------------------------------------------------------------------------
@@ -228,6 +249,7 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
+    int64_t nextPts = 0;
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;

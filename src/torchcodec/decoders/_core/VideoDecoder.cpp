@@ -140,8 +140,8 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
   if (options.dimensionOrder == "NHWC") {
     frames = torch::empty(
         {numFrames,
@@ -512,6 +512,12 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
+
+    for (int i = 0; i < stream.allFrames.size(); ++i) {
+      if (i + 1 < stream.allFrames.size()) {
+        stream.allFrames[i].nextPts = stream.allFrames[i + 1].pts;
+      }
+    }
   }
   scanned_all_streams_ = true;
 }
@@ -855,9 +861,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    torch::Tensor frame = getNextDecodedOutput().frame;
+    torch::Tensor frame = getFrameAtIndex(streamIndex, frameIndex).frame;
     output.frames[i++] = frame;
   }
   return output;
@@ -887,15 +891,104 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   const auto& options = stream.options;
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
-  int64_t f = 0;
-  for (int64_t i = start; i < stop; i += step) {
-    int64_t pts = stream.allFrames[i].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    DecodedOutput singleOut = getNextDecodedOutput();
+  for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
     output.frames[f] = singleOut.frame;
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
-    ++f;
+  }
+
+  return output;
+}
+
+VideoDecoder::BatchDecodedOutput
+VideoDecoder::getFramesDisplayedByTimestampInRange(
+    int streamIndex,
+    double startSeconds,
+    double stopSeconds) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+  TORCH_CHECK(
+      startSeconds >= minSeconds && startSeconds < maxSeconds,
+      "Start seconds is " + std::to_string(startSeconds) +
+          "; must be in range [" + std::to_string(minSeconds) + ", " +
+          std::to_string(maxSeconds) + ").");
+  TORCH_CHECK(
+      stopSeconds <= maxSeconds,
+      "Stop seconds (" + std::to_string(stopSeconds) +
+          "; must be less than or equal to " + std::to_string(maxSeconds) +
+          ").");
+
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
+
+  // Special case needed to implement a half-open range. At first glance, this
+  // may seem unnecessary, as our search for stopFrame can return the end, and
+  // we don't include stopFramIndex in our output. However, consider the
+  // following scenario:
+  //
+  //   frame=0, pts=0.0
+  //   frame=1, pts=0.3
+  //
+  //   interval A: [0.2, 0.2)
+  //   interval B: [0.2, 0.15)
+  //
+  // Both intervals take place between the pts values for frame 0 and frame 1,
+  // which by our abstract player, means that both intervals map to frame 0. By
+  // the definition of a half open interval, interval A should return no frames.
+  // Interval B should return frame 0. However, for both A and B, the individual
+  // values of the intervals will map to the same frame indices below. Hence, we
+  // need this special case below.
+  if (startSeconds == stopSeconds) {
+    BatchDecodedOutput output(0, options, streamMetadata);
+    return output;
+  }
+
+  // Note that we look at nextPts for a frame, and not its pts or duration. Our
+  // abstract player displays frames starting at the pts for that frame until
+  // the pts for the next frame. There are two consequences:
+  //
+  //   1. We ignore the duration for a frame. A frame is displayed until the
+  //   next frame replaces it. This model is robust to durations being 0 or
+  //   incorrect; our source of truth is the pts for frames. If duration is
+  //   accurate, the nextPts for a frame would be equivalent to pts + duration.
+  //   2. In order to establish if the start of an interval maps to a particular
+  //   frame, we need to figure out if it is ordered after the frame's pts, but
+  //   before the next frames's pts.
+  auto startFrame = std::lower_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      startSeconds,
+      [&stream](const FrameInfo& info, double start) {
+        return ptsToSeconds(info.nextPts, stream.timeBase) < start;
+      });
+
+  auto stopFrame = std::upper_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      stopSeconds,
+      [&stream](double stop, const FrameInfo& info) {
+        return stop < ptsToSeconds(info.pts, stream.timeBase);
+      });
+
+  int64_t startFrameIndex = startFrame - stream.allFrames.begin();
+  int64_t stopFrameIndex = stopFrame - stream.allFrames.begin();
+  int64_t numFrames = stopFrameIndex - startFrameIndex;
+  BatchDecodedOutput output(numFrames, options, streamMetadata);
+  for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
+    output.frames[f] = singleOut.frame;
+    output.ptsSeconds[f] = singleOut.ptsSeconds;
+    output.durationSeconds[f] = singleOut.durationSeconds;
   }
 
   return output;
