@@ -142,7 +142,7 @@ def relocate_elf_library(patchelf, output_dir, output_library, binary):
 
         if library in ALLOWLIST:
             # Omit glibc/gcc/system libraries
-            print(f"Omitting {library}")
+            print(f"Omitting {library} because in ALLOWLIST")
             continue
 
         parent_dependencies = binary_dependencies.get(parent, [])
@@ -161,6 +161,7 @@ def relocate_elf_library(patchelf, output_dir, output_library, binary):
 
     new_names = {binary: binary_path}
 
+    print(f"{binary_paths = }")
     for library in binary_paths:
         if library != binary:
             library_path = binary_paths[library]
@@ -189,6 +190,7 @@ def relocate_elf_library(patchelf, output_dir, output_library, binary):
             subprocess.check_output([patchelf, "--print-rpath", new_library_name], cwd=new_libraries_path)
 
     print("Update library dependencies")
+    print(f"{binary_dependencies = }")
     library_dependencies = binary_dependencies[binary]
     for dep in library_dependencies:
         new_dep = osp.basename(new_names[dep])
