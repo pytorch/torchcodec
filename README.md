@@ -8,7 +8,7 @@ and fed to ML models. TorchCodec needs a working FFMPEG installation (that the
  user provides) and uses it as a library to do the decoding. We use FFMPEG
  because of the diverse video formats it supports as well as its popularlity.
 
- Under the hood TorchCodec uses Pytorch's C++ custom ops to wrap C++ code that
+ Under the hood, TorchCodec uses Pytorch's C++ custom ops to wrap C++ code that
  does the memory management of packets, frames and codecs. TorchCodec hides
  that complexity under its API (see example usage below).
 
