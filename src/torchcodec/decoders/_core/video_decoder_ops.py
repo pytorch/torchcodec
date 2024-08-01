@@ -115,6 +115,7 @@ def add_video_stream_abstract(
     num_threads: Optional[int] = None,
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
+    device_string: Optional[str] = None,
 ) -> None:
     return
 
