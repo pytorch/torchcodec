@@ -2,8 +2,10 @@
 
 # TorchCodec
 
-TorchCodec is a Python package with a goal to provide useful and fast APIs to
-decode video frames to PyTorch Tensors.
+TorchCodec is a Python package that provides easy-to-use and fast APIs to
+decode video frames to PyTorch Tensors. These tensors can then be transformed
+and fed to ML models. TorchCodec uses FFMPEG under the hood and supports most
+popular video formats.
 
 > [!NOTE]
 > ⚠️ TorchCodec is still in early development stage and some APIs may be updated
