@@ -10,8 +10,9 @@ auditwheel repair --plat manylinux_2_17_x86_64 dist/* --exclude libtorch.so --ex
 echo "LS"
 ls
 
-echo "cp wheelhouse"
-cp -r wheelhouse dist/
+echo "mv wheelhouse"
+rm -r dist
+mv wheelhouse dist
 
 echo "find dist"
 find dist
