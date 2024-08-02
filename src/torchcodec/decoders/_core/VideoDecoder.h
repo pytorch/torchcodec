@@ -153,8 +153,8 @@ class VideoDecoder {
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameAsTensor() will return the first frame at or after this
-  // position.
+  // Calling getNextDecodedOutputNoDemux() will return the first frame at or
+  // after this position.
   void setCursorPtsInSeconds(double seconds);
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
@@ -180,13 +180,14 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutput();
-  // Decodes the frame that is visible at a given timestamp. Frames in the video
-  // have a presentation timestamp and a duration. For example, if a frame has
-  // presentation timestamp of 5.0s and a duration of 1.0s, it will be visible
-  // in the timestamp range [5.0, 6.0). i.e. it will be returned when this
-  // function is called with seconds=5.0 or seconds=5.999, etc.
-  DecodedOutput getFrameDisplayedAtTimestamp(double seconds);
+  DecodedOutput getNextDecodedOutputNoDemux();
+  // Decodes the first frame in any added stream that is visible at a given
+  // timestamp. Frames in the video have a presentation timestamp and a
+  // duration. For example, if a frame has presentation timestamp of 5.0s and a
+  // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
+  // i.e. it will be returned when this function is called with seconds=5.0 or
+  // seconds=5.999, etc.
+  DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
