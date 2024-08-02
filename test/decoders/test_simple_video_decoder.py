@@ -434,19 +434,10 @@ class TestSimpleDecoder:
         # in the pts-based method. We ensure it is correct by making sure it returns the
         # frames at the indices we know the pts-values map to.
 
-        # TODO: Investigate our need for this "nudge" value and floating point in general.
-        # We currently have a problem where round-tripping pts values from the C++ side
-        # to Python back to the C++ side seems to result in values slightly less than
-        # expected. We use this "nudge" value to ensure the values we provide in testing
-        # are comfortably above or below the target value.
-        #
-        # (The one exception to this reasoning is 0.0 in pts seconds.)
-        NUDGE = 0.000001
-
         # This value is rougly half of the duration of a frame in seconds in the test
         # stream. We use it to obtain values that fall rougly halfway between the pts
         # values for two back-to-back frames.
-        HALF_DURATION = 0.015
+        HALF_DURATION = (1 / decoder.metadata.average_fps) / 2
 
         # The intention here is that the stop and start are exactly specified. In practice, the pts
         # value for frame 5 that we have access to on the Python side is slightly less than the pts
@@ -467,7 +458,7 @@ class TestSimpleDecoder:
         # Again, the intention here is to provide the exact values we care about. In practice, our
         # pts values are slightly smaller, so we nudge the start upwards.
         frames5_9 = decoder.get_frames_displayed_at(
-            decoder.get_frame_at(5).pts_seconds + NUDGE,
+            decoder.get_frame_at(5).pts_seconds,
             decoder.get_frame_at(10).pts_seconds,
         )
         assert_tensor_equal(frames5_9.data, NASA_VIDEO.get_frame_data_by_range(5, 10))
@@ -476,15 +467,15 @@ class TestSimpleDecoder:
         # also should land in the same window of time between two frame's pts values. As
         # a result, we should only get back one frame.
         frame6 = decoder.get_frames_displayed_at(
-            decoder.get_frame_at(6).pts_seconds + NUDGE,
+            decoder.get_frame_at(6).pts_seconds,
             decoder.get_frame_at(6).pts_seconds + HALF_DURATION,
         )
         assert_tensor_equal(frame6.data, NASA_VIDEO.get_frame_data_by_range(6, 7))
 
         # Very small range that falls in the same frame.
         frame35 = decoder.get_frames_displayed_at(
-            decoder.get_frame_at(35).pts_seconds + NUDGE,
-            decoder.get_frame_at(35).pts_seconds + (2 * NUDGE),
+            decoder.get_frame_at(35).pts_seconds,
+            decoder.get_frame_at(35).pts_seconds + 1e-10,
         )
         assert_tensor_equal(frame35.data, NASA_VIDEO.get_frame_data_by_range(35, 36))
 
@@ -499,8 +490,8 @@ class TestSimpleDecoder:
 
         # Start and stop seconds are the same value, which should not return a frame.
         empty_frame = decoder.get_frames_displayed_at(
-            NASA_VIDEO.frames[4].pts_seconds + NUDGE,
-            NASA_VIDEO.frames[4].pts_seconds + NUDGE,
+            NASA_VIDEO.frames[4].pts_seconds,
+            NASA_VIDEO.frames[4].pts_seconds,
         )
         assert_tensor_equal(empty_frame.data, NASA_VIDEO.empty_chw_tensor)
         assert_tensor_equal(empty_frame.pts_seconds, NASA_VIDEO.empty_pts_seconds)

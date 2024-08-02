@@ -966,6 +966,16 @@ void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
   }
 }
 
+void VideoDecoder::validateFrameIndex(
+    const StreamInfo& stream,
+    int64_t frameIndex) {
+  TORCH_CHECK(
+      frameIndex >= 0 && frameIndex < stream.allFrames.size(),
+      "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(stream.streamIndex) +
+          " numFrames=" + std::to_string(stream.allFrames.size()));
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
@@ -973,12 +983,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
   validateScannedAllStreams("getFrameAtIndex");
 
   const auto& stream = streams_[streamIndex];
-  if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
-    throw std::runtime_error(
-        "Invalid frame index=" + std::to_string(frameIndex) +
-        " for streamIndex=" + std::to_string(streamIndex) +
-        " numFrames=" + std::to_string(streams_[streamIndex].allFrames.size()));
-  }
+  validateFrameIndex(stream, frameIndex);
+
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
   return getNextDecodedOutput();
@@ -1109,7 +1115,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
       stream.allFrames.end(),
       startSeconds,
       [&stream](const FrameInfo& info, double start) {
-        return ptsToSeconds(info.nextPts, stream.timeBase) < start;
+        return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
       });
 
   auto stopFrame = std::upper_bound(
@@ -1117,7 +1123,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
       stream.allFrames.end(),
       stopSeconds,
       [&stream](double stop, const FrameInfo& info) {
-        return stop < ptsToSeconds(info.pts, stream.timeBase);
+        return stop <= ptsToSeconds(info.pts, stream.timeBase);
       });
 
   int64_t startFrameIndex = startFrame - stream.allFrames.begin();
@@ -1153,6 +1159,18 @@ VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
 
 void VideoDecoder::resetDecodeStats() {
   decodeStats_ = DecodeStats{};
+}
+
+double VideoDecoder::getPtsSecondsForFrame(
+    int streamIndex,
+    int64_t frameIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFrameAtIndex");
+
+  const auto& stream = streams_[streamIndex];
+  validateFrameIndex(stream, frameIndex);
+
+  return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(

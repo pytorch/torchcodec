@@ -69,6 +69,7 @@ get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
+_test_frame_pts_equality = torch.ops.torchcodec_ns._test_frame_pts_equality.default
 _get_container_json_metadata = (
     torch.ops.torchcodec_ns.get_container_json_metadata.default
 )
@@ -220,6 +221,17 @@ def get_container_json_metadata_abstract(decoder: torch.Tensor) -> str:
 @register_fake("torchcodec_ns::get_stream_json_metadata")
 def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) -> str:
     return ""
+
+
+@register_fake("torchcodec_ns::_test_frame_pts_equality")
+def _test_frame_pts_equality_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    frame_index: int,
+    pts_seconds_to_test: float,
+) -> bool:
+    return False
 
 
 @register_fake("torchcodec_ns::_get_json_ffmpeg_library_versions")
