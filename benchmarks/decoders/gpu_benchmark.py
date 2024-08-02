@@ -2,46 +2,37 @@ import argparse
 import os
 import time
 
+import torch
 import torch.utils.benchmark as benchmark
 
 import torchcodec
 from torchvision.transforms import Resize
 
 
-def transfer_and_resize_frame(frame, device):
-    # This should be a no-op if the frame is already on the device.
-    frame = frame.to(device)
+def transfer_and_resize_frame(frame):
+    # This should be a no-op if the frame is already on the GPU.
+    frame = frame.to("cuda:0")
     frame = Resize((256, 256))(frame)
     return frame
 
 
-def decode_full_video(video_path, decode_device):
-    decoder = torchcodec.decoders._core.create_from_file(video_path)
-    num_threads = None
-    if "cuda" in decode_device:
-        num_threads = 1
-    torchcodec.decoders._core.add_video_stream(
-        decoder, stream_index=0, device_string=decode_device, num_threads=num_threads
+def decode_full_video(video_path, device_string, do_gpu_preproc):
+    decoder = torchcodec.decoders.SimpleVideoDecoder(
+        video_path, device=torch.device(device_string)
     )
     start_time = time.time()
     frame_count = 0
-    while True:
-        try:
-            frame, *_ = torchcodec.decoders._core.get_next_frame(decoder)
-            # You can do a resize to simulate extra preproc work that happens
-            # on the GPU by uncommenting the following line:
-            # frame = transfer_and_resize_frame(frame, decode_device)
-
-            frame_count += 1
-        except Exception as e:
-            print("EXCEPTION", e)
-            break
-        # print(f"current {frame_count=}", flush=True)
+    for frame in decoder:
+        # You can do a resize to simulate extra preproc work that happens
+        # on the GPU by uncommenting the following line:
+        if do_gpu_preproc:
+            frame = transfer_and_resize_frame(frame)
+        frame_count += 1
     end_time = time.time()
     elapsed = end_time - start_time
     fps = frame_count / (end_time - start_time)
     print(
-        f"****** DECODED full video {decode_device=} {frame_count=} {elapsed=} {fps=}"
+        f"****** DECODED full video {device_string=} {frame_count=} {elapsed=} {fps=}"
     )
     return frame_count, end_time - start_time
 
@@ -69,6 +60,15 @@ def main():
             "to measure the cold start time."
         ),
     )
+    parser.add_argument(
+        "--do_gpu_preproc",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Do a transfer to GPU and resize operation after the decode to "
+            "simulate a real-world transform."
+        ),
+    )
     args = parser.parse_args()
     video_path = args.video
 
@@ -78,17 +78,23 @@ def main():
             decode_full_video(video_path, device)
         return
 
+    label = "Decode"
+    if args.do_gpu_preproc:
+        label += " + GPU Preproc"
+    label += " Time"
+
     results = []
     for device in args.devices.split(","):
         print("device", device)
         t = benchmark.Timer(
-            stmt="decode_full_video(video_path, device)",
+            stmt="decode_full_video(video_path, device, do_gpu_preproc)",
             globals={
                 "device": device,
                 "video_path": video_path,
                 "decode_full_video": decode_full_video,
+                "do_gpu_preproc": args.do_gpu_preproc,
             },
-            label="Decode+Resize Time",
+            label=label,
             sub_label=f"video={os.path.basename(video_path)}",
             description=f"decode_device={device}",
         ).blocked_autorange()

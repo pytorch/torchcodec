@@ -158,3 +158,14 @@ frame_at_2_seconds = decoder.get_frame_displayed_at(seconds=2)
 print(f"{type(frame_at_2_seconds) = }")
 print(frame_at_2_seconds)
 plot(frame_at_2_seconds.data, "Frame displayed at 2 seconds")
+
+# %%
+# Using a CUDA GPU to accelerate decoding
+# ---------------------------------------
+#
+# If you have a CUDA GPU that has NVDEC, you can decode on the GPU.
+if torch.cuda.is_available():
+    cuda_decoder = SimpleVideoDecoder(raw_video_bytes, device="cuda:0")
+    cuda_frame = cuda_decoder.get_frame_displayed_at(seconds=2)
+    print(cuda_frame.data.device)  # should be cuda:0
+    plot(cuda_frame.data.to("cpu"), "Frame displayed at 2 seconds on CUDA")

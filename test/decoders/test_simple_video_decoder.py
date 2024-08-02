@@ -45,6 +45,34 @@ class TestSimpleDecoder:
         with pytest.raises(TypeError, match="Unknown source type"):
             decoder = SimpleVideoDecoder(123)  # noqa
 
+    def test_can_accept_devices(self):
+        # You can pass a CPU device as a string...<contd>
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, device="cpu")
+        assert_tensor_equal(decoder[0], NASA_VIDEO.get_frame_data_by_index(0))
+
+        # ...or as a torch.device.
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path, device=torch.device("cpu"))
+        assert_tensor_equal(decoder[0], NASA_VIDEO.get_frame_data_by_index(0))
+
+        if torch.cuda.is_available():
+            # You can pass a CUDA device as a string...<contd>
+            decoder = SimpleVideoDecoder(NASA_VIDEO.path, device="cuda")
+            frame = decoder[0]
+            assert frame.device.type == "cuda"
+            assert frame.shape == torch.Size(
+                [NASA_VIDEO.num_color_channels, NASA_VIDEO.height, NASA_VIDEO.width]
+            )
+
+            # ...or as a torch.device.
+            decoder = SimpleVideoDecoder(NASA_VIDEO.path, device=torch.device("cuda"))
+            frame = decoder[0]
+            assert frame.device.type == "cuda"
+            assert frame.shape == torch.Size(
+                [NASA_VIDEO.num_color_channels, NASA_VIDEO.height, NASA_VIDEO.width]
+            )
+            # TODO: compare tensor values too. We don't compare values because
+            # the exact values are hardware-dependent.
+
     def test_getitem_int(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
