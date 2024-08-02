@@ -47,6 +47,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
   m.def("_get_json_ffmpeg_library_versions() -> str");
+  m.def(
+      "_test_frame_pts_equality(Tensor(a!) decoder, *, int stream_index, int frame_index, float pts_seconds_to_test) -> bool");
   m.def("scan_all_streams_to_update_metadata(Tensor(a!) decoder) -> ()");
 }
 
@@ -73,8 +75,8 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
   return std::make_tuple(
       frame.frame,
-      torch::tensor(frame.ptsSeconds),
-      torch::tensor(frame.durationSeconds));
+      torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
+      torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
 OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
@@ -226,6 +228,22 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   ss << "}";
 
   return ss.str();
+}
+
+bool _test_frame_pts_equality(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index,
+    double pts_seconds_to_test) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  LOG(INFO) << "pts_seconds_to_test: " << std::setprecision(15)
+            << pts_seconds_to_test << std::endl;
+  LOG(INFO) << "frame pts  : " << std::setprecision(15)
+            << videoDecoder->getPtsSecondsForFrame(stream_index, frame_index)
+            << std::endl
+            << std::endl;
+  return pts_seconds_to_test ==
+      videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }
 
 std::string get_json_metadata(at::Tensor& decoder) {
@@ -422,6 +440,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
+  m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);
   m.impl(
       "scan_all_streams_to_update_metadata",
       &scan_all_streams_to_update_metadata);

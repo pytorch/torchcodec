@@ -16,6 +16,7 @@ import pytest
 import torch
 
 from torchcodec.decoders._core import (
+    _test_frame_pts_equality,
     add_video_stream,
     create_from_bytes,
     create_from_file,
@@ -300,6 +301,26 @@ class TestOps:
         ffmpeg_version = ffmpeg_dict["ffmpeg_version"]
         split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
         assert len(split_ffmpeg_version) == 3
+
+    def test_frame_pts_equality(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+
+        # Note that for all of these tests, we store the return value of
+        # _test_frame_pts_equality() into a boolean variable, and then do the assertion
+        # on that variable. This indirection is necessary because if we do the assertion
+        # directly on the call to _test_frame_pts_equality(), and it returns False making
+        # the assertion fail, we get a PyTorch segfault.
+
+        # If this fails, there's a good chance that we accidentally truncated a 64-bit
+        # floating point value to a 32-bit floating value.
+        for i in range(390):
+            frame, pts, _ = get_frame_at_index(decoder, stream_index=3, frame_index=i)
+            pts_is_equal = _test_frame_pts_equality(
+                decoder, stream_index=3, frame_index=i, pts_seconds_to_test=pts.item()
+            )
+            assert pts_is_equal
 
 
 if __name__ == "__main__":

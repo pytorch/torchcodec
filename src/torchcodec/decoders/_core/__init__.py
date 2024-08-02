@@ -12,6 +12,7 @@ from ._metadata import (
     VideoStreamMetadata,
 )
 from .video_decoder_ops import (
+    _test_frame_pts_equality,
     add_video_stream,
     create_from_bytes,
     create_from_file,

@@ -100,6 +100,21 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds);
 
+// For testing only. We need to implement this operation as a core library
+// function because what we're testing is round-tripping pts values as
+// double-precision floating point numbers from C++ to Python and back to C++.
+// We want to make sure that the value is preserved exactly, bit-for-bit, during
+// this process.
+//
+// Returns true if for the given decoder, in the stream stream_index, the pts
+// value when converted to seconds as a double is exactly pts_seconds_to_test.
+// Returns false otherwise.
+bool _test_frame_pts_equality(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index,
+    double pts_seconds_to_test);
+
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 

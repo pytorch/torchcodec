@@ -249,6 +249,8 @@ class VideoDecoder {
   DecodeStats getDecodeStats() const;
   void resetDecodeStats();
 
+  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+
  private:
   struct FrameInfo {
     int64_t pts = 0;
@@ -305,6 +307,7 @@ class VideoDecoder {
   void initializeDecoder();
   void validateUserProvidedStreamIndex(uint64_t streamIndex);
   void validateScannedAllStreams(const std::string& msg);
+  void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(
