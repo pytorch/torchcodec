@@ -34,8 +34,6 @@ extern "C" {
 #endif
 }
 
-#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
-
 namespace facebook::torchcodec {
 namespace {
 
