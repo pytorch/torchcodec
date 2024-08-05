@@ -2,7 +2,6 @@ import argparse
 import os
 import time
 
-import torch
 import torch.utils.benchmark as benchmark
 
 import torchcodec
