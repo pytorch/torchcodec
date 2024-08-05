@@ -29,6 +29,12 @@ from ..utils import assert_tensor_equal, NASA_VIDEO
         IndexBasedSamplerArgs(
             sampler_type="uniform", clips_per_video=3, frames_per_clip=4
         ),
+        TimeBasedSamplerArgs(
+            sampler_type="random",
+            clips_per_video=2,
+            frames_per_clip=4,
+            stack_output_per_clip=True,
+        ),
     ],
 )
 @pytest.mark.parametrize(("device"), [torch.device("cpu"), torch.device("cuda:0")])
@@ -44,12 +50,14 @@ def test_sampler(sampler_args, device):
     clips = sampler(NASA_VIDEO.to_tensor())
     assert_tensor_equal(len(clips), sampler_args.clips_per_video)
     clip = clips[0]
-    if isinstance(sampler_args, TimeBasedSamplerArgs):
-        # Note: Looks like we have an API inconsistency.
-        # With time-based sampler, `clip` is a tensor but with index-based
-        # samplers `clip` is a list.
-        # Below manually convert that list to a tensor for the `.shape` check to
-        # be unified, but this block should be removed eventually.
+    if (
+        isinstance(sampler_args, TimeBasedSamplerArgs)
+        and not sampler_args.stack_output_per_clip
+    ):
+        # Note: there're no batch API in core decoder for time-based ops.
+        # So the default return for time-based sampler is List[List[Tensor]], where Tensor is CHW.
+        # If stack_output_per_clip is True, the return is List[Tensor], where Tensor is NCHW.
+        # Eventually we hope to return stack tensor efficiently.
         clip = torch.stack(clip)
     assert clip.shape == (
         sampler_args.frames_per_clip,
