@@ -344,6 +344,19 @@ TEST_P(VideoDecoderTest, GetsFrameDisplayedAtTimestamp) {
   EXPECT_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
 }
 
+TEST_P(VideoDecoderTest, GetDisplayedFrameIndexByTimestamp) {
+  std::string path = getResourcePath("nasa_13013.mp4");
+  std::unique_ptr<VideoDecoder> ourDecoder =
+      createDecoderFromPath(path, GetParam());
+  ourDecoder->addVideoStreamDecoder(-1);
+  ourDecoder->scanFileAndUpdateMetadataAndIndex();
+  int bestVideoStreamIndex =
+      *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
+  auto output = ourDecoder->getDisplayedFrameIndexByTimestamp(
+      bestVideoStreamIndex, 6.006);
+  EXPECT_EQ(output, 180);
+}
+
 TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =

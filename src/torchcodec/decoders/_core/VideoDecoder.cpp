@@ -1138,6 +1138,44 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   return output;
 }
 
+int64_t VideoDecoder::getDisplayedFrameIndexByTimestamp(
+    int streamIndex,
+    double seconds) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getDisplayedFrameIndexByTimestamp");
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+  TORCH_CHECK(
+      seconds >= minSeconds && seconds < maxSeconds,
+      "Provided pts is " + std::to_string(seconds) + "; must be in range [" +
+          std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
+          ").");
+
+  const auto& stream = streams_[streamIndex];
+  auto displayedFrame = std::lower_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      seconds,
+      [&stream](const FrameInfo& info, double start) {
+        return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
+      });
+  int64_t frameIndex = displayedFrame - stream.allFrames.begin();
+  return frameIndex;
+}
+
+double VideoDecoder::getPtsSecondsForFrame(
+    int streamIndex,
+    int64_t frameIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFrameAtIndex");
+
+  const auto& stream = streams_[streamIndex];
+  validateFrameIndex(stream, frameIndex);
+
+  return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutput() {
   return getDecodedOutputWithFilter(
       [this](int frameStreamIndex, AVFrame* frame) {
@@ -1157,18 +1195,6 @@ VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
 
 void VideoDecoder::resetDecodeStats() {
   decodeStats_ = DecodeStats{};
-}
-
-double VideoDecoder::getPtsSecondsForFrame(
-    int streamIndex,
-    int64_t frameIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFrameAtIndex");
-
-  const auto& stream = streams_[streamIndex];
-  validateFrameIndex(stream, frameIndex);
-
-  return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
