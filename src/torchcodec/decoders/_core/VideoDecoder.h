@@ -232,6 +232,13 @@ class VideoDecoder {
       int streamIndex,
       double startSeconds,
       double stopSeconds);
+
+  // Return index of frame displayed at a given timestamp for a given stream.
+  int64_t getDisplayedFrameIndexByTimestamp(int streamIndex, double seconds);
+
+  // Return pts Second for a given frame index of a given stream.
+  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
   // --------------------------------------------------------------------------
@@ -248,8 +255,6 @@ class VideoDecoder {
   };
   DecodeStats getDecodeStats() const;
   void resetDecodeStats();
-
-  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
 
  private:
   struct FrameInfo {

@@ -100,6 +100,11 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds);
 
+int64_t get_displayed_frame_index_by_timestamp(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    double seconds);
+
 // For testing only. We need to implement this operation as a core library
 // function because what we're testing is round-tripping pts values as
 // double-precision floating point numbers from C++ to Python and back to C++.

@@ -21,6 +21,7 @@ from torchcodec.decoders._core import (
     create_from_bytes,
     create_from_file,
     create_from_tensor,
+    get_displayed_frame_index_by_timestamp,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -170,6 +171,16 @@ class TestOps:
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
         assert_tensor_equal(empty_frame, NASA_VIDEO.empty_chw_tensor)
+
+    def test_get_displayed_frame_index_by_timestamp(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+        # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
+        frame_index = get_displayed_frame_index_by_timestamp(
+            decoder, stream_index=3, seconds=6.006
+        )
+        assert frame_index == 180
 
     def test_throws_exception_at_eof(self):
         decoder = create_from_file(str(NASA_VIDEO.path))

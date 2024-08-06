@@ -68,6 +68,9 @@ get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
+get_displayed_frame_index_by_timestamp = (
+    torch.ops.torchcodec_ns.get_displayed_frame_index_by_timestamp.default
+)
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 _test_frame_pts_equality = torch.ops.torchcodec_ns._test_frame_pts_equality.default
 _get_container_json_metadata = (
@@ -206,6 +209,16 @@ def get_frames_by_pts_in_range_abstract(
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),
     )
+
+
+@register_fake("torchcodec_ns::get_displayed_frame_index_by_timestamp")
+def get_displayed_frame_index_by_timestamp_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    timestamp: float,
+) -> int:
+    return 0
 
 
 @register_fake("torchcodec_ns::get_json_metadata")

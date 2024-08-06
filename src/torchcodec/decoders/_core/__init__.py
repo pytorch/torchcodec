@@ -17,6 +17,7 @@ from .video_decoder_ops import (
     create_from_bytes,
     create_from_file,
     create_from_tensor,
+    get_displayed_frame_index_by_timestamp,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
