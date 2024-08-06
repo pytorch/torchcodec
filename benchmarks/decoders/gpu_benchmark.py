@@ -5,16 +5,16 @@ import time
 import torch.utils.benchmark as benchmark
 
 import torchcodec
-from torchvision.transforms import Resize
+import torchvision.transforms.v2.functional as F
 
 RESIZED_WIDTH = 256
 RESIZED_HEIGHT = 256
 
 
 def transfer_and_resize_frame(frame, resize_device_string):
-    # This should be a no-op if the frame is already on the GPU.
+    # This should be a no-op if the frame is already on the target device.
     frame = frame.to(resize_device_string)
-    frame = Resize((RESIZED_HEIGHT, RESIZED_WIDTH))(frame)
+    frame = F.resize(frame, (RESIZED_HEIGHT, RESIZED_WIDTH))
     return frame
 
 
@@ -129,8 +129,8 @@ def main():
                     "resize_device_string": resize_device_string,
                 },
                 label=label,
-                sub_label=f"video={os.path.basename(video_path)}",
-                description=f"D={decode_label},R={resize_label}",
+                description=f"video={os.path.basename(video_path)}",
+                sub_label=f"D={decode_label} R={resize_label}",
             ).blocked_autorange()
             results.append(t)
     compare = benchmark.Compare(results)
