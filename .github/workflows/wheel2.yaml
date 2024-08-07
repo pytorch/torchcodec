@@ -34,7 +34,7 @@ jobs:
     needs: generate-matrix
     strategy:
       fail-fast: false
-    name: ${{ matrix.repository }}
+    name: pytorch/torchcodec
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: pytorch/torchcodec
