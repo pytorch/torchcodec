@@ -12,6 +12,7 @@
 #include <ostream>
 #include <string_view>
 
+#include "c10/core/Device.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -139,6 +140,8 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
+    // Set the device to torch::kGPU for GPU decoding.
+    torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
@@ -150,8 +153,8 @@ class VideoDecoder {
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameAsTensor() will return the first frame at or after this
-  // position.
+  // Calling getNextDecodedOutputNoDemux() will return the first frame at or
+  // after this position.
   void setCursorPtsInSeconds(double seconds);
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
@@ -177,13 +180,14 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutput();
-  // Decodes the frame that is visible at a given timestamp. Frames in the video
-  // have a presentation timestamp and a duration. For example, if a frame has
-  // presentation timestamp of 5.0s and a duration of 1.0s, it will be visible
-  // in the timestamp range [5.0, 6.0). i.e. it will be returned when this
-  // function is called with seconds=5.0 or seconds=5.999, etc.
-  DecodedOutput getFrameDisplayedAtTimestamp(double seconds);
+  DecodedOutput getNextDecodedOutputNoDemux();
+  // Decodes the first frame in any added stream that is visible at a given
+  // timestamp. Frames in the video have a presentation timestamp and a
+  // duration. For example, if a frame has presentation timestamp of 5.0s and a
+  // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
+  // i.e. it will be returned when this function is called with seconds=5.0 or
+  // seconds=5.999, etc.
+  DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
@@ -208,6 +212,27 @@ class VideoDecoder {
   BatchDecodedOutput
   getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
+  // Returns frames within a given pts range for a given stream as a single
+  // stacked tensor. The range is defined by [startSeconds, stopSeconds) with
+  // respect to the pts values for frames. The returned frames are in pts order.
+  //
+  // Note that while stopSeconds is excluded in the half open range, this really
+  // only makes a difference when stopSeconds is exactly the pts value for a
+  // frame. Otherwise, the moment in time immediately before stopSeconds is in
+  // the range, and that time maps to the same frame as stopSeconds.
+  //
+  // The frames returned are the frames that would be displayed by our abstract
+  // player. Our abstract player displays frames based on pts only. It displays
+  // frame i starting at the pts for frame i, and stops at the pts for frame
+  // i+1. This model ignores a frame's reported duration.
+  //
+  // Valid values for startSeconds and stopSeconds are:
+  //
+  //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
+  BatchDecodedOutput getFramesDisplayedByTimestampInRange(
+      int streamIndex,
+      double startSeconds,
+      double stopSeconds);
   // --------------------------------------------------------------------------
   // DECODER PERFORMANCE STATISTICS API
   // --------------------------------------------------------------------------
@@ -225,9 +250,12 @@ class VideoDecoder {
   DecodeStats getDecodeStats() const;
   void resetDecodeStats();
 
+  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+
  private:
   struct FrameInfo {
     int64_t pts = 0;
+    int64_t nextPts = 0;
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;
@@ -253,6 +281,8 @@ class VideoDecoder {
     FilterState filterState;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    AVPixelFormat hwPixelFormat = AV_PIX_FMT_NONE;
+    UniqueAVBufferRef hwDeviceContext;
   };
   VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
@@ -278,6 +308,7 @@ class VideoDecoder {
   void initializeDecoder();
   void validateUserProvidedStreamIndex(uint64_t streamIndex);
   void validateScannedAllStreams(const std::string& msg);
+  void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(

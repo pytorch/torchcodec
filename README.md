@@ -2,8 +2,15 @@
 
 # TorchCodec
 
-TorchCodec is a Python package with a goal to provide useful and fast APIs to
-decode video frames to PyTorch Tensors.
+TorchCodec is a Python package that provides easy-to-use and fast APIs to
+decode video frames to PyTorch Tensors. These tensors can then be transformed
+and fed to ML models. TorchCodec needs a working FFMPEG installation (that the
+user provides) and uses it as a library to do the decoding. We use FFMPEG
+because of the diverse video formats it supports as well as its popularity.
+
+Under the hood, TorchCodec uses Pytorch's C++ custom ops to wrap C++ code that
+does the memory management of packets, frames and codecs. TorchCodec hides
+that complexity under its API (see example usage below).
 
 > [!NOTE]
 > ⚠️ TorchCodec is still in early development stage and some APIs may be updated
@@ -127,3 +134,7 @@ guide](CONTRIBUTING.md) for more details.
 ## License
 
 TorchCodec is released under the [BSD 3 license](./LICENSE).
+
+
+If you are building with ENABLE_CUDA and/or ENABLE_NVTX please review
+[Nvidia licenses](https://docs.nvidia.com/cuda/eula/index.html).

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Literal, Tuple, Union
 
-from torch import Tensor
+from torch import device as torch_device, Tensor
 
 from torchcodec.decoders import _core as core
 
@@ -89,6 +89,14 @@ class SimpleVideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
+        device (torch.device, optional): The device to use for decoding.
+            Currently we only support CPU and CUDA devices. If CUDA is used,
+            we use NVDEC and CUDA to do decoding and color-conversion
+            respectively. The resulting frame is left on the GPU for further
+            processing.
+            You can either pass in a string like "cpu" or "cuda:0" or a
+            torch.device like torch.device("cuda:0").
+            Default: ``torch.device("cpu")``.
 
             .. note::
 
@@ -106,6 +114,7 @@ class SimpleVideoDecoder:
         self,
         source: Union[str, Path, bytes, Tensor],
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
+        device: Union[str, torch_device] = torch_device("cpu"),
     ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
@@ -129,7 +138,20 @@ class SimpleVideoDecoder:
             )
 
         core.scan_all_streams_to_update_metadata(self._decoder)
-        core.add_video_stream(self._decoder, dimension_order=dimension_order)
+        num_threads = None
+        if isinstance(device, str):
+            device = torch_device(device)
+        if device.type == "cuda":
+            # Using multiple CPU threads seems to slow down decoding on CUDA.
+            # CUDA internally uses dedicated hardware to do decoding so we
+            # don't need CPU software threads here.
+            num_threads = 1
+        core.add_video_stream(
+            self._decoder,
+            dimension_order=dimension_order,
+            device_string=str(device),
+            num_threads=num_threads,
+        )
 
         self.metadata, self._stream_index = _get_and_validate_stream_metadata(
             self._decoder
@@ -283,6 +305,47 @@ class SimpleVideoDecoder:
             pts_seconds=pts_seconds.item(),
             duration_seconds=duration_seconds.item(),
         )
+
+    def get_frames_displayed_at(
+        self, start_seconds: float, stop_seconds: float
+    ) -> FrameBatch:
+        """Returns multiple frames in the given range.
+
+        Frames are in the half open range [start_seconds, stop_seconds). Each
+        returned frame's :term`pts`, in seconds, is inside of the half open
+        range.
+
+        Args:
+            start_seconds (float): Time, in seconds, of the start of the
+                range.
+            stop_seconds (float): Time, in seconds, of the end of the
+                range. As a half open range, the end is excluded.
+
+        Returns:
+            FrameBatch: The frames within the specified range.
+        """
+        if not start_seconds <= stop_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. It must be less than or equal to stop seconds ({stop_seconds})."
+            )
+        if not self._begin_stream_seconds <= start_seconds < self._end_stream_seconds:
+            raise ValueError(
+                f"Invalid start seconds: {start_seconds}. "
+                f"It must be greater than or equal to {self._begin_stream_seconds} "
+                f"and less than or equal to {self._end_stream_seconds}."
+            )
+        if not stop_seconds <= self._end_stream_seconds:
+            raise ValueError(
+                f"Invalid stop seconds: {stop_seconds}. "
+                f"It must be less than or equal to {self._end_stream_seconds}."
+            )
+        frames = core.get_frames_by_pts_in_range(
+            self._decoder,
+            stream_index=self._stream_index,
+            start_seconds=start_seconds,
+            stop_seconds=stop_seconds,
+        )
+        return FrameBatch(*frames)
 
 
 def _get_and_validate_stream_metadata(

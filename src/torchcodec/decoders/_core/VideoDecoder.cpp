@@ -5,11 +5,22 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include <torch/torch.h>
+#include <torch/types.h>
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
 #include <stdexcept>
 #include <string_view>
-#include "torch/types.h"
+
+#ifdef ENABLE_CUDA
+#include <c10/cuda/CUDAStream.h>
+#include <cuda.h>
+#include <npp.h>
+#ifdef ENABLE_NVTX
+#include <nvtx3/nvtx3.hpp>
+#endif
+#endif
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -18,9 +29,10 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
+#ifdef ENABLE_CUDA
+#include <libavutil/hwcontext_cuda.h>
+#endif
 }
-
-#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 namespace {
@@ -95,6 +107,87 @@ std::vector<std::string> splitStringWithDelimiters(
   return result;
 }
 
+#ifdef ENABLE_CUDA
+
+AVBufferRef* getCudaContext() {
+  enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
+  TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
+  int err = 0;
+  AVBufferRef* hw_device_ctx;
+  err = av_hwdevice_ctx_create(
+      &hw_device_ctx,
+      type,
+      nullptr,
+      nullptr,
+  // Introduced in 58.26.100:
+  // https://github.com/FFmpeg/FFmpeg/blob/4acb9b7d1046944345ae506165fb55883d04d8a6/doc/APIchanges#L265
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
+      AV_CUDA_USE_CURRENT_CONTEXT
+#else
+      0
+#endif
+  );
+  if (err < 0) {
+    TORCH_CHECK(
+        false,
+        "Failed to create specified HW device",
+        getFFMPEGErrorStringFromErrorCode(err));
+  }
+  return hw_device_ctx;
+}
+
+torch::Tensor allocateDeviceTensor(
+    at::IntArrayRef shape,
+    torch::Device device,
+    const torch::Dtype dtype = torch::kUInt8) {
+  return torch::empty(
+      shape,
+      torch::TensorOptions()
+          .dtype(dtype)
+          .layout(torch::kStrided)
+          .device(device));
+}
+
+torch::Tensor convertFrameToTensorUsingCUDA(
+    const AVCodecContext* codecContext,
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const AVFrame* src) {
+  TORCH_CHECK(
+      src->format == AV_PIX_FMT_CUDA,
+      "Expected format to be AV_PIX_FMT_CUDA, got " +
+          std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
+  int width = options.width.value_or(codecContext->width);
+  int height = options.height.value_or(codecContext->height);
+  NppStatus status;
+  NppiSize oSizeROI;
+  oSizeROI.width = width;
+  oSizeROI.height = height;
+  Npp8u* input[2];
+  input[0] = (Npp8u*)src->data[0];
+  input[1] = (Npp8u*)src->data[1];
+  torch::Tensor dst = allocateDeviceTensor({height, width, 3}, options.device);
+  auto start = std::chrono::high_resolution_clock::now();
+  status = nppiNV12ToRGB_8u_P2C3R(
+      input,
+      src->linesize[0],
+      static_cast<Npp8u*>(dst.data_ptr()),
+      dst.stride(0),
+      oSizeROI);
+  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::micro> duration = end - start;
+  VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
+          << " took: " << duration.count() << "us" << std::endl;
+  if (options.dimensionOrder == "NCHW") {
+    // The docs guaranty this to return a view:
+    // https://pytorch.org/docs/stable/generated/torch.permute.html
+    dst = dst.permute({2, 0, 1});
+  }
+  return dst;
+}
+
+#endif
+
 } // namespace
 
 VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
@@ -140,8 +233,8 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat})) {
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
   if (options.dimensionOrder == "NHWC") {
     frames = torch::empty(
         {numFrames,
@@ -340,13 +433,13 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs.reset(inputsTmp);
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
-        "Failed to parse filter description: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        "Failed to parse filter description: " + std::string(description) +
+        "; " + getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
   ffmpegStatus = avfilter_graph_config(filterState.filterGraph.get(), nullptr);
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
-        "Failed to configure filter graph: " +
+        "Failed to configure filter graph: " + std::string(description) + "; " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
 }
@@ -395,15 +488,37 @@ void VideoDecoder::addVideoStreamDecoder(
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
+
+  if (options.device.type() == torch::DeviceType::CUDA) {
+#ifdef ENABLE_CUDA
+    // We create a small tensor using pytorch to initialize the cuda context.
+    torch::Tensor dummyTensorForCudaInitialization = torch::zeros(
+        {1},
+        torch::TensorOptions().dtype(torch::kUInt8).device(options.device));
+    codecContext->hw_device_ctx = av_buffer_ref(getCudaContext());
+
+    TORCH_INTERNAL_ASSERT(
+        codecContext->hw_device_ctx,
+        "Failed to create/reference the CUDA HW device context for index=" +
+            std::to_string(options.device.index()) + ".");
+#else
+    throw std::runtime_error(
+        "CUDA support is not enabled in this build of TorchCodec.");
+#endif
+  }
+
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
   if (retVal < AVSUCCESS) {
     throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
   }
+
   codecContext->time_base = streamInfo.stream->time_base;
   activeStreamIndices_.insert(streamNumber);
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
-  initializeFilterGraphForStream(streamNumber, options);
+  if (options.device.is_cpu()) {
+    initializeFilterGraphForStream(streamNumber, options);
+  }
 }
 
 void VideoDecoder::updateMetadataWithCodecContext(
@@ -512,6 +627,12 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
+
+    for (int i = 0; i < stream.allFrames.size(); ++i) {
+      if (i + 1 < stream.allFrames.size()) {
+        stream.allFrames[i].nextPts = stream.allFrames[i + 1].pts;
+      }
+    }
   }
   scanned_all_streams_ = true;
 }
@@ -632,10 +753,13 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
+#ifdef ENABLE_NVTX
+  nvtx3::scoped_range loop{"decodeOneFrame"};
+#endif
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getNextDecodedOutput()";
+  VLOG(9) << "Starting getNextDecodedOutputNoDemux()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
     VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
@@ -719,8 +843,13 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       // This packet is not for any of the active streams.
       continue;
     }
-    ffmpegStatus = avcodec_send_packet(
-        streams_[packet->stream_index].codecContext.get(), packet.get());
+    {
+#ifdef ENABLE_NVTX
+      nvtx3::scoped_range loop{"avcodec_send_packet"};
+#endif
+      ffmpegStatus = avcodec_send_packet(
+          streams_[packet->stream_index].codecContext.get(), packet.get());
+    }
     decodeStats_.numPacketsSentToDecoder++;
     if (ffmpegStatus < AVSUCCESS) {
       throw std::runtime_error(
@@ -757,8 +886,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     UniqueAVFrame frame) {
   // Convert the frame to tensor.
   DecodedOutput output;
+  auto& streamInfo = streams_[streamIndex];
   output.streamIndex = streamIndex;
-  output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
+  output.streamType = streamInfo.stream->codecpar->codec_type;
   output.pts = frame->pts;
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
@@ -766,8 +896,22 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
-    output.frame =
-        convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
+    if (streamInfo.options.device.is_cpu()) {
+      output.frame =
+          convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
+    } else if (streamInfo.options.device.is_cuda()) {
+#ifdef ENABLE_CUDA
+      {
+#ifdef ENABLE_NVTX
+        nvtx3::scoped_range loop{"convertFrameUsingCuda"};
+#endif
+        output.frame = convertFrameToTensorUsingCUDA(
+            streamInfo.codecContext.get(), streamInfo.options, frame.get());
+      }
+#else
+      throw std::runtime_error("CUDA is not enabled in this build.");
+#endif // ENABLE_CUDA
+    }
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
     // audio decoding.
@@ -776,7 +920,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
+VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
@@ -820,6 +964,16 @@ void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
   }
 }
 
+void VideoDecoder::validateFrameIndex(
+    const StreamInfo& stream,
+    int64_t frameIndex) {
+  TORCH_CHECK(
+      frameIndex >= 0 && frameIndex < stream.allFrames.size(),
+      "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(stream.streamIndex) +
+          " numFrames=" + std::to_string(stream.allFrames.size()));
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
@@ -827,15 +981,11 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
   validateScannedAllStreams("getFrameAtIndex");
 
   const auto& stream = streams_[streamIndex];
-  if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
-    throw std::runtime_error(
-        "Invalid frame index=" + std::to_string(frameIndex) +
-        " for streamIndex=" + std::to_string(streamIndex) +
-        " numFrames=" + std::to_string(streams_[streamIndex].allFrames.size()));
-  }
+  validateFrameIndex(stream, frameIndex);
+
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  return getNextDecodedOutput();
+  return getNextDecodedOutputNoDemux();
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
@@ -855,9 +1005,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    torch::Tensor frame = getNextDecodedOutput().frame;
+    torch::Tensor frame = getFrameAtIndex(streamIndex, frameIndex).frame;
     output.frames[i++] = frame;
   }
   return output;
@@ -887,21 +1035,110 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   const auto& options = stream.options;
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
-  int64_t f = 0;
-  for (int64_t i = start; i < stop; i += step) {
-    int64_t pts = stream.allFrames[i].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    DecodedOutput singleOut = getNextDecodedOutput();
+  for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
     output.frames[f] = singleOut.frame;
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
-    ++f;
   }
 
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutput() {
+VideoDecoder::BatchDecodedOutput
+VideoDecoder::getFramesDisplayedByTimestampInRange(
+    int streamIndex,
+    double startSeconds,
+    double stopSeconds) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+  TORCH_CHECK(
+      startSeconds >= minSeconds && startSeconds < maxSeconds,
+      "Start seconds is " + std::to_string(startSeconds) +
+          "; must be in range [" + std::to_string(minSeconds) + ", " +
+          std::to_string(maxSeconds) + ").");
+  TORCH_CHECK(
+      stopSeconds <= maxSeconds,
+      "Stop seconds (" + std::to_string(stopSeconds) +
+          "; must be less than or equal to " + std::to_string(maxSeconds) +
+          ").");
+
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
+
+  // Special case needed to implement a half-open range. At first glance, this
+  // may seem unnecessary, as our search for stopFrame can return the end, and
+  // we don't include stopFramIndex in our output. However, consider the
+  // following scenario:
+  //
+  //   frame=0, pts=0.0
+  //   frame=1, pts=0.3
+  //
+  //   interval A: [0.2, 0.2)
+  //   interval B: [0.2, 0.15)
+  //
+  // Both intervals take place between the pts values for frame 0 and frame 1,
+  // which by our abstract player, means that both intervals map to frame 0. By
+  // the definition of a half open interval, interval A should return no frames.
+  // Interval B should return frame 0. However, for both A and B, the individual
+  // values of the intervals will map to the same frame indices below. Hence, we
+  // need this special case below.
+  if (startSeconds == stopSeconds) {
+    BatchDecodedOutput output(0, options, streamMetadata);
+    return output;
+  }
+
+  // Note that we look at nextPts for a frame, and not its pts or duration. Our
+  // abstract player displays frames starting at the pts for that frame until
+  // the pts for the next frame. There are two consequences:
+  //
+  //   1. We ignore the duration for a frame. A frame is displayed until the
+  //   next frame replaces it. This model is robust to durations being 0 or
+  //   incorrect; our source of truth is the pts for frames. If duration is
+  //   accurate, the nextPts for a frame would be equivalent to pts + duration.
+  //   2. In order to establish if the start of an interval maps to a particular
+  //   frame, we need to figure out if it is ordered after the frame's pts, but
+  //   before the next frames's pts.
+  auto startFrame = std::lower_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      startSeconds,
+      [&stream](const FrameInfo& info, double start) {
+        return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
+      });
+
+  auto stopFrame = std::upper_bound(
+      stream.allFrames.begin(),
+      stream.allFrames.end(),
+      stopSeconds,
+      [&stream](double stop, const FrameInfo& info) {
+        return stop <= ptsToSeconds(info.pts, stream.timeBase);
+      });
+
+  int64_t startFrameIndex = startFrame - stream.allFrames.begin();
+  int64_t stopFrameIndex = stopFrame - stream.allFrames.begin();
+  int64_t numFrames = stopFrameIndex - startFrameIndex;
+  BatchDecodedOutput output(numFrames, options, streamMetadata);
+  for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
+    output.frames[f] = singleOut.frame;
+    output.ptsSeconds[f] = singleOut.ptsSeconds;
+    output.durationSeconds[f] = singleOut.durationSeconds;
+  }
+
+  return output;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
   return getDecodedOutputWithFilter(
       [this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
@@ -920,6 +1157,18 @@ VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
 
 void VideoDecoder::resetDecodeStats() {
   decodeStats_ = DecodeStats{};
+}
+
+double VideoDecoder::getPtsSecondsForFrame(
+    int streamIndex,
+    int64_t frameIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFrameAtIndex");
+
+  const auto& stream = streams_[streamIndex];
+  validateFrameIndex(stream, frameIndex);
+
+  return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(

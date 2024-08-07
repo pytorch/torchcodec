@@ -81,7 +81,7 @@ class TestContainerFile:
         self, start: int, stop: int, step: int = 1
     ) -> torch.Tensor:
         all_pts = [self.frames[i].pts_seconds for i in range(start, stop, step)]
-        return torch.tensor(all_pts, dtype=torch.float)
+        return torch.tensor(all_pts, dtype=torch.float64)
 
     def get_duration_seconds_by_range(
         self, start: int, stop: int, step: int = 1
@@ -89,18 +89,18 @@ class TestContainerFile:
         all_durations = [
             self.frames[i].duration_seconds for i in range(start, stop, step)
         ]
-        return torch.tensor(all_durations, dtype=torch.float)
+        return torch.tensor(all_durations, dtype=torch.float64)
 
     def get_frame_by_name(self, name: str) -> torch.Tensor:
         return _load_tensor_from_file(f"{self.filename}.{name}.pt")
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
-        return torch.empty([0], dtype=torch.float)
+        return torch.empty([0], dtype=torch.float64)
 
     @property
     def empty_duration_seconds(self) -> torch.Tensor:
-        return torch.empty([0], dtype=torch.float)
+        return torch.empty([0], dtype=torch.float64)
 
 
 @dataclass
@@ -145,6 +145,7 @@ NASA_VIDEO = TestVideo(
         7: TestFrameInfo(pts_seconds=0.233567, duration_seconds=0.033367),
         8: TestFrameInfo(pts_seconds=0.266933, duration_seconds=0.033367),
         9: TestFrameInfo(pts_seconds=0.300300, duration_seconds=0.033367),
+        10: TestFrameInfo(pts_seconds=0.333667, duration_seconds=0.033367),
     },
 )
 

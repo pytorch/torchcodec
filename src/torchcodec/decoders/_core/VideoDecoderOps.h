@@ -35,7 +35,8 @@ void add_video_stream(
     std::optional<int64_t> height = std::nullopt,
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<c10::string_view> dimension_order = std::nullopt,
-    std::optional<int64_t> stream_index = std::nullopt);
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<c10::string_view> device_string = std::nullopt);
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
@@ -89,6 +90,30 @@ OpsBatchDecodedOutput get_frames_in_range(
     int64_t start,
     int64_t stop,
     std::optional<int64_t> step = std::nullopt);
+
+// Return the frames inside the range as a single stacked Tensor. The range is
+// defined as [start_seconds, stop_seconds). The frames are stacked in pts
+// order.
+OpsBatchDecodedOutput get_frames_by_pts_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    double start_seconds,
+    double stop_seconds);
+
+// For testing only. We need to implement this operation as a core library
+// function because what we're testing is round-tripping pts values as
+// double-precision floating point numbers from C++ to Python and back to C++.
+// We want to make sure that the value is preserved exactly, bit-for-bit, during
+// this process.
+//
+// Returns true if for the given decoder, in the stream stream_index, the pts
+// value when converted to seconds as a double is exactly pts_seconds_to_test.
+// Returns false otherwise.
+bool _test_frame_pts_equality(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index,
+    double pts_seconds_to_test);
 
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);

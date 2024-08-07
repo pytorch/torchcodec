@@ -63,7 +63,7 @@ void runNDecodeIterations(
     decoder->addVideoStreamDecoder(-1);
     for (double pts : ptsList) {
       decoder->setCursorPtsInSeconds(pts);
-      torch::Tensor tensor = decoder->getNextDecodedOutput().frame;
+      torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
@@ -95,7 +95,7 @@ void runNdecodeIterationsGrabbingConsecutiveFrames(
         VideoDecoder::createFromFilePath(videoPath);
     decoder->addVideoStreamDecoder(-1);
     for (int j = 0; j < consecutiveFrameCount; ++j) {
-      torch::Tensor tensor = decoder->getNextDecodedOutput().frame;
+      torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
@@ -145,7 +145,8 @@ void runNDecodeIterationsWithCustomOps(
         /*height=*/std::nullopt,
         /*thread_count=*/std::nullopt,
         /*dimension_order=*/std::nullopt,
-        /*stream_index=*/std::nullopt);
+        /*stream_index=*/std::nullopt,
+        /*device_string=*/std::nullopt);
 
     for (double pts : ptsList) {
       seekFrameOp.call(decoderTensor, pts);

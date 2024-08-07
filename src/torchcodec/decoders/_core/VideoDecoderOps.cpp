@@ -29,7 +29,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device_string=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -40,11 +40,15 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
   m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
   m.def("_get_json_ffmpeg_library_versions() -> str");
+  m.def(
+      "_test_frame_pts_equality(Tensor(a!) decoder, *, int stream_index, int frame_index, float pts_seconds_to_test) -> bool");
   m.def("scan_all_streams_to_update_metadata(Tensor(a!) decoder) -> ()");
 }
 
@@ -71,8 +75,8 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
   return std::make_tuple(
       frame.frame,
-      torch::tensor(frame.ptsSeconds),
-      torch::tensor(frame.durationSeconds));
+      torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
+      torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
 OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
@@ -113,7 +117,8 @@ void add_video_stream(
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
-    std::optional<int64_t> stream_index) {
+    std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> device_string) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
@@ -123,6 +128,10 @@ void add_video_stream(
     std::string stdDimensionOrder{dimension_order.value()};
     TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
     options.dimensionOrder = stdDimensionOrder;
+  }
+  if (device_string.has_value()) {
+    std::string deviceString{device_string.value()};
+    options.device = torch::Device(deviceString);
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
@@ -138,7 +147,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
   try {
-    result = videoDecoder->getNextDecodedOutput();
+    result = videoDecoder->getNextDecodedOutputNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
     throw pybind11::stop_iteration(e.what());
   }
@@ -152,7 +161,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
 
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFrameDisplayedAtTimestamp(seconds);
+  auto result = videoDecoder->getFrameDisplayedAtTimestampNoDemux(seconds);
   return makeOpsDecodedOutput(result);
 }
 
@@ -188,6 +197,17 @@ OpsBatchDecodedOutput get_frames_in_range(
   return makeOpsBatchDecodedOutput(result);
 }
 
+OpsBatchDecodedOutput get_frames_by_pts_in_range(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    double start_seconds,
+    double stop_seconds) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  auto result = videoDecoder->getFramesDisplayedByTimestampInRange(
+      stream_index, start_seconds, stop_seconds);
+  return makeOpsBatchDecodedOutput(result);
+}
+
 std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
@@ -208,6 +228,22 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   ss << "}";
 
   return ss.str();
+}
+
+bool _test_frame_pts_equality(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    int64_t frame_index,
+    double pts_seconds_to_test) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  LOG(INFO) << "pts_seconds_to_test: " << std::setprecision(15)
+            << pts_seconds_to_test << std::endl;
+  LOG(INFO) << "frame pts  : " << std::setprecision(15)
+            << videoDecoder->getPtsSecondsForFrame(stream_index, frame_index)
+            << std::endl
+            << std::endl;
+  return pts_seconds_to_test ==
+      videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }
 
 std::string get_json_metadata(at::Tensor& decoder) {
@@ -403,6 +439,8 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
+  m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
+  m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);
   m.impl(
       "scan_all_streams_to_update_metadata",
       &scan_all_streams_to_update_metadata);
