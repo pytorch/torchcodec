@@ -1,0 +1,3 @@
+#!/bin/bash
+
+export BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1

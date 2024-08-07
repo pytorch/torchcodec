@@ -2,21 +2,21 @@
 
 # TorchCodec
 
-TorchCodec is a Python library for decoding videos into PyTorch tensors. It aims 
-to be fast, easy to use and well integrated into the PyTorch ecosystem. If you 
-want to use PyTorch to train ML models on videos, TorchCodec how you turn those 
-videos into data.
+TorchCodec is a Python library for decoding videos into PyTorch tensors. It aims
+to be fast, easy to use, and well integrated into the PyTorch ecosystem. If you
+want to use PyTorch to train ML models on videos, TorchCodec is how you turn
+those videos into data.
 
 We achieve these capabilities through:
 
 * Pythonic APIs that mirror Python and PyTorch conventions.
-* Relying on [FFMPEG](https://www.ffmpeg.org/) to do the decoding. TorchCodec 
-  uses the version of FFMPEG you already have installed. FMPEG is a mature 
-  library with broad coverage available on most systems. It is, however, not 
-  easy to use. TorchCodec abstracts FFMPEG's complexity to ensure it used 
+* Relying on [FFmpeg](https://www.ffmpeg.org/) to do the decoding. TorchCodec
+  uses the version of FFmpeg you already have installed. FMPEG is a mature
+  library with broad coverage available on most systems. It is, however, not
+  easy to use. TorchCodec abstracts FFmpeg's complexity to ensure it is used
   correctly and efficiently.
-* Implementing the core logic as 
-  [PyTorch custom operators](https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html).
+* Returning data as PyTorch tensors, ready to be fed into PyTorch transforms
+  or used directly to train models.
 
 > [!NOTE]
 > ⚠️ TorchCodec is still in early development stage and some APIs may be updated
