@@ -19,11 +19,9 @@ permissions:
   id-token: write
   contents: write
 
-
 defaults:
   run:
     shell: bash -l -eo pipefail {0}
-
 
 jobs:
   generate-matrix:
@@ -54,7 +52,7 @@ jobs:
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
-      wheel-build-extra-args: "--no-isolation"
+      wheel-build-extra-args: "-vvv --no-isolation"
 
   install-and-test:
     runs-on: ubuntu-latest
