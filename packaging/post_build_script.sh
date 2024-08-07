@@ -7,7 +7,7 @@ ls dist
 
 
 echo "MVVVV"
-mv dist/*linux*.whl $(echo dist/*linux*.whl | sed 's/linux/manylinux2014/')
+mv dist/*linux_x86_64*.whl $(echo dist/*linux_x86_64*.whl | sed 's/linux_x86_64/manylinux_2_17_x86_64.manylinux2014_x86_64/')
 
 echo "LS dist"
 ls dist
