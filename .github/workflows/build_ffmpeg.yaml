@@ -33,7 +33,7 @@ jobs:
           export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
           export FFMPEG_ROOT="${PWD}/ffmpeg"
 
-          .github/scripts/build_ffmpeg.sh
+          packaging/build_ffmpeg.sh
 
           tar -czf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
 
