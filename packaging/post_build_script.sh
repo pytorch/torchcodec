@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source .github/scripts/helpers.sh
+source packaging/helpers.sh
 
 wheel_path=$(pwd)/$(find dist -type f -name "*.whl")
 echo "Wheel content:"
@@ -24,7 +24,7 @@ assert_not_in_wheel $wheel_path "^packaging"
 extracted_wheel_dir=$(mktemp -d)
 unzip -q $wheel_path -d $extracted_wheel_dir
 symbols_matches=$(find $extracted_wheel_dir | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.)
-python .github/scripts/check_glibcxx.py "$symbols_matches"
+python packaging/check_glibcxx.py "$symbols_matches"
 
 echo "ls dist"
 ls dist
