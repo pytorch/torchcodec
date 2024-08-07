@@ -17,6 +17,7 @@ The "torch" package is not just a runtime dependency but also a *build time*
 dependency, since we are including pytorch's headers. We are however not
 specifying either of these dependencies in our pyproject.toml file.
 
+
 Why we don't specify torch as a runtime dep: I'm not 100% sure, all I know is
 that no project does it and those who tried had tons of problems. I think it has
 to do with the fact that there are different flavours of torch (cpu, cuda, etc.)
