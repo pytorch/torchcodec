@@ -94,7 +94,8 @@ jobs:
           # but we need to checkout the repo to access this file, and we don't
           # want to checkout the repo before installing the wheel to avoid any
           # side-effect. It's OK.
-          packaging/assert_ffmpeg_not_installed.sh
+          source packaging/helpers.sh
+          assert_ffmpeg_not_installed
 
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
