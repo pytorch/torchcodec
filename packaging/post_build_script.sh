@@ -1,13 +1,29 @@
 #!/bin/bash
 
-echo "LS"
-ls
-echo "LS dist"
-ls dist
+source .github/scripts/helpers.sh
 
+wheel_path=$(pwd)/$(find dist -type f -name "*.whl")
+echo "Wheel content:"
+unzip -l $wheel_path
 
-echo "MVVVV"
+for ffmpeg_major_version in 4 5 6 7; do
+    assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.so
+done
+assert_not_in_wheel $wheel_path libtorchcodec.so
+
+for ffmpeg_so in libavcodec.so libavfilter.so libavformat.so libavutil.so libavdevice.so ; do
+    assert_not_in_wheel $wheel_path $ffmpeg_so
+done
+
+assert_not_in_wheel $wheel_path "^test"
+assert_not_in_wheel $wheel_path "^doc"
+assert_not_in_wheel $wheel_path "^benchmarks"
+assert_not_in_wheel $wheel_path "^packaging"
+
+# See invoked python script below for details about this check.
+extracted_wheel_dir=$(mktemp -d)
+unzip -q $wheel_path -d $extracted_wheel_dir
+symbols_matches=$(find $extracted_wheel_dir | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.)
+python .github/scripts/check_glibcxx.py "$symbols_matches"
+
 mv dist/*linux_x86_64*.whl $(echo dist/*linux_x86_64*.whl | sed 's/linux_x86_64/manylinux_2_17_x86_64.manylinux2014_x86_64/')
-
-echo "LS dist"
-ls dist
