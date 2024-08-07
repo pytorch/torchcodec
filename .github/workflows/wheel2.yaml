@@ -34,7 +34,7 @@ jobs:
     needs: generate-matrix
     strategy:
       fail-fast: false
-    name: pytorch/torchcodec
+    name: Build and Upload wheel
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: pytorch/torchcodec
@@ -78,7 +78,7 @@ jobs:
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install torchcodec from the wheel
         run: |
-          wheel_path=`find dist -type f -name "*.whl"`
+          wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
           echo Installing $wheel_path
           python -m pip install $wheel_path -vvv
 
