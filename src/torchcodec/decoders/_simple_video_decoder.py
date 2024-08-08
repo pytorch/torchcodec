@@ -312,7 +312,7 @@ class SimpleVideoDecoder:
         """Returns multiple frames in the given range.
 
         Frames are in the half open range [start_seconds, stop_seconds). Each
-        returned frame's :term`pts`, in seconds, is inside of the half open
+        returned frame's :term:`pts`, in seconds, is inside of the half open
         range.
 
         Args:
