@@ -102,7 +102,7 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install torchvision --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "torchvision<0.19" --index-url https://download.pytorch.org/whl/cpu
           # Ideally we would find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow
           python -c "import torch; print(f'{torch.__version__ = }')"
