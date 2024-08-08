@@ -9,7 +9,21 @@ import warnings
 from typing import List, Optional, Tuple
 
 import torch
-from torch.library import get_ctx, register_fake
+from torch.library import get_ctx
+
+try:
+    from torch.library import register_fake
+except ImportError:
+    # register_fake is only available from pytorch 2.4 which was only just
+    # released. We're OK supporting 2.3 for a little longer.
+    from torch.library import impl_abstract
+
+    register_fake = impl_abstract
+    warnings.filterwarnings(
+        "ignore",
+        category=FutureWarning,
+        message="`torch.library.impl_abstract` was renamed to `torch.library.register_fake`. Please use that instead; we will remove `torch.library.impl_abstract` in a future version of PyTorch",
+    )
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
