@@ -1,0 +1,11 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.decoders
+
+
+FrameBatch
+==========
+
+.. autoclass:: FrameBatch
+    :members:
+    :undoc-members: __init__
