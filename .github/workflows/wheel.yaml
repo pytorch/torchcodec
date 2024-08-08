@@ -1,4 +1,4 @@
-t name: Build and test Linux wheels
+name: Build and test Linux wheels
 
 on:
   pull_request:
