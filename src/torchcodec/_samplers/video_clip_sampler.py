@@ -84,6 +84,7 @@ class TimeBasedSamplerArgs(SamplerArgs):
     sample_end_second: float = float("inf")
     sample_per_second: float = 0.0
     target_sample_start_second: List[float] = field(default_factory=lambda: [])
+    stack_output_per_clip: bool = False
 
 
 @dataclass
@@ -138,7 +139,7 @@ class VideoClipSampler(nn.Module):
         self.sampler_args = sampler_args
         self.decoder_args = DecoderArgs() if decoder_args is None else decoder_args
 
-    def forward(self, video_data: Tensor) -> Union[List[Any]]:
+    def forward(self, video_data: Tensor) -> List[Any]:
         """Sample video clips from the video data
 
         Args:
@@ -179,6 +180,7 @@ class VideoClipSampler(nn.Module):
                     start_ts,
                     video_decoder,
                     time_based_sampler_args.video_frame_dilation,
+                    stack_output=time_based_sampler_args.stack_output_per_clip,
                 )
                 clips.append(clip)
         elif isinstance(self.sampler_args, IndexBasedSamplerArgs):
@@ -320,14 +322,19 @@ class VideoClipSampler(nn.Module):
         return clip_starts_in_seconds
 
     def _get_clip_with_start_second(
-        self, start_second: float, video_decoder: Tensor, video_frame_dilation: int
-    ) -> List[Tensor]:
+        self,
+        start_second: float,
+        video_decoder: Tensor,
+        video_frame_dilation: int,
+        stack_output: bool = False,
+    ) -> Union[Tensor, List[Tensor]]:
         """Get clip with start second.
 
         Args:
             `start_second` (`float`): The start second of the clip
             `video_decoder` (`Tensor`): The video decoder
             `video_frame_dilation` (`int`): The video frame dilation, by default it's 1.
+            `stack_output` (`bool`): Whether to stack the output, if set the true, then clip is returned as tensor.
 
         Returns:
             `clip` (`List[Tensor]`): clip is list of frame tensor. Dimension of each frame tensor is user specified, by default it's HWC.
@@ -343,6 +350,8 @@ class VideoClipSampler(nn.Module):
 
         # slice the list of tensor with frame_dilation and stack to tensor
         clip = clip[::video_frame_dilation]
+        if stack_output:
+            clip = torch.stack(clip, dim=0)
         return clip
 
     def _compute_frame_width_height(
