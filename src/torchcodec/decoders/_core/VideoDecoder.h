@@ -130,8 +130,7 @@ class VideoDecoder {
     explicit VideoStreamDecoderOptions(const std::string& optionsString);
     // Number of threads we pass to FFMPEG for decoding.
     // 0 means FFMPEG will choose the number of threads automatically to fully
-    // utilize all cores. If not set, it will be the default FFMPEG behavior for
-    // the given codec.
+    // utilize all cores. If not set, this defaults to 0.
     std::optional<int> ffmpegThreadCount;
     // Currently the dimension order can be either NHWC or NCHW.
     // H=height, W=width, C=channel.
