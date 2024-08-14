@@ -24,6 +24,10 @@ jobs:
         whoami
         pwd
         ls
+        conda create --yes --quiet -n test
+        conda activate test
+        python3 -m pip install --index-url https://download.pytorch.org/whl/nightly/cpu --pre torch
+        conda install --yes ffmpeg pkg-config cmake pytest
 
         build_tests_dir="${PWD}/build_tests"
         mkdir $build_tests_dir
@@ -33,4 +37,5 @@ jobs:
         cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
         cmake --build .
         ctest
+        pytest test/
         popd
