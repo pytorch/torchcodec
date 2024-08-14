@@ -322,11 +322,7 @@ class TestSimpleDecoder:
 
     def test_get_frame_displayed_at_h265(self):
         decoder = SimpleVideoDecoder(H265_VIDEO.path)
-        # Note that for H265, FFMPEG's seeking is not precise. Even though we ask to
-        # seek with a max_ts=0.5, FFMPEG will seek beyond that point.
-        # TODO: Revert use frame5 in the test below once it's fixed upstream:
-        # https://trac.ffmpeg.org/ticket/11137
-        ref_frame6 = H265_VIDEO.get_frame_by_name("frame000006")
+        ref_frame6 = H265_VIDEO.get_frame_by_name("frame000005")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(0.5).data)
 
     def test_get_frame_displayed_at_fails(self):

@@ -732,6 +732,12 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streams_[firstActiveStreamIndex];
   int64_t desiredPts = *maybeDesiredPts_ * firstStreamInfo.timeBase.den;
+  if (scanned_all_streams_) {
+    int desiredKeyFrameIndex =
+        getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
+    desiredPts = firstStreamInfo.allFrames[desiredKeyFrameIndex].pts;
+  }
+
   int ffmepgStatus = avformat_seek_file(
       formatContext_.get(),
       firstStreamInfo.streamIndex,

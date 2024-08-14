@@ -38,7 +38,7 @@ ffmpeg -y -ss 10.0 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time10.000000.bmp"
 # This is the last frame of this video.
 ffmpeg -y -ss 12.979633 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time12.979633.bmp"
 # Audio generation in the form of an mp3.
-ffmpeg -y -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
+# ffmpeg -y -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
 
 # TODO: Add frames decoded by Nvidia's NVDEC.
 
@@ -47,7 +47,7 @@ ffmpeg -y -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
 # ./configure --enable-nonfree --enable-gpl --prefix=$(readlink -f ../bin) --enable-libx265  --enable-rpath --extra-ldflags=-Wl,-rpath=$CONDA_PREFIX/lib --enable-filter=drawtext --enable-libfontconfig --enable-libfreetype --enable-libharfbuzz
 # ffmpeg -f lavfi -i color=size=128x128:duration=1:rate=10:color=blue -vf "drawtext=fontsize=30:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Frame %{frame_num}'" -vcodec libx265 -pix_fmt yuv420p -g 2 -crf 10 h265_video.mp4 -y
 VIDEO_PATH=$RESOURCES_DIR/h265_video.mp4
-FRAMES=(6)
+FRAMES=(5)
 for frame in "${FRAMES[@]}"; do
   frame_name=$(printf "%06d" "$frame")
   ffmpeg -y -i "$VIDEO_PATH" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.frame$frame_name.bmp"
