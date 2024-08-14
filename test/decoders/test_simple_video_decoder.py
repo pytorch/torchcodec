@@ -321,6 +321,7 @@ class TestSimpleDecoder:
         assert isinstance(decoder.get_frame_displayed_at(6.02).duration_seconds, float)
 
     def test_get_frame_displayed_at_h265(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/179
         decoder = SimpleVideoDecoder(H265_VIDEO.path)
         ref_frame6 = H265_VIDEO.get_frame_by_name("frame000005")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(0.5).data)
