@@ -249,20 +249,20 @@ def main() -> None:
     large_video_path = get_video_path("853.mp4")
 
     decoder_dict = {}
-    decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
-        DecordNonBatchDecoderAccurateSeek()
-    )
+    # decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
+    #     DecordNonBatchDecoderAccurateSeek()
+    # )
     decoder_dict["TorchCodecDecoderNonCompiled"] = (
         TorchCodecDecoderNonCompiledWithOptions()
     )
-    decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
-        TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
-    )
-    decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
-    decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = TVNewAPIDecoderWithBackend(
-        "video_reader"
-    )
-    decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
+    # decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
+    #     TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
+    # )
+    # decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
+    # decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = TVNewAPIDecoderWithBackend(
+    #     "video_reader"
+    # )
+    # decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
 
     # We don't compare TorchVision's "pyav" backend because it doesn't support
     # accurate seeks.
