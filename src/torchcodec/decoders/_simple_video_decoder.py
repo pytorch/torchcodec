@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Literal, Tuple, Union
 
-from torch import device as torch_device, Tensor
+from torch import Tensor
 
 from torchcodec.decoders import _core as core
 
@@ -89,14 +89,6 @@ class SimpleVideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
-        device (torch.device, optional): The device to use for decoding.
-            Currently we only support CPU and CUDA devices. If CUDA is used,
-            we use NVDEC and CUDA to do decoding and color-conversion
-            respectively. The resulting frame is left on the GPU for further
-            processing.
-            You can either pass in a string like "cpu" or "cuda:0" or a
-            torch.device like torch.device("cuda:0").
-            Default: ``torch.device("cpu")``.
 
             .. note::
 
@@ -114,7 +106,6 @@ class SimpleVideoDecoder:
         self,
         source: Union[str, Path, bytes, Tensor],
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
-        device: Union[str, torch_device] = torch_device("cpu"),
     ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
@@ -138,20 +129,7 @@ class SimpleVideoDecoder:
             )
 
         core.scan_all_streams_to_update_metadata(self._decoder)
-        num_threads = None
-        if isinstance(device, str):
-            device = torch_device(device)
-        if device.type == "cuda":
-            # Using multiple CPU threads seems to slow down decoding on CUDA.
-            # CUDA internally uses dedicated hardware to do decoding so we
-            # don't need CPU software threads here.
-            num_threads = 1
-        core.add_video_stream(
-            self._decoder,
-            dimension_order=dimension_order,
-            device_string=str(device),
-            num_threads=num_threads,
-        )
+        core.add_video_stream(self._decoder, dimension_order=dimension_order)
 
         self.metadata, self._stream_index = _get_and_validate_stream_metadata(
             self._decoder
