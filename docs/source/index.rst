@@ -9,7 +9,7 @@ those videos into data.
 We achieve these capabilities through:
 
 * Pythonic APIs that mirror Python and PyTorch conventions.
-* Relying on [FFmpeg](https://www.ffmpeg.org/) to do the decoding. TorchCodec
+* Relying on `FFmpeg <https://www.ffmpeg.org/>`_ to do the decoding. TorchCodec
   uses the version of FFmpeg you already have installed. FMPEG is a mature
   library with broad coverage available on most systems. It is, however, not
   easy to use. TorchCodec abstracts FFmpeg's complexity to ensure it is used
