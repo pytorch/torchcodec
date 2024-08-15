@@ -359,14 +359,16 @@ void VideoDecoder::initializeFilterGraphForStream(
   snprintf(
       args,
       sizeof(args),
-      "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
+      "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d:colorspace=%d:range=%d",
       codecContext->width,
       codecContext->height,
       codecContext->pix_fmt,
       activeStream.stream->time_base.num,
       activeStream.stream->time_base.den,
       codecContext->sample_aspect_ratio.num,
-      codecContext->sample_aspect_ratio.den);
+      codecContext->sample_aspect_ratio.den,
+      codecContext->colorspace,
+      codecContext->color_range);
 
   int ffmpegStatus = avfilter_graph_create_filter(
       &filterState.sourceContext,
