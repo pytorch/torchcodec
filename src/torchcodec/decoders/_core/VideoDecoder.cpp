@@ -738,7 +738,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   // the key frame that we want to seek to.
   // See https://github.com/pytorch/torchcodec/issues/179 for more details.
   // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
-  if (scanned_all_streams_) {
+  if (!firstStreamInfo.keyFrames.empty()) {
     int desiredKeyFrameIndex =
         getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
     desiredPts = firstStreamInfo.keyFrames[desiredKeyFrameIndex].pts;
