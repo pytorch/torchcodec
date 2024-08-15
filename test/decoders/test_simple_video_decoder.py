@@ -9,7 +9,7 @@ import torch
 
 from torchcodec.decoders import _core, SimpleVideoDecoder
 
-from ..utils import assert_tensor_close, assert_tensor_equal, NASA_VIDEO
+from ..utils import assert_tensor_close, assert_tensor_equal, H265_VIDEO, NASA_VIDEO
 
 
 class TestSimpleDecoder:
@@ -319,6 +319,15 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.039366).data)
         assert isinstance(decoder.get_frame_displayed_at(6.02).pts_seconds, float)
         assert isinstance(decoder.get_frame_displayed_at(6.02).duration_seconds, float)
+
+    def test_get_frame_displayed_at_h265(self):
+        decoder = SimpleVideoDecoder(H265_VIDEO.path)
+        # Note that for H265, FFMPEG's seeking is not precise. Even though we ask to
+        # seek with a max_ts=0.5, FFMPEG will seek beyond that point.
+        # TODO: Revert use frame5 in the test below once it's fixed upstream:
+        # https://trac.ffmpeg.org/ticket/11137
+        ref_frame6 = H265_VIDEO.get_frame_by_name("frame000006")
+        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(0.5).data)
 
     def test_get_frame_displayed_at_fails(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)

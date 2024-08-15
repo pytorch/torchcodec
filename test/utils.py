@@ -152,3 +152,17 @@ NASA_VIDEO = TestVideo(
 # When we start actually decoding audio-only files, we'll probably need to define
 # a TestAudio class with audio specific values. Until then, we only need a filename.
 NASA_AUDIO = TestContainerFile(filename="nasa_13013.mp4.audio.mp3", frames={})
+
+H265_VIDEO = TestVideo(
+    filename="h265_video.mp4",
+    height=128,
+    width=128,
+    num_color_channels=3,
+    # TODO_OPEN_ISSUE Scott: improve the testing framework so that these values are loaded from a JSON
+    # file and not hardcoded. These values were copied over by hand from the JSON
+    # output from the following command:
+    #  $ ffprobe -v error -hide_banner -select_streams v:1 -show_frames -of json test/resources/h265_video.mp4 > out.json
+    frames={
+        6: TestFrameInfo(pts_seconds=0.6, duration_seconds=0.1),
+    },
+)
