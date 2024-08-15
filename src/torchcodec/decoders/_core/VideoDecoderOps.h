@@ -35,8 +35,7 @@ void add_video_stream(
     std::optional<int64_t> height = std::nullopt,
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<c10::string_view> dimension_order = std::nullopt,
-    std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<c10::string_view> device_string = std::nullopt);
+    std::optional<int64_t> stream_index = std::nullopt);
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);

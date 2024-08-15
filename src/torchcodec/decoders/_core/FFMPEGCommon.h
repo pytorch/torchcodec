@@ -57,8 +57,6 @@ using UniqueAVFilterInOut = std::unique_ptr<
     Deleterp<AVFilterInOut, void, avfilter_inout_free>>;
 using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
-using UniqueAVBufferRef =
-    std::unique_ptr<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>;
 
 // av_find_best_stream is not const-correct before commit:
 // https://github.com/FFmpeg/FFmpeg/commit/46dac8cf3d250184ab4247809bc03f60e14f4c0c

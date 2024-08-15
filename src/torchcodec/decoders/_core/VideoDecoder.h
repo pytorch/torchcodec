@@ -12,7 +12,6 @@
 #include <ostream>
 #include <string_view>
 
-#include "c10/core/Device.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -140,8 +139,6 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    // Set the device to torch::kGPU for GPU decoding.
-    torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
@@ -280,8 +277,6 @@ class VideoDecoder {
     FilterState filterState;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
-    AVPixelFormat hwPixelFormat = AV_PIX_FMT_NONE;
-    UniqueAVBufferRef hwDeviceContext;
   };
   VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
