@@ -1,0 +1,40 @@
+
+name: Unit-tests on Linux GPU
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+  workflow_dispatch:
+
+jobs:
+  tests:
+    strategy:
+      matrix:
+        python_version: ["3.8", "3.9", "3.10"]
+        cuda_arch_version: ["11.8"]
+      fail-fast: false
+    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
+    with:
+      runner: linux.g5.4xlarge.nvidia.gpu
+      repository: pytorch/torchcodec
+      gpu-arch-type: cuda
+      gpu-arch-version: ${{ matrix.cuda_arch_version }}
+      timeout: 120
+
+      script: |
+        nvidia-smi
+        ls -l
+        pwd
+        conda create --yes --name test
+        conda activate test
+        conda install --yes pip
+        pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
+        conda install --yes ffmpeg
+        CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
+        pip install pytest
+        pytest test
+        conda deactivate
