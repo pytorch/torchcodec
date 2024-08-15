@@ -171,4 +171,3 @@ print(first_two_seconds)
 # %%
 plot(frame_at_2_seconds.data, "Frame displayed at 2 seconds")
 plot(first_two_seconds.data, "Frames displayed during [0, 2) seconds")
-
