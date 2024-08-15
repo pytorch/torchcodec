@@ -1,0 +1,11 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.decoders
+
+
+SimpleVideoDecoder
+==================
+
+.. autoclass:: SimpleVideoDecoder
+    :members:
+    :special-members: __getitem__
