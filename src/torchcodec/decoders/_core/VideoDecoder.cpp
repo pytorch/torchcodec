@@ -732,6 +732,18 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streams_[firstActiveStreamIndex];
   int64_t desiredPts = *maybeDesiredPts_ * firstStreamInfo.timeBase.den;
+
+  // For some encodings like H265, FFMPEG sometimes seeks past the point we
+  // set as the max_ts. So we use our own index to give it the exact pts of
+  // the key frame that we want to seek to.
+  // See https://github.com/pytorch/torchcodec/issues/179 for more details.
+  // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
+  if (!firstStreamInfo.keyFrames.empty()) {
+    int desiredKeyFrameIndex =
+        getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
+    desiredPts = firstStreamInfo.keyFrames[desiredKeyFrameIndex].pts;
+  }
+
   int ffmepgStatus = avformat_seek_file(
       formatContext_.get(),
       firstStreamInfo.streamIndex,
