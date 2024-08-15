@@ -51,7 +51,7 @@ jobs:
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
-      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build -vvv --no-isolation"
+      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
     runs-on: ubuntu-latest
