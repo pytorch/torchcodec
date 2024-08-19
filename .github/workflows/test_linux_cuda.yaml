@@ -34,6 +34,7 @@ jobs:
         conda install --yes pip cmake pkg-config
         pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
         conda install --yes ffmpeg
+        conda install --yes nvidia::npp
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
         pip install pytest
         pytest test
