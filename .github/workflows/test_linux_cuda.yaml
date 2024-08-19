@@ -37,5 +37,7 @@ jobs:
         conda install --yes nvidia::libnpp
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
         pip install pytest
+        ffmpeg -version
+        ffprobe -version
         pytest test
         conda deactivate
