@@ -31,7 +31,7 @@ jobs:
         pwd
         conda create --yes --name test
         conda activate test
-        conda install --yes pip cmake pkg-config
+        conda install --yes pip cmake pkg-config nasm
         pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
         conda install --yes nvidia::libnpp
 
@@ -51,7 +51,6 @@ jobs:
         ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --enable-libnpp --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping
         make -j install
         popd
-
 
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
         pip install pytest
