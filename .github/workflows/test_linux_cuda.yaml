@@ -54,6 +54,8 @@ jobs:
 
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
         pip install pytest
+        ldd $(which ffmpeg)
+        ldd $(which ffprobe)
         ffmpeg -version
         ffprobe -version
         pytest test
