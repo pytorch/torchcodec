@@ -56,6 +56,7 @@ jobs:
         pip install pytest
         ldd $(which ffmpeg)
         ldd $(which ffprobe)
+
         ffmpeg -version
         ffprobe -version
         pytest test
