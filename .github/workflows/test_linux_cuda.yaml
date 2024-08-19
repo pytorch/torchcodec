@@ -56,6 +56,9 @@ jobs:
         pip install pytest
         ldd $(which ffmpeg)
         ldd $(which ffprobe)
+        find $CONDA_PREFIX -name libavutil.so.59
+        find $CONDA_PREFIX -name libavutil.so\*
+        find $CONDA_PREFIX -name \*libavutil.so\*
 
         ffmpeg -version
         ffprobe -version
