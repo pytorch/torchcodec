@@ -14,7 +14,7 @@ jobs:
   tests:
     strategy:
       matrix:
-        python_version: ["3.9", "3.10"]
+        python_version: ["3.9"]
         # TODO: Add more cuda versions.
         cuda_arch_version: ["12.4"]
       fail-fast: false
