@@ -32,10 +32,10 @@ jobs:
         pwd
         conda create --yes --name test
         conda activate test
-        conda install --yes pip cmake pkg-config nasm
+        conda install --quiet --yes pip cmake pkg-config nasm
 
-        pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
-        conda install --yes nvidia::libnpp
+        pip install --quiet --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu124
+        conda install --quiet --yes nvidia::libnpp
 
         # Build and install FFMPEG from source with CUDA enabled.
         # The one on conda doesn't have CUDA enabled.
@@ -54,7 +54,7 @@ jobs:
         which pkg-config
         pkg-config --list-all
         ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid
-        make -j install
+        make --quiet -j install
         popd
 
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
