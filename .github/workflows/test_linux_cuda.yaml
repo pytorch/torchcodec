@@ -57,8 +57,7 @@ jobs:
         make --quiet -j install
         popd
 
-        CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e . --no-build-isolation -vv --debug
-        pip install pytest
+        CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e ".[dev]"" --no-build-isolation -vv --debug
 
         # We skip certain tests because they are not relevant to GPU decoding and they always fail with
         # a custom FFMPEG build.
