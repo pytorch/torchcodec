@@ -52,7 +52,8 @@ jobs:
         # Now build FFMPEG from source with CUDA enabled.
         git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg/
         pushd ffmpeg
-        ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping
+        git checkout origin/release/6.1
+        ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid
         make -j install
         popd
 
