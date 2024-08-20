@@ -28,8 +28,6 @@ jobs:
 
       script: |
         nvidia-smi
-        ls -l
-        pwd
         conda create --yes --name test
         conda activate test
         conda install --quiet --yes pip cmake pkg-config nasm
