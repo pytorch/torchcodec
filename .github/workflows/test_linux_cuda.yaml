@@ -43,10 +43,9 @@ jobs:
         # The one on conda doesn't have CUDA enabled.
         # Sub-step: install nvidia headers. Reference this link for details:
         # https://docs.nvidia.com/video-technologies/video-codec-sdk/12.1/ffmpeg-with-nvidia-gpu/index.html
-        git clone https://github.com/FFmpeg/nv-codec-headers.git
+        git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
 
         pushd nv-codec-headers
-        git checkout n11.0.10.1
         make PREFIX=$CONDA_PREFIX -j install
         popd
 
