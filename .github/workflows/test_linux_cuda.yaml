@@ -64,7 +64,7 @@ jobs:
         find $CONDA_PREFIX -name libavutil.so\*
         find $CONDA_PREFIX -name \*libavutil.so\*
 
-        ffmpeg -version
-        ffprobe -version
+        # ffmpeg -version
+        # ffprobe -version
         pytest test
         conda deactivate
