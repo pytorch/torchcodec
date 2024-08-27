@@ -198,6 +198,7 @@ class TorchAudioDecoder(AbstractDecoder):
 
 
 def get_video_path(filename: str) -> str:
+    return os.path.join("/home/ahmads/personal/torchcodec/test/resources", filename)
     resource = importlib.resources.files(__package__).joinpath(filename)
     with importlib.resources.as_file(resource) as path:
         return os.fspath(path)
@@ -238,15 +239,27 @@ def main() -> None:
         type=float,
         default=2.0,
     )
+    parser.add_argument(
+        "--bm_large_video_path",
+        help="Path to the large video file to benchmark",
+        type=str,
+        default=get_video_path("853.mp4"),
+    )
+    parser.add_argument(
+        "--bm_small_video_path",
+        help="Path to the small video file to benchmark",
+        type=str,
+        default=get_video_path("nasa_13013.mp4"),
+    )
 
     args = parser.parse_args()
 
     # These are the PTS values we want to extract from the small video.
     small_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
-    small_video_path = get_video_path("nasa_13013.mp4")
+    small_video_path = args.bm_small_video_path
 
     large_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0]
-    large_video_path = get_video_path("853.mp4")
+    large_video_path = args.bm_large_video_path
 
     decoder_dict = {}
     decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
