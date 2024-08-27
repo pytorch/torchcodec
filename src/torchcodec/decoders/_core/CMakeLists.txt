@@ -32,6 +32,8 @@ find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 function(make_torchcodec_library library_name ffmpeg_target)
     set(
         sources
+        CUDACommon.h
+        CUDACommon.cpp
         FFMPEGCommon.h
         FFMPEGCommon.cpp
         VideoDecoder.h
