@@ -257,7 +257,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--decoders",
-        help="Comma-separated list of decoders to benchmark",
+        help="Comma-separated list of decoders to benchmark. Choices are torchcodec, torchaudio, torchvision, decord, torchcodec1. torchcodec1 means torchcodec with num_threads=1.",
         type=str,
         default="decord,torchcodec,torchvision,torchaudio",
     )
@@ -281,13 +281,14 @@ def main() -> None:
         decoder_dict["TorchCodecDecoderNonCompiled"] = (
             TorchCodecDecoderNonCompiledWithOptions()
         )
+        decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
+    if "torchcodec1" in decoders:
         decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
             TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
         )
-        decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
     if "torchvision" in decoders:
-        decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = TVNewAPIDecoderWithBackend(
-            "video_reader"
+        decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
+            TVNewAPIDecoderWithBackend("video_reader")
         )
     if "torchaudio" in decoders:
         decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
