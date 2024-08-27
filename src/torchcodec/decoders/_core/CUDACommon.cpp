@@ -79,12 +79,7 @@ AVBufferRef* initializeCudaContext(const torch::Device& device) {
   torch::Tensor dummyTensorForCudaInitialization = torch::zeros(
       {1},
       torch::TensorOptions().dtype(torch::kUInt8).device(device));
-  codecContext->hw_device_ctx = av_buffer_ref(getCudaContext());
-
-  TORCH_INTERNAL_ASSERT(
-      codecContext->hw_device_ctx,
-      "Failed to create/reference the CUDA HW device context for index=" +
-          std::to_string(device.index()) + ".");
+  return av_buffer_ref(getCudaContext());
 #else
   throw std::runtime_error(
       "CUDA support is not enabled in this build of TorchCodec.");

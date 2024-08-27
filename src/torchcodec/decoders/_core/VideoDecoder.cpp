@@ -398,6 +398,11 @@ void VideoDecoder::addVideoStreamDecoder(
 
   if (options.device.type() == torch::DeviceType::CUDA) {
     codecContext->hw_device_ctx = initializeCudaContext(options.device);
+
+    TORCH_INTERNAL_ASSERT(
+        codecContext->hw_device_ctx,
+        "Failed to create/reference the CUDA HW device context for index=" +
+            std::to_string(options.device.index()) + ".");
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
