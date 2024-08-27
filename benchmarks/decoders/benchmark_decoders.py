@@ -251,8 +251,15 @@ def main() -> None:
         type=str,
         default=get_video_path("nasa_13013.mp4"),
     )
+    parser.add_argument(
+        "--decoders",
+        help="Comma-separated list of decoders to benchmark",
+        type=str,
+        default="decord,torchcodec,torchvision,torchaudio",
+    )
 
     args = parser.parse_args()
+    decoders = set(args.decoders.split(","))
 
     # These are the PTS values we want to extract from the small video.
     small_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
@@ -262,20 +269,24 @@ def main() -> None:
     large_video_path = args.bm_large_video_path
 
     decoder_dict = {}
-    decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
-        DecordNonBatchDecoderAccurateSeek()
-    )
-    decoder_dict["TorchCodecDecoderNonCompiled"] = (
-        TorchCodecDecoderNonCompiledWithOptions()
-    )
-    decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
-        TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
-    )
-    decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
-    decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = TVNewAPIDecoderWithBackend(
-        "video_reader"
-    )
-    decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
+    if "decord" in decoders:
+        decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
+            DecordNonBatchDecoderAccurateSeek()
+        )
+    if "torchcodec" in decoders:
+        decoder_dict["TorchCodecDecoderNonCompiled"] = (
+            TorchCodecDecoderNonCompiledWithOptions()
+        )
+        decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
+            TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
+        )
+        decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
+    if "torchvision" in decoders:
+        decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = TVNewAPIDecoderWithBackend(
+            "video_reader"
+        )
+    if "torchaudio" in decoders:
+        decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
 
     # We don't compare TorchVision's "pyav" backend because it doesn't support
     # accurate seeks.
