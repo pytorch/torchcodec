@@ -197,8 +197,12 @@ class TorchAudioDecoder(AbstractDecoder):
         return frames
 
 
-def get_video_path(filename: str) -> str:
-    return os.path.join("/home/ahmads/personal/torchcodec/test/resources", filename)
+def get_test_resource_path(filename: str) -> str:
+    if not __package__:
+        return os.path.join(
+            os.path.dirname(__file__), "..", "..", "test", "resources", filename
+        )
+
     resource = importlib.resources.files(__package__).joinpath(filename)
     with importlib.resources.as_file(resource) as path:
         return os.fspath(path)
@@ -243,13 +247,13 @@ def main() -> None:
         "--bm_large_video_path",
         help="Path to the large video file to benchmark",
         type=str,
-        default=get_video_path("853.mp4"),
+        default=get_test_resource_path("853.mp4"),
     )
     parser.add_argument(
         "--bm_small_video_path",
         help="Path to the small video file to benchmark",
         type=str,
-        default=get_video_path("nasa_13013.mp4"),
+        default=get_test_resource_path("nasa_13013.mp4"),
     )
 
     args = parser.parse_args()
