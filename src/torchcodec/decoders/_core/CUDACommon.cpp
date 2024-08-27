@@ -13,6 +13,7 @@
 #include <npp.h>
 
 extern "C" {
+#include <libavutil/pixdesc.h>
 #include <libavutil/hwcontext_cuda.h>
 }
 

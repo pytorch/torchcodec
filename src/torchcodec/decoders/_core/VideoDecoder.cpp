@@ -20,7 +20,6 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
-#include <libavutil/pixdesc.h>
 }
 
 namespace facebook::torchcodec {
