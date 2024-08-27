@@ -5,7 +5,6 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
-#include "src/torchcodec/decoders/_core/CUDACommon.h"
 #include <torch/torch.h>
 #include <torch/types.h>
 #include <cstdint>
@@ -13,6 +12,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+
+#include "src/torchcodec/decoders/_core/CUDACommon.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -808,7 +809,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
           convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
     } else if (streamInfo.options.device.is_cuda()) {
         output.frame = convertFrameToTensorUsingCuda(
-            streamInfo.codecContext.get(), streamInfo.options, frame.get());
+          streamInfo.codecContext.get(), streamInfo.options, frame.get());
     }
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement

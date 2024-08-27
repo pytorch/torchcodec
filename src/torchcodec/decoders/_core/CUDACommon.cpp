@@ -17,9 +17,10 @@
 //   |
 //   | <API for general code to access CUDA specific behavior.>
 //
-// If code needs to access definitions in the CUDA specific includes, then it is CUDA
-// specific code, and belongs inside of the guard. If that behavior needs to be
-// accessible to general code, then it should be added to the API for general code.
+// If code needs to access definitions in the CUDA specific includes, then it is
+// CUDA specific code, and belongs inside of the guard. If that behavior needs
+// to be accessible to general code, then it should be added to the API for
+// general code.
 
 #ifdef ENABLE_CUDA
 
@@ -28,8 +29,8 @@
 #include <npp.h>
 
 extern "C" {
-#include <libavutil/pixdesc.h>
 #include <libavutil/hwcontext_cuda.h>
+#include <libavutil/pixdesc.h>
 }
 
 namespace facebook::torchcodec {
@@ -76,7 +77,7 @@ torch::Tensor allocateDeviceTensor(
 
 } // namespace
 
-} // facebook::torchcodec
+} // namespace facebook::torchcodec
 
 #endif // ENABLE_CUDA
 
@@ -143,4 +144,4 @@ torch::Tensor convertFrameToTensorUsingCuda(
 #endif
 }
 
-} // facebook::torchcodec
+} // namespace facebook::torchcodec
