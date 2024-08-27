@@ -14,6 +14,15 @@
 #include <nvtx3/nvtx3.hpp>
 #endif
 
+// The API for general code to access CUDA specific behaviors. CUDA specific behaviors
+// require CUDA specific definitions which are only available on systems with CUDA
+// installed. Hence, CUDA specific behaviors have to be guarded with ifdefs.
+//
+// In order to prevent ifdefs in general code, we create an API with a function for
+// each behavior we need. General code can call the API, as the correct guards happen
+// internally. General code still needs to check in general code if CUDA is being used,
+// as the functions will throw an exception if CUDA is not available.
+
 namespace facebook::torchcodec {
 
 #ifdef ENABLE_NVTX

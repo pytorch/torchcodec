@@ -6,6 +6,21 @@
 
 #include "src/torchcodec/decoders/_core/CUDACommon.h"
 
+// This source file is organized in the following way:
+//
+//   | <general includes>
+//   |
+//   | <CUDA ifdef guard>
+//   | <CUDA specific includes>
+//   | <CUDA specific code>
+//   | </CUDA ifdef guard>
+//   |
+//   | <API for general code to access CUDA specific behavior.>
+//
+// If code needs to access definitions in the CUDA specific includes, then it is CUDA
+// specific code, and belongs inside of the guard. If that behavior needs to be
+// accessible to general code, then it should be added to the API for general code.
+
 #ifdef ENABLE_CUDA
 
 #include <c10/cuda/CUDAStream.h>
@@ -65,9 +80,7 @@ torch::Tensor allocateDeviceTensor(
 
 #endif // ENABLE_CUDA
 
-/*
- * Entry points from non-CUDA code.
- */
+// API implementations for general code to access CUDA specific behaviors.
 
 namespace facebook::torchcodec {
 
