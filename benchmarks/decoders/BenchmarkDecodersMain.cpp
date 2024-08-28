@@ -145,8 +145,7 @@ void runNDecodeIterationsWithCustomOps(
         /*height=*/std::nullopt,
         /*thread_count=*/std::nullopt,
         /*dimension_order=*/std::nullopt,
-        /*stream_index=*/std::nullopt,
-        /*device_string=*/std::nullopt);
+        /*stream_index=*/std::nullopt);
 
     for (double pts : ptsList) {
       seekFrameOp.call(decoderTensor, pts);

@@ -17,10 +17,6 @@
 #include "tools/cxx/Resources.h"
 #endif
 
-#ifdef ENABLE_CUDA
-#include <c10/cuda/CUDAStream.h>
-#endif
-
 using namespace ::testing;
 
 C10_DEFINE_bool(
@@ -204,54 +200,6 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
     dumpTensorToDisk(tensor1FromOurDecoder, "tensor1FromOurDecoder.pt");
   }
 }
-
-#ifdef ENABLE_CUDA
-TEST(GPUVideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
-  if (!torch::cuda::is_available()) {
-    return;
-  }
-  at::cuda::getDefaultCUDAStream();
-  std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
-      VideoDecoder::createFromFilePath(path);
-  VideoDecoder::VideoStreamDecoderOptions streamOptions;
-  streamOptions.device = torch::Device("cuda");
-  ASSERT_TRUE(streamOptions.device.is_cuda());
-  ASSERT_EQ(streamOptions.device.type(), torch::DeviceType::CUDA);
-  ourDecoder->addVideoStreamDecoder(-1, streamOptions);
-  auto output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor1FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
-  EXPECT_EQ(output.ptsSeconds, 0.0);
-  EXPECT_EQ(output.pts, 0);
-  output = ourDecoder->getNextDecodedOutput();
-  torch::Tensor tensor2FromOurDecoder = output.frame;
-  EXPECT_EQ(tensor2FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
-  EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
-  EXPECT_EQ(output.pts, 1001);
-
-  torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.cuda.pt");
-  torch::Tensor tensor2FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000002.cuda.pt");
-
-  EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({3, 270, 480}));
-  EXPECT_EQ(tensor2FromFFMPEG.sizes(), std::vector<long>({3, 270, 480}));
-  EXPECT_EQ(tensor1FromOurDecoder.device().type(), torch::DeviceType::CUDA);
-  EXPECT_EQ(tensor2FromOurDecoder.device().type(), torch::DeviceType::CUDA);
-  torch::Tensor tensor1FromOurDecoderCPU = tensor1FromOurDecoder.cpu();
-  torch::Tensor tensor2FromOurDecoderCPU = tensor1FromOurDecoder.cpu();
-  EXPECT_TRUE(torch::equal(tensor1FromOurDecoderCPU, tensor1FromFFMPEG));
-  EXPECT_TRUE(torch::equal(tensor2FromOurDecoderCPU, tensor2FromFFMPEG));
-
-  if (FLAGS_dump_frames_for_debugging) {
-    dumpTensorToDisk(tensor1FromFFMPEG, "tensor1FromFFMPEG.pt");
-    dumpTensorToDisk(tensor2FromFFMPEG, "tensor2FromFFMPEG.pt");
-    dumpTensorToDisk(tensor1FromOurDecoderCPU, "tensor1FromOurDecoder.pt");
-    dumpTensorToDisk(tensor2FromOurDecoderCPU, "tensor2FromOurDecoder.pt");
-  }
-}
-#endif
 
 TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   std::string path = getResourcePath("nasa_13013.mp4");
