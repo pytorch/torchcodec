@@ -147,7 +147,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
   try {
-    result = videoDecoder->getNextDecodedOutputNoDemux();
+    result = videoDecoder->getNextDecodedOutput();
   } catch (const VideoDecoder::EndOfFileException& e) {
     throw pybind11::stop_iteration(e.what());
   }
@@ -161,7 +161,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
 
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFrameDisplayedAtTimestampNoDemux(seconds);
+  auto result = videoDecoder->getFrameDisplayedAtTimestamp(seconds);
   return makeOpsDecodedOutput(result);
 }
 
