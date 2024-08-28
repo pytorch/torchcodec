@@ -12,7 +12,6 @@
 #include <ostream>
 #include <string_view>
 
-#include "c10/core/Device.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -140,8 +139,6 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    // Set the device to torch::kGPU for GPU decoding.
-    torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
@@ -153,8 +150,8 @@ class VideoDecoder {
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextDecodedOutputNoDemux() will return the first frame at or
-  // after this position.
+  // Calling getNextFrameAsTensor() will return the first frame at or after this
+  // position.
   void setCursorPtsInSeconds(double seconds);
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
@@ -180,14 +177,13 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutputNoDemux();
-  // Decodes the first frame in any added stream that is visible at a given
-  // timestamp. Frames in the video have a presentation timestamp and a
-  // duration. For example, if a frame has presentation timestamp of 5.0s and a
-  // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
-  // i.e. it will be returned when this function is called with seconds=5.0 or
-  // seconds=5.999, etc.
-  DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
+  DecodedOutput getNextDecodedOutput();
+  // Decodes the frame that is visible at a given timestamp. Frames in the video
+  // have a presentation timestamp and a duration. For example, if a frame has
+  // presentation timestamp of 5.0s and a duration of 1.0s, it will be visible
+  // in the timestamp range [5.0, 6.0). i.e. it will be returned when this
+  // function is called with seconds=5.0 or seconds=5.999, etc.
+  DecodedOutput getFrameDisplayedAtTimestamp(double seconds);
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
@@ -281,8 +277,6 @@ class VideoDecoder {
     FilterState filterState;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
-    AVPixelFormat hwPixelFormat = AV_PIX_FMT_NONE;
-    UniqueAVBufferRef hwDeviceContext;
   };
   VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
