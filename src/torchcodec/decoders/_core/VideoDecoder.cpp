@@ -71,7 +71,7 @@ AVInput createAVFormatContextFromBuffer(const void* buffer, size_t length) {
   TORCH_CHECK(
       toReturn.formatContext.get() != nullptr,
       "Unable to alloc avformat context");
-  constexpr int kAVIOInternalTemporaryBufferSize = 4 * 1024 * 1024;
+  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
   toReturn.ioBytesContext.reset(
       new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
   if (!toReturn.ioBytesContext) {
