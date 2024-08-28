@@ -27,6 +27,10 @@ torch._dynamo.config.cache_size_limit = 100
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
 
+def in_fbcode() -> bool:
+    return "FB_PAR_RUNTIME_FILES" in os.environ
+
+
 class AbstractDecoder:
     def __init__(self):
         pass
@@ -197,10 +201,14 @@ class TorchAudioDecoder(AbstractDecoder):
         return frames
 
 
-def get_video_path(filename: str) -> str:
-    resource = importlib.resources.files(__package__).joinpath(filename)
-    with importlib.resources.as_file(resource) as path:
-        return os.fspath(path)
+def get_test_resource_path(filename: str) -> str:
+    if in_fbcode():
+        resource = importlib.resources.files(__package__).joinpath(filename)
+        with importlib.resources.as_file(resource) as path:
+            return os.fspath(path)
+    return os.path.join(
+        os.path.dirname(__file__), "..", "..", "test", "resources", filename
+    )
 
 
 def create_torchcodec_decoder_from_file(video_file):
@@ -238,15 +246,27 @@ def main() -> None:
         type=float,
         default=2.0,
     )
+    parser.add_argument(
+        "--bm_large_video_path",
+        help="Path to the large video file to benchmark",
+        type=str,
+        default=get_test_resource_path("853.mp4"),
+    )
+    parser.add_argument(
+        "--bm_small_video_path",
+        help="Path to the small video file to benchmark",
+        type=str,
+        default=get_test_resource_path("nasa_13013.mp4"),
+    )
 
     args = parser.parse_args()
 
     # These are the PTS values we want to extract from the small video.
     small_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
-    small_video_path = get_video_path("nasa_13013.mp4")
+    small_video_path = args.bm_small_video_path
 
     large_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0]
-    large_video_path = get_video_path("853.mp4")
+    large_video_path = args.bm_large_video_path
 
     decoder_dict = {}
     decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
