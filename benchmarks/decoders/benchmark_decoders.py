@@ -27,6 +27,10 @@ torch._dynamo.config.cache_size_limit = 100
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
 
+def in_fbcode() -> bool:
+    return "FB_PAR_RUNTIME_FILES" in os.environ
+
+
 class AbstractDecoder:
     def __init__(self):
         pass
@@ -198,14 +202,13 @@ class TorchAudioDecoder(AbstractDecoder):
 
 
 def get_test_resource_path(filename: str) -> str:
-    if not __package__:
-        return os.path.join(
-            os.path.dirname(__file__), "..", "..", "test", "resources", filename
-        )
-
-    resource = importlib.resources.files(__package__).joinpath(filename)
-    with importlib.resources.as_file(resource) as path:
-        return os.fspath(path)
+    if in_fbcode():
+        resource = importlib.resources.files(__package__).joinpath(filename)
+        with importlib.resources.as_file(resource) as path:
+            return os.fspath(path)
+    return os.path.join(
+        os.path.dirname(__file__), "..", "..", "test", "resources", filename
+    )
 
 
 def create_torchcodec_decoder_from_file(video_file):
