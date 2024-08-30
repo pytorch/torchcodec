@@ -10,11 +10,8 @@ import importlib
 import os
 import timeit
 
-import decord
 import torch
 import torch.utils.benchmark as benchmark
-import torchaudio
-import torchvision.io
 
 from torchcodec.decoders._core import (
     add_video_stream,
@@ -42,6 +39,8 @@ class AbstractDecoder:
 
 class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
     def __init__(self):
+        import decord  # noqa: F401
+
         self._print_each_iteration_time = False
 
     def get_frames_from_video(self, video_file, pts_list):
@@ -80,6 +79,7 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
 class TVNewAPIDecoderWithBackend(AbstractDecoder):
     def __init__(self, backend):
         self._backend = backend
+        import torchvision.io  # noqa: F401
 
     def get_frames_from_video(self, video_file, pts_list):
         torchvision.set_video_backend(self._backend)
@@ -174,6 +174,8 @@ class TorchCodecDecoderCompiled(AbstractDecoder):
 
 class TorchAudioDecoder(AbstractDecoder):
     def __init__(self):
+        import torchaudio  # noqa: F401
+
         pass
 
     def get_frames_from_video(self, video_file, pts_list):
