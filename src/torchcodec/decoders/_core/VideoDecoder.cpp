@@ -651,7 +651,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getNextDecodedOutput()";
+  VLOG(9) << "Starting getNextDecodedOutputNoDemux()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
     VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
@@ -792,7 +792,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestamp(
+VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
@@ -867,7 +867,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  return getNextDecodedOutput();
+  return getNextDecodedOutputNoDemux();
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
@@ -1020,7 +1020,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutput() {
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
   return getDecodedOutputWithFilter(
       [this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
