@@ -26,10 +26,6 @@ add_executable(
   VideoDecoderOpsTest.cpp
 )
 
-if(ENABLE_CUDA)
-    target_compile_definitions(VideoDecoderTest PRIVATE ENABLE_CUDA=1)
-endif()
-
 target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
 target_include_directories(VideoDecoderTest PRIVATE ../../)
 target_include_directories(VideoDecoderOpsTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})

@@ -31,7 +31,6 @@ class VideoTooShortException(Exception):
 @dataclass
 class DecoderArgs:
     num_threads: int = 0
-    device: torch.device = torch.device("cpu")
 
 
 @dataclass
@@ -164,7 +163,6 @@ class VideoClipSampler(nn.Module):
             width=target_width,
             height=target_height,
             num_threads=self.decoder_args.num_threads,
-            device_string=str(self.decoder_args.device),
         )
 
         clips: List[Any] = []
