@@ -41,11 +41,13 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
     def __init__(self):
         import decord  # noqa: F401
 
+        self.decord = decord
+
         self._print_each_iteration_time = False
 
     def get_frames_from_video(self, video_file, pts_list):
-        decord.bridge.set_bridge("torch")
-        decord_vr = decord.VideoReader(video_file, ctx=decord.cpu())
+        self.decord.bridge.set_bridge("torch")
+        decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         frames = []
         times = []
         fps = decord_vr.get_avg_fps()
@@ -61,8 +63,8 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
-        decord.bridge.set_bridge("torch")
-        decord_vr = decord.VideoReader(video_file, ctx=decord.cpu())
+        self.decord.bridge.set_bridge("torch")
+        decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         frames = []
         times = []
         for _ in range(numFramesToDecode):
@@ -79,11 +81,13 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
 class TVNewAPIDecoderWithBackend(AbstractDecoder):
     def __init__(self, backend):
         self._backend = backend
-        import torchvision.io  # noqa: F401
+        import torchvision  # noqa: F401
+
+        self.torchvision = torchvision
 
     def get_frames_from_video(self, video_file, pts_list):
-        torchvision.set_video_backend(self._backend)
-        reader = torchvision.io.VideoReader(video_file, "video")
+        self.torchvision.set_video_backend(self._backend)
+        reader = self.torchvision.io.VideoReader(video_file, "video")
         frames = []
         for pts in pts_list:
             reader.seek(pts)
@@ -92,8 +96,8 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
-        torchvision.set_video_backend(self._backend)
-        reader = torchvision.io.VideoReader(video_file, "video")
+        self.torchvision.set_video_backend(self._backend)
+        reader = self.torchvision.io.VideoReader(video_file, "video")
         frames = []
         for _ in range(numFramesToDecode):
             frame = next(reader)
@@ -176,10 +180,12 @@ class TorchAudioDecoder(AbstractDecoder):
     def __init__(self):
         import torchaudio  # noqa: F401
 
+        self.torchaudio = torchaudio
+
         pass
 
     def get_frames_from_video(self, video_file, pts_list):
-        stream_reader = torchaudio.io.StreamReader(src=video_file)
+        stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(frames_per_chunk=1)
         frames = []
         for pts in pts_list:
@@ -190,7 +196,7 @@ class TorchAudioDecoder(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
-        stream_reader = torchaudio.io.StreamReader(src=video_file)
+        stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(frames_per_chunk=1)
         frames = []
         frame_cnt = 0
