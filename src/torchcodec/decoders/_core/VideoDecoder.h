@@ -153,6 +153,12 @@ class VideoDecoder {
   // Calling getNextDecodedOutputNoDemux() will return the first frame at or
   // after this position.
   void setCursorPtsInSeconds(double seconds);
+  struct RawDecodedOutput {
+    // The actual decoded output as a unique pointer to an AVFrame.
+    UniqueAVFrame frame;
+    // The stream index of the decoded frame.
+    int streamIndex;
+  };
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
     torch::Tensor frame;
@@ -310,7 +316,7 @@ class VideoDecoder {
       int streamIndex,
       const VideoStreamDecoderOptions& options);
   void maybeSeekToBeforeDesiredPts();
-  DecodedOutput getDecodedOutputWithFilter(std::function<bool(int, AVFrame*)>);
+  RawDecodedOutput getDecodedOutputWithFilter(std::function<bool(int, AVFrame*)>);
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
@@ -322,8 +328,8 @@ class VideoDecoder {
       int streamIndex,
       const AVFrame* frame);
   DecodedOutput convertAVFrameToDecodedOutput(
-      int streamIndex,
-      UniqueAVFrame frame);
+      RawDecodedOutput& rawOutput,
+      std::optional<torch::Tensor> maybeTensor = std::nullopt);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

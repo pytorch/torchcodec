@@ -646,7 +646,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
+VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
@@ -764,15 +764,19 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   activeStream.currentDuration = getDuration(frame);
   VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
           << " pts=" << frame->pts << " stats=" << decodeStats_;
-  // Convert the frame to tensor.
-  return convertAVFrameToDecodedOutput(frameStreamIndex, std::move(frame));
+  RawDecodedOutput rawOutput;
+  rawOutput.streamIndex = frameStreamIndex;
+  rawOutput.frame = std::move(frame);
+  return rawOutput;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
-    int streamIndex,
-    UniqueAVFrame frame) {
+    VideoDecoder::RawDecodedOutput &rawOutput,
+    std::optional<torch::Tensor> maybeTensor) {
   // Convert the frame to tensor.
   DecodedOutput output;
+  int streamIndex = rawOutput.streamIndex;
+  UniqueAVFrame frame = std::move(rawOutput.frame);
   output.streamIndex = streamIndex;
   output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
   output.pts = frame->pts;
@@ -806,7 +810,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
     }
   }
   setCursorPtsInSeconds(seconds);
-  return getDecodedOutputWithFilter(
+  RawDecodedOutput rawOutput = getDecodedOutputWithFilter(
       [seconds, this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& stream = streams_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(frame->pts, stream.timeBase);
@@ -824,6 +828,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
         }
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
+    // Convert the frame to tensor.
+  return convertAVFrameToDecodedOutput(rawOutput);
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
@@ -1021,12 +1027,13 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
-  return getDecodedOutputWithFilter(
+  auto rawOutput = getDecodedOutputWithFilter(
       [this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
         return frame->pts >=
             activeStream.discardFramesBeforePts.value_or(INT64_MIN);
       });
+  return convertAVFrameToDecodedOutput(rawOutput);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
