@@ -12,6 +12,7 @@ import timeit
 
 import torch
 import torch.utils.benchmark as benchmark
+from torchcodec.decoders import SimpleVideoDecoder
 
 from torchcodec.decoders._core import (
     add_video_stream,
@@ -231,21 +232,15 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--bm_small_video_speed",
-        help="Benchmark small video decoding speed",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-    )
-    parser.add_argument(
-        "--bm_large_video_speed",
-        help="Benchmark large video decoding speed",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-    )
-    parser.add_argument(
-        "--bm_large_video_creation",
+        "--bm_video_creation",
         help="Benchmark large video creation memory",
         default=True,
+        action=argparse.BooleanOptionalAction,
+    )
+    parser.add_argument(
+        "--verbose",
+        help="Show verbose output",
+        default=False,
         action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
@@ -255,14 +250,8 @@ def main() -> None:
         default=2.0,
     )
     parser.add_argument(
-        "--bm_large_video_path",
-        help="Path to the large video file to benchmark",
-        type=str,
-        default=get_test_resource_path("853.mp4"),
-    )
-    parser.add_argument(
-        "--bm_small_video_path",
-        help="Path to the small video file to benchmark",
+        "--bm_video_paths",
+        help="Comma-separated paths to videos that you want to benchmark.",
         type=str,
         default=get_test_resource_path("nasa_13013.mp4"),
     )
@@ -277,11 +266,7 @@ def main() -> None:
     decoders = set(args.decoders.split(","))
 
     # These are the PTS values we want to extract from the small video.
-    small_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
-    small_video_path = args.bm_small_video_path
-
-    large_pts_to_extract = [0.0, 1.0, 2.0, 3.0, 4.0]
-    large_video_path = args.bm_large_video_path
+    num_uniform_samples = 10
 
     decoder_dict = {}
     if "decord" in decoders:
@@ -298,6 +283,8 @@ def main() -> None:
         decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
             TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
         )
+    # We don't compare TorchVision's "pyav" backend because it doesn't support
+    # accurate seeks.
     if "torchvision" in decoders:
         decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
             TVNewAPIDecoderWithBackend("video_reader")
@@ -305,66 +292,47 @@ def main() -> None:
     if "torchaudio" in decoders:
         decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
 
-    # We don't compare TorchVision's "pyav" backend because it doesn't support
-    # accurate seeks.
+    decoder_dict["TVNewAPIDecoderWithBackendVideoReader"]
+
     results = []
     for decoder_name, decoder in decoder_dict.items():
-        if args.bm_small_video_speed:
+        for video_path in args.bm_video_paths.split(","):
+            simple_decoder = SimpleVideoDecoder(video_path)
+            duration = simple_decoder.metadata.duration_seconds
+            pts_list = [
+                i * duration / num_uniform_samples for i in range(num_uniform_samples)
+            ]
+            metadata = simple_decoder.metadata
+            metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
+            if args.verbose:
+                print(
+                    f"video={video_path}, decoder={decoder_name}, pts_list={pts_list}"
+                )
             seeked_result = benchmark.Timer(
                 stmt="decoder.get_frames_from_video(video_file, pts_list)",
                 globals={
-                    "video_file": small_video_path,
-                    "pts_list": small_pts_to_extract,
+                    "video_file": video_path,
+                    "pts_list": pts_list,
                     "decoder": decoder,
                 },
-                label="decode latency for function call pattern for 700KB video",
+                label=f"video={video_path} {metadata_string}",
                 sub_label=decoder_name,
-                description=f"{len(small_pts_to_extract)} seek()+next()",
+                description=f"{num_uniform_samples} seek()+next()",
             )
             results.append(
                 seeked_result.blocked_autorange(
                     min_run_time=args.bm_video_speed_min_run_seconds
                 )
             )
-            for num_consecutive_nexts in [1, 10, 100, 200]:
+            for num_consecutive_nexts in [1, 10, 100]:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={
-                        "video_file": small_video_path,
+                        "video_file": video_path,
                         "consecutive_frames_to_extract": num_consecutive_nexts,
                         "decoder": decoder,
                     },
-                    label="decode latency for function call pattern for 700KB video",
-                    sub_label=decoder_name,
-                    description=f"{num_consecutive_nexts} next()",
-                )
-                results.append(
-                    consecutive_frames_result.blocked_autorange(
-                        min_run_time=args.bm_video_speed_min_run_seconds
-                    )
-                )
-        if args.bm_large_video_speed:
-            seeked_result = benchmark.Timer(
-                stmt="decoder.get_frames_from_video(video_file, pts_list)",
-                globals={
-                    "video_file": large_video_path,
-                    "pts_list": large_pts_to_extract,
-                    "decoder": decoder,
-                },
-                label="decode latency for function call pattern for 50MB video",
-                sub_label=decoder_name,
-                description=f"{len(large_pts_to_extract)} seek()+next()",
-            )
-            results.append(seeked_result.blocked_autorange())
-            for num_consecutive_nexts in [1, 10]:
-                consecutive_frames_result = benchmark.Timer(
-                    stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
-                    globals={
-                        "video_file": large_video_path,
-                        "consecutive_frames_to_extract": num_consecutive_nexts,
-                        "decoder": decoder,
-                    },
-                    label="decode latency for function call pattern for 50MB video",
+                    label=f"video={video_path} {metadata_string}",
                     sub_label=decoder_name,
                     description=f"{num_consecutive_nexts} next()",
                 )
@@ -374,16 +342,17 @@ def main() -> None:
                     )
                 )
 
-    if args.bm_large_video_creation:
+    first_video_path = args.bm_video_paths.split(",")[0]
+    if args.bm_video_creation:
         creation_result = benchmark.Timer(
             stmt="create_torchcodec_decoder_from_file(video_file)",
             globals={
-                "video_file": large_video_path,
+                "video_file": first_video_path,
                 "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
             },
-            label="creation latency for function call pattern for 50MB video",
-            sub_label="TorchCodecDecoder",
-            description="creation+next time",
+            label=f"video={first_video_path} {metadata_string}",
+            sub_label="TorchCodecDecoderNonCompiled",
+            description="create()+next()",
         )
         results.append(creation_result.blocked_autorange(min_run_time=10.0))
     compare = benchmark.Compare(results)
