@@ -158,6 +158,9 @@ class VideoDecoder {
     UniqueAVFrame frame;
     // The stream index of the decoded frame.
     int streamIndex;
+    // After color conversion we store the output in this buffer.
+    void *data = nullptr;
+    size_t size = 0;
   };
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
@@ -284,6 +287,7 @@ class VideoDecoder {
     FilterState filterState;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    UniqueSwsContext swsContext;
   };
   VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
@@ -327,9 +331,10 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
+  void convertFrameToBufferUsingSwsScale(
+    RawDecodedOutput& rawOutput);
   DecodedOutput convertAVFrameToDecodedOutput(
-      RawDecodedOutput& rawOutput,
-      std::optional<torch::Tensor> maybeTensor = std::nullopt);
+      RawDecodedOutput& rawOutput);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
