@@ -27,7 +27,7 @@ We achieve these capabilities through:
 ## Using TorchCodec
 
 Here's a condensed summary of what you can do with TorchCodec. For a more
-detailed example, [check out our
+detailed example,  [check out our
 documentation](https://pytorch.org/torchcodec/stable/generated_examples/)!
 
 ```python
