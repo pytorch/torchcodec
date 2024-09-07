@@ -6,7 +6,7 @@
 #
 # This job does not include the uploading part.
 # Upload needs to be done manually, and it should be done only once
-# par new major release of FFmepg.
+# per new major release of FFmepg.
 name: Build non-GPL FFmpeg from source
 
 on:
@@ -20,26 +20,47 @@ defaults:
 
 jobs:
   LGPL-Linux-x86_64:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@v3
-      - name: Build FFmpeg
-        run: |
-          export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
-          export FFMPEG_ROOT="${PWD}/ffmpeg"
+    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
+    with:
+      job-name: Build
+      upload-artifact: ffmpeg-lgpl
+      repository: pytorch/torchcodec
+      script: |
+        export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
+        export FFMPEG_ROOT="${PWD}/ffmpeg"
 
-          packaging/build_ffmpeg.sh
+        packaging/build_ffmpeg.sh
 
-          tar -czf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
+        tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
 
-          mkdir -p artifact_dir
-          mv ffmpeg.tar.gz artifact_dir/ffmpeg_"${FFMPEG_VERSION}".tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: "ffmpeg_${{ matrix.ffmpeg-version }}_linux_x86_64"
-          path: artifact_dir
+        artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/linux_x86_64"
+        mkdir -p "${artifact_dir}"
+        mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+
+  LGPL-macOS:
+    strategy:
+      fail-fast: false
+      matrix:
+        ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
+        runner: ["macos-m1-stable", "macos-12"]
+    uses: pytorch/test-infra/.github/workflows/macos_job.yml@main
+    with:
+      job-name: Build
+      upload-artifact: ffmpeg-lgpl
+      repository: pytorch/torchcodec
+      runner: "${{ matrix.runner }}"
+      script: |
+        export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
+        export FFMPEG_ROOT="${PWD}/ffmpeg"
+
+        packaging/build_ffmpeg.sh
+
+        tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
+
+        artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/macos_$(uname -m)"
+        mkdir -p "${artifact_dir}"
+        mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
