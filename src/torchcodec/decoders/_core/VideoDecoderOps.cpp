@@ -133,7 +133,7 @@ void add_video_stream(
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
       options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
-    } else if (stdColorConversionLibrary == "swscale") {
+    } else if (stdColorConversionLibrary == "swsscale") {
       options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(

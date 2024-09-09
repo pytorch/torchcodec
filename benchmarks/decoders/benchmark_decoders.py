@@ -90,7 +90,7 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
     def get_frames_from_video(self, video_file, pts_list):
         start = timeit.default_timer()
         self.torchvision.set_video_backend(self._backend)
-        reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=1)
+        reader = self.torchvision.io.VideoReader(video_file, "video")
         create_done = timeit.default_timer()
         frames = []
         for pts in pts_list:
@@ -135,10 +135,10 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
         return frames
 
 
-class TorchCodecDecoderNonCompiledWithOptions(AbstractDecoder):
+class TorchcodecNonCompiledWithOptions(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None):
         self._print_each_iteration_time = False
-        self._num_threads = num_threads
+        self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
 
     def get_frames_from_video(self, video_file, pts_list):
@@ -203,7 +203,7 @@ def compiled_next(decoder):
     return get_next_frame(decoder)
 
 
-class TorchCodecDecoderCompiled(AbstractDecoder):
+class TorchcodecCompiled(AbstractDecoder):
     def __init__(self):
         pass
 
@@ -308,13 +308,11 @@ def main() -> None:
         "--decoders",
         help=(
             "Comma-separated list of decoders to benchmark. "
-            "Choices are torchcodec, torchaudio, torchvision, decord, torchcodec1, torchcodec_compiled, torchcodec_filtergraph. "
-            "torchcodec1 means torchcodec with num_threads=1. torchcodec_compiled means torch.compiled torchcodec. "
-            "torchcodec_filtergraph means torchcodec with filtergraph. "
-            "torchcodec_sws_scale means torchcodec with sws_scale. "
+            "Choices are torchcodec, torchaudio, torchvision, decord, tcoptions:num_threads=1+color_conversion_library=filtergraph, torchcodec_compiled"
+            "For torchcodec, you can specify options with tcoptions:<plus-separated-options>. "
         ),
         type=str,
-        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled,torchcodec_filtergraph,torchcodec_sws_scale",
+        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled,torchcodec_filtergraph,torchcodec_swsscale",
     )
 
     args = parser.parse_args()
@@ -324,32 +322,25 @@ def main() -> None:
     num_uniform_samples = 10
 
     decoder_dict = {}
-    if "decord" in decoders:
-        decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
-            DecordNonBatchDecoderAccurateSeek()
-        )
-    if "torchcodec" in decoders:
-        decoder_dict["TorchCodecDecoderNonCompiled"] = (
-            TorchCodecDecoderNonCompiledWithOptions()
-        )
-    if "torchcodec_compiled" in decoders:
-        decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
-    if "torchcodec1" in decoders:
-        decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
-            TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
-        )
-    if "torchcodec_filtergraph" in decoders:
-        decoder_dict["TCNonCompiled:filtergraph"] = (
-            TorchCodecDecoderNonCompiledWithOptions(
-                color_conversion_library="filtergraph"
+    for decoder in decoders:
+        if decoder == "decord":
+            decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
+                DecordNonBatchDecoderAccurateSeek()
             )
-        )
-    if "torchcodec_sws_scale" in decoders:
-        decoder_dict["TCNonCompiled:sws_scale"] = (
-            TorchCodecDecoderNonCompiledWithOptions(
-                color_conversion_library="sws_scale"
+        elif decoder == "torchcodec":
+            decoder_dict["TorchCodecNonCompiled"] = TorchcodecNonCompiledWithOptions()
+        elif decoder == "torchcodec_compiled":
+            decoder_dict["TorchcodecCompiled"] = TorchcodecCompiled()
+        elif decoder.startswith("tcoptions:"):
+            options = decoder[len("tcoptions:") :]
+            kwargs_dict = {}
+            for item in options.split("+"):
+                k, v = item.split("=")
+                kwargs_dict[k] = v
+            decoder_dict["TorchcodecNonCompiled:" + options] = (
+                TorchcodecNonCompiledWithOptions(**kwargs_dict)
             )
-        )
+
     # We don't compare TorchVision's "pyav" backend because it doesn't support
     # accurate seeks.
     if "torchvision" in decoders:
@@ -417,6 +408,24 @@ def main() -> None:
                         min_run_time=args.bm_video_speed_min_run_seconds
                     )
                 )
+
+    first_video_path = args.bm_video_paths.split(",")[0]
+    if args.bm_video_creation:
+        creation_result = benchmark.Timer(
+            stmt="create_torchcodec_decoder_from_file(video_file)",
+            globals={
+                "video_file": first_video_path,
+                "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
+            },
+            label=f"video={first_video_path} {metadata_string}",
+            sub_label="TorchcodecNonCompiled",
+            description="create()+next()",
+        )
+        results.append(
+            creation_result.blocked_autorange(
+                min_run_time=args.bm_video_speed_min_run_seconds
+            )
+        )
     compare = benchmark.Compare(results)
     compare.print()
 
