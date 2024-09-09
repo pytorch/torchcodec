@@ -441,7 +441,7 @@ def main() -> None:
                     min_run_time=args.bm_video_speed_min_run_seconds
                 )
             )
-            for num_consecutive_nexts in [1, 10, 100]:
+            for num_consecutive_nexts in [1, 10]:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={

@@ -345,6 +345,7 @@ class VideoDecoder {
       const VideoStreamDecoderOptions& options);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(std::function<bool(int, AVFrame*)>);
+  RawDecodedOutput getNextRawDecodedOutputNoDemux();
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.

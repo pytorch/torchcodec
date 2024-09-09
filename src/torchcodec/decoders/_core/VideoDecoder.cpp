@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string_view>
+#include <iostream>
 #include "torch/types.h"
 
 extern "C" {
@@ -875,8 +876,21 @@ VideoDecoder::getFramesAtIndexes(int streamIndex,
       throw std::runtime_error("Invalid frame index=" +
                                std::to_string(frameIndex));
     }
-    torch::Tensor frame = getFrameAtIndex(streamIndex, frameIndex).frame;
-    output.frames[i++] = frame;
+    int64_t pts = stream.allFrames[frameIndex].pts;
+    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
+    auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
+    if (stream.filterState.sourceContext == nullptr) {
+      // We are using sws_scale to conver the frame to tensor. So we can
+      // convert directly to the output tensor.
+      rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
+      convertFrameToBufferUsingSwsScale(rawSingleOutput);
+    } else {
+      // We are using a filter graph to convert the frame to tensor. So we need
+      // to copy the color-converted frame to the output tensor.
+      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
+      output.frames[i] = frame;
+    }
+    i++;
   }
   return output;
 }
@@ -998,13 +1012,18 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(int streamIndex,
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   auto rawOutput =
       getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame *frame) {
         StreamInfo &activeStream = streams_[frameStreamIndex];
         return frame->pts >=
                activeStream.discardFramesBeforePts.value_or(INT64_MIN);
       });
+  return rawOutput;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+  auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput);
 }
 
