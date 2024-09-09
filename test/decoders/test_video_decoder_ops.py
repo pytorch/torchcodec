@@ -132,8 +132,6 @@ class TestOps:
         )
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame180 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        print(frames0and180.shape)
-        print(frames0and180.stride())
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
 
