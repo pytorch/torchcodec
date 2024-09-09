@@ -122,6 +122,18 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
       width = std::stoi(value);
     } else if (key == "height") {
       height = std::stoi(value);
+    } else if (key == "color_conversion_library") {
+      if (value == "auto") {
+        colorConversionLibrary = ColorConversionLibrary::AUTO;
+      } if (value == "filtergraph") {
+        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+      } else if (value == "swscale") {
+        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+      } else {
+        throw std::runtime_error(
+            "Invalid color_conversion_library=" + value +
+            ". color_conversion_library must be either filtergraph or swscale.");
+      }
     } else {
       throw std::runtime_error(
           "Invalid option: " + key +
@@ -367,7 +379,10 @@ void VideoDecoder::addVideoStreamDecoder(
   // widths.
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   // In that case we are forced to use a filtergraph to do the color conversion.
-  if (width % 32 != 0) {
+  auto colorConversionLibrary = options.colorConversionLibrary.value_or(ColorConversionLibrary::AUTO);
+  bool useFilterGraph = (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) ||
+  (colorConversionLibrary == ColorConversionLibrary::AUTO && width % 32 != 0);
+  if (useFilterGraph) {
     initializeFilterGraphForStream(streamNumber, options);
   }
 }
@@ -1055,7 +1070,6 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
     int streamIndex,
     const AVFrame* frame) {
-  TORCH_CHECK(false);
   FilterState& filterState = streams_[streamIndex].filterState;
   int ffmpegStatus = av_buffersrc_write_frame(filterState.sourceContext, frame);
   if (ffmpegStatus < AVSUCCESS) {

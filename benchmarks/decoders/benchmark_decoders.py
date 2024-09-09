@@ -136,13 +136,18 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
 
 
 class TorchCodecDecoderNonCompiledWithOptions(AbstractDecoder):
-    def __init__(self, num_threads=None):
+    def __init__(self, num_threads=None, color_conversion_library=None):
         self._print_each_iteration_time = False
         self._num_threads = num_threads
+        self._color_conversion_library = color_conversion_library
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         frames = []
         times = []
         for pts in pts_list:
@@ -301,9 +306,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--decoders",
-        help="Comma-separated list of decoders to benchmark. Choices are torchcodec, torchaudio, torchvision, decord, torchcodec1, torchcodec_compiled. torchcodec1 means torchcodec with num_threads=1. torchcodec_compiled means torch.compiled torchcodec",
+        help=(
+            "Comma-separated list of decoders to benchmark. "
+            "Choices are torchcodec, torchaudio, torchvision, decord, torchcodec1, torchcodec_compiled, torchcodec_filtergraph. "
+            "torchcodec1 means torchcodec with num_threads=1. torchcodec_compiled means torch.compiled torchcodec. "
+            "torchcodec_filtergraph means torchcodec with filtergraph. "
+            "torchcodec_sws_scale means torchcodec with sws_scale. "
+        ),
         type=str,
-        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled",
+        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled,torchcodec_filtergraph,torchcodec_sws_scale",
     )
 
     args = parser.parse_args()
@@ -326,6 +337,18 @@ def main() -> None:
     if "torchcodec1" in decoders:
         decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
             TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
+        )
+    if "torchcodec_filtergraph" in decoders:
+        decoder_dict["TCNonCompiled:filtergraph"] = (
+            TorchCodecDecoderNonCompiledWithOptions(
+                color_conversion_library="filtergraph"
+            )
+        )
+    if "torchcodec_sws_scale" in decoders:
+        decoder_dict["TCNonCompiled:sws_scale"] = (
+            TorchCodecDecoderNonCompiledWithOptions(
+                color_conversion_library="sws_scale"
+            )
         )
     # We don't compare TorchVision's "pyav" backend because it doesn't support
     # accurate seeks.

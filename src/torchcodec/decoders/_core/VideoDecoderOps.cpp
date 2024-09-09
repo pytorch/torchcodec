@@ -29,7 +29,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -117,7 +117,8 @@ void add_video_stream(
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
-    std::optional<int64_t> stream_index) {
+    std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
@@ -127,6 +128,18 @@ void add_video_stream(
     std::string stdDimensionOrder{dimension_order.value()};
     TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
     options.dimensionOrder = stdDimensionOrder;
+  }
+  if (color_conversion_library.has_value()) {
+    std::string stdColorConversionLibrary{color_conversion_library.value()};
+    if (stdColorConversionLibrary == "filtergraph") {
+      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+    } else if (stdColorConversionLibrary == "swscale") {
+      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::SWSCALE;
+    } else {
+      throw std::runtime_error(
+          "Invalid color_conversion_library=" + stdColorConversionLibrary +
+          ". color_conversion_library must be either filtergraph or swscale.");
+    }
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

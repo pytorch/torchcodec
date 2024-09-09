@@ -123,7 +123,11 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
-
+  enum ColorConversionLibrary {
+    AUTO,
+    SWSCALE,
+    FILTERGRAPH
+  };
   struct VideoStreamDecoderOptions {
     VideoStreamDecoderOptions() {}
     explicit VideoStreamDecoderOptions(const std::string& optionsString);
@@ -139,6 +143,7 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
+    std::optional<ColorConversionLibrary> colorConversionLibrary = AUTO;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
