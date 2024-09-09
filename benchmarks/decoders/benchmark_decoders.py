@@ -7,6 +7,7 @@
 import abc
 import argparse
 import importlib
+import json
 import os
 import timeit
 
@@ -17,7 +18,10 @@ from torchcodec.decoders import SimpleVideoDecoder
 from torchcodec.decoders._core import (
     add_video_stream,
     create_from_file,
+    get_frames_at_indices,
+    get_json_metadata,
     get_next_frame,
+    scan_all_streams_to_update_metadata,
     seek_to_pts,
 )
 
@@ -192,6 +196,44 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
         return frames
 
 
+class TorchCodecNonCompiledBatch(AbstractDecoder):
+    def __init__(self, num_threads=None, color_conversion_library=None):
+        self._print_each_iteration_time = False
+        self._num_threads = int(num_threads) if num_threads else None
+        self._color_conversion_library = color_conversion_library
+
+    def get_frames_from_video(self, video_file, pts_list):
+        decoder = create_from_file(video_file)
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
+        metadata = json.loads(get_json_metadata(decoder))
+        average_fps = metadata["averageFps"]
+        best_video_stream = metadata["bestVideoStreamIndex"]
+        indexes_list = [int(pts * average_fps) for pts in pts_list]
+        frames = []
+        frames = get_frames_at_indices(
+            decoder, stream_index=best_video_stream, frame_indices=indexes_list
+        )
+        return frames
+
+    def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        decoder = create_from_file(video_file)
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder, num_threads=self._num_threads)
+        metadata = json.loads(get_json_metadata(decoder))
+        best_video_stream = metadata["bestVideoStreamIndex"]
+        frames = []
+        indices_list = list(range(numFramesToDecode))
+        frames = get_frames_at_indices(
+            decoder, stream_index=best_video_stream, frame_indices=indices_list
+        )
+        return frames
+
+
 @torch.compile(fullgraph=True, backend="eager")
 def compiled_seek_and_next(decoder, pts):
     seek_to_pts(decoder, pts)
@@ -331,6 +373,23 @@ def main() -> None:
             decoder_dict["TorchCodecNonCompiled"] = TorchcodecNonCompiledWithOptions()
         elif decoder == "torchcodec_compiled":
             decoder_dict["TorchcodecCompiled"] = TorchcodecCompiled()
+        elif decoder == "torchvision":
+            decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
+                # We don't compare TorchVision's "pyav" backend because it doesn't support
+                # accurate seeks.
+                TVNewAPIDecoderWithBackend("video_reader")
+            )
+        elif decoder == "torchaudio":
+            decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
+        elif decoder.startswith("tcbatchoptions:"):
+            options = decoder[len("tcbatchoptions:") :]
+            kwargs_dict = {}
+            for item in options.split("+"):
+                k, v = item.split("=")
+                kwargs_dict[k] = v
+            decoder_dict["TorchCodecNonCompiledBatch:" + options] = (
+                TorchCodecNonCompiledBatch(**kwargs_dict)
+            )
         elif decoder.startswith("tcoptions:"):
             options = decoder[len("tcoptions:") :]
             kwargs_dict = {}
@@ -340,15 +399,6 @@ def main() -> None:
             decoder_dict["TorchcodecNonCompiled:" + options] = (
                 TorchcodecNonCompiledWithOptions(**kwargs_dict)
             )
-
-    # We don't compare TorchVision's "pyav" backend because it doesn't support
-    # accurate seeks.
-    if "torchvision" in decoders:
-        decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
-            TVNewAPIDecoderWithBackend("video_reader")
-        )
-    if "torchaudio" in decoders:
-        decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
 
     decoder_dict["TVNewAPIDecoderWithBackendVideoReader"]
 
