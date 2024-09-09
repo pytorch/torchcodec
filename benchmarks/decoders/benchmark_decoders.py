@@ -82,27 +82,56 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
 class TVNewAPIDecoderWithBackend(AbstractDecoder):
     def __init__(self, backend):
         self._backend = backend
+        self._print_each_iteration_time = False
         import torchvision  # noqa: F401
 
         self.torchvision = torchvision
 
     def get_frames_from_video(self, video_file, pts_list):
+        start = timeit.default_timer()
         self.torchvision.set_video_backend(self._backend)
-        reader = self.torchvision.io.VideoReader(video_file, "video")
+        reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=1)
+        create_done = timeit.default_timer()
         frames = []
         for pts in pts_list:
             reader.seek(pts)
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
+        frames_done = timeit.default_timer()
+        if self._print_each_iteration_time:
+            del reader
+        del_done = timeit.default_timer()
+        create_duration = 1000 * round(create_done - start, 3)
+        frames_duration = 1000 * round(frames_done - create_done, 3)
+        del_duration = 1000 * round(del_done - frames_done, 3)
+        total_duration = 1000 * round(del_done - start, 3)
+        if self._print_each_iteration_time:
+            print(
+                f"TV: {create_duration=} {frames_duration=} {del_duration=} {total_duration=}"
+            )
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        start = timeit.default_timer()
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video")
+        create_done = timeit.default_timer()
         frames = []
         for _ in range(numFramesToDecode):
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
+        frames_done = timeit.default_timer()
+        if self._print_each_iteration_time:
+            del reader
+        del_done = timeit.default_timer()
+        create_duration = 1000 * round(create_done - start, 3)
+        frames_duration = 1000 * round(frames_done - create_done, 3)
+        del_duration = 1000 * round(del_done - frames_done, 3)
+        total_duration = 1000 * round(del_done - start, 3)
+        if self._print_each_iteration_time:
+            print(
+                f"TV: consecutive: {create_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0].shape=}"
+            )
         return frames
 
 
@@ -128,17 +157,32 @@ class TorchCodecDecoderNonCompiledWithOptions(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        create_time = timeit.default_timer()
         decoder = create_from_file(video_file)
+        add_stream_time = timeit.default_timer()
         add_video_stream(decoder, num_threads=self._num_threads)
         frames = []
         times = []
+        frames_time = timeit.default_timer()
         for _ in range(numFramesToDecode):
             start = timeit.default_timer()
             frame = get_next_frame(decoder)
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
+        del_time = timeit.default_timer()
         if self._print_each_iteration_time:
+            del decoder
+        done_time = timeit.default_timer()
+        create_duration = 1000 * round(add_stream_time - create_time, 3)
+        add_stream_duration = 1000 * round(frames_time - add_stream_time, 3)
+        frames_duration = 1000 * round(del_time - frames_time, 3)
+        del_duration = 1000 * round(done_time - del_time, 3)
+        total_duration = 1000 * round(done_time - create_time, 3)
+        if self._print_each_iteration_time:
+            print(
+                f"{numFramesToDecode=} {create_duration=} {add_stream_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0][0].shape=}"
+            )
             print("torchcodec times=", times, sum(times))
         return frames
 
@@ -297,6 +341,15 @@ def main() -> None:
     results = []
     for decoder_name, decoder in decoder_dict.items():
         for video_path in args.bm_video_paths.split(","):
+
+            # decoder.get_consecutive_frames_from_video(video_path, 1)
+            # start = timeit.default_timer()
+            # decoder.get_consecutive_frames_from_video(video_path, 1)
+            # end = timeit.default_timer()
+            # duration_ms = 1000 * round(end - start, 3)
+            # print(f"{decoder_name} {video_path} {duration_ms}ms")
+            # continue
+
             simple_decoder = SimpleVideoDecoder(video_path)
             duration = simple_decoder.metadata.duration_seconds
             pts_list = [
@@ -341,20 +394,6 @@ def main() -> None:
                         min_run_time=args.bm_video_speed_min_run_seconds
                     )
                 )
-
-    first_video_path = args.bm_video_paths.split(",")[0]
-    if args.bm_video_creation:
-        creation_result = benchmark.Timer(
-            stmt="create_torchcodec_decoder_from_file(video_file)",
-            globals={
-                "video_file": first_video_path,
-                "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
-            },
-            label=f"video={first_video_path} {metadata_string}",
-            sub_label="TorchCodecDecoderNonCompiled",
-            description="create()+next()",
-        )
-        results.append(creation_result.blocked_autorange(min_run_time=10.0))
     compare = benchmark.Compare(results)
     compare.print()
 

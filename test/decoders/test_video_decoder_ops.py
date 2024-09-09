@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 import torch
+from PIL import Image
 
 from torchcodec.decoders._core import (
     _test_frame_pts_equality,
@@ -51,12 +52,25 @@ class ReferenceDecoder:
         seek_to_pts(self.decoder, pts)
 
 
+def dump_tensor_to_disk(tensor, filename_prefix):
+    filename = f"{filename_prefix}.pt"
+    bmp_filename = f"{filename_prefix}.bmp"
+    img_array = tensor.permute(1, 2, 0).cpu().numpy()
+    img = Image.fromarray(img_array)
+    img.save(bmp_filename, format="BMP")
+    torch.save(tensor, filename, _use_new_zipfile_serialization=True)
+
+
 class TestOps:
     def test_seek_and_next(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        # To debug the test, uncomment the following line:
+        # dump_tensor_to_disk(frame0, "frame0")
+        # TODO: assert_tensor_equal should automatically dump tensors to disk
+        # for debugging upon failure.
         assert_tensor_equal(frame0, reference_frame0)
         reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         frame1, _, _ = get_next_frame(decoder)

@@ -362,7 +362,12 @@ void VideoDecoder::addVideoStreamDecoder(
   activeStreamIndices_.insert(streamNumber);
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
-  if (options.width.has_value() && options.width.value() % 16 != 0 && false) {
+  int width = options.width.value_or(codecContext->width);
+  // There is a bug in sws_scale where it doesn't handle non-multiple of 16
+  // widths.
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // In that case we are forced to use a filtergraph to do the color conversion.
+  if (width % 32 != 0) {
     initializeFilterGraphForStream(streamNumber, options);
   }
 }
@@ -593,6 +598,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame *)> filterFunction) {
+  auto start = std::chrono::high_resolution_clock::now();
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
@@ -604,6 +610,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     maybeDesiredPts_ = std::nullopt;
     VLOG(9) << "seeking done";
   }
+  auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame frame(av_frame_alloc());
   int ffmpegStatus = AVSUCCESS;
@@ -696,6 +703,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     throw std::runtime_error("Could not receive frame from decoder: " +
                              getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+  auto decodeDone = std::chrono::high_resolution_clock::now();
   // Note that we don't flush the decoder when we reach EOF (even though that's
   // mentioned in https://ffmpeg.org/doxygen/trunk/group__lavc__encdec.html).
   // This is because we may have packets internally in the decoder that we
@@ -705,8 +713,14 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo &activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
+  auto startToSeekDone = std::chrono::duration_cast<std::chrono::milliseconds>(
+      seekDone - start);
+  auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
+      decodeDone - seekDone);
   VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
-          << " pts=" << frame->pts << " stats=" << decodeStats_;
+          << " pts=" << frame->pts << " stats=" << decodeStats_
+          << " startToSeekDone=" << startToSeekDone.count() << "ms"
+          << " seekToDecodeDone=" << seekToDecodeDone.count() << "ms";
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
@@ -1012,7 +1026,16 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext *swsContext = sws_getContext(
         frame->width, frame->height, frameFormat, outputWidth, outputHeight,
-        AV_PIX_FMT_RGB24, 0, nullptr, nullptr, nullptr);
+        AV_PIX_FMT_RGB24,
+        SWS_BILINEAR,
+        nullptr, nullptr, nullptr);
+    const int *invTable, *table;
+    int srcRange, dstRange, brightness, contrast, saturation;
+    sws_getColorspaceDetails(swsContext, (int **)&invTable, &srcRange,
+                                     (int **)&table, &dstRange,
+                                     &brightness, &contrast, &saturation);
+    const int *colorspaceTable = sws_getCoefficients(frame->colorspace);
+    sws_setColorspaceDetails(swsContext, colorspaceTable, srcRange, colorspaceTable, dstRange, brightness, contrast, saturation);
     activeStream.swsContext.reset(swsContext);
   }
   SwsContext *swsContext = activeStream.swsContext.get();
@@ -1020,13 +1043,6 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   // of the Tensor unfilled. We use torch::zeros instead of torch::empty to have
   // deterministic output.
   // TODO: T179078241 we can use libfiltergraph to resolve this bug.
-
-#ifdef ENABLE_CODEC_TIMING
-  std::cout << "AHMAD: " << " outputHeight=" << outputHeight
-            << " outputWidth=" << outputWidth
-            << " frame->width=" << frame->width
-            << " frame->height=" << frame->height << std::endl;
-#endif
   uint8_t *pointers[4] = {static_cast<uint8_t*>(rawOutput.data), nullptr, nullptr, nullptr};
   int linesizes[4] = {outputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(swsContext, frame->data, frame->linesize, 0,
