@@ -169,7 +169,11 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
         create_time = timeit.default_timer()
         decoder = create_from_file(video_file)
         add_stream_time = timeit.default_timer()
-        add_video_stream(decoder, num_threads=self._num_threads)
+        add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         frames = []
         times = []
         frames_time = timeit.default_timer()
@@ -223,7 +227,11 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
         frames = []
@@ -405,15 +413,8 @@ def main() -> None:
     results = []
     for decoder_name, decoder in decoder_dict.items():
         for video_path in args.bm_video_paths.split(","):
-
-            # decoder.get_consecutive_frames_from_video(video_path, 1)
-            # start = timeit.default_timer()
-            # decoder.get_consecutive_frames_from_video(video_path, 1)
-            # end = timeit.default_timer()
-            # duration_ms = 1000 * round(end - start, 3)
-            # print(f"{decoder_name} {video_path} {duration_ms}ms")
-            # continue
-
+            # We only use the SimpleVideoDecoder to get the metadata and get
+            # the list of PTS values to seek to.
             simple_decoder = SimpleVideoDecoder(video_path)
             duration = simple_decoder.metadata.duration_seconds
             pts_list = [
@@ -473,7 +474,7 @@ def main() -> None:
         )
         results.append(
             creation_result.blocked_autorange(
-                min_run_time=args.bm_video_speed_min_run_seconds
+                min_run_time=2.0,
             )
         )
     compare = benchmark.Compare(results)

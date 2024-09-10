@@ -125,8 +125,8 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   enum ColorConversionLibrary {
     AUTO,
-    SWSCALE,
-    FILTERGRAPH
+    FILTERGRAPH,
+    SWSSCALE
   };
   struct VideoStreamDecoderOptions {
     VideoStreamDecoderOptions() {}

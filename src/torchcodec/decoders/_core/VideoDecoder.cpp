@@ -129,11 +129,11 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
       } if (value == "filtergraph") {
         colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
       } else if (value == "swscale") {
-        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+        colorConversionLibrary = ColorConversionLibrary::SWSSCALE;
       } else {
-        throw std::runtime_error(
-            "Invalid color_conversion_library=" + value +
-            ". color_conversion_library must be either filtergraph or swscale.");
+        throw std::runtime_error("Invalid color_conversion_library=" + value +
+                                 ". color_conversion_library must be either "
+                                 "filtergraph or swscale.");
       }
     } else {
       throw std::runtime_error(
@@ -380,9 +380,10 @@ void VideoDecoder::addVideoStreamDecoder(
   // widths.
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   // In that case we are forced to use a filtergraph to do the color conversion.
-  auto colorConversionLibrary = options.colorConversionLibrary.value_or(ColorConversionLibrary::AUTO);
-  bool useFilterGraph = (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) ||
-  (colorConversionLibrary == ColorConversionLibrary::AUTO && width % 32 != 0);
+  auto colorConversionLibrary = options.colorConversionLibrary.value_or(
+      ColorConversionLibrary::FILTERGRAPH);
+  bool useFilterGraph =
+      (colorConversionLibrary != ColorConversionLibrary::SWSSCALE);
   if (useFilterGraph) {
     initializeFilterGraphForStream(streamNumber, options);
   }
@@ -729,8 +730,8 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo &activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
-  auto startToSeekDone = std::chrono::duration_cast<std::chrono::milliseconds>(
-      seekDone - start);
+  auto startToSeekDone =
+      std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
   auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
       decodeDone - seekDone);
   VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
@@ -748,7 +749,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
-  AVFrame* frame = rawOutput.frame.get();
+  AVFrame *frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto &streamInfo = streams_[streamIndex];
   output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
@@ -760,20 +761,40 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.filterState.sourceContext == nullptr) {
+      auto start = std::chrono::high_resolution_clock::now();
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
-      torch::Tensor tensor = torch::empty({height, width, 3},
-                     torch::TensorOptions()
-                         .dtype({torch::kUInt8}));
+      torch::Tensor tensor = torch::empty(
+          {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+      auto allocateDone = std::chrono::high_resolution_clock::now();
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
+      auto convertDone = std::chrono::high_resolution_clock::now();
+      auto startToAllocateDone =
+          std::chrono::duration_cast<std::chrono::microseconds>(allocateDone -
+                                                                start);
+      auto allocateToConvertDone =
+          std::chrono::duration_cast<std::chrono::microseconds>(convertDone -
+                                                                allocateDone);
+      auto total = std::chrono::duration_cast<std::chrono::microseconds>(
+          convertDone - start);
+      VLOG(9) << "convertFrameToBufferUsingSwsScale() took "
+              << startToAllocateDone.count() << "us"
+              << " allocateToConvertDone=" << allocateToConvertDone.count()
+              << "us" << " total=" << total.count() << "us" << std::endl;
+
       if (streamInfo.options.dimensionOrder == "NCHW") {
         tensor = tensor.permute({2, 0, 1});
       }
       output.frame = tensor;
     } else {
-      output.frame =
-        convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      auto start = std::chrono::high_resolution_clock::now();
+      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      auto end = std::chrono::high_resolution_clock::now();
+      auto duration =
+          std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+      VLOG(9) << "convertFrameToTensorUsingFilterGraph() took "
+              << duration.count() << "us" << std::endl;
     }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
@@ -887,7 +908,8 @@ VideoDecoder::getFramesAtIndexes(int streamIndex,
     } else {
       // We are using a filter graph to convert the frame to tensor. So we need
       // to copy the color-converted frame to the output tensor.
-      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
+      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
+          rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
       output.frames[i] = frame;
     }
     i++;
@@ -1060,23 +1082,19 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext *swsContext = sws_getContext(
         frame->width, frame->height, frameFormat, outputWidth, outputHeight,
-        AV_PIX_FMT_RGB24,
-        SWS_BILINEAR,
-        nullptr, nullptr, nullptr);
+        AV_PIX_FMT_RGB24, SWS_BILINEAR, nullptr, nullptr, nullptr);
     const int *invTable, *table;
     int srcRange, dstRange, brightness, contrast, saturation;
     sws_getColorspaceDetails(swsContext, (int **)&invTable, &srcRange,
-                                     (int **)&table, &dstRange,
-                                     &brightness, &contrast, &saturation);
+                             (int **)&table, &dstRange, &brightness, &contrast,
+                             &saturation);
     const int *colorspaceTable = sws_getCoefficients(frame->colorspace);
-    sws_setColorspaceDetails(swsContext, colorspaceTable, srcRange, colorspaceTable, dstRange, brightness, contrast, saturation);
+    sws_setColorspaceDetails(swsContext, colorspaceTable, srcRange,
+                             colorspaceTable, dstRange, brightness, contrast,
+                             saturation);
     activeStream.swsContext.reset(swsContext);
   }
   SwsContext *swsContext = activeStream.swsContext.get();
-  // There appears to be a bug in sws_scale where it can sometimes leave parts
-  // of the Tensor unfilled. We use torch::zeros instead of torch::empty to have
-  // deterministic output.
-  // TODO: T179078241 we can use libfiltergraph to resolve this bug.
   uint8_t *pointers[4] = {static_cast<uint8_t*>(rawOutput.data), nullptr, nullptr, nullptr};
   int linesizes[4] = {outputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(swsContext, frame->data, frame->linesize, 0,
