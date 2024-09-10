@@ -63,7 +63,8 @@ jobs:
           pushd $build_tests_dir
           TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
           Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
-          cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
+          # TELL SCOTT TO REMOVE THE S3 LINE BELOW
+          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
           cmake --build .
           ctest
           popd
