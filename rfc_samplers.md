@@ -68,6 +68,7 @@ clips = samplers.get_evenly_timed_clips(  # often called "Periodic"
     clip_range_start_seconds=3,
     clip_range_end_seconds=4,
 )
+```
 
 Option 2
 --------
