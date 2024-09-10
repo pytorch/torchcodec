@@ -138,7 +138,7 @@ void add_video_stream(
     } else {
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
-          ". color_conversion_library must be either filtergraph or swscale.");
+          ". color_conversion_library must be either filtergraph or swsscale.");
     }
   }
 

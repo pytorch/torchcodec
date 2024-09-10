@@ -124,8 +124,11 @@ class VideoDecoder {
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
   enum ColorConversionLibrary {
+    // Let the decoder decide the color conversion library to use.
     AUTO,
+    // Use the libswscale library for color conversion.
     FILTERGRAPH,
+    // Use the libswscale library for color conversion.
     SWSSCALE
   };
   struct VideoStreamDecoderOptions {
