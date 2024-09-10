@@ -393,6 +393,8 @@ def main() -> None:
             options = decoder[len("tcbatchoptions:") :]
             kwargs_dict = {}
             for item in options.split("+"):
+                if item.strip() == "":
+                    continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
             decoder_dict["TorchCodecNonCompiledBatch:" + options] = (
@@ -402,6 +404,8 @@ def main() -> None:
             options = decoder[len("tcoptions:") :]
             kwargs_dict = {}
             for item in options.split("+"):
+                if item.strip() == "":
+                    continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
             decoder_dict["TorchcodecNonCompiled:" + options] = (
