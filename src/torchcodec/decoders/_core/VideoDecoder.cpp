@@ -971,13 +971,15 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
     setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
     auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
     if (stream.filterState.sourceContext == nullptr) {
-      // We are using sws_scale to conver the frame to tensor. So we can
-      // convert directly to the output tensor.
+      // We are using sws_scale to convert the frame to tensor. sws_scale can
+      // convert to a pre-allocated buffer so we can do the color-conversion
+      // in-place on the output tensor's data_ptr.
       rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawSingleOutput);
     } else {
-      // We are using a filter graph to convert the frame to tensor. So we need
-      // to copy the color-converted frame to the output tensor.
+      // We are using a filter graph to convert the frame to tensor. The
+      // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
+      // copy the AVFrame to the output tensor.
       torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
           rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
       output.frames[i] = frame;
