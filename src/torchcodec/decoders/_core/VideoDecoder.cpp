@@ -419,7 +419,7 @@ void VideoDecoder::addVideoStreamDecoder(
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
   int width = options.width.value_or(codecContext->width);
-  // There is a bug in sws_scale where it doesn't handle non-multiple of 16
+  // There is a bug in sws_scale where it doesn't handle non-multiple of 32
   // widths.
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   // In that case we are forced to use a filtergraph to do the color conversion.
