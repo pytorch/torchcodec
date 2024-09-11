@@ -135,7 +135,7 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
       if (value == "filtergraph") {
         colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
       } else if (value == "swscale") {
-        colorConversionLibrary = ColorConversionLibrary::SWSSCALE;
+        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
       } else {
         throw std::runtime_error(
             "Invalid color_conversion_library=" + value +
@@ -426,7 +426,7 @@ void VideoDecoder::addVideoStreamDecoder(
   auto colorConversionLibrary = options.colorConversionLibrary.value_or(
       ColorConversionLibrary::FILTERGRAPH);
   bool useFilterGraph =
-      (colorConversionLibrary != ColorConversionLibrary::SWSSCALE);
+      (colorConversionLibrary != ColorConversionLibrary::SWSCALE);
   if (useFilterGraph) {
     initializeFilterGraphForStream(streamNumber, options);
   }

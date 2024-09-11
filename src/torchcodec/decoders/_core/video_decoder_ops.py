@@ -61,6 +61,7 @@ create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
+_add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
 seek_to_pts = torch.ops.torchcodec_ns.seek_to_pts.default
 get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
@@ -105,6 +106,20 @@ def create_from_file_abstract(filename: str) -> torch.Tensor:
 @register_fake("torchcodec_ns::create_from_tensor")
 def create_from_tensor_abstract(video_tensor: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::_add_video_stream")
+def _add_video_stream_abstract(
+    decoder: torch.Tensor,
+    *,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    num_threads: Optional[int] = None,
+    dimension_order: Optional[str] = None,
+    stream_index: Optional[int] = None,
+    color_conversion_library: Optional[str] = None,
+) -> None:
+    return
 
 
 @register_fake("torchcodec_ns::add_video_stream")

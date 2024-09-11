@@ -35,6 +35,14 @@ void add_video_stream(
     std::optional<int64_t> height = std::nullopt,
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<c10::string_view> dimension_order = std::nullopt,
+    std::optional<int64_t> stream_index = std::nullopt);
+
+void _add_video_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> width = std::nullopt,
+    std::optional<int64_t> height = std::nullopt,
+    std::optional<int64_t> num_threads = std::nullopt,
+    std::optional<c10::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<c10::string_view> color_conversion_library = std::nullopt);
 

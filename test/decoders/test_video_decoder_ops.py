@@ -14,9 +14,9 @@ import numpy as np
 import pytest
 
 import torch
-from PIL import Image
 
 from torchcodec.decoders._core import (
+    _add_video_stream,
     _test_frame_pts_equality,
     add_video_stream,
     create_from_bytes,
@@ -52,26 +52,12 @@ class ReferenceDecoder:
         seek_to_pts(self.decoder, pts)
 
 
-def dump_tensor_to_disk(tensor, filename_prefix):
-    filename = f"{filename_prefix}.pt"
-    bmp_filename = f"{filename_prefix}.bmp"
-    img_array = tensor.permute(1, 2, 0).cpu().numpy()
-    img = Image.fromarray(img_array)
-    img.save(bmp_filename, format="BMP")
-    torch.save(tensor, filename, _use_new_zipfile_serialization=True)
-
-
 class TestOps:
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_seek_and_next(self, color_conversion_library):
+    def test_seek_and_next(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        # To debug the test, uncomment the following line:
-        # dump_tensor_to_disk(frame0, "frame0")
-        # TODO: assert_tensor_equal should automatically dump tensors to disk
-        # for debugging upon failure.
         assert_tensor_equal(frame0, reference_frame0)
         reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         frame1, _, _ = get_next_frame(decoder)
@@ -81,10 +67,9 @@ class TestOps:
         reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_get_frame_at_pts(self, color_conversion_library):
+    def test_get_frame_at_pts(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
         frame6, _, _ = get_frame_at_pts(decoder, 6.006)
@@ -101,11 +86,10 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(next_frame, reference_frame6)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_get_frame_at_index(self, color_conversion_library):
+    def test_get_frame_at_index(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
@@ -114,11 +98,10 @@ class TestOps:
         reference_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_get_frame_with_info_at_index(self, color_conversion_library):
+    def test_get_frame_with_info_at_index(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
         frame6, pts, duration = get_frame_at_index(
             decoder, stream_index=3, frame_index=180
         )
@@ -127,11 +110,10 @@ class TestOps:
         assert pts.item() == pytest.approx(6.006, rel=1e-3)
         assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_get_frames_at_indices(self, color_conversion_library):
+    def test_get_frames_at_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
         frames0and180 = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
         )
@@ -140,11 +122,10 @@ class TestOps:
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_get_frames_in_range(self, color_conversion_library):
+    def test_get_frames_in_range(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
 
         # ensure that the degenerate case of a range of size 1 works
         ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
@@ -209,14 +190,13 @@ class TestOps:
         with pytest.raises(StopIteration, match="no more frames"):
             get_next_frame(decoder)
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_compile_seek_and_next(self, color_conversion_library):
+    def test_compile_seek_and_next(self):
         # TODO_OPEN_ISSUE Scott (T180277797): Get this to work with the inductor stack. Right now
         # compilation fails because it can't handle tensors of size unknown at
         # compile-time.
         @torch.compile(fullgraph=True, backend="eager")
         def get_frame1_and_frame_time6(decoder):
-            add_video_stream(decoder, color_conversion_library=color_conversion_library)
+            add_video_stream(decoder)
             frame0, _, _ = get_next_frame(decoder)
             seek_to_pts(decoder, 6.0)
             frame_time6, _, _ = get_next_frame(decoder)
@@ -323,11 +303,10 @@ class TestOps:
         split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
         assert len(split_ffmpeg_version) == 3
 
-    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swsscale"))
-    def test_frame_pts_equality(self, color_conversion_library):
+    def test_frame_pts_equality(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        add_video_stream(decoder)
 
         # Note that for all of these tests, we store the return value of
         # _test_frame_pts_equality() into a boolean variable, and then do the assertion
@@ -343,6 +322,46 @@ class TestOps:
                 decoder, stream_index=3, frame_index=i, pts_seconds_to_test=pts.item()
             )
             assert pts_is_equal
+
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library(self, color_conversion_library):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        frame0, _, _ = get_next_frame(decoder)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        assert_tensor_equal(frame0, reference_frame0)
+        reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
+        frame1, _, _ = get_next_frame(decoder)
+        assert_tensor_equal(frame1, reference_frame1)
+        seek_to_pts(decoder, 6.0)
+        frame_time6, _, _ = get_next_frame(decoder)
+        reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
+        assert_tensor_equal(frame_time6, reference_frame_time6)
+
+    def test_color_conversion_library_with_scaling(self):
+        target_height = 100
+        target_width = 100
+        assert target_width != NASA_VIDEO.width
+        assert target_height != NASA_VIDEO.height
+
+        filtergraph_decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(
+            filtergraph_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="filtergraph",
+        )
+        filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
+
+        swscale_decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(
+            swscale_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="swscale",
+        )
+        swscale_frame0, _, _ = get_next_frame(swscale_decoder)
+        assert_tensor_equal(filtergraph_frame0, swscale_frame0)
 
 
 if __name__ == "__main__":

@@ -29,7 +29,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
+  m.def(
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -117,6 +119,16 @@ void add_video_stream(
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
+    std::optional<int64_t> stream_index) {
+  _add_video_stream(decoder, width, height, num_threads, dimension_order, stream_index);
+}
+
+void _add_video_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> width,
+    std::optional<int64_t> height,
+    std::optional<int64_t> num_threads,
+    std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index,
     std::optional<c10::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
@@ -133,12 +145,12 @@ void add_video_stream(
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
       options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
-    } else if (stdColorConversionLibrary == "swsscale") {
-      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::SWSSCALE;
+    } else if (stdColorConversionLibrary == "swscale") {
+      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
-          ". color_conversion_library must be either filtergraph or swsscale.");
+          ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
 
@@ -439,6 +451,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
+  m.impl("_add_video_stream", &_add_video_stream);
   m.impl("get_next_frame", &get_next_frame);
   m.impl("get_json_metadata", &get_json_metadata);
   m.impl("get_container_json_metadata", &get_container_json_metadata);

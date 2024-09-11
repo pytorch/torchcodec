@@ -16,7 +16,7 @@ import torch.utils.benchmark as benchmark
 from torchcodec.decoders import SimpleVideoDecoder
 
 from torchcodec.decoders._core import (
-    add_video_stream,
+    _add_video_stream,
     create_from_file,
     get_frames_at_indices,
     get_json_metadata,
@@ -147,7 +147,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        add_video_stream(
+        _add_video_stream(
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
@@ -169,7 +169,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
         create_time = timeit.default_timer()
         decoder = create_from_file(video_file)
         add_stream_time = timeit.default_timer()
-        add_video_stream(
+        _add_video_stream(
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
@@ -209,7 +209,7 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(
+        _add_video_stream(
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
@@ -227,7 +227,7 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(
+        _add_video_stream(
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
@@ -259,7 +259,7 @@ class TorchcodecCompiled(AbstractDecoder):
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder)
+        _add_video_stream(decoder)
         frames = []
         for pts in pts_list:
             frame = compiled_seek_and_next(decoder, pts)
@@ -268,7 +268,7 @@ class TorchcodecCompiled(AbstractDecoder):
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder)
+        _add_video_stream(decoder)
         frames = []
         for _ in range(numFramesToDecode):
             frame = compiled_next(decoder)
@@ -321,7 +321,7 @@ def get_test_resource_path(filename: str) -> str:
 
 def create_torchcodec_decoder_from_file(video_file):
     video_decoder = create_from_file(video_file)
-    add_video_stream(video_decoder)
+    _add_video_stream(video_decoder)
     get_next_frame(video_decoder)
     return video_decoder
 
@@ -362,7 +362,7 @@ def main() -> None:
             "For torchcodec, you can specify options with tcoptions:<plus-separated-options>. "
         ),
         type=str,
-        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled,torchcodec_filtergraph,torchcodec_swsscale",
+        default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,tcoptions:num_threads=1",
     )
 
     args = parser.parse_args()

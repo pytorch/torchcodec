@@ -129,7 +129,7 @@ class VideoDecoder {
     // Use the libswscale library for color conversion.
     FILTERGRAPH,
     // Use the libswscale library for color conversion.
-    SWSSCALE
+    SWSCALE
   };
   struct VideoStreamDecoderOptions {
     VideoStreamDecoderOptions() {}
