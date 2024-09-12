@@ -124,8 +124,7 @@ class VideoDecoder {
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
   enum ColorConversionLibrary {
-    // Let the implementation decide the color conversion library to use.
-    AUTO,
+    // TODO: Add an AUTO option later.
     // Use the libswscale library for color conversion.
     FILTERGRAPH,
     // Use the libswscale library for color conversion.
@@ -146,7 +145,7 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary = AUTO;
+    std::optional<ColorConversionLibrary> colorConversionLibrary = FILTERGRAPH;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(

@@ -129,9 +129,6 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
     } else if (key == "height") {
       height = std::stoi(value);
     } else if (key == "color_conversion_library") {
-      if (value == "auto") {
-        colorConversionLibrary = ColorConversionLibrary::AUTO;
-      }
       if (value == "filtergraph") {
         colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
       } else if (value == "swscale") {

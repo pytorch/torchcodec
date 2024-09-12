@@ -338,9 +338,17 @@ class TestOps:
         reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
-    def test_color_conversion_library_with_scaling(self):
-        target_height = 100
-        target_width = 100
+    # We choose arbitrary values for width and height scaling to get better
+    # test coverage. Some pairs upscale the image while others downscale it.
+    @pytest.mark.parametrize(
+        "width_scaling_factor,height_scaling_factor",
+        ((1.3, 1.5), (0.7, 0.5), (1.3, 0.7), (0.7, 1.5)),
+    )
+    def test_color_conversion_library_with_down_scaling(
+        self, width_scaling_factor, height_scaling_factor
+    ):
+        target_height = int(NASA_VIDEO.height * height_scaling_factor)
+        target_width = int(NASA_VIDEO.width * width_scaling_factor)
         assert target_width != NASA_VIDEO.width
         assert target_height != NASA_VIDEO.height
 
