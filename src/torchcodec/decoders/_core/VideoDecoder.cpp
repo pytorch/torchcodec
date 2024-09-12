@@ -342,7 +342,7 @@ void VideoDecoder::initializeFilterGraphForStream(
     width = *options.width;
     height = *options.height;
   }
-  std::snprintf(description, sizeof(description), "scale=%d:%d:sws_flags=bicubic", width, height);
+  std::snprintf(description, sizeof(description), "scale=%d:%d:sws_flags=bilinear", width, height);
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
   ffmpegStatus = avfilter_graph_parse_ptr(
