@@ -14,23 +14,22 @@ In this example, we'll learn how to decode a video using the
 """
 
 # %%
-# First, a bit of boilerplate: we'll download a video from the web, and define a
-# plotting utility. You can ignore that part and jump right below to
-# :ref:`creating_decoder`.
+# First, a bit of boilerplate: we'll define the location of the video we're
+# going to use and a plotting utility. You can ignore that part and jump right
+# below to :ref:`creating_decoder`.
 
 from typing import Optional
 import torch
-import requests
 
 
 # Video source: https://www.pexels.com/video/dog-eating-854132/
 # License: CC0. Author: Coverr.
-url = "https://videos.pexels.com/video-files/854132/854132-sd_640_360_25fps.mp4"
-response = requests.get(url)
-if response.status_code != 200:
-    raise RuntimeError(f"Failed to download video. {response.status_code = }.")
+#
+# You can download your own copy from:
+#     https://videos.pexels.com/video-files/854132/854132-sd_640_360_25fps.mp4.
+# We're going to load a local copy that we already downloaded.
 
-raw_video_bytes = response.content
+dog_video_path = "dog_eating_854132.mp4"
 
 
 def plot(frames: torch.Tensor, title : Optional[str] = None):
@@ -57,13 +56,11 @@ def plot(frames: torch.Tensor, title : Optional[str] = None):
 # Creating a decoder
 # ------------------
 #
-# We can now create a decoder from the raw (encoded) video bytes. You can of
-# course use a local video file and pass the path as input, rather than download
-# a video.
+# We can now create a decoder from the locally available video file. You can also
+# dynamically download a video and provide the raw, encoded bytes as input as well.
 from torchcodec.decoders import SimpleVideoDecoder
 
-# You can also pass a path to a local file!
-decoder = SimpleVideoDecoder(raw_video_bytes)
+decoder = SimpleVideoDecoder(dog_video_path)
 
 # %%
 # The has not yet been decoded by the decoder, but we already have access to
