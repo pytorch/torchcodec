@@ -26,6 +26,7 @@ function(make_torchcodec_library library_name ffmpeg_target)
         ./../../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
+        ${FFMPEG_INCLUDE_DIRS}
     )
 
     target_link_libraries(
