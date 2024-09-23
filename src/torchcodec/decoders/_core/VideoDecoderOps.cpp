@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include "c10/util/Exception.h"
 #include "c10/core/SymIntArrayRef.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
@@ -169,7 +170,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   try {
     result = videoDecoder->getNextDecodedOutputNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
-    throw pybind11::stop_iteration(e.what());
+    C10_THROW_ERROR(IndexError, e.what());
   }
   if (result.frame.sizes().size() != 3) {
     throw std::runtime_error(

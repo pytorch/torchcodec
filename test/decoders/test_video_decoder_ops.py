@@ -179,7 +179,7 @@ class TestOps:
         last_frame, _, _ = get_next_frame(decoder)
         reference_last_frame = NASA_VIDEO.get_frame_by_name("time12.979633")
         assert_tensor_equal(last_frame, reference_last_frame)
-        with pytest.raises(StopIteration, match="no more frames"):
+        with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
     def test_throws_exception_if_seek_too_far(self):
@@ -187,7 +187,7 @@ class TestOps:
         add_video_stream(decoder)
         # pts=12.979633 is the last frame in the video.
         seek_to_pts(decoder, 12.979633 + 1.0e-4)
-        with pytest.raises(StopIteration, match="no more frames"):
+        with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
     def test_compile_seek_and_next(self):

@@ -1,6 +1,7 @@
 import importlib
 import os
 import pathlib
+import sys
 
 from dataclasses import dataclass
 from typing import Dict
@@ -10,12 +11,16 @@ import numpy as np
 import torch
 
 
-# For use with decoded data frames, or in other instances were we are confident that
-# reference and test tensors should be exactly equal. This is true for decoded data
-# frames from media because we expect our decoding to exactly match what a user can
-# do on the command line with ffmpeg.
+# For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On
+# all other platforms, we allow a small tolerance. FFmpeg does not guarantee bit-for-bit
+# equality across systems and architectures, so we also cannot. We currently use Linux
+# on x86_64 as our reference system.
 def assert_tensor_equal(*args, **kwargs):
-    torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
+    if sys.platform == "linux":
+        absolute_tolerance = 0
+    else:
+        absolute_tolerance = 3
+    torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
 
 
 # For use with floating point metadata, or in other instances where we are not confident
