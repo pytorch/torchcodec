@@ -104,12 +104,11 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
         frames_done = timeit.default_timer()
         if self._print_each_iteration_time:
             del reader
-        del_done = timeit.default_timer()
-        create_duration = 1000 * round(create_done - start, 3)
-        frames_duration = 1000 * round(frames_done - create_done, 3)
-        del_duration = 1000 * round(del_done - frames_done, 3)
-        total_duration = 1000 * round(del_done - start, 3)
-        if self._print_each_iteration_time:
+            del_done = timeit.default_timer()
+            create_duration = 1000 * round(create_done - start, 3)
+            frames_duration = 1000 * round(frames_done - create_done, 3)
+            del_duration = 1000 * round(del_done - frames_done, 3)
+            total_duration = 1000 * round(del_done - start, 3)
             print(
                 f"TV: {create_duration=} {frames_duration=} {del_duration=} {total_duration=}"
             )
@@ -125,14 +124,14 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
         frames_done = timeit.default_timer()
+
         if self._print_each_iteration_time:
             del reader
-        del_done = timeit.default_timer()
-        create_duration = 1000 * round(create_done - start, 3)
-        frames_duration = 1000 * round(frames_done - create_done, 3)
-        del_duration = 1000 * round(del_done - frames_done, 3)
-        total_duration = 1000 * round(del_done - start, 3)
-        if self._print_each_iteration_time:
+            del_done = timeit.default_timer()
+            create_duration = 1000 * round(create_done - start, 3)
+            frames_duration = 1000 * round(frames_done - create_done, 3)
+            del_duration = 1000 * round(del_done - frames_done, 3)
+            total_duration = 1000 * round(del_done - start, 3)
             print(
                 f"TV: consecutive: {create_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0].shape=}"
             )
@@ -161,6 +160,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
+
         if self._print_each_iteration_time:
             print("torchcodec times=", times, sum(times))
         return frames
@@ -183,16 +183,16 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
-        del_time = timeit.default_timer()
+        del decoder
         if self._print_each_iteration_time:
+            del_time = timeit.default_timer()
             del decoder
-        done_time = timeit.default_timer()
-        create_duration = 1000 * round(add_stream_time - create_time, 3)
-        add_stream_duration = 1000 * round(frames_time - add_stream_time, 3)
-        frames_duration = 1000 * round(del_time - frames_time, 3)
-        del_duration = 1000 * round(done_time - del_time, 3)
-        total_duration = 1000 * round(done_time - create_time, 3)
-        if self._print_each_iteration_time:
+            done_time = timeit.default_timer()
+            create_duration = 1000 * round(add_stream_time - create_time, 3)
+            add_stream_duration = 1000 * round(frames_time - add_stream_time, 3)
+            frames_duration = 1000 * round(del_time - frames_time, 3)
+            del_duration = 1000 * round(done_time - del_time, 3)
+            total_duration = 1000 * round(done_time - create_time, 3)
             print(
                 f"{numFramesToDecode=} {create_duration=} {add_stream_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0][0].shape=}"
             )
@@ -412,8 +412,6 @@ def main() -> None:
                 TorchcodecNonCompiledWithOptions(**kwargs_dict)
             )
 
-    decoder_dict["TVNewAPIDecoderWithBackendVideoReader"]
-
     results = []
     for decoder_name, decoder in decoder_dict.items():
         for video_path in args.bm_video_paths.split(","):
@@ -466,6 +464,9 @@ def main() -> None:
 
     first_video_path = args.bm_video_paths.split(",")[0]
     if args.bm_video_creation:
+        simple_decoder = SimpleVideoDecoder(first_video_path)
+        metadata = simple_decoder.metadata
+        metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
         creation_result = benchmark.Timer(
             stmt="create_torchcodec_decoder_from_file(video_file)",
             globals={
