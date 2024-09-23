@@ -183,7 +183,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
-        del decoder
+
         if self._print_each_iteration_time:
             del_time = timeit.default_timer()
             del decoder
