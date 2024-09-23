@@ -44,6 +44,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.58
        libavdevice.so.58
        libavfilter.so.7
+       libswscale.so.5
     )
     set(
        f5_library_file_names
@@ -52,6 +53,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.59
        libavdevice.so.59
        libavfilter.so.8
+       libswscale.so.6
     )
     set(
        f6_library_file_names
@@ -60,6 +62,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.60
        libavdevice.so.60
        libavfilter.so.9
+       libswscale.so.7
     )
     set(
        f7_library_file_names
@@ -68,6 +71,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.61
        libavdevice.so.61
        libavfilter.so.10
+       libswscale.so.8
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(
@@ -97,6 +101,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.58.dylib
        libavdevice.58.dylib
        libavfilter.7.dylib
+       libswscale.5.dylib
     )
     set(
        f5_library_file_names
@@ -105,6 +110,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.59.dylib
        libavdevice.59.dylib
        libavfilter.8.dylib
+       libswscale.6.dylib
     )
     set(
        f6_library_file_names
@@ -113,6 +119,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.60.dylib
        libavdevice.60.dylib
        libavfilter.9.dylib
+       libswscale.7.dylib
     )
     set(
        f7_library_file_names
@@ -121,6 +128,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.61.dylib
        libavdevice.61.dylib
        libavfilter.10.dylib
+       libswscale.8.dylib
     )
 else()
     message(
