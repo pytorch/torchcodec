@@ -416,16 +416,15 @@ void VideoDecoder::addVideoStreamDecoder(
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
   int width = options.width.value_or(codecContext->width);
-  // There is a bug in sws_scale where it doesn't handle non-multiple of 32
-  // widths.
-  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
-  // In that case we are forced to use a filtergraph to do the color conversion.
   auto colorConversionLibrary = options.colorConversionLibrary.value_or(
       ColorConversionLibrary::FILTERGRAPH);
   bool useFilterGraph =
       (colorConversionLibrary != ColorConversionLibrary::SWSCALE);
   if (useFilterGraph) {
     initializeFilterGraphForStream(streamNumber, options);
+    streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+  } else {
+    streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
   }
 }
 
@@ -822,41 +821,20 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
-    if (streamInfo.filterState.sourceContext == nullptr) {
-      auto start = std::chrono::high_resolution_clock::now();
+    if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
       torch::Tensor tensor = torch::empty(
           {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
-      auto allocateDone = std::chrono::high_resolution_clock::now();
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
-      auto convertDone = std::chrono::high_resolution_clock::now();
-      auto startToAllocateDone =
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              allocateDone - start);
-      auto allocateToConvertDone =
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              convertDone - allocateDone);
-      auto total = std::chrono::duration_cast<std::chrono::microseconds>(
-          convertDone - start);
-      VLOG(9) << "convertFrameToBufferUsingSwsScale() took "
-              << startToAllocateDone.count() << "us"
-              << " allocateToConvertDone=" << allocateToConvertDone.count()
-              << "us" << " total=" << total.count() << "us" << std::endl;
 
       if (streamInfo.options.dimensionOrder == "NCHW") {
         tensor = tensor.permute({2, 0, 1});
       }
       output.frame = tensor;
     } else {
-      auto start = std::chrono::high_resolution_clock::now();
       output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
-      auto end = std::chrono::high_resolution_clock::now();
-      auto duration =
-          std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-      VLOG(9) << "convertFrameToTensorUsingFilterGraph() took "
-              << duration.count() << "us" << std::endl;
     }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
@@ -967,7 +945,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
     int64_t pts = stream.allFrames[frameIndex].pts;
     setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
     auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
-    if (stream.filterState.sourceContext == nullptr) {
+    if (stream.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       // We are using sws_scale to convert the frame to tensor. sws_scale can
       // convert to a pre-allocated buffer so we can do the color-conversion
       // in-place on the output tensor's data_ptr.
@@ -1173,13 +1151,14 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
         nullptr,
         nullptr,
         nullptr);
-    const int *invTable, *table;
+    int* invTable = nullptr;
+    int* table = nullptr;
     int srcRange, dstRange, brightness, contrast, saturation;
     sws_getColorspaceDetails(
         swsContext,
-        (int**)&invTable,
+        &invTable,
         &srcRange,
-        (int**)&table,
+        &table,
         &dstRange,
         &brightness,
         &contrast,
