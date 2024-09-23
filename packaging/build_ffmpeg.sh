@@ -76,24 +76,28 @@ if [[ "$(uname)" == Darwin ]]; then
         avformat=libavformat.58
         avdevice=libavdevice.58
         avfilter=libavfilter.7
+        swscale=libswscale.5
     elif [[ ${major_ver} == 5 ]]; then
         avutil=libavutil.57
         avcodec=libavcodec.59
         avformat=libavformat.59
         avdevice=libavdevice.59
         avfilter=libavfilter.8
+        swscale=libswscale.6
     elif [[ ${major_ver} == 6 ]]; then
         avutil=libavutil.58
         avcodec=libavcodec.60
         avformat=libavformat.60
         avdevice=libavdevice.60
         avfilter=libavfilter.9
+        swscale=libswscale.7
     elif [[ ${major_ver} == 7 ]]; then
         avutil=libavutil.59
         avcodec=libavcodec.61
         avformat=libavformat.61
         avdevice=libavdevice.61
         avfilter=libavfilter.10
+        swscale=libswscale.8
     else
         printf "Error: unexpected FFmpeg major version: %s\n"  ${major_ver}
         exit 1;
@@ -115,7 +119,7 @@ if [[ "$(uname)" == Darwin ]]; then
     fi
 
     # list up the paths to fix
-    for lib in ${avcodec} ${avdevice} ${avfilter} ${avformat} ${avutil}; do
+    for lib in ${avcodec} ${avdevice} ${avfilter} ${avformat} ${avutil} ${swscale}; do
         ${otool} -l ${prefix}/lib/${lib}.dylib | grep -B2 ${prefix}
     done
 
@@ -142,6 +146,13 @@ if [[ "$(uname)" == Darwin ]]; then
         -id @rpath/${avfilter}.dylib \
         ${prefix}/lib/${avfilter}.dylib
     ${otool} -l ${prefix}/lib/${avfilter}.dylib | grep -B2 ${prefix}
+
+    ${install_name_tool} \
+        -change ${prefix}/lib/${avutil}.dylib @rpath/${avutil}.dylib \
+        -delete_rpath ${prefix}/lib \
+        -id @rpath/${swscale}.dylib \
+        ${prefix}/lib/${swscale}.dylib
+    ${otool} -l ${prefix}/lib/${swscale}.dylib | grep -B2 ${prefix}
 
     ${install_name_tool} \
         -change ${prefix}/lib/${avcodec}.dylib @rpath/${avcodec}.dylib \
