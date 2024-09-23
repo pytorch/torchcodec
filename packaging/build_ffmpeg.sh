@@ -60,7 +60,8 @@ tar -xf ffmpeg.tar.gz --strip-components 1
     --enable-avdevice \
     --enable-avfilter \
     --enable-avformat \
-    --enable-avutil
+    --enable-avutil \
+    --enable-swscale
 
 make -j install
 ls ${prefix}/*
