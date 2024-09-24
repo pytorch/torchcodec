@@ -1,3 +1,4 @@
+import random
 import re
 
 import pytest
@@ -5,7 +6,7 @@ import torch
 from torchcodec.decoders import FrameBatch, SimpleVideoDecoder
 from torchcodec.samplers import clips_at_random_indices
 
-from ..utils import NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
 @pytest.mark.parametrize("num_indices_between_frames", [1, 5])
@@ -41,6 +42,40 @@ def test_random_sampler(num_indices_between_frames):
     assert avg_distance_between_frames_seconds == pytest.approx(
         num_indices_between_frames / decoder.metadata.average_fps
     )
+
+
+def test_random_sampler_randomness():
+    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    num_clips = 5
+
+    builtin_random_state_start = random.getstate()
+
+    torch.manual_seed(0)
+    clips_1 = clips_at_random_indices(decoder, num_clips=num_clips)
+
+    # Assert the clip starts aren't sorted, to make sure we haven't messed up
+    # the implementation. (This may fail if we're unlucky, but we hard-coded a
+    # seed, so it will always pass.)
+    clip_starts = [clip.pts_seconds.item() for clip in clips_1]
+    assert sorted(clip_starts) != clip_starts
+
+    # Call the same sampler again with the same seed, expect same results
+    torch.manual_seed(0)
+    clips_2 = clips_at_random_indices(decoder, num_clips=num_clips)
+    for clip_1, clip_2 in zip(clips_1, clips_2):
+        assert_tensor_equal(clip_1.data, clip_2.data)
+        assert_tensor_equal(clip_1.pts_seconds, clip_2.pts_seconds)
+        assert_tensor_equal(clip_1.duration_seconds, clip_2.duration_seconds)
+
+    # Call with a different seed, expect different results
+    torch.manual_seed(1)
+    clips_3 = clips_at_random_indices(decoder, num_clips=num_clips)
+    with pytest.raises(AssertionError, match="not equal"):
+        assert_tensor_equal(clips_1[0].data, clips_3[0].data)
+
+    # Make sure we didn't alter the builting Python RNG
+    builtin_random_state_end = random.getstate()
+    assert builtin_random_state_start == builtin_random_state_end
 
 
 def test_random_sampler_errors():

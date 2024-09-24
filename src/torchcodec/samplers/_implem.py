@@ -1,3 +1,4 @@
+import random
 from typing import List
 
 import torch
@@ -26,6 +27,11 @@ def clips_at_random_indices(
             f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
         )
 
+    if len(decoder) < 1:
+        raise ValueError(
+            f"Decoder must have at least one frame, found {len(decoder)} frames."
+        )
+
     # Determine the span of a clip, i.e. the number of frames (or indices)
     # between the first and last frame in the clip, both included. This isn't
     # the same as the number of frames in a clip!
@@ -47,9 +53,16 @@ def clips_at_random_indices(
         low=0, high=last_clip_start_index + 1, size=(num_clips,)
     )
 
-    # TODO: This is inefficient as we are potentially seeking backwards.
-    # We should sort by clip start before querying, and re-shuffle.
-    # Note: we may still have to seek backwards if we have overlapping clips.
+    # We want to avoid seeking backwards, so we sort the clip start indices
+    # before decoding the frames, and then re-shuffle the clips afterwards.
+    # Backward seeks may still happen if there are overlapping clips, i.e. if a
+    # clip ends after the next one starts.
+    # TODO: We should use a different strategy to avoid backward seeks:
+    # - flatten all frames indices, irrespective of their clip
+    # - sort the indices and dedup
+    # - decode all frames in index order
+    # - re-arrange the frames back into their original clips
+    clip_start_indices = torch.sort(clip_start_indices).values
     clips = [
         decoder.get_frames_at(
             start=clip_start_index,
@@ -58,5 +71,12 @@ def clips_at_random_indices(
         )
         for clip_start_index in clip_start_indices
     ]
+
+    # This an ugly way to shuffle the clips using pytorch RNG *without*
+    # affecting the python builtin RNG.
+    builtin_random_state = random.getstate()
+    random.seed(torch.randint(0, 2**32, (1,)).item())
+    random.shuffle(clips)
+    random.setstate(builtin_random_state)
 
     return clips
