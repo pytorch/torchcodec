@@ -125,7 +125,7 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   enum ColorConversionLibrary {
     // TODO: Add an AUTO option later.
-    // Use the libswscale library for color conversion.
+    // Use the libavfilter library for color conversion.
     FILTERGRAPH,
     // Use the libswscale library for color conversion.
     SWSCALE
