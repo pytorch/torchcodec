@@ -95,29 +95,28 @@ ffmpeg -f lavfi -i \
 ## Installing TorchCodec
 
 Note: if you're on MacOS, you'll need to [build from source](./CONTRIBUTING.md).
-Instructions below assume you're on Linux.
+The instructions below assume you're on Linux.
 
-First install the latest stable version of PyTorch following the [official
-instructions](https://pytorch.org/get-started/locally/).
+  1. Install the latest stable version of PyTorch following the
+     [official instructions](https://pytorch.org/get-started/locally/). TorchCodec
+     requires [PyTorch 2.4](https://pytorch.org/docs/2.4/).
 
-Then:
+  2. Install FFmpeg, if it's not already installed. Your Linux distribution probably
+     comes with FFmpeg pre-installed. TorchCodec supports all major FFmpeg versions
+     in [4, 7].
 
-```bash
-pip install torchcodec
-```
-You will also need FFmpeg installed on your system, and TorchCodec decoding
-capabilities are determined by your underlying FFmpeg installation. There are
-different options to install FFmpeg e.g.:
+     If FFmpeg is not already installed, or you need a later version, install it with:
 
-```bash
-conda install ffmpeg
-# or
-conda install ffmpeg -c conda-forge
-```
+     ```bash
+     conda install ffmpeg
+     # or
+     conda install ffmpeg -c conda-forge
+     ```
+  3. Install TorchCodec:
 
-Your Linux distribution probably comes with FFmpeg pre-installed as well.
-TorchCodec supports all major FFmpeg version in [4, 7].
-
+     ```bash
+     pip install torchcodec
+     ```
 
 ## Planned future work
 
