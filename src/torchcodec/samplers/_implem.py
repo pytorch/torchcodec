@@ -60,3 +60,50 @@ def clips_at_random_indices(
     ]
 
     return clips
+
+
+def clips_at_regular_indices(
+    decoder: SimpleVideoDecoder,
+    *,
+    num_clips: int = 1,
+    num_frames_per_clip: int = 1,
+    num_indices_between_frames: int = 1,
+) -> List[FrameBatch]:
+    if num_clips <= 0:
+        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
+    if num_frames_per_clip <= 0:
+        raise ValueError(
+            f"num_frames_per_clip ({num_frames_per_clip}) must be strictly positive"
+        )
+    if num_indices_between_frames <= 0:
+        raise ValueError(
+            f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
+        )
+
+    clip_span = num_indices_between_frames * (num_frames_per_clip - 1) + 1
+
+    # TODO: We should probably not error.
+    if clip_span > len(decoder):
+        raise ValueError(
+            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
+        )
+    
+    # TODO what if num_clips > (len(decoder) - clip_span)? We can:
+    # - wrap around
+    #   - as a real wrap around [0, 1, 2, 3, 0, 1]
+    #   - the way linspace natively does it i.g. [0, 0, 1, 2, 2, 3]
+    # - truncate and return less than num_clips.
+    # - error
+
+    clip_start_indices = torch.linspace(0, len(decoder) - clip_span, steps=num_clips, dtype=torch.int)
+
+    clips = [
+        decoder.get_frames_at(
+            start=clip_start_index,
+            stop=clip_start_index + clip_span,
+            step=num_indices_between_frames,
+        )
+        for clip_start_index in clip_start_indices
+    ]
+
+    return clips
