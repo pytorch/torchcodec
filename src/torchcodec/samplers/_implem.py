@@ -1,5 +1,5 @@
 import random
-from typing import List
+from typing import List, Optional
 
 import torch
 
@@ -9,12 +9,46 @@ from torchcodec.decoders import (  # TODO: move FrameBatch to torchcodec.FrameBa
 )
 
 
+def _validate_sampling_range(
+    *, sampling_range_start, sampling_range_end, num_frames, clip_span
+):
+    if sampling_range_start < 0:
+        raise ValueError(
+            f"sampling_range_start ({sampling_range_start}) must be non-negative."
+        )
+
+    # TODO: or max(sampling_range_start, num_frames - 1)?
+    sampling_range_start = sampling_range_start % num_frames
+
+    if sampling_range_end is None:
+        sampling_range_end = num_frames - clip_span + 1
+        if sampling_range_start > sampling_range_end:
+            raise ValueError(
+                f"We determined that sampling_range_end should be {sampling_range_end}, "
+                f"but it is smaller than sampling_range_start ({sampling_range_start})."
+            )
+    else:
+        if sampling_range_end < 0:
+            # Support negative values so that -1 means last frame.
+            # TODO: do we want to wrap around if sampling_range_end < -num_frames ?
+            sampling_range_end = num_frames + sampling_range_end + 1
+        if sampling_range_start > sampling_range_end:
+            raise ValueError(
+                f"sampling_range_start ({sampling_range_start}) must be smaller than "
+                f"sampling_range_end ({sampling_range_end})."
+            )
+
+    return sampling_range_start, sampling_range_end
+
+
 def clips_at_random_indices(
     decoder: SimpleVideoDecoder,
     *,
     num_clips: int = 1,
     num_frames_per_clip: int = 1,
     num_indices_between_frames: int = 1,
+    sampling_range_start: int = 0,
+    sampling_range_end: Optional[int] = None,  # interval is [start, end).
 ) -> List[FrameBatch]:
     if num_clips <= 0:
         raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
@@ -48,9 +82,15 @@ def clips_at_random_indices(
             f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
         )
 
-    last_clip_start_index = len(decoder) - clip_span
+    sampling_range_start, sampling_range_end = _validate_sampling_range(
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+        num_frames=len(decoder),
+        clip_span=clip_span,
+    )
+
     clip_start_indices = torch.randint(
-        low=0, high=last_clip_start_index + 1, size=(num_clips,)
+        low=sampling_range_start, high=sampling_range_end, size=(num_clips,)
     )
 
     # We want to avoid seeking backwards, so we sort the clip start indices

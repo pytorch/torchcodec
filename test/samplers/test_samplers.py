@@ -109,3 +109,23 @@ def test_random_sampler_errors():
         clips_at_random_indices(
             decoder, num_frames_per_clip=2, num_indices_between_frames=1000
         )
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_start (-1) must be non-negative")
+    ):
+        clips_at_random_indices(decoder, sampling_range_start=-1)
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_start (4) must be smaller than")
+    ):
+        clips_at_random_indices(decoder, sampling_range_start=4, sampling_range_end=0)
+
+    with pytest.raises(
+        ValueError, match="We determined that sampling_range_end should"
+    ):
+        clips_at_random_indices(
+            decoder,
+            num_frames_per_clip=10,
+            sampling_range_start=len(decoder) - 1,
+            sampling_range_end=None,
+        )
