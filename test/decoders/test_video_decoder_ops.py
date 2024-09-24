@@ -327,14 +327,14 @@ class TestOps:
     def test_color_conversion_library(self, color_conversion_library):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, color_conversion_library=color_conversion_library)
-        frame0, _, _ = get_next_frame(decoder)
+        frame0, *_ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
         reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
-        frame1, _, _ = get_next_frame(decoder)
+        frame1, *_ = get_next_frame(decoder)
         assert_tensor_equal(frame1, reference_frame1)
         seek_to_pts(decoder, 6.0)
-        frame_time6, _, _ = get_next_frame(decoder)
+        frame_time6, *_ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame_time6, reference_frame_time6)
 
