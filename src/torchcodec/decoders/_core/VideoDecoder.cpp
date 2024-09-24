@@ -254,6 +254,9 @@ void VideoDecoder::initializeFilterGraphForStream(
   }
   filterState.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterState.filterGraph.get() != nullptr);
+  if (options.ffmpegThreadCount.has_value()) {
+    filterState.filterGraph->nb_threads = options.ffmpegThreadCount.value();
+  }
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
   const AVFilter* buffersink = avfilter_get_by_name("buffersink");
   enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
