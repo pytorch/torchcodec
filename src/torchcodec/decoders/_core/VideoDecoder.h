@@ -347,7 +347,8 @@ class VideoDecoder {
       int streamIndex,
       const VideoStreamDecoderOptions& options);
   void maybeSeekToBeforeDesiredPts();
-  RawDecodedOutput getDecodedOutputWithFilter(std::function<bool(int, AVFrame*)>);
+  RawDecodedOutput getDecodedOutputWithFilter(
+      std::function<bool(int, AVFrame*)>);
   RawDecodedOutput getNextRawDecodedOutputNoDemux();
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
@@ -359,10 +360,8 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  void convertFrameToBufferUsingSwsScale(
-    RawDecodedOutput& rawOutput);
-  DecodedOutput convertAVFrameToDecodedOutput(
-      RawDecodedOutput& rawOutput);
+  void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
+  DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

@@ -342,7 +342,12 @@ void VideoDecoder::initializeFilterGraphForStream(
     width = *options.width;
     height = *options.height;
   }
-  std::snprintf(description, sizeof(description), "scale=%d:%d:sws_flags=bilinear", width, height);
+  std::snprintf(
+      description,
+      sizeof(description),
+      "scale=%d:%d:sws_flags=bilinear",
+      width,
+      height);
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
   ffmpegStatus = avfilter_graph_parse_ptr(
@@ -836,7 +841,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
         tensor = tensor.permute({2, 0, 1});
       }
       output.frame = tensor;
-    } else if (streamInfo.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH ) {
+    } else if (
+        streamInfo.colorConversionLibrary ==
+        ColorConversionLibrary::FILTERGRAPH) {
       output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
     } else {
       throw std::runtime_error(
@@ -958,7 +965,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       // in-place on the output tensor's data_ptr.
       rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawSingleOutput);
-    } else if (stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+    } else if (
+        stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
       // We are using a filter graph to convert the frame to tensor. The
       // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
       // copy the AVFrame to the output tensor.

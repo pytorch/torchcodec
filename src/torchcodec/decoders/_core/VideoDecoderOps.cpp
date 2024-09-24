@@ -9,8 +9,8 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
-#include "c10/util/Exception.h"
 #include "c10/core/SymIntArrayRef.h"
+#include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
@@ -121,7 +121,14 @@ void add_video_stream(
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index) {
-  _add_video_stream(decoder, width, height, num_threads, dimension_order, stream_index, "filtergraph");
+  _add_video_stream(
+      decoder,
+      width,
+      height,
+      num_threads,
+      dimension_order,
+      stream_index,
+      "filtergraph");
 }
 
 void _add_video_stream(
@@ -145,9 +152,11 @@ void _add_video_stream(
   if (color_conversion_library.has_value()) {
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
-      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+      options.colorConversionLibrary =
+          VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
     } else if (stdColorConversionLibrary == "swscale") {
-      options.colorConversionLibrary = VideoDecoder::ColorConversionLibrary::SWSCALE;
+      options.colorConversionLibrary =
+          VideoDecoder::ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
