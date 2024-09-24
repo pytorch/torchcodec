@@ -103,15 +103,10 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
             frames.append(frame["data"].permute(1, 2, 0))
         frames_done = timeit.default_timer()
         if self._print_each_iteration_time:
-            del reader
-            del_done = timeit.default_timer()
             create_duration = 1000 * round(create_done - start, 3)
             frames_duration = 1000 * round(frames_done - create_done, 3)
-            del_duration = 1000 * round(del_done - frames_done, 3)
-            total_duration = 1000 * round(del_done - start, 3)
-            print(
-                f"TV: {create_duration=} {frames_duration=} {del_duration=} {total_duration=}"
-            )
+            total_duration = 1000 * round(frames_done - start, 3)
+            print(f"TV: {create_duration=} {frames_duration=} {total_duration=}")
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
@@ -126,14 +121,11 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
         frames_done = timeit.default_timer()
 
         if self._print_each_iteration_time:
-            del reader
-            del_done = timeit.default_timer()
             create_duration = 1000 * round(create_done - start, 3)
             frames_duration = 1000 * round(frames_done - create_done, 3)
-            del_duration = 1000 * round(del_done - frames_done, 3)
-            total_duration = 1000 * round(del_done - start, 3)
+            total_duration = 1000 * round(frames_done - start, 3)
             print(
-                f"TV: consecutive: {create_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0].shape=}"
+                f"TV: consecutive: {create_duration=} {frames_duration=} {total_duration=} {frames[0].shape=}"
             )
         return frames
 
@@ -185,16 +177,13 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
             frames.append(frame)
 
         if self._print_each_iteration_time:
-            del_time = timeit.default_timer()
-            del decoder
             done_time = timeit.default_timer()
             create_duration = 1000 * round(add_stream_time - create_time, 3)
             add_stream_duration = 1000 * round(frames_time - add_stream_time, 3)
-            frames_duration = 1000 * round(del_time - frames_time, 3)
-            del_duration = 1000 * round(done_time - del_time, 3)
+            frames_duration = 1000 * round(done_time - frames_time, 3)
             total_duration = 1000 * round(done_time - create_time, 3)
             print(
-                f"{numFramesToDecode=} {create_duration=} {add_stream_duration=} {frames_duration=} {del_duration=} {total_duration=} {frames[0][0].shape=}"
+                f"{numFramesToDecode=} {create_duration=} {add_stream_duration=} {frames_duration=} {total_duration=} {frames[0][0].shape=}"
             )
             print("torchcodec times=", times, sum(times))
         return frames

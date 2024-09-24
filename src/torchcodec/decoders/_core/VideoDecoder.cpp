@@ -836,8 +836,12 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
         tensor = tensor.permute({2, 0, 1});
       }
       output.frame = tensor;
-    } else {
+    } else if (streamInfo.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH ) {
       output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+    } else {
+      throw std::runtime_error(
+          "Invalid color conversion library: " +
+          std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
     }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
@@ -954,13 +958,17 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       // in-place on the output tensor's data_ptr.
       rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawSingleOutput);
-    } else {
+    } else if (stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
       // We are using a filter graph to convert the frame to tensor. The
       // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
       // copy the AVFrame to the output tensor.
       torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
           rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
       output.frames[i] = frame;
+    } else {
+      throw std::runtime_error(
+          "Invalid color conversion library: " +
+          std::to_string(static_cast<int>(stream.colorConversionLibrary)));
     }
     i++;
   }
