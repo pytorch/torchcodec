@@ -27,3 +27,11 @@ repos:
     hooks:
       - id: flake8
         args: [--config=.flake8]
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v13.0.0
+    hooks:
+      - id: clang-format
+        name: clang-format
+        files: \.(cpp|hpp|c|h)$
+        types: [file]
