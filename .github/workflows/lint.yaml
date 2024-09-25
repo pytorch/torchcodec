@@ -38,6 +38,7 @@ jobs:
       - name: Run pre-commit checks
         run: |
           pre-commit run --all-files
+      - name: Check to see what files pre-commit modified
           git diff
 
   mypy:
