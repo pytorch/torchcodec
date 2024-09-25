@@ -42,9 +42,13 @@ def load_torchcodec_extension():
         + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
-        "Could not load libtorchcodec. "
-        "Is FFmpeg (4, 5, 6, or 7) properly installed in your environment? "
-        "The following exceptions were raised as we tried to load libtorchcodec: "
+        """Could not load libtorchcodec. Likely causes:
+          1. FFmpeg is not properly installed in your environment. We support
+             verisons 4, 5, 6 and 7.
+          2. PyTorch 2.4 is not properly installed in your environment.
+          3. Another runtime dependency; see exceptions below.
+        The following exceptions were raised as we tried to load libtorchcodec:
+        """
         f"{traceback}"
     )
 
