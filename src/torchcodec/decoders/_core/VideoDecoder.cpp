@@ -13,6 +13,7 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+
 #include <libavfilter/buffersink.h>
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
@@ -674,7 +675,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       StreamInfo& streamInfo = streams_[streamIndex];
       ffmpegStatus =
           avcodec_receive_frame(streamInfo.codecContext.get(), frame.get());
-      VLOG(9) << "received frame" << " status=" << ffmpegStatus
+      VLOG(9) << "received frame"
+              << " status=" << ffmpegStatus
               << " streamIndex=" << streamInfo.stream->index;
       bool gotNonRetriableError =
           ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN);
