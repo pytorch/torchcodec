@@ -1,6 +1,3 @@
-# The primary clang-format config file.
-# TODO(afuller): Set these settings when they aren't broken:
-# - AllowShortBlocksOnASingleLine: Empty
 ---
 AccessModifierOffset: -1
 AlignAfterOpenBracket: AlwaysBreak
