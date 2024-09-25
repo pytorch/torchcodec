@@ -36,6 +36,7 @@ jobs:
         run: |
           python -m pip install pre-commit
       - name: Run pre-commit checks
+        # Continue on error to display the formatting diff in case lint fails.
         continue-on-error: true
         run: |
           pre-commit run --all-files
