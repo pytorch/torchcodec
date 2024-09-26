@@ -424,15 +424,32 @@ void VideoDecoder::addVideoStreamDecoder(
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
   int width = options.width.value_or(codecContext->width);
-  auto colorConversionLibrary = options.colorConversionLibrary.value_or(
-      ColorConversionLibrary::FILTERGRAPH);
-  bool useFilterGraph =
-      (colorConversionLibrary != ColorConversionLibrary::SWSCALE);
-  if (useFilterGraph) {
+
+  // Use swscale for color conversion by default because it is faster.
+  VideoDecoder::ColorConversionLibrary autoColorConversionLibrary =
+      ColorConversionLibrary::SWSCALE;
+  // However, swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // so we fall back to filtergraph if the width is not a multiple of 32.
+  if (width % 32 != 0 && !canSwsScaleHandleUnalignedData()) {
+    autoColorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+  }
+  // If the user specifies the color conversion library (example in
+  // benchmarks), we use that instead.
+  auto colorConversionLibrary =
+      options.colorConversionLibrary.value_or(autoColorConversionLibrary);
+
+  if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
     initializeFilterGraphForStream(streamNumber, options);
     streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-  } else {
+  } else if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
     streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+  } else {
+    throw std::invalid_argument(
+        "Invalid colorConversionLibrary=" +
+        std::to_string(static_cast<int>(colorConversionLibrary)) +
+        ". colorConversionLibrary must be either "
+        "filtergraph or swscale.");
   }
 }
 

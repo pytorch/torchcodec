@@ -7,6 +7,7 @@
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 #include <c10/util/Exception.h>
+#include <iostream>
 
 namespace facebook::torchcodec {
 
@@ -25,6 +26,14 @@ int64_t getDuration(const AVFrame* frame) {
   return frame->pkt_duration;
 #else
   return frame->duration;
+#endif
+}
+
+bool canSwsScaleHandleUnalignedData() {
+#if LIBSWSCALE_VERSION_MAJOR < 6
+  return false;
+#else
+  return true;
 #endif
 }
 

@@ -122,13 +122,7 @@ void add_video_stream(
     std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index) {
   _add_video_stream(
-      decoder,
-      width,
-      height,
-      num_threads,
-      dimension_order,
-      stream_index,
-      "filtergraph");
+      decoder, width, height, num_threads, dimension_order, stream_index);
 }
 
 void _add_video_stream(
