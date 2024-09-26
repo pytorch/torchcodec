@@ -16,7 +16,7 @@ import torch.utils.benchmark as benchmark
 from torchcodec.decoders import SimpleVideoDecoder
 
 from torchcodec.decoders._core import (
-    add_video_stream,
+    _add_video_stream,
     create_from_file,
     get_frames_at_indices,
     get_json_metadata,
@@ -86,38 +86,63 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
 class TVNewAPIDecoderWithBackend(AbstractDecoder):
     def __init__(self, backend):
         self._backend = backend
+        self._print_each_iteration_time = False
         import torchvision  # noqa: F401
 
         self.torchvision = torchvision
 
     def get_frames_from_video(self, video_file, pts_list):
+        start = timeit.default_timer()
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video")
+        create_done = timeit.default_timer()
         frames = []
         for pts in pts_list:
             reader.seek(pts)
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
+        frames_done = timeit.default_timer()
+        if self._print_each_iteration_time:
+            create_duration = 1000 * round(create_done - start, 3)
+            frames_duration = 1000 * round(frames_done - create_done, 3)
+            total_duration = 1000 * round(frames_done - start, 3)
+            print(f"TV: {create_duration=} {frames_duration=} {total_duration=}")
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        start = timeit.default_timer()
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video")
+        create_done = timeit.default_timer()
         frames = []
         for _ in range(numFramesToDecode):
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
+        frames_done = timeit.default_timer()
+
+        if self._print_each_iteration_time:
+            create_duration = 1000 * round(create_done - start, 3)
+            frames_duration = 1000 * round(frames_done - create_done, 3)
+            total_duration = 1000 * round(frames_done - start, 3)
+            print(
+                f"TV: consecutive: {create_duration=} {frames_duration=} {total_duration=} {frames[0].shape=}"
+            )
         return frames
 
 
-class TorchCodecDecoderNonCompiledWithOptions(AbstractDecoder):
-    def __init__(self, num_threads=None):
+class TorchcodecNonCompiledWithOptions(AbstractDecoder):
+    def __init__(self, num_threads=None, color_conversion_library=None):
         self._print_each_iteration_time = False
-        self._num_threads = num_threads
+        self._num_threads = int(num_threads) if num_threads else None
+        self._color_conversion_library = color_conversion_library
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        _add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         frames = []
         times = []
         for pts in pts_list:
@@ -127,35 +152,57 @@ class TorchCodecDecoderNonCompiledWithOptions(AbstractDecoder):
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
+
         if self._print_each_iteration_time:
             print("torchcodec times=", times, sum(times))
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        create_time = timeit.default_timer()
         decoder = create_from_file(video_file)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        add_stream_time = timeit.default_timer()
+        _add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         frames = []
         times = []
+        frames_time = timeit.default_timer()
         for _ in range(numFramesToDecode):
             start = timeit.default_timer()
             frame = get_next_frame(decoder)
             end = timeit.default_timer()
             times.append(round(end - start, 3))
             frames.append(frame)
+
         if self._print_each_iteration_time:
+            done_time = timeit.default_timer()
+            create_duration = 1000 * round(add_stream_time - create_time, 3)
+            add_stream_duration = 1000 * round(frames_time - add_stream_time, 3)
+            frames_duration = 1000 * round(done_time - frames_time, 3)
+            total_duration = 1000 * round(done_time - create_time, 3)
+            print(
+                f"{numFramesToDecode=} {create_duration=} {add_stream_duration=} {frames_duration=} {total_duration=} {frames[0][0].shape=}"
+            )
             print("torchcodec times=", times, sum(times))
         return frames
 
 
-class TorchCodecDecoderNonCompiledBatch(AbstractDecoder):
-    def __init__(self, num_threads=None):
+class TorchCodecNonCompiledBatch(AbstractDecoder):
+    def __init__(self, num_threads=None, color_conversion_library=None):
         self._print_each_iteration_time = False
-        self._num_threads = num_threads
+        self._num_threads = int(num_threads) if num_threads else None
+        self._color_conversion_library = color_conversion_library
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        _add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         metadata = json.loads(get_json_metadata(decoder))
         average_fps = metadata["averageFps"]
         best_video_stream = metadata["bestVideoStreamIndex"]
@@ -169,7 +216,11 @@ class TorchCodecDecoderNonCompiledBatch(AbstractDecoder):
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, num_threads=self._num_threads)
+        _add_video_stream(
+            decoder,
+            num_threads=self._num_threads,
+            color_conversion_library=self._color_conversion_library,
+        )
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
         frames = []
@@ -191,13 +242,13 @@ def compiled_next(decoder):
     return get_next_frame(decoder)
 
 
-class TorchCodecDecoderCompiled(AbstractDecoder):
+class TorchcodecCompiled(AbstractDecoder):
     def __init__(self):
         pass
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder)
+        _add_video_stream(decoder)
         frames = []
         for pts in pts_list:
             frame = compiled_seek_and_next(decoder, pts)
@@ -206,7 +257,7 @@ class TorchCodecDecoderCompiled(AbstractDecoder):
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         decoder = create_from_file(video_file)
-        add_video_stream(decoder)
+        _add_video_stream(decoder)
         frames = []
         for _ in range(numFramesToDecode):
             frame = compiled_next(decoder)
@@ -259,7 +310,7 @@ def get_test_resource_path(filename: str) -> str:
 
 def create_torchcodec_decoder_from_file(video_file):
     video_decoder = create_from_file(video_file)
-    add_video_stream(video_decoder)
+    _add_video_stream(video_decoder)
     get_next_frame(video_decoder)
     return video_decoder
 
@@ -294,9 +345,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--decoders",
-        help="Comma-separated list of decoders to benchmark. Choices are torchcodec, torchaudio, torchvision, decord, torchcodec1, torchcodec_compiled. torchcodec1 means torchcodec with num_threads=1. torchcodec_compiled means torch.compiled torchcodec. torchcodec_batch means torchcodec using batch methods.",
+        help=(
+            "Comma-separated list of decoders to benchmark. "
+            "Choices are torchcodec, torchaudio, torchvision, decord, tcoptions:num_threads=1+color_conversion_library=filtergraph, torchcodec_compiled"
+            "For torchcodec, you can specify options with tcoptions:<plus-separated-options>. "
+        ),
         type=str,
-        default="decord,torchcodec,torchvision,torchaudio,torchcodec1,torchcodec_compiled,torchcodec_batch",
+        default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,tcoptions:num_threads=1",
     )
 
     args = parser.parse_args()
@@ -306,38 +361,51 @@ def main() -> None:
     num_uniform_samples = 10
 
     decoder_dict = {}
-    if "decord" in decoders:
-        decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
-            DecordNonBatchDecoderAccurateSeek()
-        )
-    if "torchcodec" in decoders:
-        decoder_dict["TorchCodecDecoderNonCompiled"] = (
-            TorchCodecDecoderNonCompiledWithOptions()
-        )
-    if "torchcodec_compiled" in decoders:
-        decoder_dict["TorchCodecDecoderCompiled"] = TorchCodecDecoderCompiled()
-    if "torchcodec1" in decoders:
-        decoder_dict["TCNonCompiled:ffmpeg_thread_count=1"] = (
-            TorchCodecDecoderNonCompiledWithOptions(num_threads=1)
-        )
-    # We don't compare TorchVision's "pyav" backend because it doesn't support
-    # accurate seeks.
-    if "torchvision" in decoders:
-        decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
-            TVNewAPIDecoderWithBackend("video_reader")
-        )
-    if "torchaudio" in decoders:
-        decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
-    if "torchcodec_batch" in decoders:
-        decoder_dict["TorchCodecDecoderNonCompiledBatch"] = (
-            TorchCodecDecoderNonCompiledBatch()
-        )
-
-    decoder_dict["TVNewAPIDecoderWithBackendVideoReader"]
+    for decoder in decoders:
+        if decoder == "decord":
+            decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
+                DecordNonBatchDecoderAccurateSeek()
+            )
+        elif decoder == "torchcodec":
+            decoder_dict["TorchCodecNonCompiled"] = TorchcodecNonCompiledWithOptions()
+        elif decoder == "torchcodec_compiled":
+            decoder_dict["TorchcodecCompiled"] = TorchcodecCompiled()
+        elif decoder == "torchvision":
+            decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
+                # We don't compare TorchVision's "pyav" backend because it doesn't support
+                # accurate seeks.
+                TVNewAPIDecoderWithBackend("video_reader")
+            )
+        elif decoder == "torchaudio":
+            decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
+        elif decoder.startswith("tcbatchoptions:"):
+            options = decoder[len("tcbatchoptions:") :]
+            kwargs_dict = {}
+            for item in options.split("+"):
+                if item.strip() == "":
+                    continue
+                k, v = item.split("=")
+                kwargs_dict[k] = v
+            decoder_dict["TorchCodecNonCompiledBatch:" + options] = (
+                TorchCodecNonCompiledBatch(**kwargs_dict)
+            )
+        elif decoder.startswith("tcoptions:"):
+            options = decoder[len("tcoptions:") :]
+            kwargs_dict = {}
+            for item in options.split("+"):
+                if item.strip() == "":
+                    continue
+                k, v = item.split("=")
+                kwargs_dict[k] = v
+            decoder_dict["TorchcodecNonCompiled:" + options] = (
+                TorchcodecNonCompiledWithOptions(**kwargs_dict)
+            )
 
     results = []
     for decoder_name, decoder in decoder_dict.items():
         for video_path in args.bm_video_paths.split(","):
+            # We only use the SimpleVideoDecoder to get the metadata and get
+            # the list of PTS values to seek to.
             simple_decoder = SimpleVideoDecoder(video_path)
             duration = simple_decoder.metadata.duration_seconds
             pts_list = [
@@ -365,7 +433,7 @@ def main() -> None:
                     min_run_time=args.bm_video_speed_min_run_seconds
                 )
             )
-            for num_consecutive_nexts in [1, 10, 100]:
+            for num_consecutive_nexts in [1, 10]:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={
@@ -385,6 +453,9 @@ def main() -> None:
 
     first_video_path = args.bm_video_paths.split(",")[0]
     if args.bm_video_creation:
+        simple_decoder = SimpleVideoDecoder(first_video_path)
+        metadata = simple_decoder.metadata
+        metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
         creation_result = benchmark.Timer(
             stmt="create_torchcodec_decoder_from_file(video_file)",
             globals={
@@ -392,10 +463,14 @@ def main() -> None:
                 "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
             },
             label=f"video={first_video_path} {metadata_string}",
-            sub_label="TorchCodecDecoderNonCompiled",
+            sub_label="TorchcodecNonCompiled",
             description="create()+next()",
         )
-        results.append(creation_result.blocked_autorange(min_run_time=10.0))
+        results.append(
+            creation_result.blocked_autorange(
+                min_run_time=2.0,
+            )
+        )
     compare = benchmark.Compare(results)
     compare.print()
 

@@ -22,6 +22,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/version.h>
+#include <libswscale/swscale.h>
 }
 
 namespace facebook::torchcodec {
@@ -34,6 +35,15 @@ struct Deleterp {
   inline void operator()(T* p) const {
     if (p) {
       Fn(&p);
+    }
+  }
+};
+
+template <typename T, typename R, R (*Fn)(T*)>
+struct Deleter {
+  inline void operator()(T* p) const {
+    if (p) {
+      Fn(p);
     }
   }
 };
@@ -57,6 +67,8 @@ using UniqueAVFilterInOut = std::unique_ptr<
     Deleterp<AVFilterInOut, void, avfilter_inout_free>>;
 using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
+using UniqueSwsContext =
+    std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
 
 // av_find_best_stream is not const-correct before commit:
 // https://github.com/FFmpeg/FFmpeg/commit/46dac8cf3d250184ab4247809bc03f60e14f4c0c
