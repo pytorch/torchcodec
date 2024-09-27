@@ -405,7 +405,7 @@ class TestOps:
             "-s",
             f"{width}x{height}",
             "-c:v",
-            "libx264",
+            "libopenh264",
             "-t",
             "1",
             video_path,

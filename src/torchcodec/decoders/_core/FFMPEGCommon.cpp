@@ -28,14 +28,6 @@ int64_t getDuration(const AVFrame* frame) {
 #endif
 }
 
-bool canSwsScaleHandleUnalignedData() {
-#if LIBSWSCALE_VERSION_MAJOR < 6
-  return false;
-#else
-  return true;
-#endif
-}
-
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
     size_t data_size,
