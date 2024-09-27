@@ -392,6 +392,8 @@ class TestOps:
     def test_color_conversion_library_with_generated_videos(
         self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
     ):
+        if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+            return
         # We consider filtergraph to be the reference color conversion library.
         # However the video decoder sometimes uses swscale as that is faster.
         # The exact color conversion library used is an implementation detail
