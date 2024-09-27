@@ -7,6 +7,7 @@
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
 #include <stdexcept>
 #include <string_view>
 #include "torch/types.h"
@@ -18,6 +19,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
+#include <libswscale/swscale.h>
 }
 
 namespace facebook::torchcodec {
@@ -126,10 +128,22 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
       width = std::stoi(value);
     } else if (key == "height") {
       height = std::stoi(value);
+    } else if (key == "color_conversion_library") {
+      if (value == "filtergraph") {
+        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+      } else if (value == "swscale") {
+        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+      } else {
+        throw std::runtime_error(
+            "Invalid color_conversion_library=" + value +
+            ". color_conversion_library must be either "
+            "filtergraph or swscale.");
+      }
     } else {
       throw std::runtime_error(
           "Invalid option: " + key +
-          ". Valid options are: ffmpeg_thread_count=<int>,dimension_order=<string>");
+          ". Valid options are: "
+          "ffmpeg_thread_count=<int>,dimension_order=<string>");
     }
   }
 }
@@ -328,7 +342,12 @@ void VideoDecoder::initializeFilterGraphForStream(
     width = *options.width;
     height = *options.height;
   }
-  std::snprintf(description, sizeof(description), "scale=%d:%d", width, height);
+  std::snprintf(
+      description,
+      sizeof(description),
+      "scale=%d:%d:sws_flags=bilinear",
+      width,
+      height);
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
   ffmpegStatus = avfilter_graph_parse_ptr(
@@ -404,7 +423,17 @@ void VideoDecoder::addVideoStreamDecoder(
   activeStreamIndices_.insert(streamNumber);
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
-  initializeFilterGraphForStream(streamNumber, options);
+  int width = options.width.value_or(codecContext->width);
+  auto colorConversionLibrary = options.colorConversionLibrary.value_or(
+      ColorConversionLibrary::FILTERGRAPH);
+  bool useFilterGraph =
+      (colorConversionLibrary != ColorConversionLibrary::SWSCALE);
+  if (useFilterGraph) {
+    initializeFilterGraphForStream(streamNumber, options);
+    streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+  } else {
+    streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+  }
 }
 
 void VideoDecoder::updateMetadataWithCodecContext(
@@ -649,8 +678,9 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
+VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
+  auto start = std::chrono::high_resolution_clock::now();
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
@@ -662,6 +692,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     maybeDesiredPts_ = std::nullopt;
     VLOG(9) << "seeking done";
   }
+  auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame frame(av_frame_alloc());
   int ffmpegStatus = AVSUCCESS;
@@ -717,7 +748,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       for (int streamIndex : activeStreamIndices_) {
         StreamInfo& streamInfo = streams_[streamIndex];
         ffmpegStatus = avcodec_send_packet(
-            streamInfo.codecContext.get(), /*avpkt=*/nullptr);
+            streamInfo.codecContext.get(),
+            /*avpkt=*/nullptr);
         if (ffmpegStatus < AVSUCCESS) {
           throw std::runtime_error(
               "Could not flush decoder: " +
@@ -750,12 +782,14 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (ffmpegStatus < AVSUCCESS) {
     if (reachedEOF || ffmpegStatus == AVERROR_EOF) {
       throw VideoDecoder::EndOfFileException(
-          "Requested next frame while there are no more frames left to decode.");
+          "Requested next frame while there are no more frames left to "
+          "decode.");
     }
     throw std::runtime_error(
         "Could not receive frame from decoder: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+  auto decodeDone = std::chrono::high_resolution_clock::now();
   // Note that we don't flush the decoder when we reach EOF (even though that's
   // mentioned in https://ffmpeg.org/doxygen/trunk/group__lavc__encdec.html).
   // This is because we may have packets internally in the decoder that we
@@ -765,18 +799,28 @@ VideoDecoder::DecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo& activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
+  auto startToSeekDone =
+      std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
+  auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
+      decodeDone - seekDone);
   VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
-          << " pts=" << frame->pts << " stats=" << decodeStats_;
-  // Convert the frame to tensor.
-  return convertAVFrameToDecodedOutput(frameStreamIndex, std::move(frame));
+          << " pts=" << frame->pts << " stats=" << decodeStats_
+          << " startToSeekDone=" << startToSeekDone.count() << "ms"
+          << " seekToDecodeDone=" << seekToDecodeDone.count() << "ms";
+  RawDecodedOutput rawOutput;
+  rawOutput.streamIndex = frameStreamIndex;
+  rawOutput.frame = std::move(frame);
+  return rawOutput;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
-    int streamIndex,
-    UniqueAVFrame frame) {
+    VideoDecoder::RawDecodedOutput& rawOutput) {
   // Convert the frame to tensor.
   DecodedOutput output;
+  int streamIndex = rawOutput.streamIndex;
+  AVFrame* frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
+  auto& streamInfo = streams_[streamIndex];
   output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
   output.pts = frame->pts;
   output.ptsSeconds =
@@ -785,8 +829,28 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
-    output.frame =
-        convertFrameToTensorUsingFilterGraph(streamIndex, frame.get());
+    if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+      int width = streamInfo.options.width.value_or(frame->width);
+      int height = streamInfo.options.height.value_or(frame->height);
+      torch::Tensor tensor = torch::empty(
+          {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+      rawOutput.data = tensor.data_ptr<uint8_t>();
+      convertFrameToBufferUsingSwsScale(rawOutput);
+
+      if (streamInfo.options.dimensionOrder == "NCHW") {
+        tensor = tensor.permute({2, 0, 1});
+      }
+      output.frame = tensor;
+    } else if (
+        streamInfo.colorConversionLibrary ==
+        ColorConversionLibrary::FILTERGRAPH) {
+      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+    } else {
+      throw std::runtime_error(
+          "Invalid color conversion library: " +
+          std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
+    }
+
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
     // audio decoding.
@@ -809,7 +873,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
     }
   }
   setCursorPtsInSeconds(seconds);
-  return getDecodedOutputWithFilter(
+  RawDecodedOutput rawOutput = getDecodedOutputWithFilter(
       [seconds, this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& stream = streams_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(frame->pts, stream.timeBase);
@@ -827,6 +891,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
         }
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
+  // Convert the frame to tensor.
+  return convertAVFrameToDecodedOutput(rawOutput);
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
@@ -890,8 +956,29 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    torch::Tensor frame = getFrameAtIndex(streamIndex, frameIndex).frame;
-    output.frames[i++] = frame;
+    int64_t pts = stream.allFrames[frameIndex].pts;
+    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
+    auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
+    if (stream.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+      // We are using sws_scale to convert the frame to tensor. sws_scale can
+      // convert to a pre-allocated buffer so we can do the color-conversion
+      // in-place on the output tensor's data_ptr.
+      rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
+      convertFrameToBufferUsingSwsScale(rawSingleOutput);
+    } else if (
+        stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      // We are using a filter graph to convert the frame to tensor. The
+      // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
+      // copy the AVFrame to the output tensor.
+      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
+          rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
+      output.frames[i] = frame;
+    } else {
+      throw std::runtime_error(
+          "Invalid color conversion library: " +
+          std::to_string(static_cast<int>(stream.colorConversionLibrary)));
+    }
+    i++;
   }
   return output;
 }
@@ -1023,13 +1110,19 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
-  return getDecodedOutputWithFilter(
-      [this](int frameStreamIndex, AVFrame* frame) {
+VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
+  auto rawOutput =
+      getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
         return frame->pts >=
             activeStream.discardFramesBeforePts.value_or(INT64_MIN);
       });
+  return rawOutput;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+  auto rawOutput = getNextRawDecodedOutputNoDemux();
+  return convertAVFrameToDecodedOutput(rawOutput);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
@@ -1054,6 +1147,68 @@ double VideoDecoder::getPtsSecondsForFrame(
   validateFrameIndex(stream, frameIndex);
 
   return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
+}
+
+void VideoDecoder::convertFrameToBufferUsingSwsScale(
+    RawDecodedOutput& rawOutput) {
+  AVFrame* frame = rawOutput.frame.get();
+  int streamIndex = rawOutput.streamIndex;
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(frame->format);
+  StreamInfo& activeStream = streams_[streamIndex];
+  int outputWidth = activeStream.options.width.value_or(frame->width);
+  int outputHeight = activeStream.options.height.value_or(frame->height);
+  if (activeStream.swsContext.get() == nullptr) {
+    SwsContext* swsContext = sws_getContext(
+        frame->width,
+        frame->height,
+        frameFormat,
+        outputWidth,
+        outputHeight,
+        AV_PIX_FMT_RGB24,
+        SWS_BILINEAR,
+        nullptr,
+        nullptr,
+        nullptr);
+    int* invTable = nullptr;
+    int* table = nullptr;
+    int srcRange, dstRange, brightness, contrast, saturation;
+    sws_getColorspaceDetails(
+        swsContext,
+        &invTable,
+        &srcRange,
+        &table,
+        &dstRange,
+        &brightness,
+        &contrast,
+        &saturation);
+    const int* colorspaceTable = sws_getCoefficients(frame->colorspace);
+    sws_setColorspaceDetails(
+        swsContext,
+        colorspaceTable,
+        srcRange,
+        colorspaceTable,
+        dstRange,
+        brightness,
+        contrast,
+        saturation);
+    activeStream.swsContext.reset(swsContext);
+  }
+  SwsContext* swsContext = activeStream.swsContext.get();
+  uint8_t* pointers[4] = {
+      static_cast<uint8_t*>(rawOutput.data), nullptr, nullptr, nullptr};
+  int linesizes[4] = {outputWidth * 3, 0, 0, 0};
+  int resultHeight = sws_scale(
+      swsContext,
+      frame->data,
+      frame->linesize,
+      0,
+      frame->height,
+      pointers,
+      linesizes);
+  TORCH_CHECK(
+      outputHeight == resultHeight,
+      "outputHeight(" + std::to_string(resultHeight) + ") != resultHeight");
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(

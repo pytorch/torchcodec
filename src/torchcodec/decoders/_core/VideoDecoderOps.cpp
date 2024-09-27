@@ -9,8 +9,8 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
-#include "c10/util/Exception.h"
 #include "c10/core/SymIntArrayRef.h"
+#include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
@@ -29,6 +29,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
+  m.def(
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
   m.def(
       "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
@@ -119,6 +121,24 @@ void add_video_stream(
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index) {
+  _add_video_stream(
+      decoder,
+      width,
+      height,
+      num_threads,
+      dimension_order,
+      stream_index,
+      "filtergraph");
+}
+
+void _add_video_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> width,
+    std::optional<int64_t> height,
+    std::optional<int64_t> num_threads,
+    std::optional<c10::string_view> dimension_order,
+    std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
@@ -128,6 +148,20 @@ void add_video_stream(
     std::string stdDimensionOrder{dimension_order.value()};
     TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
     options.dimensionOrder = stdDimensionOrder;
+  }
+  if (color_conversion_library.has_value()) {
+    std::string stdColorConversionLibrary{color_conversion_library.value()};
+    if (stdColorConversionLibrary == "filtergraph") {
+      options.colorConversionLibrary =
+          VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+    } else if (stdColorConversionLibrary == "swscale") {
+      options.colorConversionLibrary =
+          VideoDecoder::ColorConversionLibrary::SWSCALE;
+    } else {
+      throw std::runtime_error(
+          "Invalid color_conversion_library=" + stdColorConversionLibrary +
+          ". color_conversion_library must be either filtergraph or swscale.");
+    }
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
@@ -427,6 +461,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
+  m.impl("_add_video_stream", &_add_video_stream);
   m.impl("get_next_frame", &get_next_frame);
   m.impl("get_json_metadata", &get_json_metadata);
   m.impl("get_container_json_metadata", &get_container_json_metadata);

@@ -123,7 +123,13 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
-
+  enum ColorConversionLibrary {
+    // TODO: Add an AUTO option later.
+    // Use the libavfilter library for color conversion.
+    FILTERGRAPH,
+    // Use the libswscale library for color conversion.
+    SWSCALE
+  };
   struct VideoStreamDecoderOptions {
     VideoStreamDecoderOptions() {}
     explicit VideoStreamDecoderOptions(const std::string& optionsString);
@@ -139,6 +145,7 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
+    std::optional<ColorConversionLibrary> colorConversionLibrary = FILTERGRAPH;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
@@ -153,6 +160,34 @@ class VideoDecoder {
   // Calling getNextDecodedOutputNoDemux() will return the first frame at or
   // after this position.
   void setCursorPtsInSeconds(double seconds);
+  // This is an internal structure that is used to store the decoded output
+  // from decoding a frame through color conversion. Example usage is:
+  //
+  // RawDecodedOutput rawOutput = getDecodedOutputWithFilter();
+  // // Now allocate a single tensor or a batch tensor.
+  // torch::Tensor userOutput = torch::empty(...);
+  // // Now fill in `data` and `size`.
+  // rawOutput.data = userOutput.data_ptr();
+  // // Now run the color conversion.
+  // convertFrameToBufferUsingSwsScale(rawOutput);
+  //
+  // This structure ensures we always keep the streamIndex and frame together
+  // with the data output. Note that AVFrame itself doesn't retain the
+  // streamIndex.
+  struct RawDecodedOutput {
+    // The actual decoded output as a unique pointer to an AVFrame.
+    UniqueAVFrame frame;
+    // The stream index of the decoded frame.
+    int streamIndex;
+    // This is an unowned pointer that we copy the frame data to after color
+    // conversion.
+    // For a single tensor this points to the start of data_ptr. For a batch
+    // tensor it may point to the middle of the allocated batch tensor.
+    void* data = nullptr;
+    // We carry around the size to ensure we don't stomp on memory while doing
+    // color conversion.
+    size_t size = 0;
+  };
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
     torch::Tensor frame;
@@ -276,8 +311,10 @@ class VideoDecoder {
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
     FilterState filterState;
+    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    UniqueSwsContext swsContext;
   };
   VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
@@ -310,7 +347,9 @@ class VideoDecoder {
       int streamIndex,
       const VideoStreamDecoderOptions& options);
   void maybeSeekToBeforeDesiredPts();
-  DecodedOutput getDecodedOutputWithFilter(std::function<bool(int, AVFrame*)>);
+  RawDecodedOutput getDecodedOutputWithFilter(
+      std::function<bool(int, AVFrame*)>);
+  RawDecodedOutput getNextRawDecodedOutputNoDemux();
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
@@ -321,9 +360,8 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  DecodedOutput convertAVFrameToDecodedOutput(
-      int streamIndex,
-      UniqueAVFrame frame);
+  void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
+  DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
