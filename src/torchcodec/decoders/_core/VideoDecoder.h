@@ -145,7 +145,7 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary = FILTERGRAPH;
+    std::optional<ColorConversionLibrary> colorConversionLibrary;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
