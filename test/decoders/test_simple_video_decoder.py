@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import numpy
 import pytest
 import torch
 
@@ -57,6 +58,36 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame1, decoder[1])
         assert_tensor_equal(ref_frame180, decoder[180])
         assert_tensor_equal(ref_frame_last, decoder[-1])
+
+    def test_getitem_numpy_int(self):
+        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+        ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
+        ref_frame180 = NASA_VIDEO.get_frame_by_name("time6.000000")
+        ref_frame_last = NASA_VIDEO.get_frame_by_name("time12.979633")
+
+        # test against numpy.int64
+        assert_tensor_equal(ref_frame0, decoder[numpy.int64(0)])
+        assert_tensor_equal(ref_frame1, decoder[numpy.int64(1)])
+        assert_tensor_equal(ref_frame180, decoder[numpy.int64(180)])
+        assert_tensor_equal(ref_frame_last, decoder[numpy.int64(-1)])
+
+        # test against numpy.int32
+        assert_tensor_equal(ref_frame0, decoder[numpy.int32(0)])
+        assert_tensor_equal(ref_frame1, decoder[numpy.int32(1)])
+        assert_tensor_equal(ref_frame180, decoder[numpy.int32(180)])
+        assert_tensor_equal(ref_frame_last, decoder[numpy.int32(-1)])
+
+        # test against numpy.uint64
+        assert_tensor_equal(ref_frame0, decoder[numpy.uint64(0)])
+        assert_tensor_equal(ref_frame1, decoder[numpy.uint64(1)])
+        assert_tensor_equal(ref_frame180, decoder[numpy.uint64(180)])
+
+        # test against numpy.uint32
+        assert_tensor_equal(ref_frame0, decoder[numpy.uint32(0)])
+        assert_tensor_equal(ref_frame1, decoder[numpy.uint32(1)])
+        assert_tensor_equal(ref_frame180, decoder[numpy.uint32(180)])
 
     def test_getitem_slice(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
@@ -207,6 +238,9 @@ class TestSimpleDecoder:
         with pytest.raises(TypeError, match="Unsupported key type"):
             frame = decoder["0"]  # noqa
 
+        with pytest.raises(TypeError, match="Unsupported key type"):
+            frame = decoder[2.3]  # noqa
+
     def test_iteration(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
 
@@ -262,6 +296,22 @@ class TestSimpleDecoder:
         assert frame9.pts_seconds == pytest.approx(0.3003)
         assert isinstance(frame9.duration_seconds, float)
         assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
+
+        # test numpy.int64
+        frame9 = decoder.get_frame_at(numpy.int64(9))
+        assert_tensor_equal(ref_frame9, frame9.data)
+
+        # test numpy.int32
+        frame9 = decoder.get_frame_at(numpy.int32(9))
+        assert_tensor_equal(ref_frame9, frame9.data)
+
+        # test numpy.uint64
+        frame9 = decoder.get_frame_at(numpy.uint64(9))
+        assert_tensor_equal(ref_frame9, frame9.data)
+
+        # test numpy.uint32
+        frame9 = decoder.get_frame_at(numpy.uint32(9))
+        assert_tensor_equal(ref_frame9, frame9.data)
 
     def test_get_frame_at_tuple_unpacking(self):
         decoder = SimpleVideoDecoder(NASA_VIDEO.path)
@@ -359,6 +409,12 @@ class TestSimpleDecoder:
             NASA_VIDEO.get_duration_seconds_by_range(0, 10, 2),
             frames0_8_2.duration_seconds,
         )
+
+        # test numpy.int64 for indices
+        frames0_8_2 = decoder.get_frames_at(
+            start=numpy.int64(0), stop=numpy.int64(10), step=numpy.int64(2)
+        )
+        assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
 
         # an empty range is valid!
         empty_frames = decoder.get_frames_at(5, 5)
