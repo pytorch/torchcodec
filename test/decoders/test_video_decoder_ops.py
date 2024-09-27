@@ -392,6 +392,15 @@ class TestOps:
     def test_color_conversion_library_with_generated_videos(
         self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
     ):
+        # We consider filtergraph to be the reference color conversion library.
+        # However the video decoder sometimes uses swscale as that is faster.
+        # The exact color conversion library used is an implementation detail
+        # of the video decoder and depends on the video's width.
+        #
+        # In this test we compare the output of filtergraph (which is the
+        # reference) with the output of the video decoder (which may use
+        # swscale if it chooses for certain video widths) to make sure they are
+        # always the same.
         video_path = f"{tmp_path}/frame_numbers_{width}x{height}.mp4"
         command = [
             "ffmpeg",
