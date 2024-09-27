@@ -11,7 +11,7 @@ include(FetchContent)
 
 set(
     base_url
-    https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2024-09-13
+    https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2024-09-23
 )
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -22,19 +22,19 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     set(
         f4_sha256
-        07d3e33281f0dce04d3e987d20cce03b155b0c39965333960689c625f451f93a
+        c0311e983c426a7f5abcffc3056f0d64a93bfcb69a9db8e40b81d5c976d84952
     )
     set(
         f5_sha256
-        1a2227445f513deb8f4f339050a160fa2419ca494a7f981df93e747d00eeaa69
+        9a48dbe7912a0c3dbbac0c906a840754caf147d37dad2f1b3906de7441e1483a
     )
     set(
         f6_sha256
-        63320ec05ae9341ba307ff0005ac853bcec0b9d2cb55a580d1a72731de2bb5d8
+        337cd2ce671a69737e246c73bf69e2c36732d89b7d2c37eefaca8601cad272ca
     )
     set(
         f7_sha256
-        0b7c983b5d675441a1c1756eefa23cb24450af6bae5ae2011d9e5807a315d7df
+        b7df528b1c66eb37b926c1336c89a63b3b784165f6f30bd0932a39b82469f0e9
     )
 
     set(
@@ -44,6 +44,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.58
        libavdevice.so.58
        libavfilter.so.7
+       libswscale.so.5
     )
     set(
        f5_library_file_names
@@ -52,6 +53,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.59
        libavdevice.so.59
        libavfilter.so.8
+       libswscale.so.6
     )
     set(
        f6_library_file_names
@@ -60,6 +62,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.60
        libavdevice.so.60
        libavfilter.so.9
+       libswscale.so.7
     )
     set(
        f7_library_file_names
@@ -68,6 +71,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavformat.so.61
        libavdevice.so.61
        libavfilter.so.10
+       libswscale.so.8
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(
@@ -76,19 +80,19 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     )
     set(
         f4_sha256
-        7839bebecb9a25f470405a745225d29a5a7f43f4e6d9a57868732aa897ce32be
+        57622392af27bf479e18afb9d79ccf3deddaef153048b34ce518bd477c12d1e6
     )
     set(
         f5_sha256
-        df204c89ae52d3af16eb23604955e8cfbee649845d3ae737778a264346ab0063
+        7bc5a70ac66d45857372ccabdcd15594aa9a39a86bc396f92724435e5c4de54e
     )
     set(
         f6_sha256
-        8a82e9ae2eabb23ba546e2c96ba7f1bd656b4db38679876df936db7a92c15677
+        0214733bc987c2deeabfc779331108c19964dcdac2c5e2db12960f0febcea2c4
     )
     set(
         f7_sha256
-        39d96d8191c58ff439d674701d83c775b2b57019a1c2436aa78e7bc9ab74445b
+        c28925bb423383c0c37d9f3106fa7768c8733153a33154c8bedab8acf883366f
     )
     set(
        f4_library_file_names
@@ -97,6 +101,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.58.dylib
        libavdevice.58.dylib
        libavfilter.7.dylib
+       libswscale.5.dylib
     )
     set(
        f5_library_file_names
@@ -105,6 +110,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.59.dylib
        libavdevice.59.dylib
        libavfilter.8.dylib
+       libswscale.6.dylib
     )
     set(
        f6_library_file_names
@@ -113,6 +119,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.60.dylib
        libavdevice.60.dylib
        libavfilter.9.dylib
+       libswscale.7.dylib
     )
     set(
        f7_library_file_names
@@ -121,6 +128,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavformat.61.dylib
        libavdevice.61.dylib
        libavfilter.10.dylib
+       libswscale.8.dylib
     )
 else()
     message(

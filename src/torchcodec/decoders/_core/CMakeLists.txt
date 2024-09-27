@@ -85,6 +85,7 @@ else()
         libavformat
         libavcodec
         libavutil
+        libswscale
     )
 
     # Split libavcodec's version string by '.' and convert it to a list

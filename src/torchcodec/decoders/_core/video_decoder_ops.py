@@ -42,9 +42,13 @@ def load_torchcodec_extension():
         + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
-        "Could not load libtorchcodec. "
-        "Is FFmpeg (4, 5, 6, or 7) properly installed in your environment? "
-        "The following exceptions were raised as we tried to load libtorchcodec: "
+        """Could not load libtorchcodec. Likely causes:
+          1. FFmpeg is not properly installed in your environment. We support
+             verisons 4, 5, 6 and 7.
+          2. PyTorch 2.4 is not properly installed in your environment.
+          3. Another runtime dependency; see exceptions below.
+        The following exceptions were raised as we tried to load libtorchcodec:
+        """
         f"{traceback}"
     )
 
@@ -61,6 +65,7 @@ create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
+_add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
 seek_to_pts = torch.ops.torchcodec_ns.seek_to_pts.default
 get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
@@ -105,6 +110,20 @@ def create_from_file_abstract(filename: str) -> torch.Tensor:
 @register_fake("torchcodec_ns::create_from_tensor")
 def create_from_tensor_abstract(video_tensor: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::_add_video_stream")
+def _add_video_stream_abstract(
+    decoder: torch.Tensor,
+    *,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    num_threads: Optional[int] = None,
+    dimension_order: Optional[str] = None,
+    stream_index: Optional[int] = None,
+    color_conversion_library: Optional[str] = None,
+) -> None:
+    return
 
 
 @register_fake("torchcodec_ns::add_video_stream")

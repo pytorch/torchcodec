@@ -65,5 +65,5 @@ jobs:
           Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
           cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
           cmake --build .
-          ctest
+          ctest --output-on-failure
           popd
