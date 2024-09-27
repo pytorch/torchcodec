@@ -7,7 +7,6 @@
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 #include <c10/util/Exception.h>
-#include <iostream>
 
 namespace facebook::torchcodec {
 

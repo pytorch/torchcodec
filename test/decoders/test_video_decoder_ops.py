@@ -410,7 +410,6 @@ class TestOps:
             "1",
             video_path,
         ]
-        print(" ".join(command))
         subprocess.check_call(command)
 
         decoder = create_from_file(str(video_path))
