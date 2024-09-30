@@ -56,7 +56,7 @@ def _validate_sampling_range(
     return sampling_range_start, sampling_range_end
 
 
-def get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
+def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     """Return the span of a clip, i.e. the number of frames (or indices)
     between the first and last frame in the clip, both included.
 
@@ -87,7 +87,7 @@ def clips_at_random_indices(
         num_indices_between_frames=num_indices_between_frames,
     )
 
-    clip_span = get_clip_span(
+    clip_span = _get_clip_span(
         num_indices_between_frames=num_indices_between_frames,
         num_frames_per_clip=num_frames_per_clip,
     )
