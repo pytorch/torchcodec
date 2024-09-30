@@ -25,12 +25,12 @@ defaults:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: NicolasHug/test-infra/.github/workflows/generate_binary_build_matrix.yml@macos_wheels_experiments
     with:
       package-type: wheel
       os: macos-arm64
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
+      test-infra-repository: NicolasHug/test-infra
+      test-infra-ref: macos_wheels_experiments
       with-xpu: disable
       with-rocm: disable
       with-cuda: disable
