@@ -76,7 +76,7 @@ def test_random_sampler_range(
     cm = (
         contextlib.nullcontext()
         if assert_all_equal
-        else pytest.raises(AssertionError, match="Tensor-likes are not equal!")
+        else pytest.raises(AssertionError, match="Tensor-likes are not")
     )
     with cm:
         for clip in clips:
