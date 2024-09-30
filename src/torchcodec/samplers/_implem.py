@@ -3,10 +3,27 @@ from typing import List, Optional
 
 import torch
 
-from torchcodec.decoders import (  # TODO: move FrameBatch to torchcodec.FrameBatch?
-    FrameBatch,
-    SimpleVideoDecoder,
-)
+from torchcodec.decoders import FrameBatch, SimpleVideoDecoder
+
+
+def _validate_params(
+    *, decoder, num_clips, num_frames_per_clip, num_indices_between_frames
+):
+    if len(decoder) < 1:
+        raise ValueError(
+            f"Decoder must have at least one frame, found {len(decoder)} frames."
+        )
+
+    if num_clips <= 0:
+        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
+    if num_frames_per_clip <= 0:
+        raise ValueError(
+            f"num_frames_per_clip ({num_frames_per_clip}) must be strictly positive"
+        )
+    if num_indices_between_frames <= 0:
+        raise ValueError(
+            f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
+        )
 
 
 def _validate_sampling_range(
@@ -39,6 +56,20 @@ def _validate_sampling_range(
     return sampling_range_start, sampling_range_end
 
 
+def get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
+    """Return the span of a clip, i.e. the number of frames (or indices)
+    between the first and last frame in the clip, both included.
+
+    This isn't the same as the number of frames in a clip!
+    Example: f means a frame in the clip, x means a frame excluded from the clip
+    num_frames_per_clip = 4
+    num_indices_between_frames = 1, clip = ffff      , span = 4
+    num_indices_between_frames = 2, clip = fxfxfxf   , span = 7
+    num_indices_between_frames = 3, clip = fxxfxxfxxf, span = 10
+    """
+    return num_indices_between_frames * (num_frames_per_clip - 1) + 1
+
+
 def clips_at_random_indices(
     decoder: SimpleVideoDecoder,
     *,
@@ -48,31 +79,18 @@ def clips_at_random_indices(
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
 ) -> List[FrameBatch]:
-    if num_clips <= 0:
-        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
-    if num_frames_per_clip <= 0:
-        raise ValueError(
-            f"num_frames_per_clip ({num_frames_per_clip}) must be strictly positive"
-        )
-    if num_indices_between_frames <= 0:
-        raise ValueError(
-            f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
-        )
 
-    if len(decoder) < 1:
-        raise ValueError(
-            f"Decoder must have at least one frame, found {len(decoder)} frames."
-        )
+    _validate_params(
+        decoder=decoder,
+        num_clips=num_clips,
+        num_frames_per_clip=num_frames_per_clip,
+        num_indices_between_frames=num_indices_between_frames,
+    )
 
-    # Determine the span of a clip, i.e. the number of frames (or indices)
-    # between the first and last frame in the clip, both included. This isn't
-    # the same as the number of frames in a clip!
-    # Example: f means a frame in the clip, x means a frame excluded from the clip
-    # num_frames_per_clip = 4
-    # num_indices_between_frames = 1, clip = ffff      , span = 4
-    # num_indices_between_frames = 2, clip = fxfxfxf   , span = 7
-    # num_indices_between_frames = 3, clip = fxxfxxfxxf, span = 10
-    clip_span = num_indices_between_frames * (num_frames_per_clip - 1) + 1
+    clip_span = get_clip_span(
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_per_clip=num_frames_per_clip,
+    )
 
     # TODO: We should probably not error.
     if clip_span > len(decoder):
