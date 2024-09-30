@@ -1,3 +1,4 @@
+import contextlib
 import random
 import re
 
@@ -44,6 +45,74 @@ def test_random_sampler(num_indices_between_frames):
     )
 
 
+@pytest.mark.parametrize(
+    "sampling_range_start, sampling_range_end, assert_all_equal",
+    (
+        (10, 11, True),
+        (10, 12, False),
+    ),
+)
+def test_random_sampler_range(
+    sampling_range_start, sampling_range_end, assert_all_equal
+):
+    # Test the sampling_range_start and sampling_range_end parameters by
+    # asserting that all clips are equal if the sampling range is of size 1,
+    # and that they are not all equal if the sampling range is of size 2.
+
+    # Since this has a low but non-zero probability of failing, we hard-code a
+    # seed that works.
+    torch.manual_seed(0)
+
+    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+    clips = clips_at_random_indices(
+        decoder,
+        num_clips=10,
+        num_frames_per_clip=2,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+    )
+
+    cm = (
+        contextlib.nullcontext()
+        if assert_all_equal
+        else pytest.raises(AssertionError, match="Tensor-likes are not equal!")
+    )
+    with cm:
+        for clip in clips:
+            assert_tensor_equal(clip.data, clips[0].data)
+
+
+def test_random_sampler_range_negative():
+    # Test the passing negative values for sampling_range_start and
+    # sampling_range_end is the same as passing `len(decoder) - val`
+
+    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+
+    clips_1 = clips_at_random_indices(
+        decoder,
+        num_clips=10,
+        num_frames_per_clip=2,
+        sampling_range_start=len(decoder) - 100,
+        sampling_range_end=len(decoder) - 99,
+    )
+
+    clips_2 = clips_at_random_indices(
+        decoder,
+        num_clips=10,
+        num_frames_per_clip=2,
+        sampling_range_start=-100,
+        sampling_range_end=-99,
+    )
+
+    # There is only one unique clip in clips_1...
+    for clip in clips_1:
+        assert_tensor_equal(clip.data, clips_1[0].data)
+    # ... and it's the same that's in clips_2
+    for clip in clips_2:
+        assert_tensor_equal(clip.data, clips_1[0].data)
+
+
 def test_random_sampler_randomness():
     decoder = SimpleVideoDecoder(NASA_VIDEO.path)
     num_clips = 5
@@ -73,7 +142,7 @@ def test_random_sampler_randomness():
     with pytest.raises(AssertionError, match="not equal"):
         assert_tensor_equal(clips_1[0].data, clips_3[0].data)
 
-    # Make sure we didn't alter the builting Python RNG
+    # Make sure we didn't alter the builtin Python RNG
     builtin_random_state_end = random.getstate()
     assert builtin_random_state_start == builtin_random_state_end
 
@@ -111,14 +180,16 @@ def test_random_sampler_errors():
         )
 
     with pytest.raises(
-        ValueError, match=re.escape("sampling_range_start (-1) must be non-negative")
-    ):
-        clips_at_random_indices(decoder, sampling_range_start=-1)
-
-    with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (4) must be smaller than")
     ):
-        clips_at_random_indices(decoder, sampling_range_start=4, sampling_range_end=0)
+        clips_at_random_indices(decoder, sampling_range_start=4, sampling_range_end=4)
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_start (290) must be smaller than")
+    ):
+        clips_at_random_indices(
+            decoder, sampling_range_start=-100, sampling_range_end=-100
+        )
 
     with pytest.raises(
         ValueError, match="We determined that sampling_range_end should"

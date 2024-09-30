@@ -13,26 +13,24 @@ def _validate_sampling_range(
     *, sampling_range_start, sampling_range_end, num_frames, clip_span
 ):
     if sampling_range_start < 0:
-        raise ValueError(
-            f"sampling_range_start ({sampling_range_start}) must be non-negative."
-        )
+        sampling_range_start = num_frames + sampling_range_start
 
     # TODO: or max(sampling_range_start, num_frames - 1)?
     sampling_range_start = sampling_range_start % num_frames
 
     if sampling_range_end is None:
         sampling_range_end = num_frames - clip_span + 1
-        if sampling_range_start > sampling_range_end:
+        if sampling_range_start >= sampling_range_end:
             raise ValueError(
                 f"We determined that sampling_range_end should be {sampling_range_end}, "
-                f"but it is smaller than sampling_range_start ({sampling_range_start})."
+                "but it is smaller than or equal to sampling_range_start "
+                f"({sampling_range_start})."
             )
     else:
         if sampling_range_end < 0:
             # Support negative values so that -1 means last frame.
-            # TODO: do we want to wrap around if sampling_range_end < -num_frames ?
-            sampling_range_end = num_frames + sampling_range_end + 1
-        if sampling_range_start > sampling_range_end:
+            sampling_range_end = num_frames + sampling_range_end
+        if sampling_range_start >= sampling_range_end:
             raise ValueError(
                 f"sampling_range_start ({sampling_range_start}) must be smaller than "
                 f"sampling_range_end ({sampling_range_end})."
