@@ -392,8 +392,11 @@ class TestOps:
     def test_color_conversion_library_with_generated_videos(
         self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
     ):
+        ffmpeg_cli = "ffmpeg"
         if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
-            return
+            import importlib.resources
+
+            ffmpeg_cli = importlib.resources.path(__package__, "ffmpeg")
         # We consider filtergraph to be the reference color conversion library.
         # However the video decoder sometimes uses swscale as that is faster.
         # The exact color conversion library used is an implementation detail
@@ -404,8 +407,11 @@ class TestOps:
         # swscale if it chooses for certain video widths) to make sure they are
         # always the same.
         video_path = f"{tmp_path}/frame_numbers_{width}x{height}.mp4"
+        # We don't specify a particular encoder because the ffmpeg binary could
+        # be configured with different encoders. For the purposes of this test,
+        # the actual encoder is irrelevant.
         command = [
-            "ffmpeg",
+            ffmpeg_cli,
             "-y",
             "-f",
             "lavfi",
@@ -415,9 +421,7 @@ class TestOps:
             "yuv420p",
             "-s",
             f"{width}x{height}",
-            "-c:v",
-            "libopenh264",
-            "-t",
+            "-frames:v",
             "1",
             video_path,
         ]
