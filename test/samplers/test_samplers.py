@@ -139,7 +139,7 @@ def test_random_sampler_randomness():
     # Call with a different seed, expect different results
     torch.manual_seed(1)
     clips_3 = clips_at_random_indices(decoder, num_clips=num_clips)
-    with pytest.raises(AssertionError, match="not equal"):
+    with pytest.raises(AssertionError, match="Tensor-likes are not"):
         assert_tensor_equal(clips_1[0].data, clips_3[0].data)
 
     # Make sure we didn't alter the builtin Python RNG
