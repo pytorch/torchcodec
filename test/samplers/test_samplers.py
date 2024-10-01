@@ -59,8 +59,8 @@ def test_random_sampler_range(
     # asserting that all clips are equal if the sampling range is of size 1,
     # and that they are not all equal if the sampling range is of size 2.
 
-    # Since this has a low but non-zero probability of failing, we hard-code a
-    # seed that works.
+    # When size=2 there's still a (small) non-zero probability of sampling the
+    # same indices for clip starts, so we hard-code a seed that works.
     torch.manual_seed(0)
 
     decoder = SimpleVideoDecoder(NASA_VIDEO.path)
@@ -73,6 +73,9 @@ def test_random_sampler_range(
         sampling_range_end=sampling_range_end,
     )
 
+    # This context manager is used to ensure that the call to
+    # assert_tensor_equal() below either passes (nullcontext) or fails
+    # (pytest.raises)
     cm = (
         contextlib.nullcontext()
         if assert_all_equal
@@ -178,6 +181,11 @@ def test_random_sampler_errors():
         clips_at_random_indices(
             decoder, num_frames_per_clip=2, num_indices_between_frames=1000
         )
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_start (1000) must be smaller than")
+    ):
+        clips_at_random_indices(decoder, sampling_range_start=1000)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (4) must be smaller than")
