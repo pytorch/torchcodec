@@ -18,10 +18,10 @@ body:
       # All necessary imports at the beginning
       import torch
       import torchcodec
-      from torchcodec.decoders import SimpleVideoDecoder
+      from torchcodec.decoders import VideoDecoder
 
       # A succinct reproducing example trimmed down to the essential parts:
-      decoder = SimpleVideoDecoder("path/to/video.mp4")  # Help! This fails!
+      decoder = VideoDecoder("path/to/video.mp4")  # Help! This fails!
       # ...
       ```
 

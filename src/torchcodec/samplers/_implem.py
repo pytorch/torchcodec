@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import torch
 
-from torchcodec.decoders import FrameBatch, SimpleVideoDecoder
+from torchcodec.decoders import FrameBatch, VideoDecoder
 
 
 def _validate_params(
@@ -75,7 +75,7 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
 
 
 def clips_at_random_indices(
-    decoder: SimpleVideoDecoder,
+    decoder: VideoDecoder,
     *,
     num_clips: int = 1,
     num_frames_per_clip: int = 1,
