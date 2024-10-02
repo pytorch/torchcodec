@@ -4,7 +4,7 @@ import re
 
 import pytest
 import torch
-from torchcodec.decoders import FrameBatch, SimpleVideoDecoder
+from torchcodec.decoders import FrameBatch, VideoDecoder
 from torchcodec.samplers import clips_at_random_indices
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
@@ -12,7 +12,7 @@ from ..utils import assert_tensor_equal, NASA_VIDEO
 
 @pytest.mark.parametrize("num_indices_between_frames", [1, 5])
 def test_random_sampler(num_indices_between_frames):
-    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    decoder = VideoDecoder(NASA_VIDEO.path)
     num_clips = 2
     num_frames_per_clip = 3
 
@@ -63,7 +63,7 @@ def test_random_sampler_range(
     # same indices for clip starts, so we hard-code a seed that works.
     torch.manual_seed(0)
 
-    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    decoder = VideoDecoder(NASA_VIDEO.path)
 
     clips = clips_at_random_indices(
         decoder,
@@ -90,7 +90,7 @@ def test_random_sampler_range_negative():
     # Test the passing negative values for sampling_range_start and
     # sampling_range_end is the same as passing `len(decoder) - val`
 
-    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    decoder = VideoDecoder(NASA_VIDEO.path)
 
     clips_1 = clips_at_random_indices(
         decoder,
@@ -117,7 +117,7 @@ def test_random_sampler_range_negative():
 
 
 def test_random_sampler_randomness():
-    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    decoder = VideoDecoder(NASA_VIDEO.path)
     num_clips = 5
 
     builtin_random_state_start = random.getstate()
@@ -151,7 +151,7 @@ def test_random_sampler_randomness():
 
 
 def test_random_sampler_errors():
-    decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+    decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(
         ValueError, match=re.escape("num_clips (0) must be strictly positive")
     ):

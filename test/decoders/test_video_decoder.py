@@ -8,12 +8,12 @@ import numpy
 import pytest
 import torch
 
-from torchcodec.decoders import _core, SimpleVideoDecoder
+from torchcodec.decoders import _core, VideoDecoder
 
 from ..utils import assert_tensor_close, assert_tensor_equal, H265_VIDEO, NASA_VIDEO
 
 
-class TestSimpleDecoder:
+class TestVideoDecoder:
     @pytest.mark.parametrize("source_kind", ("str", "path", "tensor", "bytes"))
     def test_create(self, source_kind):
         if source_kind == "str":
@@ -29,7 +29,7 @@ class TestSimpleDecoder:
         else:
             raise ValueError("Oops, double check the parametrization of this test!")
 
-        decoder = SimpleVideoDecoder(source)
+        decoder = VideoDecoder(source)
         assert isinstance(decoder.metadata, _core.VideoStreamMetadata)
         assert (
             len(decoder)
@@ -44,10 +44,10 @@ class TestSimpleDecoder:
 
     def test_create_fails(self):
         with pytest.raises(TypeError, match="Unknown source type"):
-            decoder = SimpleVideoDecoder(123)  # noqa
+            decoder = VideoDecoder(123)  # noqa
 
     def test_getitem_int(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -60,7 +60,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame_last, decoder[-1])
 
     def test_getitem_numpy_int(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -90,7 +90,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame180, decoder[numpy.uint32(180)])
 
     def test_getitem_slice(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -227,7 +227,7 @@ class TestSimpleDecoder:
             assert_tensor_equal(sliced, ref)
 
     def test_getitem_fails(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder[1000]  # noqa
@@ -242,7 +242,7 @@ class TestSimpleDecoder:
             frame = decoder[2.3]  # noqa
 
     def test_iteration(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -272,7 +272,7 @@ class TestSimpleDecoder:
                 assert_tensor_equal(ref_frame_last, frame)
 
     def test_iteration_slow(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
 
         # Force the decoder to seek around a lot while iterating; this will
@@ -286,7 +286,7 @@ class TestSimpleDecoder:
         assert iterations == len(decoder) == 390
 
     def test_get_frame_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9)
         frame9 = decoder.get_frame_at(9)
@@ -314,7 +314,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(ref_frame9, frame9.data)
 
     def test_get_frame_at_tuple_unpacking(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         frame = decoder.get_frame_at(50)
         data, pts, duration = decoder.get_frame_at(50)
@@ -324,7 +324,7 @@ class TestSimpleDecoder:
         assert frame.duration_seconds == duration
 
     def test_get_frame_at_fails(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(-1)  # noqa
@@ -333,7 +333,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_at(10000)  # noqa
 
     def test_get_frame_displayed_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
@@ -344,12 +344,12 @@ class TestSimpleDecoder:
 
     def test_get_frame_displayed_at_h265(self):
         # Non-regression test for https://github.com/pytorch/torchcodec/issues/179
-        decoder = SimpleVideoDecoder(H265_VIDEO.path)
+        decoder = VideoDecoder(H265_VIDEO.path)
         ref_frame6 = H265_VIDEO.get_frame_by_name("frame000005")
         assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(0.5).data)
 
     def test_get_frame_displayed_at_fails(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(IndexError, match="Invalid pts in seconds"):
             frame = decoder.get_frame_displayed_at(-1.0)  # noqa
@@ -358,7 +358,7 @@ class TestSimpleDecoder:
             frame = decoder.get_frame_displayed_at(100.0)  # noqa
 
     def test_get_frames_at(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(start=9, stop=10)
@@ -437,7 +437,7 @@ class TestSimpleDecoder:
         ),
     )
     def test_dimension_order(self, dimension_order, frame_getter):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path, dimension_order=dimension_order)
+        decoder = VideoDecoder(NASA_VIDEO.path, dimension_order=dimension_order)
         frame = frame_getter(decoder)
 
         C, H, W = NASA_VIDEO.num_color_channels, NASA_VIDEO.height, NASA_VIDEO.width
@@ -454,12 +454,12 @@ class TestSimpleDecoder:
 
     def test_dimension_order_fails(self):
         with pytest.raises(ValueError, match="Invalid dimension order"):
-            SimpleVideoDecoder(NASA_VIDEO.path, dimension_order="NCDHW")
+            VideoDecoder(NASA_VIDEO.path, dimension_order="NCDHW")
 
     def test_get_frames_by_pts_in_range(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
-        # Note that we are comparing the results of SimpleVideoDecoder's method:
+        # Note that we are comparing the results of VideoDecoder's method:
         #   get_frames_displayed_at()
         # With the testing framework's method:
         #   get_frame_data_by_range()
@@ -548,7 +548,7 @@ class TestSimpleDecoder:
         assert_tensor_equal(all_frames.data, decoder[:])
 
     def test_get_frames_by_pts_in_range_fails(self):
-        decoder = SimpleVideoDecoder(NASA_VIDEO.path)
+        decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(ValueError, match="Invalid start seconds"):
             frame = decoder.get_frames_displayed_at(100.0, 1.0)  # noqa

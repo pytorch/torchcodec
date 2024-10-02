@@ -75,7 +75,7 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 """
 
 
-class SimpleVideoDecoder:
+class VideoDecoder:
     """A single-stream video decoder.
 
     If the video contains multiple video streams, the :term:`best stream` is

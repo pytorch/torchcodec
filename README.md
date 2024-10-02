@@ -31,9 +31,9 @@ detailed example, [check out our
 documentation](https://pytorch.org/torchcodec/stable/generated_examples/)!
 
 ```python
-from torchcodec.decoders import SimpleVideoDecoder
+from torchcodec.decoders import VideoDecoder
 
-decoder = SimpleVideoDecoder("path/to/video.mp4")
+decoder = VideoDecoder("path/to/video.mp4")
 
 decoder.metadata
 # VideoStreamMetadata:

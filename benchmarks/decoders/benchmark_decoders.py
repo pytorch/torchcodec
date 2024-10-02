@@ -13,7 +13,7 @@ import timeit
 
 import torch
 import torch.utils.benchmark as benchmark
-from torchcodec.decoders import SimpleVideoDecoder
+from torchcodec.decoders import VideoDecoder
 
 from torchcodec.decoders._core import (
     _add_video_stream,
@@ -404,9 +404,9 @@ def main() -> None:
     results = []
     for decoder_name, decoder in decoder_dict.items():
         for video_path in args.bm_video_paths.split(","):
-            # We only use the SimpleVideoDecoder to get the metadata and get
+            # We only use the VideoDecoder to get the metadata and get
             # the list of PTS values to seek to.
-            simple_decoder = SimpleVideoDecoder(video_path)
+            simple_decoder = VideoDecoder(video_path)
             duration = simple_decoder.metadata.duration_seconds
             pts_list = [
                 i * duration / num_uniform_samples for i in range(num_uniform_samples)
@@ -453,7 +453,7 @@ def main() -> None:
 
     first_video_path = args.bm_video_paths.split(",")[0]
     if args.bm_video_creation:
-        simple_decoder = SimpleVideoDecoder(first_video_path)
+        simple_decoder = VideoDecoder(first_video_path)
         metadata = simple_decoder.metadata
         metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
         creation_result = benchmark.Timer(
