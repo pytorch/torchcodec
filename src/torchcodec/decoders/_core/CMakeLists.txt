@@ -16,7 +16,13 @@ function(make_torchcodec_library library_name ffmpeg_target)
         VideoDecoder.cpp
         VideoDecoderOps.h
         VideoDecoderOps.cpp
+        DeviceInterface.h
     )
+    if(ENABLE_CUDA)
+        list(APPEND sources CPUOnlyDevice.cpp)
+    else()
+        list(APPEND sources CudaDevice.cpp)
+    endif()
     add_library(${library_name} SHARED ${sources})
     set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
 

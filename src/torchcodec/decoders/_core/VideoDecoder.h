@@ -146,6 +146,7 @@ class VideoDecoder {
     std::optional<int> width;
     std::optional<int> height;
     std::optional<ColorConversionLibrary> colorConversionLibrary;
+    torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
