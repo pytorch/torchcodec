@@ -51,7 +51,7 @@ jobs:
         git checkout ${{ matrix.ffmpeg_version }}
         which pkg-config
         pkg-config --list-all
-        ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid
+        ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid --enable-rpath
         make --silent -j install
         popd
 
