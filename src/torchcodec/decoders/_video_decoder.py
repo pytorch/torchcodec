@@ -191,7 +191,7 @@ class VideoDecoder:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(numbers.Integral or slice): The index or range of frame(s) to retrieve.
+            key(int or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.
