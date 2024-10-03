@@ -146,6 +146,7 @@ class VideoDecoder {
     std::optional<int> width;
     std::optional<int> height;
     std::optional<ColorConversionLibrary> colorConversionLibrary;
+    // By default we use CPU for decoding for both C++ and python users.
     torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
