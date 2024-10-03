@@ -56,11 +56,11 @@ jobs:
         popd
 
         CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e ".[dev]" --no-build-isolation -vv --debug
-
+        # Ensure our compiled ffmpeg binary is in the path.
+        which ffmpeg
         # We skip certain tests because they are not relevant to GPU decoding and they always fail with
         # a custom FFMPEG build.
-        which ffmpeg
-        pytest -k "not (test_get_metadata or get_ffmpeg_version)"
+        pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
 
         # TODO: Run actual GPU decoding. We will do that once the implementation is in-place.
         conda deactivate
