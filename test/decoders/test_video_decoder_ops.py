@@ -40,6 +40,10 @@ torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
 
 def needs_cuda(test_item):
+    # TODO(ahmads): Get these tests working in FBCODE.
+    # For now they only run on OSS CUDA CI.
+    if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+        return pytest.mark.skip(reason="CUDA not available")(test_item)
     if not torch.cuda.is_available():
         return pytest.mark.skip(reason="CUDA not available")(test_item)
     return test_item
