@@ -1,5 +1,5 @@
 import random
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
 import torch
 
@@ -74,6 +74,26 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     return num_indices_between_frames * (num_frames_per_clip - 1) + 1
 
 
+def _repeat_last_policy(clip_indices, *, num_frames_per_clip):
+    clip_indices += [clip_indices[-1]] * (num_frames_per_clip - len(clip_indices))
+    return clip_indices
+
+
+def _wrap_policy(clip_indices, *, num_frames_per_clip):
+    return (clip_indices * (num_frames_per_clip // len(clip_indices) + 1))[:num_frames_per_clip]
+
+
+def _error_policy(clip_indices, **kwargs):
+    raise ValueError("TODO")
+
+
+_POLICY_FUNCTIONS: dict[str, Callable[Any, list[int]]] = {
+    "repeat_last": _repeat_last_policy,
+    "wrap": _wrap_policy,
+    "error": _error_policy,
+}
+
+
 # TODO: What is sampling_range_end?
 # - The upper bound of where a clip can *start*
 # - The upper bound of where a clip can *end*
@@ -87,7 +107,7 @@ def clips_at_random_indices(
     num_indices_between_frames: int = 1,
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
-    policy: str = "repeat_last"  # can also be: "wrap", "error" TODO: use Literal
+    policy: str = "repeat_last",  # can also be: "wrap", "error" TODO: use Literal
 ) -> List[FrameBatch]:
 
     _validate_params(
@@ -119,24 +139,12 @@ def clips_at_random_indices(
         low=sampling_range_start, high=sampling_range_end, size=(num_clips,)
     )
 
-    all_clip_indices : list[int] = []
-
-    def repeat_last_policy(clip_indices):
-        clip_indices += [clip_indices[-1]] * (num_frames_per_clip - len(clip_indices))
-        return clip_indices
-    
-    def wrap_policy(clip_indices):
-        clip_indices += list(
-            range(
-                clip_indices[0],
-                clip_indices[0] + clip_span,
-                num_indices_between_frames,
-            )
+    if policy not in _POLICY_FUNCTIONS.keys():
+        raise ValueError(
+            f"Invalid policy ({policy}). Supported values are {_POLICY_FUN.keys()}."
         )
-        return clip_indices
-    
-    def error_policy(clip_indices):
-        raise ValueError(f"TODO")
+
+    all_clip_indices: list[int] = []
 
     print(f"{len(decoder) = }")
     print(f"{clip_span = }")
@@ -146,13 +154,8 @@ def clips_at_random_indices(
         clip_indices = list(range(start_index, upper_bound, num_indices_between_frames))
         print(f"{clip_indices = }")
         if len(clip_indices) < num_frames_per_clip:
-            # TODO clean up this mess
-            policy_fun = {
-                "repeat_last": repeat_last_policy,
-                "wrap": wrap_policy,
-                "error": error_policy,
-            }[policy]
-            clip_indices = policy_fun(clip_indices)
+            policy_fun = _POLICY_FUNCTIONS[policy]
+            clip_indices = policy_fun(clip_indices, num_frames_per_clip=num_frames_per_clip)
         print(f"{clip_indices = }")
         all_clip_indices += clip_indices
         # if start_index + clip_span < sampling_range_end:
@@ -226,10 +229,13 @@ def clips_at_regular_indices(
     )
 
     # Note [num clips larger than sampling range]
-    # If we ask for more clips than there are frames in the sampling range (or
-    # in the video), we rely on torch.linspace behavior which will return
-    # duplicated indices. E.g. torch.linspace(0, 10, steps=20, dtype=torch.int)
-    # returns 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
+    # If we ask for more clips than there are frames in the sampling range or
+    # in the video, we rely on torch.linspace behavior which will return
+    # duplicated indices.
+    # E.g. torch.linspace(0, 10, steps=20, dtype=torch.int) returns
+    # 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
+    # Alternatively we could wrap around, but the current behavior is closer to
+    # the expected "equally spaced indices" sampling.
     clip_start_indices = torch.linspace(
         sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
     )

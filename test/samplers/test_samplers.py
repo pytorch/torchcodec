@@ -168,7 +168,7 @@ def test_random_sampler_randomness():
 @pytest.mark.parametrize(
     "num_clips, sampling_range_size",
     (
-        # Ask for 50 clips while the sampling range is 10 frames wide
+        # Ask for 10 clips while the sampling range is 10 frames wide
         # expect 10 clips with 10 unique starting points.
         (10, 10),
         # Ask for 50 clips while the sampling range is only 10 frames wide
