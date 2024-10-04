@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import dataclasses
+import numbers
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Literal, Tuple, Union
@@ -74,7 +75,7 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 """
 
 
-class SimpleVideoDecoder:
+class VideoDecoder:
     """A single-stream video decoder.
 
     If the video contains multiple video streams, the :term:`best stream` is
@@ -186,17 +187,17 @@ class SimpleVideoDecoder:
         )
         return frame_data
 
-    def __getitem__(self, key: Union[int, slice]) -> Tensor:
+    def __getitem__(self, key: Union[numbers.Integral, slice]) -> Tensor:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(int or slice): The index or range of frame(s) to retrieve.
+            key(numbers.Integral or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.
         """
-        if isinstance(key, int):
-            return self._getitem_int(key)
+        if isinstance(key, numbers.Integral):
+            return self._getitem_int(int(key))
         elif isinstance(key, slice):
             return self._getitem_slice(key)
 

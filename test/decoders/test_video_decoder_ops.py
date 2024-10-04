@@ -8,6 +8,7 @@ import os
 
 os.environ["TORCH_LOGS"] = "output_code"
 import json
+import subprocess
 from typing import Tuple
 
 import numpy as np
@@ -16,6 +17,7 @@ import pytest
 import torch
 
 from torchcodec.decoders._core import (
+    _add_video_stream,
     _test_frame_pts_equality,
     add_video_stream,
     create_from_bytes,
@@ -321,6 +323,142 @@ class TestOps:
                 decoder, stream_index=3, frame_index=i, pts_seconds_to_test=pts.item()
             )
             assert pts_is_equal
+
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library(self, color_conversion_library):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, color_conversion_library=color_conversion_library)
+        frame0, *_ = get_next_frame(decoder)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        assert_tensor_equal(frame0, reference_frame0)
+        reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
+        frame1, *_ = get_next_frame(decoder)
+        assert_tensor_equal(frame1, reference_frame1)
+        seek_to_pts(decoder, 6.0)
+        frame_time6, *_ = get_next_frame(decoder)
+        reference_frame_time6 = NASA_VIDEO.get_frame_by_name("time6.000000")
+        assert_tensor_equal(frame_time6, reference_frame_time6)
+
+    # We choose arbitrary values for width and height scaling to get better
+    # test coverage. Some pairs upscale the image while others downscale it.
+    @pytest.mark.parametrize(
+        "width_scaling_factor,height_scaling_factor",
+        ((1.31, 1.5), (0.71, 0.5), (1.31, 0.7), (0.71, 1.5), (1.0, 1.0)),
+    )
+    @pytest.mark.parametrize("input_video", [NASA_VIDEO])
+    def test_color_conversion_library_with_scaling(
+        self, input_video, width_scaling_factor, height_scaling_factor
+    ):
+        decoder = create_from_file(str(input_video.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+        metadata = get_json_metadata(decoder)
+        metadata_dict = json.loads(metadata)
+        assert metadata_dict["width"] == input_video.width
+        assert metadata_dict["height"] == input_video.height
+
+        target_height = int(input_video.height * height_scaling_factor)
+        target_width = int(input_video.width * width_scaling_factor)
+        if width_scaling_factor != 1.0:
+            assert target_width != input_video.width
+        if height_scaling_factor != 1.0:
+            assert target_height != input_video.height
+
+        filtergraph_decoder = create_from_file(str(input_video.path))
+        _add_video_stream(
+            filtergraph_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="filtergraph",
+        )
+        filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
+
+        swscale_decoder = create_from_file(str(input_video.path))
+        _add_video_stream(
+            swscale_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="swscale",
+        )
+        swscale_frame0, _, _ = get_next_frame(swscale_decoder)
+        assert_tensor_equal(filtergraph_frame0, swscale_frame0)
+
+    @pytest.mark.parametrize(
+        "width_scaling_factor,height_scaling_factor",
+        ((1.31, 1.5), (0.71, 0.5), (1.31, 0.7), (0.71, 1.5), (1.0, 1.0)),
+    )
+    @pytest.mark.parametrize("width", [30, 32, 300])
+    @pytest.mark.parametrize("height", [128])
+    def test_color_conversion_library_with_generated_videos(
+        self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
+    ):
+        ffmpeg_cli = "ffmpeg"
+        if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+            import importlib.resources
+
+            ffmpeg_cli = importlib.resources.path(__package__, "ffmpeg")
+        # We consider filtergraph to be the reference color conversion library.
+        # However the video decoder sometimes uses swscale as that is faster.
+        # The exact color conversion library used is an implementation detail
+        # of the video decoder and depends on the video's width.
+        #
+        # In this test we compare the output of filtergraph (which is the
+        # reference) with the output of the video decoder (which may use
+        # swscale if it chooses for certain video widths) to make sure they are
+        # always the same.
+        video_path = f"{tmp_path}/frame_numbers_{width}x{height}.mp4"
+        # We don't specify a particular encoder because the ffmpeg binary could
+        # be configured with different encoders. For the purposes of this test,
+        # the actual encoder is irrelevant.
+        command = [
+            ffmpeg_cli,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=blue",
+            "-pix_fmt",
+            "yuv420p",
+            "-s",
+            f"{width}x{height}",
+            "-frames:v",
+            "1",
+            video_path,
+        ]
+        subprocess.check_call(command)
+
+        decoder = create_from_file(str(video_path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+        metadata = get_json_metadata(decoder)
+        metadata_dict = json.loads(metadata)
+        assert metadata_dict["width"] == width
+        assert metadata_dict["height"] == height
+
+        target_height = int(height * height_scaling_factor)
+        target_width = int(width * width_scaling_factor)
+        if width_scaling_factor != 1.0:
+            assert target_width != width
+        if height_scaling_factor != 1.0:
+            assert target_height != height
+
+        filtergraph_decoder = create_from_file(str(video_path))
+        _add_video_stream(
+            filtergraph_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="filtergraph",
+        )
+        filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
+
+        auto_decoder = create_from_file(str(video_path))
+        add_video_stream(
+            auto_decoder,
+            width=target_width,
+            height=target_height,
+        )
+        auto_frame0, _, _ = get_next_frame(auto_decoder)
+        assert_tensor_equal(filtergraph_frame0, auto_frame0)
 
 
 if __name__ == "__main__":

@@ -6,4 +6,4 @@
 
 from . import decoders, samplers  # noqa  # noqa
 
-__version__ = "0.0.2.dev"
+__version__ = "0.0.4.dev"

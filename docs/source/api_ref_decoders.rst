@@ -12,7 +12,7 @@ torchcodec.decoders
     :nosignatures:
     :template: class.rst
 
-    SimpleVideoDecoder
+    VideoDecoder
 
 
 .. autosummary::

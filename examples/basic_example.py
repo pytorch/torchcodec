@@ -6,11 +6,11 @@
 
 """
 ========================================
-Decoding a video with SimpleVideoDecoder
+Decoding a video with VideoDecoder
 ========================================
 
 In this example, we'll learn how to decode a video using the
-:class:`~torchcodec.decoders.SimpleVideoDecoder` class.
+:class:`~torchcodec.decoders.VideoDecoder` class.
 """
 
 # %%
@@ -60,10 +60,10 @@ def plot(frames: torch.Tensor, title : Optional[str] = None):
 # We can now create a decoder from the raw (encoded) video bytes. You can of
 # course use a local video file and pass the path as input, rather than download
 # a video.
-from torchcodec.decoders import SimpleVideoDecoder
+from torchcodec.decoders import VideoDecoder
 
 # You can also pass a path to a local file!
-decoder = SimpleVideoDecoder(raw_video_bytes)
+decoder = VideoDecoder(raw_video_bytes)
 
 # %%
 # The has not yet been decoded by the decoder, but we already have access to
@@ -90,7 +90,7 @@ print(f"{every_twenty_frame.dtype = }")
 # frames.  The batch dimension N is only present when we're decoding more than
 # one frame. The dimension order can be changed to ``N, H, W, C`` using the
 # ``dimension_order`` parameter of
-# :class:`~torchcodec.decoders.SimpleVideoDecoder`. Frames are always of
+# :class:`~torchcodec.decoders.VideoDecoder`. Frames are always of
 # ``torch.uint8`` dtype.
 #
 
@@ -119,8 +119,8 @@ for frame in decoder:
 # can be useful to retrieve additional information about the frames, such as
 # their :term:`pts` (Presentation Time Stamp), and their duration.
 # This can be achieved using the
-# :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frame_at` and
-# :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frames_at`  methods, which
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at` and
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`  methods, which
 # will return a :class:`~torchcodec.decoders.Frame` and
 # :class:`~torchcodec.decoders.FrameBatch` objects respectively.
 
@@ -151,8 +151,8 @@ plot(middle_frames.data, "Middle frames")
 #
 # So far, we have retrieved frames based on their index. We can also retrieve
 # frames based on *when* they are displayed with
-# :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frame_displayed_at` and
-# :meth:`~torchcodec.decoders.SimpleVideoDecoder.get_frames_displayed_at`, which
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frame_displayed_at` and
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_displayed_at`, which
 # also returns :class:`~torchcodec.decoders.Frame` and :class:`~torchcodec.decoders.FrameBatch`
 # respectively.
 

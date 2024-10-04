@@ -13,7 +13,8 @@
 set -x
 set -e
 
-TORCHCODEC_PATH=$HOME/fbsource/fbcode/pytorch/torchcodec
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TORCHCODEC_PATH=$SCRIPT_DIR/../
 RESOURCES_DIR=$TORCHCODEC_PATH/test/resources
 VIDEO_PATH=$RESOURCES_DIR/nasa_13013.mp4
 
