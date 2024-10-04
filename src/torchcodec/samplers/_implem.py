@@ -178,10 +178,13 @@ def clips_at_regular_indices(
     )
 
     # Note [num clips larger than sampling range]
-    # If we ask for more clips than there are frames in the sampling range (or
-    # in the video), we rely on torch.linspace behavior which will return
-    # duplicated indices. E.g. torch.linspace(0, 10, steps=20, dtype=torch.int)
-    # returns 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
+    # If we ask for more clips than there are frames in the sampling range or
+    # in the video, we rely on torch.linspace behavior which will return
+    # duplicated indices.
+    # E.g. torch.linspace(0, 10, steps=20, dtype=torch.int) returns
+    # 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
+    # Alternatively we could wrap around, but the current behavior is closer to
+    # the expected "equally spaced indices" sampling.
     clip_start_indices = torch.linspace(
         sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
     )
