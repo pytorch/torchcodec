@@ -11,13 +11,14 @@ from torchcodec.samplers import clips_at_random_indices, clips_at_regular_indice
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 @pytest.mark.parametrize("num_indices_between_frames", [1, 5])
-def test_random_sampler(num_indices_between_frames):
+def test_sampler(sampler, num_indices_between_frames):
     decoder = VideoDecoder(NASA_VIDEO.path)
-    num_clips = 2
+    num_clips = 5
     num_frames_per_clip = 3
 
-    clips = clips_at_random_indices(
+    clips = sampler(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
@@ -35,6 +36,15 @@ def test_random_sampler(num_indices_between_frames):
     )
     assert all(clip.data.shape == expected_clip_data_shape for clip in clips)
 
+    if sampler is clips_at_regular_indices:
+        # assert regular spacing between sampled clips
+        # Note: need approximate check as actual values typically look like [3.2032, 3.2366, 3.2366, 3.2366]
+        seconds_between_clip_starts = torch.tensor(
+            [clip.pts_seconds[0] for clip in clips]
+        ).diff()
+        for diff in seconds_between_clip_starts:
+            assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
+
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
     # distance.
@@ -46,6 +56,7 @@ def test_random_sampler(num_indices_between_frames):
     )
 
 
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 @pytest.mark.parametrize(
     "sampling_range_start, sampling_range_end, assert_all_equal",
     (
@@ -53,8 +64,8 @@ def test_random_sampler(num_indices_between_frames):
         (10, 12, False),
     ),
 )
-def test_random_sampler_range(
-    sampling_range_start, sampling_range_end, assert_all_equal
+def test_sampling_range(
+    sampler, sampling_range_start, sampling_range_end, assert_all_equal
 ):
     # Test the sampling_range_start and sampling_range_end parameters by
     # asserting that all clips are equal if the sampling range is of size 1,
@@ -66,7 +77,7 @@ def test_random_sampler_range(
 
     decoder = VideoDecoder(NASA_VIDEO.path)
 
-    clips = clips_at_random_indices(
+    clips = sampler(
         decoder,
         num_clips=10,
         num_frames_per_clip=2,
@@ -87,13 +98,14 @@ def test_random_sampler_range(
             assert_tensor_equal(clip.data, clips[0].data)
 
 
-def test_random_sampler_range_negative():
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+def test_sampling_range_negative(sampler):
     # Test the passing negative values for sampling_range_start and
     # sampling_range_end is the same as passing `len(decoder) - val`
 
     decoder = VideoDecoder(NASA_VIDEO.path)
 
-    clips_1 = clips_at_random_indices(
+    clips_1 = sampler(
         decoder,
         num_clips=10,
         num_frames_per_clip=2,
@@ -101,7 +113,7 @@ def test_random_sampler_range_negative():
         sampling_range_end=len(decoder) - 99,
     )
 
-    clips_2 = clips_at_random_indices(
+    clips_2 = sampler(
         decoder,
         num_clips=10,
         num_frames_per_clip=2,
@@ -151,97 +163,58 @@ def test_random_sampler_randomness():
     assert builtin_random_state_start == builtin_random_state_end
 
 
-def test_random_sampler_errors():
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+def test_random_sampler_errors(sampler):
     decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(
         ValueError, match=re.escape("num_clips (0) must be strictly positive")
     ):
-        clips_at_random_indices(decoder, num_clips=0)
+        sampler(decoder, num_clips=0)
 
     with pytest.raises(
         ValueError, match=re.escape("num_frames_per_clip (0) must be strictly positive")
     ):
-        clips_at_random_indices(decoder, num_frames_per_clip=0)
+        sampler(decoder, num_frames_per_clip=0)
 
     with pytest.raises(
         ValueError,
         match=re.escape("num_indices_between_frames (0) must be strictly positive"),
     ):
-        clips_at_random_indices(decoder, num_indices_between_frames=0)
+        sampler(decoder, num_indices_between_frames=0)
 
     with pytest.raises(
         ValueError,
         match=re.escape("Clip span (1000) is larger than the number of frames"),
     ):
-        clips_at_random_indices(decoder, num_frames_per_clip=1000)
+        sampler(decoder, num_frames_per_clip=1000)
 
     with pytest.raises(
         ValueError,
         match=re.escape("Clip span (1001) is larger than the number of frames"),
     ):
-        clips_at_random_indices(
-            decoder, num_frames_per_clip=2, num_indices_between_frames=1000
-        )
+        sampler(decoder, num_frames_per_clip=2, num_indices_between_frames=1000)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (1000) must be smaller than")
     ):
-        clips_at_random_indices(decoder, sampling_range_start=1000)
+        sampler(decoder, sampling_range_start=1000)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (4) must be smaller than")
     ):
-        clips_at_random_indices(decoder, sampling_range_start=4, sampling_range_end=4)
+        sampler(decoder, sampling_range_start=4, sampling_range_end=4)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (290) must be smaller than")
     ):
-        clips_at_random_indices(
-            decoder, sampling_range_start=-100, sampling_range_end=-100
-        )
+        sampler(decoder, sampling_range_start=-100, sampling_range_end=-100)
 
     with pytest.raises(
         ValueError, match="We determined that sampling_range_end should"
     ):
-        clips_at_random_indices(
+        sampler(
             decoder,
             num_frames_per_clip=10,
             sampling_range_start=len(decoder) - 1,
             sampling_range_end=None,
         )
-
-
-@pytest.mark.parametrize("num_indices_between_frames", [1])  # , 5])
-def test_clips_at_regular_indices(num_indices_between_frames):
-    decoder = VideoDecoder(NASA_VIDEO.path)
-    num_clips = 4
-    num_frames_per_clip = 3
-
-    clips = clips_at_regular_indices(
-        decoder,
-        num_clips=num_clips,
-        num_frames_per_clip=num_frames_per_clip,
-        num_indices_between_frames=num_indices_between_frames,
-    )
-    print(clips)
-
-    assert isinstance(clips, list)
-    assert len(clips) == num_clips
-    assert all(isinstance(clip, FrameBatch) for clip in clips)
-    expected_clip_data_shape = (
-        num_frames_per_clip,
-        3,
-        NASA_VIDEO.height,
-        NASA_VIDEO.width,
-    )
-    assert all(clip.data.shape == expected_clip_data_shape for clip in clips)
-
-    # # Check the num_indices_between_frames parameter by asserting that the
-    # # "time" difference between frames in a clip is the same as the "index"
-    # # distance.
-    # avg_distance_between_frames_seconds = torch.concat(
-    #     [clip.pts_seconds.diff() for clip in clips]
-    # ).mean()
-    # assert avg_distance_between_frames_seconds == pytest.approx(
-    #     num_indices_between_frames / decoder.metadata.average_fps
-    # )

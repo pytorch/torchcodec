@@ -148,6 +148,8 @@ def clips_at_regular_indices(
     num_clips: int = 1,
     num_frames_per_clip: int = 1,
     num_indices_between_frames: int = 1,
+    sampling_range_start: int = 0,
+    sampling_range_end: Optional[int] = None,  # interval is [start, end).
 ) -> List[FrameBatch]:
 
     _validate_params(
@@ -162,6 +164,12 @@ def clips_at_regular_indices(
         num_frames_per_clip=num_frames_per_clip,
     )
 
+    # TODO: We should probably not error.
+    if clip_span > len(decoder):
+        raise ValueError(
+            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
+        )
+
     # TODO what if num_clips > (len(decoder) - clip_span)? We can:
     # - wrap around
     #   - as a real wrap around [0, 1, 2, 3, 0, 1]
@@ -169,8 +177,15 @@ def clips_at_regular_indices(
     # - truncate and return less than num_clips.
     # - error
 
+    sampling_range_start, sampling_range_end = _validate_sampling_range(
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+        num_frames=len(decoder),
+        clip_span=clip_span,
+    )
+
     clip_start_indices = torch.linspace(
-        0, len(decoder) - clip_span, steps=num_clips, dtype=torch.int
+        sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
     )
 
     clips = [
