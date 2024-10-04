@@ -170,13 +170,6 @@ def clips_at_regular_indices(
             f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
         )
 
-    # TODO what if num_clips > (len(decoder) - clip_span)? We can:
-    # - wrap around
-    #   - as a real wrap around [0, 1, 2, 3, 0, 1]
-    #   - the way linspace natively does it i.g. [0, 0, 1, 2, 2, 3]
-    # - truncate and return less than num_clips.
-    # - error
-
     sampling_range_start, sampling_range_end = _validate_sampling_range(
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
@@ -184,10 +177,17 @@ def clips_at_regular_indices(
         clip_span=clip_span,
     )
 
+    # Note [num clips larger than sampling range]
+    # If we ask for more clips than there are frames in the sampling range (or
+    # in the video), we rely on torch.linspace behavior which will return
+    # duplicated indices. E.g. torch.linspace(0, 10, steps=20, dtype=torch.int)
+    # returns 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
     clip_start_indices = torch.linspace(
         sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
     )
 
+    # Similarly to clip_at_random_indices, there may be backward seeks if clips overlap.
+    # See other TODO over there, and apply similar changes here.
     clips = [
         decoder.get_frames_at(
             start=clip_start_index,

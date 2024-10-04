@@ -45,6 +45,8 @@ def test_sampler(sampler, num_indices_between_frames):
         for diff in seconds_between_clip_starts:
             assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
 
+        assert (diff > 0).all()  # Also assert clips are sorted by start time
+
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
     # distance.
@@ -161,6 +163,37 @@ def test_random_sampler_randomness():
     # Make sure we didn't alter the builtin Python RNG
     builtin_random_state_end = random.getstate()
     assert builtin_random_state_start == builtin_random_state_end
+
+
+@pytest.mark.parametrize(
+    "num_clips, sampling_range_size",
+    (
+        # Ask for 50 clips while the sampling range is 10 frames wide
+        # expect 10 clips with 10 unique starting points.
+        (10, 10),
+        # Ask for 50 clips while the sampling range is only 10 frames wide
+        # expect 50 clips with only 10 unique starting points.
+        (50, 10),
+    ),
+)
+def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_size):
+    # Test for expected behavior described in Note [num clips larger than sampling range]
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    clips = clips_at_regular_indices(
+        decoder,
+        num_clips=num_clips,
+        sampling_range_start=0,
+        sampling_range_end=sampling_range_size,  # because sampling_range_start=0
+    )
+
+    assert len(clips) == num_clips
+
+    clip_starts_seconds = torch.tensor([clip.pts_seconds[0] for clip in clips])
+    assert len(torch.unique(clip_starts_seconds)) == sampling_range_size
+
+    # Assert clips starts are ordered, i.e. the start indices don't just "wrap
+    # around". They're duplicated *and* ordered.
+    assert (clip_starts_seconds.diff() >= 0).all()
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
