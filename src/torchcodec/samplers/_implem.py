@@ -1,13 +1,12 @@
-import random
-from typing import Any, Callable, List, Optional
+from typing import Callable, List, Literal, Optional
 
 import torch
 
-from torchcodec.decoders import FrameBatch, VideoDecoder
+from torchcodec.decoders import Frame, FrameBatch, VideoDecoder
 
 
 def _validate_params(
-    *, decoder, num_clips, num_frames_per_clip, num_indices_between_frames
+    *, decoder, num_clips, num_frames_per_clip, num_indices_between_frames, policy
 ):
     if len(decoder) < 1:
         raise ValueError(
@@ -25,21 +24,26 @@ def _validate_params(
             f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
         )
 
+    if policy not in _POLICY_FUNCTIONS.keys():
+        raise ValueError(
+            f"Invalid policy ({policy}). Supported values are {_POLICY_FUN.keys()}."
+        )
+
 
 def _validate_sampling_range(
-    *, sampling_range_start, sampling_range_end, num_frames, clip_span
+    *, sampling_range_start, sampling_range_end, num_frames_in_video, clip_span
 ):
     if sampling_range_start < 0:
-        sampling_range_start = num_frames + sampling_range_start
+        sampling_range_start = num_frames_in_video + sampling_range_start
 
-    if sampling_range_start >= num_frames:
+    if sampling_range_start >= num_frames_in_video:
         raise ValueError(
             f"sampling_range_start ({sampling_range_start}) must be smaller than "
-            f"the number of frames ({num_frames})."
+            f"the number of frames ({num_frames_in_video})."
         )
 
     if sampling_range_end is None:
-        sampling_range_end = num_frames - clip_span + 1
+        sampling_range_end = max(num_frames_in_video - clip_span + 1, 1)
         if sampling_range_start >= sampling_range_end:
             raise ValueError(
                 f"We determined that sampling_range_end should be {sampling_range_end}, "
@@ -49,8 +53,8 @@ def _validate_sampling_range(
     else:
         if sampling_range_end < 0:
             # Support negative values so that -1 means last frame.
-            sampling_range_end = num_frames + sampling_range_end
-        sampling_range_end = min(sampling_range_end, num_frames)
+            sampling_range_end = num_frames_in_video + sampling_range_end
+        sampling_range_end = min(sampling_range_end, num_frames_in_video)
         if sampling_range_start >= sampling_range_end:
             raise ValueError(
                 f"sampling_range_start ({sampling_range_start}) must be smaller than "
@@ -74,31 +78,104 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     return num_indices_between_frames * (num_frames_per_clip - 1) + 1
 
 
-def _repeat_last_policy(clip_indices, *, num_frames_per_clip):
-    clip_indices += [clip_indices[-1]] * (num_frames_per_clip - len(clip_indices))
-    return clip_indices
+def _repeat_last_policy(
+    frame_indices: list[int], *, num_frames_per_clip: int
+) -> list[int]:
+    # frame_indices = [1, 2, 3], num_frames_per_clip = 5
+    # output = [1, 2, 3, 3, 3]
+    frame_indices += [frame_indices[-1]] * (num_frames_per_clip - len(frame_indices))
+    return frame_indices
 
 
-def _wrap_policy(clip_indices, *, num_frames_per_clip):
-    return (clip_indices * (num_frames_per_clip // len(clip_indices) + 1))[:num_frames_per_clip]
+def _wrap_policy(frame_indices: list[int], *, num_frames_per_clip: int) -> list[int]:
+    # frame_indices = [1, 2, 3], num_frames_per_clip = 5
+    # output = [1, 2, 3, 1, 2]
+    return (frame_indices * (num_frames_per_clip // len(frame_indices) + 1))[
+        :num_frames_per_clip
+    ]
 
 
-def _error_policy(clip_indices, **kwargs):
-    raise ValueError("TODO")
+def _error_policy(**kwargs):
+    raise ValueError("TODO nice error message here")
 
 
-_POLICY_FUNCTIONS: dict[str, Callable[Any, list[int]]] = {
+_POLICY_FUNCTION_TYPE = Callable[[list[int], int], list[int]]
+_POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
     "repeat_last": _repeat_last_policy,
     "wrap": _wrap_policy,
     "error": _error_policy,
 }
 
 
+def _build_all_clips_indices(
+    *,
+    clip_start_indices: list[int],
+    num_frames_per_clip: int,
+    num_indices_between_frames: int,
+    num_frames_in_video: int,
+    policy_fun: _POLICY_FUNCTION_TYPE,
+) -> list[int]:
+    # From the clip start indices (f_00, f10, f20, ...)
+    # and from the rest of the parameters, return the list of all the frame
+    # indices, within all clips.
+    # I.e. the output is [f_00, f_01, f_02, f_03, f_10, f_11, f_12, f_13, ...]
+    # where f_01 is the index of frame 1 in clip 0.
+    #
+    # All clips in the output are of length num_frames_per_clip (=4 in example
+    # above). When the frame indices go beyond the video, we force the frame
+    # indices back to valid values by applying the user's policy (wrap, repeat,
+    # etc.).
+    all_clips_indices: list[int] = []
+
+    clip_span = _get_clip_span(
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_per_clip=num_frames_per_clip,
+    )
+
+    for start_index in clip_start_indices:
+        frame_index_upper_bound = min(start_index + clip_span, num_frames_in_video)
+        frame_indices = list(
+            range(start_index, frame_index_upper_bound, num_indices_between_frames)
+        )
+        if len(frame_indices) < num_frames_per_clip:
+            frame_indices = policy_fun(
+                frame_indices, num_frames_per_clip=num_frames_per_clip
+            )
+        all_clips_indices += frame_indices
+    return all_clips_indices
+
+
+def _decode_all_clips_indices(
+    decoder: VideoDecoder, all_clips_indices: list[int], num_frames_per_clip: int
+) -> list[FrameBatch]:
+
+    def chunk_list(lst, chunk_size):
+        # return list of sublists of length chunk_size
+        return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+    def to_framebatch(frames: list[Frame]) -> FrameBatch:
+        data = torch.stack([frame.data for frame in frames])
+        pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
+        duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
+        return FrameBatch(
+            data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
+        )
+
+    all_frames: list[Frame] = [
+        decoder.get_frame_at(index) for index in all_clips_indices
+    ]
+    all_clips: list[list[Frame]] = chunk_list(
+        all_frames, chunk_size=num_frames_per_clip
+    )
+
+    return [to_framebatch(clip) for clip in all_clips]
+
+
 # TODO: What is sampling_range_end?
 # - The upper bound of where a clip can *start*
 # - The upper bound of where a clip can *end*
 # ?
-# Assuming this is where it can start... for now.
+# This has to be the upper bound of where a clip can start... right?
 def clips_at_random_indices(
     decoder: VideoDecoder,
     *,
@@ -107,7 +184,7 @@ def clips_at_random_indices(
     num_indices_between_frames: int = 1,
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
-    policy: str = "repeat_last",  # can also be: "wrap", "error" TODO: use Literal
+    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
 
     _validate_params(
@@ -115,6 +192,7 @@ def clips_at_random_indices(
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
         num_indices_between_frames=num_indices_between_frames,
+        policy=policy,
     )
 
     clip_span = _get_clip_span(
@@ -122,16 +200,10 @@ def clips_at_random_indices(
         num_frames_per_clip=num_frames_per_clip,
     )
 
-    # TODO: We should probably not error.
-    if clip_span > len(decoder):
-        raise ValueError(
-            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
-        )
-
     sampling_range_start, sampling_range_end = _validate_sampling_range(
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
-        num_frames=len(decoder),
+        num_frames_in_video=len(decoder),
         clip_span=clip_span,
     )
 
@@ -139,58 +211,18 @@ def clips_at_random_indices(
         low=sampling_range_start, high=sampling_range_end, size=(num_clips,)
     )
 
-    if policy not in _POLICY_FUNCTIONS.keys():
-        raise ValueError(
-            f"Invalid policy ({policy}). Supported values are {_POLICY_FUN.keys()}."
-        )
-
-    all_clip_indices: list[int] = []
-
-    print(f"{len(decoder) = }")
-    print(f"{clip_span = }")
-    for start_index in clip_start_indices.tolist():
-        print(f"{start_index = }")
-        upper_bound = min(start_index + clip_span, sampling_range_end)
-        clip_indices = list(range(start_index, upper_bound, num_indices_between_frames))
-        print(f"{clip_indices = }")
-        if len(clip_indices) < num_frames_per_clip:
-            policy_fun = _POLICY_FUNCTIONS[policy]
-            clip_indices = policy_fun(clip_indices, num_frames_per_clip=num_frames_per_clip)
-        print(f"{clip_indices = }")
-        all_clip_indices += clip_indices
-        # if start_index + clip_span < sampling_range_end:
-        #     clip_indices += list(range(start_index + 1, start_index + clip_span, num_indices_between_frames))
-        # clip_indices.append()
-        # print(f"{index = }")
-        # print(f"{index + clip_span = }")
-
-    # We want to avoid seeking backwards, so we sort the clip start indices
-    # before decoding the frames, and then re-shuffle the clips afterwards.
-    # Backward seeks may still happen if there are overlapping clips, i.e. if a
-    # clip ends after the next one starts.
-    # TODO: We should use a different strategy to avoid backward seeks:
-    # - flatten all frames indices, irrespective of their clip
-    # - sort the indices and dedup
-    # - decode all frames in index order
-    # - re-arrange the frames back into their original clips
-    clip_start_indices = torch.sort(clip_start_indices).values
-    clips = [
-        decoder.get_frames_at(
-            start=clip_start_index,
-            stop=clip_start_index + clip_span,
-            step=num_indices_between_frames,
-        )
-        for clip_start_index in clip_start_indices
-    ]
-
-    # This an ugly way to shuffle the clips using pytorch RNG *without*
-    # affecting the python builtin RNG.
-    builtin_random_state = random.getstate()
-    random.seed(torch.randint(0, 2**32, (1,)).item())
-    random.shuffle(clips)
-    random.setstate(builtin_random_state)
-
-    return clips
+    all_clips_indices = _build_all_clips_indices(
+        clip_start_indices=clip_start_indices,
+        num_frames_per_clip=num_frames_per_clip,
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_in_video=len(decoder),
+        policy_fun=_POLICY_FUNCTIONS[policy],
+    )
+    return _decode_all_clips_indices(
+        decoder,
+        all_clips_indices=all_clips_indices,
+        num_frames_per_clip=num_frames_per_clip,
+    )
 
 
 def clips_at_regular_indices(
@@ -201,6 +233,7 @@ def clips_at_regular_indices(
     num_indices_between_frames: int = 1,
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
+    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
 
     _validate_params(
@@ -208,6 +241,7 @@ def clips_at_regular_indices(
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
         num_indices_between_frames=num_indices_between_frames,
+        policy=policy,
     )
 
     clip_span = _get_clip_span(
@@ -215,16 +249,10 @@ def clips_at_regular_indices(
         num_frames_per_clip=num_frames_per_clip,
     )
 
-    # TODO: We should probably not error.
-    if clip_span > len(decoder):
-        raise ValueError(
-            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
-        )
-
     sampling_range_start, sampling_range_end = _validate_sampling_range(
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
-        num_frames=len(decoder),
+        num_frames_in_video=len(decoder),
         clip_span=clip_span,
     )
 
@@ -240,76 +268,15 @@ def clips_at_regular_indices(
         sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
     )
 
-    # Similarly to clip_at_random_indices, there may be backward seeks if clips overlap.
-    # See other TODO over there, and apply similar changes here.
-    clips = [
-        decoder.get_frames_at(
-            start=clip_start_index,
-            stop=clip_start_index + clip_span,
-            step=num_indices_between_frames,
-        )
-        for clip_start_index in clip_start_indices
-    ]
-
-    return clips
-
-
-def clips_at_regular_indices(
-    decoder: VideoDecoder,
-    *,
-    num_clips: int = 1,
-    num_frames_per_clip: int = 1,
-    num_indices_between_frames: int = 1,
-    sampling_range_start: int = 0,
-    sampling_range_end: Optional[int] = None,  # interval is [start, end).
-) -> List[FrameBatch]:
-
-    _validate_params(
-        decoder=decoder,
-        num_clips=num_clips,
+    all_clips_indices = _build_all_clips_indices(
+        clip_start_indices=clip_start_indices,
         num_frames_per_clip=num_frames_per_clip,
         num_indices_between_frames=num_indices_between_frames,
+        num_frames_in_video=len(decoder),
+        policy_fun=_POLICY_FUNCTIONS[policy],
     )
-
-    clip_span = _get_clip_span(
-        num_indices_between_frames=num_indices_between_frames,
+    return _decode_all_clips_indices(
+        decoder,
+        all_clips_indices=all_clips_indices,
         num_frames_per_clip=num_frames_per_clip,
     )
-
-    # TODO: We should probably not error.
-    if clip_span > len(decoder):
-        raise ValueError(
-            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
-        )
-
-    sampling_range_start, sampling_range_end = _validate_sampling_range(
-        sampling_range_start=sampling_range_start,
-        sampling_range_end=sampling_range_end,
-        num_frames=len(decoder),
-        clip_span=clip_span,
-    )
-
-    # Note [num clips larger than sampling range]
-    # If we ask for more clips than there are frames in the sampling range or
-    # in the video, we rely on torch.linspace behavior which will return
-    # duplicated indices.
-    # E.g. torch.linspace(0, 10, steps=20, dtype=torch.int) returns
-    # 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
-    # Alternatively we could wrap around, but the current behavior is closer to
-    # the expected "equally spaced indices" sampling.
-    clip_start_indices = torch.linspace(
-        sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
-    )
-
-    # Similarly to clip_at_random_indices, there may be backward seeks if clips overlap.
-    # See other TODO over there, and apply similar changes here.
-    clips = [
-        decoder.get_frames_at(
-            start=clip_start_index,
-            stop=clip_start_index + clip_span,
-            step=num_indices_between_frames,
-        )
-        for clip_start_index in clip_start_indices
-    ]
-
-    return clips

@@ -50,11 +50,12 @@ def test_sampler(sampler, num_indices_between_frames):
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
     # distance.
+
     avg_distance_between_frames_seconds = torch.concat(
         [clip.pts_seconds.diff() for clip in clips]
     ).mean()
     assert avg_distance_between_frames_seconds == pytest.approx(
-        num_indices_between_frames / decoder.metadata.average_fps
+        num_indices_between_frames / decoder.metadata.average_fps, abs=1e-5
     )
 
 
@@ -214,18 +215,6 @@ def test_random_sampler_errors(sampler):
         match=re.escape("num_indices_between_frames (0) must be strictly positive"),
     ):
         sampler(decoder, num_indices_between_frames=0)
-
-    with pytest.raises(
-        ValueError,
-        match=re.escape("Clip span (1000) is larger than the number of frames"),
-    ):
-        sampler(decoder, num_frames_per_clip=1000)
-
-    with pytest.raises(
-        ValueError,
-        match=re.escape("Clip span (1001) is larger than the number of frames"),
-    ):
-        sampler(decoder, num_frames_per_clip=2, num_indices_between_frames=1000)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (1000) must be smaller than")
