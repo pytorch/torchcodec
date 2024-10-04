@@ -140,3 +140,64 @@ def clips_at_random_indices(
     random.setstate(builtin_random_state)
 
     return clips
+
+
+def clips_at_regular_indices(
+    decoder: VideoDecoder,
+    *,
+    num_clips: int = 1,
+    num_frames_per_clip: int = 1,
+    num_indices_between_frames: int = 1,
+    sampling_range_start: int = 0,
+    sampling_range_end: Optional[int] = None,  # interval is [start, end).
+) -> List[FrameBatch]:
+
+    _validate_params(
+        decoder=decoder,
+        num_clips=num_clips,
+        num_frames_per_clip=num_frames_per_clip,
+        num_indices_between_frames=num_indices_between_frames,
+    )
+
+    clip_span = _get_clip_span(
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_per_clip=num_frames_per_clip,
+    )
+
+    # TODO: We should probably not error.
+    if clip_span > len(decoder):
+        raise ValueError(
+            f"Clip span ({clip_span}) is larger than the number of frames ({len(decoder)})"
+        )
+
+    sampling_range_start, sampling_range_end = _validate_sampling_range(
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+        num_frames=len(decoder),
+        clip_span=clip_span,
+    )
+
+    # Note [num clips larger than sampling range]
+    # If we ask for more clips than there are frames in the sampling range or
+    # in the video, we rely on torch.linspace behavior which will return
+    # duplicated indices.
+    # E.g. torch.linspace(0, 10, steps=20, dtype=torch.int) returns
+    # 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10
+    # Alternatively we could wrap around, but the current behavior is closer to
+    # the expected "equally spaced indices" sampling.
+    clip_start_indices = torch.linspace(
+        sampling_range_start, sampling_range_end - 1, steps=num_clips, dtype=torch.int
+    )
+
+    # Similarly to clip_at_random_indices, there may be backward seeks if clips overlap.
+    # See other TODO over there, and apply similar changes here.
+    clips = [
+        decoder.get_frames_at(
+            start=clip_start_index,
+            stop=clip_start_index + clip_span,
+            step=num_indices_between_frames,
+        )
+        for clip_start_index in clip_start_indices
+    ]
+
+    return clips
