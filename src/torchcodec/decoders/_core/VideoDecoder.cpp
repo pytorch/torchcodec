@@ -854,6 +854,13 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  if (streamInfo.options.device.type() != torch::kCPU) {
+    return convertAVFrameToDecodedOutputOnDevice(
+        streamInfo.options.device,
+        streamInfo.options,
+        streamInfo.codecContext.get(),
+        rawOutput);
+  }
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       int width = streamInfo.options.width.value_or(frame->width);

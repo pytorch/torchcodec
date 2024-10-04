@@ -10,6 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -22,5 +23,11 @@ namespace facebook::torchcodec {
 void maybeInitializeDeviceContext(
     const torch::Device& device,
     AVCodecContext* codecContext);
+
+VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
+    const torch::Device& device,
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    AVCodecContext* codecContext,
+    VideoDecoder::RawDecodedOutput& rawOutput);
 
 } // namespace facebook::torchcodec
