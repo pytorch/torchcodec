@@ -7,8 +7,20 @@ from dataclasses import dataclass
 from typing import Dict
 
 import numpy as np
+import pytest
 
 import torch
+
+
+# Decorator for skipping CUDA tests when CUDA isn't available
+def needs_cuda(test_item):
+    # TODO(ahmads): Get these tests working in FBCODE.
+    # For now they only run on OSS CUDA CI.
+    if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+        return pytest.mark.skip(reason="CUDA not available")(test_item)
+    if not torch.cuda.is_available():
+        return pytest.mark.skip(reason="CUDA not available")(test_item)
+    return test_item
 
 
 # For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On

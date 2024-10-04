@@ -30,9 +30,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -120,9 +120,16 @@ void add_video_stream(
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
-    std::optional<int64_t> stream_index) {
+    std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> device) {
   _add_video_stream(
-      decoder, width, height, num_threads, dimension_order, stream_index);
+      decoder,
+      width,
+      height,
+      num_threads,
+      dimension_order,
+      stream_index,
+      device);
 }
 
 void _add_video_stream(
@@ -132,6 +139,7 @@ void _add_video_stream(
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> device,
     std::optional<c10::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
@@ -155,6 +163,17 @@ void _add_video_stream(
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
           ". color_conversion_library must be either filtergraph or swscale.");
+    }
+  }
+  if (device.has_value()) {
+    if (device.value() == "cpu") {
+      options.device = torch::Device(torch::kCPU);
+    } else if (device.value() == "cuda") {
+      options.device = torch::Device(torch::kCUDA);
+    } else {
+      throw std::runtime_error(
+          "Invalid device=" + std::string(device.value()) +
+          ". device must be either cpu or cuda.");
     }
   }
 
