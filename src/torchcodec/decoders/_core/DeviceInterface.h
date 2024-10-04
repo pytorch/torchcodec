@@ -11,10 +11,16 @@
 #include <stdexcept>
 #include <string>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
+
 namespace facebook::torchcodec {
 
 // Initialize the hardware device that is specified in `device`. Some builds
 // support CUDA and others only support CPU.
-void maybeInitializeDeviceContext(const torch::Device& device);
+void maybeInitializeDeviceContext(
+    const torch::Device& device,
+    AVCodecContext* codecContext);
 
 } // namespace facebook::torchcodec
