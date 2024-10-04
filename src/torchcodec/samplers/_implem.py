@@ -74,6 +74,11 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     return num_indices_between_frames * (num_frames_per_clip - 1) + 1
 
 
+# TODO: What is sampling_range_end?
+# - The upper bound of where a clip can *start*
+# - The upper bound of where a clip can *end*
+# ?
+# Assuming this is where it can start... for now.
 def clips_at_random_indices(
     decoder: VideoDecoder,
     *,
@@ -82,6 +87,7 @@ def clips_at_random_indices(
     num_indices_between_frames: int = 1,
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
+    policy: str = "repeat_last"  # can also be: "wrap", "error" TODO: use Literal
 ) -> List[FrameBatch]:
 
     _validate_params(
@@ -112,6 +118,48 @@ def clips_at_random_indices(
     clip_start_indices = torch.randint(
         low=sampling_range_start, high=sampling_range_end, size=(num_clips,)
     )
+
+    all_clip_indices : list[int] = []
+
+    def repeat_last_policy(clip_indices):
+        clip_indices += [clip_indices[-1]] * (num_frames_per_clip - len(clip_indices))
+        return clip_indices
+    
+    def wrap_policy(clip_indices):
+        clip_indices += list(
+            range(
+                clip_indices[0],
+                clip_indices[0] + clip_span,
+                num_indices_between_frames,
+            )
+        )
+        return clip_indices
+    
+    def error_policy(clip_indices):
+        raise ValueError(f"TODO")
+
+    print(f"{len(decoder) = }")
+    print(f"{clip_span = }")
+    for start_index in clip_start_indices.tolist():
+        print(f"{start_index = }")
+        upper_bound = min(start_index + clip_span, sampling_range_end)
+        clip_indices = list(range(start_index, upper_bound, num_indices_between_frames))
+        print(f"{clip_indices = }")
+        if len(clip_indices) < num_frames_per_clip:
+            # TODO clean up this mess
+            policy_fun = {
+                "repeat_last": repeat_last_policy,
+                "wrap": wrap_policy,
+                "error": error_policy,
+            }[policy]
+            clip_indices = policy_fun(clip_indices)
+        print(f"{clip_indices = }")
+        all_clip_indices += clip_indices
+        # if start_index + clip_span < sampling_range_end:
+        #     clip_indices += list(range(start_index + 1, start_index + clip_span, num_indices_between_frames))
+        # clip_indices.append()
+        # print(f"{index = }")
+        # print(f"{index + clip_span = }")
 
     # We want to avoid seeking backwards, so we sort the clip start indices
     # before decoding the frames, and then re-shuffle the clips afterwards.
