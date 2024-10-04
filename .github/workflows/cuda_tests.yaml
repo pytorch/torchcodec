@@ -1,4 +1,5 @@
 name: Unit-tests on Linux GPU
+
 on:
   pull_request:
   push:
@@ -7,60 +8,68 @@ on:
       - main
       - release/*
   workflow_dispatch:
+
 jobs:
   tests:
     strategy:
       matrix:
         python_version: ["3.9"]
-        # TODO: Add more CUDA versions.
+        # TODO: Add more cuda versions.
         cuda_arch_version: ["12.4"]
         ffmpeg_version: ["origin/release/6.1"]
       fail-fast: false
-    runs-on: [ self-hosted, linux, gpu ]
-    timeout-minutes: 120
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
+    with:
+      runner: linux.g5.4xlarge.nvidia.gpu
+      repository: pytorch/torchcodec
+      gpu-arch-type: cuda
+      gpu-arch-version: ${{ matrix.cuda_arch_version }}
+      timeout: 120
 
-      - name: Setup Conda environment
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          miniconda-version: "latest"
-          activate-environment: test
-          python-version: ${{ matrix.python_version }}
+      script: |
+        echo '::group::Install prereqs'
+        nvidia-smi
+        conda create --yes --name test
+        conda activate test
+        conda install --quiet --yes pip cmake pkg-config nasm
 
-      - name: Install dependencies
-        run: |
-          conda install --quiet --yes pip cmake pkg-config nasm
-          pip install --quiet --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu124
-          conda install --quiet --yes nvidia::libnpp
+        pip install --quiet --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu124
+        conda install --quiet --yes nvidia::libnpp
+        echo '::endgroup::'
 
-      - name: Check NVIDIA driver presence
-        run: nvidia-smi
+        echo '::group::Build FFMPEG'
+        # Build and install FFMPEG from source with CUDA enabled.
+        # The one on conda doesn't have CUDA enabled.
+        # Sub-step: install nvidia headers. Reference this link for details:
+        # https://docs.nvidia.com/video-technologies/video-codec-sdk/12.1/ffmpeg-with-nvidia-gpu/index.html
+        git clone --quiet https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
 
-      - name: Build and install FFMPEG from source
-        run: |
-          git clone --quiet https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
-          pushd nv-codec-headers
-          make --silent PREFIX=$CONDA_PREFIX -j install
-          popd
-          git clone --quiet https://git.ffmpeg.org/ffmpeg.git ffmpeg/
-          pushd ffmpeg
-          git checkout ${{ matrix.ffmpeg_version }}
-          ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid --enable-rpath
-          make --silent -j install
-          popd
+        pushd nv-codec-headers
+        make --silent PREFIX=$CONDA_PREFIX -j install
+        popd
 
-      - name: Run tests
-        run: |
-          export CMAKE_BUILD_PARALLEL_LEVEL=8
-          export CXXFLAGS=""
-          export LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib"
-          export CMAKE_BUILD_TYPE=Release
-          export ENABLE_CUDA=1
-          pip install -e ".[dev]" --no-build-isolation -vv --debug
-          pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
+        # Now build FFMPEG from source with CUDA enabled.
+        git clone --quiet https://git.ffmpeg.org/ffmpeg.git ffmpeg/
+        pushd ffmpeg
+        git checkout ${{ matrix.ffmpeg_version }}
+        which pkg-config
+        pkg-config --list-all
+        ./configure --prefix=$CONDA_PREFIX --enable-nonfree --enable-cuda-nvcc --disable-static --enable-shared --optflags=-fno-omit-frame-pointer --disable-stripping --enable-cuvid --enable-rpath
+        make --silent -j install
+        popd
+        echo '::endgroup::'
 
-      - name: Clean up
-        run: conda deactivate
+        echo '::group::Build TorchCodec'
+        CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" LDFLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,$CONDA_PREFIX/lib -Wl,-rpath-link,$CONDA_PREFIX/lib -L$CONDA_PREFIX/lib" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=1 ENABLE_NVTX=1 pip install -e ".[dev]" --no-build-isolation -vv --debug
+        echo '::endgroup::'
+
+        echo '::group::Test TorchCodec'
+        # Ensure our compiled ffmpeg binary is in the path.
+        which ffmpeg
+        # We skip certain tests because they are not relevant to GPU decoding and they always fail with
+        # a custom FFMPEG build.
+        pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
+        echo '::endgroup::'
+
+        # TODO: Run actual GPU decoding. We will do that once the implementation is in-place.
+        conda deactivate
