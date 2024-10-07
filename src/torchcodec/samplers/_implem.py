@@ -31,7 +31,12 @@ def _validate_params(
 
 
 def _validate_sampling_range(
-    *, sampling_range_start, sampling_range_end, num_frames_in_video, clip_span
+    *,
+    num_indices_between_frames,
+    num_frames_per_clip,
+    sampling_range_start,
+    sampling_range_end,
+    num_frames_in_video,
 ):
     if sampling_range_start < 0:
         sampling_range_start = num_frames_in_video + sampling_range_start
@@ -41,6 +46,11 @@ def _validate_sampling_range(
             f"sampling_range_start ({sampling_range_start}) must be smaller than "
             f"the number of frames ({num_frames_in_video})."
         )
+
+    clip_span = _get_clip_span(
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_per_clip=num_frames_per_clip,
+    )
 
     if sampling_range_end is None:
         sampling_range_end = max(num_frames_in_video - clip_span + 1, 1)
@@ -201,16 +211,12 @@ def _abstract_sampler(
         policy=policy,
     )
 
-    clip_span = _get_clip_span(
-        num_indices_between_frames=num_indices_between_frames,
-        num_frames_per_clip=num_frames_per_clip,
-    )
-
     sampling_range_start, sampling_range_end = _validate_sampling_range(
+        num_frames_per_clip=num_frames_per_clip,
+        num_indices_between_frames=num_indices_between_frames,
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
         num_frames_in_video=len(decoder),
-        clip_span=clip_span,
     )
 
     if kind == "random":
