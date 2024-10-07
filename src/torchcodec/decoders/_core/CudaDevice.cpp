@@ -2,16 +2,17 @@
 
 namespace facebook::torchcodec {
 
-void maybeInitializeDeviceContext(const torch::Device& device) {
-  if (device.type() == torch::kCPU) {
-    return;
-  } else if (device.type() == torch::kCUDA) {
+void throwErrorIfNonCudaDevice(const torch::Device& device) {
+  if (device.type() != torch::kCUDA) {
+    throw std::runtime_error("Unsupported device: " + device.str());
+  }
+
+  void maybeInitializeDeviceContext(const torch::Device& device) {
+    throwErrorIfNonCudaDevice(device);
     // TODO: https://github.com/pytorch/torchcodec/issues/238: Implement CUDA
     // device.
     throw std::runtime_error(
         "CUDA device is unimplemented. Follow this issue for tracking progress: https://github.com/pytorch/torchcodec/issues/238");
   }
-  throw std::runtime_error("Unsupported device: " + device.str());
-}
 
 } // namespace facebook::torchcodec
