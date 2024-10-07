@@ -107,7 +107,7 @@ def _wrap_policy(frame_indices: list[int], num_frames_per_clip: int) -> list[int
 
 def _error_policy(frames_indices: list[int], num_frames_per_clip: int) -> list[int]:
     raise ValueError(
-        "You set the 'error' policy, and the sampler tried the decode a frame "
+        "You set the 'error' policy, and the sampler tried to decode a frame "
         "that is beyond the number of frames in the video. "
         "Try to leave sampling_range_end to its default value?"
     )
