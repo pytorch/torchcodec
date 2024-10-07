@@ -1,7 +1,6 @@
 import contextlib
 import random
 import re
-from collections import Counter
 
 import pytest
 import torch
@@ -262,8 +261,6 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 def test_random_sampler_errors(sampler):
-    torch.manual_seed(0)
-
     decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(
         ValueError, match=re.escape("num_clips (0) must be strictly positive")
