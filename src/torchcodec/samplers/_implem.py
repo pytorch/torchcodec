@@ -185,7 +185,7 @@ def _decode_all_clips_indices(
         )
 
     all_clips_indices_sorted, argsort = zip(
-        *sorted((j, i) for (i, j) in enumerate(all_clips_indices))
+        *sorted((frame_index, i) for (i, frame_index) in enumerate(all_clips_indices))
     )
     previous_decoded_frame = None
     all_decoded_frames = [None] * len(all_clips_indices)
