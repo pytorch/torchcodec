@@ -89,7 +89,13 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   VideoDecoder::DecodedOutput output;
   torch::Tensor& dst = output.frame;
   dst = allocateDeviceTensor({height, width, 3}, options.device);
+  at::DeviceIndex deviceIndex = device.index();
+  deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
+  at::DeviceIndex originalDeviceIndex = at::cuda::current_device();
+  cudaSetDevice(deviceIndex);
+
   auto start = std::chrono::high_resolution_clock::now();
+
   cudaStream_t nppStream = nppGetStream();
   cudaStream_t torchStream = at::cuda::getCurrentCUDAStream().stream();
   status = nppiNV12ToRGB_8u_P2C3R(
@@ -108,7 +114,14 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   cudaEventRecord(torchDoneEvent, torchStream);
   cudaStreamWaitEvent(torchStream, nppDoneEvent, 0);
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+  cudaEventDestroy(nppDoneEvent);
+  cudaEventDestroy(torchDoneEvent);
+
   auto end = std::chrono::high_resolution_clock::now();
+
+  // Restore the original device_index.
+  cudaSetDevice(originalDeviceIndex);
+
   std::chrono::duration<double, std::micro> duration = end - start;
   VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
           << " took: " << duration.count() << "us" << std::endl;
