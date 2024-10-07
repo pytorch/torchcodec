@@ -3,6 +3,8 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import torch
+
 import torch.utils.benchmark as benchmark
 
 import torchcodec
@@ -64,12 +66,20 @@ def decode_full_video(video_path, decode_device_string, resize_device_string):
 
 
 def decode_videos_using_threads(
-    video_path, decode_device_string, resize_device_string, num_videos, num_threads
+    video_path,
+    decode_device_string,
+    resize_device_string,
+    num_videos,
+    num_threads,
+    use_multiple_gpus,
 ):
     executor = ThreadPoolExecutor(max_workers=num_threads)
     for i in range(num_videos):
+        actual_decode_device = decode_device_string
+        if "cuda" in decode_device_string:
+            actual_decode_device = f"cuda:{i % torch.cuda.device_count()}"
         executor.submit(
-            decode_full_video, video_path, decode_device_string, resize_device_string
+            decode_full_video, video_path, actual_decode_device, resize_device_string
         )
     executor.shutdown(wait=True)
 
@@ -115,6 +125,12 @@ def main():
         default=50,
         help="Number of videos to decode in parallel. Only used when --num_threads is set.",
     )
+    parser.add_argument(
+        "--use_multiple_gpus",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=("Use multiple GPUs to decode multiple videos in multi-threaded mode."),
+    )
     args = parser.parse_args()
     video_path = args.video
 
@@ -146,7 +162,7 @@ def main():
             print("resize_device", resize_device_string)
             if args.num_threads > 1:
                 t = benchmark.Timer(
-                    stmt="decode_videos_using_threads(video_path, decode_device_string, resize_device_string, num_videos, num_threads)",
+                    stmt="decode_videos_using_threads(video_path, decode_device_string, resize_device_string, num_videos, num_threads, use_multiple_gpus)",
                     globals={
                         "decode_device_string": decode_device_string,
                         "video_path": video_path,
@@ -155,6 +171,7 @@ def main():
                         "resize_device_string": resize_device_string,
                         "num_videos": args.num_videos,
                         "num_threads": args.num_threads,
+                        "use_multiple_gpus": args.use_multiple_gpus,
                     },
                     label=label,
                     description=f"threads={args.num_threads} work={args.num_videos} video={os.path.basename(video_path)}",
