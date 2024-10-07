@@ -129,7 +129,7 @@ def _build_all_clips_indices(
     num_frames_in_video: int,
     policy_fun: _POLICY_FUNCTION_TYPE,
 ) -> list[int]:
-    # From the clip_start_indices [f_00, f10, f20, ...]
+    # From the clip_start_indices [f_00, f_10, f_20, ...]
     # and from the rest of the parameters, return the list of all the frame
     # indices that make up all the clips.
     # I.e. the output is [f_00, f_01, f_02, f_03, f_10, f_11, f_12, f_13, ...]
