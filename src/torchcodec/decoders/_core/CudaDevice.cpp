@@ -19,9 +19,7 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
   int err = 0;
   AVBufferRef* hw_device_ctx;
   torch::DeviceIndex deviceIndex = device.index();
-  if (deviceIndex < 0) {
-    deviceIndex = 0;
-  }
+  deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   std::string deviceOrdinal = std::to_string(deviceIndex);
   err = av_hwdevice_ctx_create(
       &hw_device_ctx, type, deviceOrdinal.c_str(), nullptr, 0);
