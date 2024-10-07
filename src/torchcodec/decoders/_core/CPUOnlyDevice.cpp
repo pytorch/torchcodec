@@ -24,7 +24,9 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   return output;
 }
 
-void initializeDeviceContext(const torch::Device& device) {
+void initializeDeviceContext(
+    const torch::Device& device,
+    AVCodecContext* codecContext) {
   throwUnsupportedDeviceError(device);
 }
 
