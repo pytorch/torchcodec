@@ -177,6 +177,7 @@ def _decode_all_clips_indices(
         return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
     def to_framebatch(frames: list[Frame]) -> FrameBatch:
+        # IMPORTANT: see other IMPORTANT note below
         data = torch.stack([frame.data for frame in frames])
         pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
         duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
@@ -196,6 +197,11 @@ def _decode_all_clips_indices(
             and frame_index == all_clips_indices_sorted[i - 1]
         ):
             # Avoid decoding the same frame twice.
+            # IMPORTANT: this is only correct because a copy of the frame will
+            # happen within `to_framebatch` when we call torch.stack.
+            # If a copy isn't made, the same underlying memory will be used for
+            # the 2 consecutive frames. When we re-write this, we should make
+            # sure to explicitly copy the data.
             decoded_frame = previous_decoded_frame
         else:
             decoded_frame = decoder.get_frame_at(index=frame_index)
