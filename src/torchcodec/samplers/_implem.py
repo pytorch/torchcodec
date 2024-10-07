@@ -2,7 +2,8 @@ from typing import Callable, List, Literal, Optional
 
 import torch
 
-from torchcodec.decoders import Frame, FrameBatch, VideoDecoder
+from torchcodec import Frame, FrameBatch
+from torchcodec.decoders import VideoDecoder
 
 
 def _validate_params(
