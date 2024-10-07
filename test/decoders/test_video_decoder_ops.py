@@ -34,7 +34,7 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
-from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO, needs_cuda
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
@@ -459,6 +459,13 @@ class TestOps:
         )
         auto_frame0, _, _ = get_next_frame(auto_decoder)
         assert_tensor_equal(filtergraph_frame0, auto_frame0)
+
+    @needs_cuda
+    def test_cuda_decoder(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        with pytest.raises(RuntimeError, match="CUDA device is unimplemented"):
+            add_video_stream(decoder, device="cuda")
 
 
 if __name__ == "__main__":
