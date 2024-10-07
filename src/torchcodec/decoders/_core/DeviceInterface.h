@@ -13,8 +13,16 @@
 
 namespace facebook::torchcodec {
 
+// Note that all these device functions should only be called if the device is
+// not a CPU device. CPU device functions are already implemented in the
+// VideoDecoder implementation.
+// These functions should only be called from within an if block like this:
+// if (device.type() != torch::kCPU) {
+//   deviceFunction(device, ...);
+// }
+
 // Initialize the hardware device that is specified in `device`. Some builds
 // support CUDA and others only support CPU.
-void maybeInitializeDeviceContext(const torch::Device& device);
+void initializeDeviceContext(const torch::Device& device);
 
 } // namespace facebook::torchcodec
