@@ -160,18 +160,24 @@ def _build_all_clips_indices(
 def _decode_all_clips_indices(
     decoder: VideoDecoder, all_clips_indices: list[int], num_frames_per_clip: int
 ) -> list[FrameBatch]:
-    # This takes the list of all the frames to decode, decode all the frames,
-    # and then packs them into clips of length num_frames_per_clip.
-    # This is slow, unoptimized, and u.g.l.y. It is not meant to stay.
-    # TODO:
-    # - sort the frames to avoid backward seeks, dedup, decode, and re-organize frames.
-    # - write most of this in C++
+    # This takes the list of all the frames to decode (in arbitrary order),
+    # decode all the frames, and then packs them into clips of length
+    # num_frames_per_clip.
+    #
+    # To avoid backwards seeks (which are slow), we:
+    # - sort all the frame indices to be decoded
+    # - dedup them
+    # - decode all unique frames in sorted order
+    # - re-assemble the decoded frames back to their original order
+    #
+    # TODO: Write this in C++ so we can avoid the copies that happen in `to_framebatch`
 
     def chunk_list(lst, chunk_size):
         # return list of sublists of length chunk_size
         return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
     def to_framebatch(frames: list[Frame]) -> FrameBatch:
+        # IMPORTANT: see other IMPORTANT note below
         data = torch.stack([frame.data for frame in frames])
         pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
         duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
@@ -179,9 +185,29 @@ def _decode_all_clips_indices(
             data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
         )
 
-    all_decoded_frames: list[Frame] = [
-        decoder.get_frame_at(index) for index in all_clips_indices
-    ]
+    all_clips_indices_sorted, argsort = zip(
+        *sorted((frame_index, i) for (i, frame_index) in enumerate(all_clips_indices))
+    )
+    previous_decoded_frame = None
+    all_decoded_frames = [None] * len(all_clips_indices)
+    for i, j in enumerate(argsort):
+        frame_index = all_clips_indices_sorted[i]
+        if (
+            previous_decoded_frame is not None  # then we know i > 0
+            and frame_index == all_clips_indices_sorted[i - 1]
+        ):
+            # Avoid decoding the same frame twice.
+            # IMPORTANT: this is only correct because a copy of the frame will
+            # happen within `to_framebatch` when we call torch.stack.
+            # If a copy isn't made, the same underlying memory will be used for
+            # the 2 consecutive frames. When we re-write this, we should make
+            # sure to explicitly copy the data.
+            decoded_frame = previous_decoded_frame
+        else:
+            decoded_frame = decoder.get_frame_at(index=frame_index)
+        previous_decoded_frame = decoded_frame
+        all_decoded_frames[j] = decoded_frame
+
     all_clips: list[list[Frame]] = chunk_list(
         all_decoded_frames, chunk_size=num_frames_per_clip
     )
