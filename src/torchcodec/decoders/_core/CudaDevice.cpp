@@ -95,12 +95,23 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   torch::Tensor& dst = output.frame;
   dst = allocateDeviceTensor({height, width, 3}, options.device);
   auto start = std::chrono::high_resolution_clock::now();
+  cudaStream_t nppStream = nppGetStream();
+  cudaStream_t torchStream = getCurrentCUDAStream().stream();
   status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],
       static_cast<Npp8u*>(dst.data_ptr()),
       dst.stride(0),
       oSizeROI);
+  // Make the pytorch stream wait for the npp kernel to finish before using the
+  // output.
+  cudaEvent_t nppDoneEvent;
+  cudaEventCreate(&nppDoneEvent);
+  cudaEventRecord(nppDoneEvent, nppStream);
+  cudaEvent_t torchDoneEvent;
+  cudaEventCreate(&torchDoneEvent);
+  cudaEventRecord(torchDoneEvent, torchStream);
+  cudaStreamWaitEvent(torchStream, nppDoneEvent, 0);
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::micro> duration = end - start;
