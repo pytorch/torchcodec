@@ -121,8 +121,8 @@ for frame in decoder:
 # This can be achieved using the
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at` and
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`  methods, which
-# will return a :class:`~torchcodec.decoders.Frame` and
-# :class:`~torchcodec.decoders.FrameBatch` objects respectively.
+# will return a :class:`~torchcodec.Frame` and
+# :class:`~torchcodec.FrameBatch` objects respectively.
 
 last_frame = decoder.get_frame_at(len(decoder) - 1)
 print(f"{type(last_frame) = }")
@@ -138,12 +138,12 @@ plot(last_frame.data, "Last frame")
 plot(middle_frames.data, "Middle frames")
 
 # %%
-# Both :class:`~torchcodec.decoders.Frame` and
-# :class:`~torchcodec.decoders.FrameBatch` have a ``data`` field, which contains
+# Both :class:`~torchcodec.Frame` and
+# :class:`~torchcodec.FrameBatch` have a ``data`` field, which contains
 # the decoded tensor data. They also have the ``pts_seconds`` and
 # ``duration_seconds`` fields which are single ints for
-# :class:`~torchcodec.decoders.Frame`, and 1-D :class:`torch.Tensor` for
-# :class:`~torchcodec.decoders.FrameBatch` (one value per frame in the batch).
+# :class:`~torchcodec.Frame`, and 1-D :class:`torch.Tensor` for
+# :class:`~torchcodec.FrameBatch` (one value per frame in the batch).
 
 # %%
 # Using time-based indexing
@@ -153,7 +153,7 @@ plot(middle_frames.data, "Middle frames")
 # frames based on *when* they are displayed with
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frame_displayed_at` and
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frames_displayed_at`, which
-# also returns :class:`~torchcodec.decoders.Frame` and :class:`~torchcodec.decoders.FrameBatch`
+# also returns :class:`~torchcodec.Frame` and :class:`~torchcodec.FrameBatch`
 # respectively.
 
 frame_at_2_seconds = decoder.get_frame_displayed_at(seconds=2)

@@ -5,7 +5,8 @@ import re
 import pytest
 import torch
 
-from torchcodec.decoders import FrameBatch, VideoDecoder
+from torchcodec import FrameBatch
+from torchcodec.decoders import VideoDecoder
 from torchcodec.samplers import clips_at_random_indices, clips_at_regular_indices
 from torchcodec.samplers._implem import _build_all_clips_indices, _POLICY_FUNCTIONS
 
