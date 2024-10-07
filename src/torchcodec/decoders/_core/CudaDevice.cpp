@@ -1,3 +1,4 @@
+#include <c10/cuda/CUDAStream.h>
 #include <npp.h>
 #include <torch/types.h>
 #include "src/torchcodec/decoders/_core/DeviceInterface.h"
@@ -96,7 +97,7 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   dst = allocateDeviceTensor({height, width, 3}, options.device);
   auto start = std::chrono::high_resolution_clock::now();
   cudaStream_t nppStream = nppGetStream();
-  cudaStream_t torchStream = getCurrentCUDAStream().stream();
+  cudaStream_t torchStream = at::cuda::getCurrentCUDAStream().stream();
   status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],
