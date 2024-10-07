@@ -469,6 +469,8 @@ class TestOps:
         assert frame0.device.type == "cuda"
         frame0_cpu = frame0.to("cpu")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        # We pass in atol of 60 because the CUDA decoder is not bit-accurate
+        # compared to the CPU decoder.
         torch.testing.assert_close(frame0_cpu, reference_frame0, atol=60, rtol=0)
 
 
