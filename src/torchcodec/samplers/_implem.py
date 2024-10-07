@@ -26,7 +26,7 @@ def _validate_params(
 
     if policy not in _POLICY_FUNCTIONS.keys():
         raise ValueError(
-            f"Invalid policy ({policy}). Supported values are {_POLICY_FUN.keys()}."
+            f"Invalid policy ({policy}). Supported values are {_POLICY_FUNCTIONS.keys()}."
         )
 
 
@@ -79,7 +79,7 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
 
 
 def _repeat_last_policy(
-    frame_indices: list[int], *, num_frames_per_clip: int
+    frame_indices: list[int], num_frames_per_clip: int
 ) -> list[int]:
     # frame_indices = [1, 2, 3], num_frames_per_clip = 5
     # output = [1, 2, 3, 3, 3]
@@ -87,7 +87,7 @@ def _repeat_last_policy(
     return frame_indices
 
 
-def _wrap_policy(frame_indices: list[int], *, num_frames_per_clip: int) -> list[int]:
+def _wrap_policy(frame_indices: list[int], num_frames_per_clip: int) -> list[int]:
     # frame_indices = [1, 2, 3], num_frames_per_clip = 5
     # output = [1, 2, 3, 1, 2]
     return (frame_indices * (num_frames_per_clip // len(frame_indices) + 1))[
@@ -95,8 +95,12 @@ def _wrap_policy(frame_indices: list[int], *, num_frames_per_clip: int) -> list[
     ]
 
 
-def _error_policy(**kwargs):
-    raise ValueError("TODO nice error message here")
+def _error_policy(frames_indices: list[int], num_frames_per_clip: int) -> list[int]:
+    raise ValueError(
+        "You set the 'error' policy, and the sampler tried the decode a frame "
+        "that is beyond the number of frames in the video. "
+        "Try to leave sampling_range_end to its default value?"
+    )
 
 
 _POLICY_FUNCTION_TYPE = Callable[[list[int], int], list[int]]
@@ -109,7 +113,7 @@ _POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
 
 def _build_all_clips_indices(
     *,
-    clip_start_indices: list[int],
+    clip_start_indices: torch.Tensor,  # 1D int tensor
     num_frames_per_clip: int,
     num_indices_between_frames: int,
     num_frames_in_video: int,
@@ -138,9 +142,7 @@ def _build_all_clips_indices(
             range(start_index, frame_index_upper_bound, num_indices_between_frames)
         )
         if len(frame_indices) < num_frames_per_clip:
-            frame_indices = policy_fun(
-                frame_indices, num_frames_per_clip=num_frames_per_clip
-            )
+            frame_indices = policy_fun(frame_indices, num_frames_per_clip)
         all_clips_indices += frame_indices
     return all_clips_indices
 

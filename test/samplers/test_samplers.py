@@ -1,12 +1,14 @@
 import contextlib
 import random
 import re
+from collections import Counter
 
 import pytest
 import torch
 
 from torchcodec.decoders import FrameBatch, VideoDecoder
 from torchcodec.samplers import clips_at_random_indices, clips_at_regular_indices
+from torchcodec.samplers._implem import _build_all_clips_indices, _POLICY_FUNCTIONS
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
@@ -132,6 +134,80 @@ def test_sampling_range_negative(sampler):
         assert_tensor_equal(clip.data, clips_1[0].data)
 
 
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+def test_sampling_range_default_behavior(sampler):
+    # This is a functional test for the default behavior of the
+    # sampling_range_end parameter. By default it's None, which means the
+    # sampler automatically sets its value such that we never sample "beyond"
+    # the number of frames in the video. That means that the last few frames of
+    # the video are less likely to be part of a clip.
+    # When sampling_range_end is set manually to e.g. len(decoder), the last
+    # frames are way more likely to be part of a clip, since there is no
+    # restriction on the sampling range (and the user-defined policy comes into
+    # action, potentially repeating that last frame).
+    #
+    # In this test we assert that the last sampled frame occurs significantly
+    # more often when sampling_range_end=len(decoder) than when it's None.
+    # This is only a proxy, for lack of better testing oppportunities.
+
+    torch.manual_seed(0)
+
+    decoder = VideoDecoder(NASA_VIDEO.path)
+
+    num_clips = 10
+    num_frames_per_clip = 5
+    sampling_range_start = -10
+
+    # with default sampling_range_end value
+    clips_default = sampler(
+        decoder,
+        num_clips=num_clips,
+        num_frames_per_clip=num_frames_per_clip,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=None,
+    )
+
+    all_pts_default = torch.concat(
+        [clip.pts_seconds for clip in clips_default]
+    ).tolist()
+    largest_pts_default = max(all_pts_default)
+    largest_pts_counts_default = Counter(all_pts_default)[largest_pts_default]
+
+    # with manual sampling_range_end value set to last frame
+    clips_manual = sampler(
+        decoder,
+        num_clips=num_clips,
+        num_frames_per_clip=num_frames_per_clip,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=len(decoder),
+    )
+    all_pts_manual = torch.concat([clip.pts_seconds for clip in clips_manual]).tolist()
+    largest_pts_manual = max(all_pts_manual)
+    largest_pts_counts_manual = Counter(all_pts_manual)[largest_pts_manual]
+
+    # Assert that the probability of occurence of the "last" sampled frame is
+    # way higher when setting sampling_range_end=len(decoder) than when relying
+    # on the default behavior.
+    # Note: ideally we would directly assert the number of occurrences of the
+    # last frame based on its index, but our APIs don't return indices, only pts
+    # (yet?)
+    assert largest_pts_counts_default < 2
+    assert largest_pts_counts_manual > 10
+
+
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+def test_sampling_range_error_policy(sampler):
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    with pytest.raises(ValueError, match="beyond the number of frames"):
+        sampler(
+            decoder,
+            num_frames_per_clip=10,
+            sampling_range_start=-1,
+            sampling_range_end=len(decoder),
+            policy="error",
+        )
+
+
 def test_random_sampler_randomness():
     decoder = VideoDecoder(NASA_VIDEO.path)
     num_clips = 5
@@ -199,6 +275,8 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 def test_random_sampler_errors(sampler):
+    torch.manual_seed(0)
+
     decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(
         ValueError, match=re.escape("num_clips (0) must be strictly positive")
@@ -240,3 +318,80 @@ def test_random_sampler_errors(sampler):
             sampling_range_start=len(decoder) - 1,
             sampling_range_end=None,
         )
+
+    with pytest.raises(ValueError, match="Invalid policy"):
+        sampler(decoder, policy="BAD")
+
+
+class TestPolicy:
+    @pytest.mark.parametrize(
+        "policy, frame_indices, expected_frame_indices",
+        (
+            ("repeat_last", [1, 2, 3], [1, 2, 3, 3, 3]),
+            ("repeat_last", [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
+            ("wrap", [1, 2, 3], [1, 2, 3, 1, 2]),
+            ("wrap", [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
+        ),
+    )
+    def test_policy(self, policy, frame_indices, expected_frame_indices):
+        policy_fun = _POLICY_FUNCTIONS[policy]
+        assert (
+            policy_fun(frame_indices, num_frames_per_clip=5) == expected_frame_indices
+        )
+
+    def test_error_policy(self):
+        with pytest.raises(ValueError, match="beyond the number of frames"):
+            _POLICY_FUNCTIONS["error"]([1, 2, 3], num_frames_per_clip=5)
+
+
+@pytest.mark.parametrize(
+    "clip_start_indices, num_indices_between_frames, policy, expected_all_clips_indices",
+    (
+        (
+            [0, 1, 2],  # clip_start_indices
+            1,  # num_indices_between_frames
+            "repeat_last",  # policy
+            # expected_all_clips_indices =
+            [0, 1, 2, 3, 4] + [1, 2, 3, 4, 4] + [2, 3, 4, 4, 4],
+        ),
+        # Same as above but with num_indices_between_frames=2
+        (
+            [0, 1, 2],  # clip_start_indices
+            2,  # num_indices_between_frames
+            "repeat_last",  # policy
+            # expected_all_clips_indices =
+            [0, 2, 4, 4, 4] + [1, 3, 3, 3, 3] + [2, 4, 4, 4, 4],
+        ),
+        # Same tests as above, for wrap policy
+        (
+            [0, 1, 2],  # clip_start_indices
+            1,  # num_indices_between_frames
+            "wrap",  # policy
+            # expected_all_clips_indices =
+            [0, 1, 2, 3, 4] + [1, 2, 3, 4, 1] + [2, 3, 4, 2, 3],
+        ),
+        (
+            [0, 1, 2],  # clip_start_indices
+            2,  # num_indices_between_frames
+            "wrap",  # policy
+            # expected_all_clips_indices =
+            [0, 2, 4, 0, 2] + [1, 3, 1, 3, 1] + [2, 4, 2, 4, 2],
+        ),
+    ),
+)
+def test_build_all_clips_indices(
+    clip_start_indices, num_indices_between_frames, policy, expected_all_clips_indices
+):
+    NUM_FRAMES_PER_CLIP = 5
+    all_clips_indices = _build_all_clips_indices(
+        clip_start_indices=clip_start_indices,
+        num_frames_per_clip=5,
+        num_indices_between_frames=num_indices_between_frames,
+        num_frames_in_video=5,
+        policy_fun=_POLICY_FUNCTIONS[policy],
+    )
+
+    assert isinstance(all_clips_indices, list)
+    assert all(isinstance(index, int) for index in all_clips_indices)
+    assert len(all_clips_indices) == len(clip_start_indices) * NUM_FRAMES_PER_CLIP
+    assert all_clips_indices == expected_all_clips_indices
