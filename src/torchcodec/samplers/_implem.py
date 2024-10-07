@@ -190,7 +190,7 @@ def _decode_all_clips_indices(
     for i, j in enumerate(argsort):
         frame_index = all_clips_indices_sorted[i]
         if (
-            previous_decoded_frame is not None
+            previous_decoded_frame is not None  # then we know i > 0
             and frame_index == all_clips_indices_sorted[i - 1]
         ):
             # Avoid decoding the same frame twice.
