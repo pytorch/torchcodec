@@ -7,7 +7,7 @@ void throwErrorIfNonCudaDevice(const torch::Device& device) {
     throw std::runtime_error("Unsupported device: " + device.str());
   }
 
-  void maybeInitializeDeviceContext(const torch::Device& device) {
+  void initializeDeviceContext(const torch::Device& device) {
     throwErrorIfNonCudaDevice(device);
     // TODO: https://github.com/pytorch/torchcodec/issues/238: Implement CUDA
     // device.

@@ -10,7 +10,7 @@ void throwUnsupportedDeviceError(const torch::Device& device) {
   throw std::runtime_error("Unsupported device: " + device.str());
 }
 
-void maybeInitializeDeviceContext(const torch::Device& device) {
+void initializeDeviceContext(const torch::Device& device) {
   throwUnsupportedDeviceError(device);
 }
 
