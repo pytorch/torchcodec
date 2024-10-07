@@ -168,8 +168,9 @@ void _add_video_stream(
   if (device.has_value()) {
     if (device.value() == "cpu") {
       options.device = torch::Device(torch::kCPU);
-    } else if (device.value() == "cuda") {
-      options.device = torch::Device(torch::kCUDA);
+    } else if (device.value().starts_with("cuda")) {
+      std::string deviceStr(device.value());
+      options.device = torch::Device(deviceStr);
     } else {
       throw std::runtime_error(
           "Invalid device=" + std::string(device.value()) +
