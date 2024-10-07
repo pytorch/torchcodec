@@ -189,7 +189,7 @@ def _decode_all_clips_indices(
     return [to_framebatch(clip) for clip in all_clips]
 
 
-def _abstract_sampler(
+def _generic_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
     *,
@@ -263,7 +263,7 @@ def clips_at_random_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
-    return _abstract_sampler(
+    return _generic_sampler(
         kind="random",
         decoder=decoder,
         num_clips=num_clips,
@@ -286,7 +286,7 @@ def clips_at_regular_indices(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
 
-    return _abstract_sampler(
+    return _generic_sampler(
         kind="regular",
         decoder=decoder,
         num_clips=num_clips,
