@@ -18,19 +18,7 @@ AVBufferRef* getCudaContext() {
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
   int err = 0;
   AVBufferRef* hw_device_ctx;
-  err = av_hwdevice_ctx_create(
-      &hw_device_ctx,
-      type,
-      nullptr,
-      nullptr,
-  // Introduced in 58.26.100:
-  // https://github.com/FFmpeg/FFmpeg/blob/4acb9b7d1046944345ae506165fb55883d04d8a6/doc/APIchanges#L265
-#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
-      AV_CUDA_USE_CURRENT_CONTEXT
-#else
-      0
-#endif
-  );
+  err = av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0);
   if (err < 0) {
     TORCH_CHECK(
         false,

@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import torch.utils.benchmark as benchmark
 
@@ -62,6 +63,17 @@ def decode_full_video(video_path, decode_device_string, resize_device_string):
     return frame_count, end_time - start_time
 
 
+def decode_videos_using_threads(
+    video_path, decode_device_string, resize_device_string, num_videos, num_threads
+):
+    executor = ThreadPoolExecutor(max_workers=num_threads)
+    for i in range(num_videos):
+        executor.submit(
+            decode_full_video, video_path, decode_device_string, resize_device_string
+        )
+    executor.shutdown(wait=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -90,6 +102,18 @@ def main():
             "autorange. Without this we just run one iteration without warmup "
             "to measure the cold start time."
         ),
+    )
+    parser.add_argument(
+        "--num_threads",
+        type=int,
+        default=1,
+        help="Number of threads to use for decoding. Only used when --use_torch_benchmark is set.",
+    )
+    parser.add_argument(
+        "--num_videos",
+        type=int,
+        default=50,
+        help="Number of videos to decode in parallel. Only used when --num_threads is set.",
     )
     args = parser.parse_args()
     video_path = args.video
@@ -120,22 +144,40 @@ def main():
                 resize_label = "cuda"
             print("decode_device", decode_device_string)
             print("resize_device", resize_device_string)
-            t = benchmark.Timer(
-                stmt="decode_full_video(video_path, decode_device_string, resize_device_string)",
-                globals={
-                    "decode_device_string": decode_device_string,
-                    "video_path": video_path,
-                    "decode_full_video": decode_full_video,
-                    "resize_device_string": resize_device_string,
-                },
-                label=label,
-                description=f"video={os.path.basename(video_path)}",
-                sub_label=f"D={decode_label} R={resize_label}",
-            ).blocked_autorange()
-            results.append(t)
+            if args.num_threads > 1:
+                t = benchmark.Timer(
+                    stmt="decode_videos_using_threads(video_path, decode_device_string, resize_device_string, num_videos, num_threads)",
+                    globals={
+                        "decode_device_string": decode_device_string,
+                        "video_path": video_path,
+                        "decode_full_video": decode_full_video,
+                        "decode_videos_using_threads": decode_videos_using_threads,
+                        "resize_device_string": resize_device_string,
+                        "num_videos": args.num_videos,
+                        "num_threads": args.num_threads,
+                    },
+                    label=label,
+                    description=f"threads={args.num_threads} work={args.num_videos} video={os.path.basename(video_path)}",
+                    sub_label=f"D={decode_label} R={resize_label} T={args.num_threads} W={args.num_videos}",
+                ).blocked_autorange()
+                results.append(t)
+            else:
+                t = benchmark.Timer(
+                    stmt="decode_full_video(video_path, decode_device_string, resize_device_string)",
+                    globals={
+                        "decode_device_string": decode_device_string,
+                        "video_path": video_path,
+                        "decode_full_video": decode_full_video,
+                        "resize_device_string": resize_device_string,
+                    },
+                    label=label,
+                    description=f"video={os.path.basename(video_path)}",
+                    sub_label=f"D={decode_label} R={resize_label}",
+                ).blocked_autorange()
+                results.append(t)
     compare = benchmark.Compare(results)
     compare.print()
-    print("Key: D=Decode, R=Resize")
+    print("Key: D=Decode, R=Resize T=threads W=work (number of videos to decode)")
     print("Native resize is done as part of the decode step")
     print("none resize means there is no resize step -- native or otherwise")
 
