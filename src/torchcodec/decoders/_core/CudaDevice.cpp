@@ -13,12 +13,18 @@ extern "C" {
 
 namespace facebook::torchcodec {
 namespace {
-AVBufferRef* getCudaContext() {
+AVBufferRef* getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
   int err = 0;
   AVBufferRef* hw_device_ctx;
-  err = av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0);
+  torch::DeviceIndex deviceIndex = device.index();
+  if (deviceIndex < 0) {
+    deviceIndex = 0;
+  }
+  std::string deviceOrdinal = std::to_string(deviceIndex);
+  err = av_hwdevice_ctx_create(
+      &hw_device_ctx, type, deviceOrdinal.c_str(), nullptr, 0);
   if (err < 0) {
     TORCH_CHECK(
         false,
@@ -56,7 +62,7 @@ void initializeDeviceContext(
   throwErrorIfNonCudaDevice(device);
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
-  codecContext->hw_device_ctx = av_buffer_ref(getCudaContext());
+  codecContext->hw_device_ctx = av_buffer_ref(getCudaContext(device));
   return;
 }
 
