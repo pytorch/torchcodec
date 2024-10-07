@@ -1,7 +1,6 @@
 import contextlib
 import random
 import re
-from collections import Counter
 
 import pytest
 import torch
@@ -146,17 +145,17 @@ def test_sampling_range_default_behavior(sampler):
     # restriction on the sampling range (and the user-defined policy comes into
     # action, potentially repeating that last frame).
     #
-    # In this test we assert that the last sampled frame occurs significantly
-    # more often when sampling_range_end=len(decoder) than when it's None.
+    # In this test we assert that the last clip starts significantly earlier
+    # when sampling_range_end=None than when sampling_range_end=len(decoder).
     # This is only a proxy, for lack of better testing oppportunities.
 
     torch.manual_seed(0)
 
     decoder = VideoDecoder(NASA_VIDEO.path)
 
-    num_clips = 10
-    num_frames_per_clip = 5
-    sampling_range_start = -10
+    num_clips = 20
+    num_frames_per_clip = 15
+    sampling_range_start = -20
 
     # with default sampling_range_end value
     clips_default = sampler(
@@ -167,11 +166,7 @@ def test_sampling_range_default_behavior(sampler):
         sampling_range_end=None,
     )
 
-    all_pts_default = torch.concat(
-        [clip.pts_seconds for clip in clips_default]
-    ).tolist()
-    largest_pts_default = max(all_pts_default)
-    largest_pts_counts_default = Counter(all_pts_default)[largest_pts_default]
+    last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
 
     # with manual sampling_range_end value set to last frame
     clips_manual = sampler(
@@ -181,18 +176,9 @@ def test_sampling_range_default_behavior(sampler):
         sampling_range_start=sampling_range_start,
         sampling_range_end=len(decoder),
     )
-    all_pts_manual = torch.concat([clip.pts_seconds for clip in clips_manual]).tolist()
-    largest_pts_manual = max(all_pts_manual)
-    largest_pts_counts_manual = Counter(all_pts_manual)[largest_pts_manual]
+    last_clip_start_manual = max([clip.pts_seconds[0] for clip in clips_manual])
 
-    # Assert that the probability of occurence of the "last" sampled frame is
-    # way higher when setting sampling_range_end=len(decoder) than when relying
-    # on the default behavior.
-    # Note: ideally we would directly assert the number of occurrences of the
-    # last frame based on its index, but our APIs don't return indices, only pts
-    # (yet?)
-    assert largest_pts_counts_default < 2
-    assert largest_pts_counts_manual > 10
+    assert last_clip_start_manual - last_clip_start_default > 0.3
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
