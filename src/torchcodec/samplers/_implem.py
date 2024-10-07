@@ -193,14 +193,14 @@ def _abstract_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
     *,
-    num_clips: int = 1,
-    num_frames_per_clip: int = 1,
-    num_indices_between_frames: int = 1,
-    sampling_range_start: int = 0,
-    sampling_range_end: Optional[int] = None,  # interval is [start, end).
+    num_clips: int,
+    num_frames_per_clip: int,
+    num_indices_between_frames: int,
+    sampling_range_start: int,
+    sampling_range_end: Optional[int],  # interval is [start, end).
     # Important note: sampling_range_end defines the upper bound of where a clip
     # can *start*, not where a clip can end.
-    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
+    policy: Literal["repeat_last", "wrap", "error"],
 ) -> List[FrameBatch]:
 
     _validate_params(
