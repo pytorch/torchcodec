@@ -3,12 +3,14 @@
 
 namespace facebook::torchcodec {
 
-void maybeInitializeDeviceContext(
-    const torch::Device& device,
-    AVCodecContext* codecContext) {
-  if (device.type() == torch::kCPU) {
-    return;
-  }
+// This file is linked with the CPU-only version of torchcodec.
+// So all functions will throw an error because they should only be called if
+// the device is not CPU.
+
+void throwUnsupportedDeviceError(const torch::Device& device) {
+  TORCH_CHECK(
+      device.type() != torch::kCPU,
+      "Device functions should only be called if the device is not CPU.")
   throw std::runtime_error("Unsupported device: " + device.str());
 }
 
@@ -17,7 +19,13 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
     VideoDecoder::RawDecodedOutput& rawOutput) {
-  TORCH_CHECK(false, "We should not run device code on CPU")
+  throwUnsupportedDeviceError(device);
+  VideoDecoder::DecodedOutput output;
+  return output;
+}
+
+void initializeDeviceContext(const torch::Device& device) {
+  throwUnsupportedDeviceError(device);
 }
 
 } // namespace facebook::torchcodec

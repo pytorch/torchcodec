@@ -50,20 +50,25 @@ torch::Tensor allocateDeviceTensor(
           .layout(torch::kStrided)
           .device(device));
 }
+
+void throwErrorIfNonCudaDevice(const torch::Device& device) {
+  TORCH_CHECK(
+      device.type() != torch::kCPU,
+      "Device functions should only be called if the device is not CPU.")
+  if (device.type() != torch::kCUDA) {
+    throw std::runtime_error("Unsupported device: " + device.str());
+  }
+}
 } // namespace
 
-void maybeInitializeDeviceContext(
+void initializeDeviceContext(
     const torch::Device& device,
     AVCodecContext* codecContext) {
-  if (device.type() == torch::kCPU) {
-    return;
-  } else if (device.type() == torch::kCUDA) {
-    torch::Tensor dummyTensorForCudaInitialization = torch::empty(
-        {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
-    codecContext->hw_device_ctx = av_buffer_ref(getCudaContext());
-    return;
-  }
-  throw std::runtime_error("Unsupported device: " + device.str());
+  throwErrorIfNonCudaDevice(device);
+  torch::Tensor dummyTensorForCudaInitialization = torch::empty(
+      {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
+  codecContext->hw_device_ctx = av_buffer_ref(getCudaContext());
+  return;
 }
 
 VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(

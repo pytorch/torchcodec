@@ -428,7 +428,9 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.codecContext.reset(codecContext);
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
-  maybeInitializeDeviceContext(options.device, codecContext);
+  if (options.device.type() != torch::kCPU) {
+    initializeDeviceContext(options.device);
+  }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
   if (retVal < AVSUCCESS) {
