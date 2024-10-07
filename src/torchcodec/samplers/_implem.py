@@ -169,6 +169,8 @@ def _decode_all_clips_indices(
     # - dedup them
     # - decode all unique frames in sorted order
     # - re-assemble the decoded frames back to their original order
+    #
+    # TODO: Write this in C++ so we can avoid the copies that happen in `to_framebatch`
 
     def chunk_list(lst, chunk_size):
         # return list of sublists of length chunk_size
