@@ -107,7 +107,7 @@ def _wrap_policy(frame_indices: list[int], num_frames_per_clip: int) -> list[int
 
 def _error_policy(frames_indices: list[int], num_frames_per_clip: int) -> list[int]:
     raise ValueError(
-        "You set the 'error' policy, and the sampler tried the decode a frame "
+        "You set the 'error' policy, and the sampler tried to decode a frame "
         "that is beyond the number of frames in the video. "
         "Try to leave sampling_range_end to its default value?"
     )
@@ -129,7 +129,7 @@ def _build_all_clips_indices(
     num_frames_in_video: int,
     policy_fun: _POLICY_FUNCTION_TYPE,
 ) -> list[int]:
-    # From the clip_start_indices [f_00, f10, f20, ...]
+    # From the clip_start_indices [f_00, f_10, f_20, ...]
     # and from the rest of the parameters, return the list of all the frame
     # indices that make up all the clips.
     # I.e. the output is [f_00, f_01, f_02, f_03, f_10, f_11, f_12, f_13, ...]
@@ -207,7 +207,7 @@ def _decode_all_clips_indices(
     return [to_framebatch(clip) for clip in all_clips]
 
 
-def _abstract_sampler(
+def _generic_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
     *,
@@ -281,7 +281,7 @@ def clips_at_random_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
-    return _abstract_sampler(
+    return _generic_sampler(
         kind="random",
         decoder=decoder,
         num_clips=num_clips,
@@ -304,7 +304,7 @@ def clips_at_regular_indices(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
 
-    return _abstract_sampler(
+    return _generic_sampler(
         kind="regular",
         decoder=decoder,
         num_clips=num_clips,
