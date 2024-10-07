@@ -7,6 +7,9 @@ namespace facebook::torchcodec {
 // the device is not CPU.
 
 void throwUnsupportedDeviceError(const torch::Device& device) {
+  TORCH_CHECK(
+      device.type() != torch::kCPU,
+      "Device functions should only be called if the device is not CPU.")
   throw std::runtime_error("Unsupported device: " + device.str());
 }
 
