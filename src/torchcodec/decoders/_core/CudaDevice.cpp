@@ -1,3 +1,4 @@
+#include <ATen/cuda/CUDAEvent.h>
 #include <c10/cuda/CUDAStream.h>
 #include <npp.h>
 #include <torch/types.h>
@@ -17,6 +18,7 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
   torch::DeviceIndex deviceIndex = device.index();
+  // FFMPEG cannot handle negative device indices.
   deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   std::string deviceOrdinal = std::to_string(deviceIndex);
   AVBufferRef* hw_device_ctx;
@@ -78,47 +80,32 @@ void convertAVFrameToDecodedOutputOnDevice(
           std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
   int width = options.width.value_or(codecContext->width);
   int height = options.height.value_or(codecContext->height);
-  NppStatus status;
-  NppiSize oSizeROI;
-  oSizeROI.width = width;
-  oSizeROI.height = height;
-  Npp8u* input[2];
-  input[0] = (Npp8u*)src->data[0];
-  input[1] = (Npp8u*)src->data[1];
+  NppiSize oSizeROI = {width, height};
+  Npp8u* input[2] = {src->data[0], src->data[1]};
   torch::Tensor& dst = output.frame;
   dst = allocateDeviceTensor({height, width, 3}, options.device);
-  at::DeviceIndex deviceIndex = device.index();
-  deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
-  at::DeviceIndex originalDeviceIndex = at::cuda::current_device();
-  cudaSetDevice(deviceIndex);
+
+  // Use the user-requested GPU for running the NPP kernel.
+  c10::cuda::CUDAGuard deviceGuard(device);
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  cudaStream_t nppStream = nppGetStream();
-  cudaStream_t torchStream = at::cuda::getCurrentCUDAStream().stream();
-  status = nppiNV12ToRGB_8u_P2C3R(
+  NppStatus status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],
       static_cast<Npp8u*>(dst.data_ptr()),
       dst.stride(0),
       oSizeROI);
+  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
   // Make the pytorch stream wait for the npp kernel to finish before using the
   // output.
-  cudaEvent_t nppDoneEvent;
-  cudaEventCreate(&nppDoneEvent);
-  cudaEventRecord(nppDoneEvent, nppStream);
-  cudaEvent_t torchDoneEvent;
-  cudaEventCreate(&torchDoneEvent);
-  cudaEventRecord(torchDoneEvent, torchStream);
-  cudaStreamWaitEvent(torchStream, nppDoneEvent, 0);
-  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
-  cudaEventDestroy(nppDoneEvent);
-  cudaEventDestroy(torchDoneEvent);
+  at::cuda::CUDAEvent nppDoneEvent;
+  at::cuda::CUDAStream nppStreamWrapper =
+      c10::cuda::getStreamFromExternal(nppGetStream(), device.index());
+  nppDoneEvent.record(nppStreamWrapper);
+  nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
 
   auto end = std::chrono::high_resolution_clock::now();
-
-  // Restore the original device_index.
-  cudaSetDevice(originalDeviceIndex);
 
   std::chrono::duration<double, std::micro> duration = end - start;
   VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width

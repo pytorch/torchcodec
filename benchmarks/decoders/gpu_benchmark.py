@@ -102,7 +102,9 @@ def main():
     parser.add_argument(
         "--video",
         type=str,
-        default=pathlib.Path(__file__).parent / "../../test/resources/nasa_13013.mp4",
+        default=str(
+            pathlib.Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
+        ),
     )
     parser.add_argument(
         "--use_torch_benchmark",
