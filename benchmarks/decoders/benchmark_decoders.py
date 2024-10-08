@@ -305,7 +305,7 @@ def get_test_resource_path(filename: str) -> str:
         with importlib.resources.as_file(resource) as path:
             return os.fspath(path)
 
-    return str(Path(__file__) / f"../../../test/resources/{filename}")
+    return str(Path(__file__).parent / f"../../test/resources/{filename}")
 
 
 def create_torchcodec_decoder_from_file(video_file):
