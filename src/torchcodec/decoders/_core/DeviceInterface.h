@@ -32,10 +32,11 @@ void initializeDeviceContext(
     const torch::Device& device,
     AVCodecContext* codecContext);
 
-VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
+void convertAVFrameToDecodedOutputOnDevice(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
-    VideoDecoder::RawDecodedOutput& rawOutput);
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    VideoDecoder::DecodedOutput& output);
 
 } // namespace facebook::torchcodec

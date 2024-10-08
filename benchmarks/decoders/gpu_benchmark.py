@@ -1,5 +1,6 @@
 import argparse
 import os
+import pathlib
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -101,7 +102,7 @@ def main():
     parser.add_argument(
         "--video",
         type=str,
-        default=os.path.dirname(__file__) + "/../../test/resources/nasa_13013.mp4",
+        default=pathlib.Path(__file__).parent / "../../test/resources/nasa_13013.mp4",
     )
     parser.add_argument(
         "--use_torch_benchmark",

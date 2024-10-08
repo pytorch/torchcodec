@@ -58,17 +58,19 @@ void initializeDeviceContext(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   throwErrorIfNonCudaDevice(device);
+  // This is a dummy tensor to initialize the cuda context.
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
   codecContext->hw_device_ctx = av_buffer_ref(getCudaContext(device));
   return;
 }
 
-VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
+void convertAVFrameToDecodedOutputOnDevice(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
-    VideoDecoder::RawDecodedOutput& rawOutput) {
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    VideoDecoder::DecodedOutput& output) {
   AVFrame* src = rawOutput.frame.get();
 
   TORCH_CHECK(
@@ -84,7 +86,6 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
   Npp8u* input[2];
   input[0] = (Npp8u*)src->data[0];
   input[1] = (Npp8u*)src->data[1];
-  VideoDecoder::DecodedOutput output;
   torch::Tensor& dst = output.frame;
   dst = allocateDeviceTensor({height, width, 3}, options.device);
   at::DeviceIndex deviceIndex = device.index();
@@ -128,7 +129,6 @@ VideoDecoder::DecodedOutput convertAVFrameToDecodedOutputOnDevice(
     // https://pytorch.org/docs/stable/generated/torch.permute.html
     dst = dst.permute({2, 0, 1});
   }
-  return output;
 }
 
 } // namespace facebook::torchcodec

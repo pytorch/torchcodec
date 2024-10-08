@@ -38,9 +38,6 @@ function(make_torchcodec_library library_name ffmpeg_target)
     if(ENABLE_CUDA)
         list(APPEND NEEDED_LIBRARIES ${CUDA_CUDA_LIBRARY} ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
     endif()
-    if(ENABLE_NVTX)
-        list(APPEND NEEDED_LIBRARIES nvtx3-cpp)
-    endif()
     target_link_libraries(
         ${library_name}
         PUBLIC

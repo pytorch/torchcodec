@@ -465,13 +465,18 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device="cuda")
-        frame0, *_ = get_next_frame(decoder)
+        frame0, pts, duration = get_next_frame(decoder)
         assert frame0.device.type == "cuda"
         frame0_cpu = frame0.to("cpu")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        # We pass in atol of 60 because the CUDA decoder is not bit-accurate
-        # compared to the CPU decoder.
-        torch.testing.assert_close(frame0_cpu, reference_frame0, atol=60, rtol=0)
+        # GPU decode is not bit-accurate. In the following assertion we ensure
+        # not more than 0.3% of values have a difference greater than 20.
+        diff = (reference_frame0.float() - frame0_cpu.float()).abs()
+        assert (diff > 20).float().mean() <= 0.003
+        assert pts == torch.tensor([0])
+        torch.testing.assert_close(
+            duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
+        )
 
 
 if __name__ == "__main__":
