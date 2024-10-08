@@ -9,32 +9,33 @@ from torchcodec.decoders import VideoDecoder
 _EPS = 1e-4
 
 
-def _validate_params(
-    *, decoder, num_clips, num_frames_per_clip, num_indices_between_frames, policy
-):
+def _validate_params(*, decoder, num_frames_per_clip, policy):
     if len(decoder) < 1:
         raise ValueError(
             f"Decoder must have at least one frame, found {len(decoder)} frames."
         )
 
-    if num_clips <= 0:
-        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
     if num_frames_per_clip <= 0:
         raise ValueError(
             f"num_frames_per_clip ({num_frames_per_clip}) must be strictly positive"
         )
-    if num_indices_between_frames <= 0:
-        raise ValueError(
-            f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
-        )
-
     if policy not in _POLICY_FUNCTIONS.keys():
         raise ValueError(
             f"Invalid policy ({policy}). Supported values are {_POLICY_FUNCTIONS.keys()}."
         )
 
 
-def _validate_sampling_range(
+def _validate_params_index_based(*, num_clips, num_indices_between_frames):
+    if num_clips <= 0:
+        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
+
+    if num_indices_between_frames <= 0:
+        raise ValueError(
+            f"num_indices_between_frames ({num_indices_between_frames}) must be strictly positive"
+        )
+
+
+def _validate_sampling_range_index_based(
     *,
     num_indices_between_frames,
     num_frames_per_clip,
@@ -235,13 +236,15 @@ def _generic_index_based_sampler(
 
     _validate_params(
         decoder=decoder,
-        num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
-        num_indices_between_frames=num_indices_between_frames,
         policy=policy,
     )
+    _validate_params_index_based(
+        num_clips=num_clips,
+        num_indices_between_frames=num_indices_between_frames,
+    )
 
-    sampling_range_start, sampling_range_end = _validate_sampling_range(
+    sampling_range_start, sampling_range_end = _validate_sampling_range_index_based(
         num_frames_per_clip=num_frames_per_clip,
         num_indices_between_frames=num_indices_between_frames,
         sampling_range_start=sampling_range_start,
@@ -328,124 +331,134 @@ def clips_at_regular_indices(
     )
 
 
-def _get_approximate_clip_span_seconds(
+def _validate_params_time_based(
     *,
     decoder,
-    num_frames_per_clip,
+    seconds_between_clip_starts,
     seconds_between_frames,
 ):
+    if seconds_between_clip_starts <= 0:
+        raise ValueError(
+            f"seconds_between_clip_starts ({seconds_between_clip_starts}) must be > 0, got"
+        )
 
-    # Compute clip span, in seconds. We can only compute an approximate value:
-    # we assume the fps are constant. Computing the real value requires
-    # accounting for variable fps.
+    if decoder.metadata.average_fps is None:
+        raise ValueError(
+            "Could not infer average fps from video metadata. "
+            "Try using an index-based sampler instead."
+        )
+    if (
+        decoder.metadata.end_stream_seconds is None
+        or decoder.metadata.begin_stream_seconds is None
+    ):
+        raise ValueError(
+            "Could not infer stream end and start from video metadata. "
+            "Try using an index-based sampler instead."
+        )
 
-    assert decoder.metadata.average_fps is not None
     average_frame_duration_seconds = 1 / decoder.metadata.average_fps
     if seconds_between_frames is None:
-        approximate_clip_span_seconds = (
-            num_frames_per_clip * average_frame_duration_seconds
+        seconds_between_frames = average_frame_duration_seconds
+    elif seconds_between_frames <= 0:
+        raise ValueError(
+            f"seconds_between_clip_starts ({seconds_between_clip_starts}) must be > 0, got"
         )
-    else:
-        # aaa, bbb, ccc, ddd are 4 frames within a clip.
-        #
-        #      seconds_between_frames
-        #              |
-        #              v
-        #           < ---- >
-        #   clip = [aaa....bbb....ccc....ddd]
-        #           < ----------------- >
-        #                    ^
-        #                    |
-        #  (num_frames_per_clip - 1) * seconds_between_frames
-        #
-        # Now to compute the clip span, we need to add the duration of the last
-        # frame. The formula is fairly approximate, as we assume fps are
-        # constant, and that
-        # seconds_between_frames > average_frame_duration_seconds. It's good
-        # enough for what we need to do.
-        approximate_clip_span_seconds = (
-            num_frames_per_clip - 1
-        ) * seconds_between_frames + average_frame_duration_seconds
 
-    return approximate_clip_span_seconds
+    return seconds_between_frames
 
 
 def _validate_sampling_range_time_based(
     *,
-    decoder,
     num_frames_per_clip,
     seconds_between_frames,
     sampling_range_start,
     sampling_range_end,
+    begin_stream_seconds,
+    end_stream_seconds,
 ):
-    assert decoder.metadata.end_stream_seconds is not None
+
     if sampling_range_start is None:
-        assert decoder.metadata.begin_stream_seconds is not None
-        sampling_range_start = decoder.metadata.begin_stream_seconds
+        sampling_range_start = begin_stream_seconds
+    elif sampling_range_start <= begin_stream_seconds:
+        raise ValueError(
+            f"sampling_range_start ({sampling_range_start}) must be at least {begin_stream_seconds}"
+        )
 
     if sampling_range_end is None:
-        approximate_clip_span_seconds = _get_approximate_clip_span_seconds(
-            decoder=decoder,
-            seconds_between_frames=seconds_between_frames,
-            num_frames_per_clip=num_frames_per_clip,
-        )
+        # We allow a clip to start anywhere within
+        # [sampling_range_start, sampling_range_end)
+        # When sampling_range_end is None, we want to automatically set it to
+        # the largest possible value such that the sampled frames in any clip
+        # are within the bounds of the video duration (in other words, we don't
+        # want to have to resort to the `policy`).
+        # I.e. we want to guarantee that for all frames in any clip we have
+        # pts < end_stream_seconds.
+        #
+        # The frames of clip will be sampled at the following pts:
+        # clip_timestamps = [
+        #  clip_start + 0 * seconds_between_frames,
+        #  clip_start + 1 * seconds_between_frames,
+        #  clip_start + 2 * seconds_between_frames,
+        #  ...
+        #  clip_start + (num_frames_per_clip - 1) * seconds_between_frames,
+        # ]
+        # To guarantee that any such value is < end_stream_seconds, we only need
+        # to guarantee that
+        # clip_start < end_stream_seconds - (num_frames_per_clip - 1) * seconds_between_frames
+        #
+        # So that's the value of sampling_range_end we want to use.
         sampling_range_end = (
-            decoder.metadata.end_stream_seconds - approximate_clip_span_seconds
+            end_stream_seconds - (num_frames_per_clip - 1) * seconds_between_frames
         )
-    sampling_range_end = min(
-        sampling_range_end, decoder.metadata.end_stream_seconds - _EPS
-    )
+    elif sampling_range_end <= begin_stream_seconds:
+        raise ValueError(
+            f"sampling_range_end ({sampling_range_end}) must be at least {begin_stream_seconds}"
+        )
+
+    if sampling_range_start >= sampling_range_end:
+        raise ValueError(
+            f"sampling_range_start ({sampling_range_start}) must be less than sampling_range_end ({sampling_range_end})"
+        )
+
+    sampling_range_end = min(sampling_range_end, end_stream_seconds)
 
     return sampling_range_start, sampling_range_end
 
 
 def _build_all_clips_timestamps(
     *,
-    decoder: VideoDecoder,
     clip_start_seconds: torch.Tensor,  # 1D float tensor
     num_frames_per_clip: int,
-    seconds_between_frames: Optional[float],
-    end_video_seconds: float,
+    seconds_between_frames: float,
+    end_stream_seconds: float,
     policy_fun: _POLICY_FUNCTION_TYPE,
 ) -> list[int]:
+
     all_clips_timestamps: list[float] = []
-
-    approximate_clip_span_seconds = _get_approximate_clip_span_seconds(
-        decoder=decoder,
-        num_frames_per_clip=num_frames_per_clip,
-        seconds_between_frames=seconds_between_frames,
-    )
-
-    if seconds_between_frames is None:
-        average_frame_duration_seconds = 1 / decoder.metadata.average_fps
-        seconds_between_frames = average_frame_duration_seconds
-        # TODO: What we're doing above defeats the purpose of having a
-        # time-based sampler because we are assuming constant fps. We won't
-        # accurately get consecutive frames for variable fps, while this is the
-        # desired behavior when seconds_between_frames is None. I think we need
-        # an API like next_pts = decoder._get_next_pts(current_pts) that returns
-        # the pts of the *next* frame. i.e. if frame i is the one displayed at
-        # current_pts, we want the pts of frame i+1.
-
     for start_seconds in clip_start_seconds:
-        frame_pts_upper_bound = min(
-            start_seconds + approximate_clip_span_seconds, end_video_seconds - _EPS
+        # clip_timestamps = [
+        #   start_seconds + 0 * seconds_between_frames,
+        #   start_seconds + 1 * seconds_between_frames,
+        #   start_seconds + 2 * seconds_between_frames,
+        #   ...
+        # ]
+        clip_timestamps = torch.full(
+            size=(num_frames_per_clip,), fill_value=start_seconds
         )
-        # This is correct when seconds_between_frames is specified by the user,
-        # but not quite correct when it's None if fps are variable. See note
-        # above.
-        frame_pts = torch.arange(
-            start_seconds, frame_pts_upper_bound, step=seconds_between_frames
-        ).tolist()
-        if len(frame_pts) < num_frames_per_clip:
-            frame_pts = policy_fun(frame_pts, num_frames_per_clip)
-        all_clips_timestamps += frame_pts
+        clip_timestamps += torch.arange(num_frames_per_clip) * seconds_between_frames
+
+        # We clip to valid values, so that we can call the same policies as
+        # for index-based samplers.
+        clip_timestamps = clip_timestamps[clip_timestamps < end_stream_seconds].tolist()
+        if len(clip_timestamps) < num_frames_per_clip:
+            clip_timestamps = policy_fun(clip_timestamps, num_frames_per_clip)
+        all_clips_timestamps += clip_timestamps
 
     return all_clips_timestamps
 
 
 def _decode_all_clips_timestamps(
-    decoder: VideoDecoder, all_clips_timestamps: list[int], num_frames_per_clip: int
+    decoder: VideoDecoder, all_clips_timestamps: list[float], num_frames_per_clip: int
 ) -> list[FrameBatch]:
     # This is 99% the same as _decode_all_clips_indices. The only change is the
     # call to .get_frame_displayed_at(pts) instead of .get_frame_at(idx)
@@ -503,40 +516,51 @@ def clips_at_regular_timestamps(
     seconds_between_frames: Optional[float] = None,
     # None means "begining", which may not always be 0
     sampling_range_start: Optional[float] = None,
-    sampling_range_end: Optional[float] = None,
+    sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: str = "repeat_last",
 ) -> List[FrameBatch]:
 
-    # TODO: better validation
-    assert seconds_between_clip_starts > 0
-    assert num_frames_per_clip > 0
-    assert seconds_between_frames is None or seconds_between_frames > 0
-    assert sampling_range_start is None or sampling_range_start >= 0
-    assert sampling_range_end is None or sampling_range_end >= 0
+    _validate_params(
+        decoder=decoder,
+        num_frames_per_clip=num_frames_per_clip,
+        policy=policy,
+    )
+
+    seconds_between_frames = _validate_params_time_based(
+        decoder=decoder,
+        seconds_between_clip_starts=seconds_between_clip_starts,
+        seconds_between_frames=seconds_between_frames,
+    )
 
     sampling_range_start, sampling_range_end = _validate_sampling_range_time_based(
-        decoder=decoder,
         num_frames_per_clip=num_frames_per_clip,
         seconds_between_frames=seconds_between_frames,
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
+        begin_stream_seconds=decoder.metadata.begin_stream_seconds,
+        end_stream_seconds=decoder.metadata.end_stream_seconds,
     )
 
     sampling_range_seconds = sampling_range_end - sampling_range_start
     num_clips = int(round(sampling_range_seconds / seconds_between_clip_starts))
 
+    # Note on sampling_range_end: we want the sampling range to be
+    # [sampling_range_start, sampling_range_end) where the upper bound is open.
+    # This is for consistency with the index-based case.
+    # Because in torch.linspace the upper bound is inclusive, we would risk
+    # getting exactly sampling_range_end as a clip start value. To avoid that,
+    # we substract a small value.
     clip_start_seconds = torch.linspace(
         sampling_range_start,
-        sampling_range_end,
+        sampling_range_end - _EPS,
         steps=num_clips,
     )
 
     all_clips_timestamps = _build_all_clips_timestamps(
-        decoder=decoder,
         clip_start_seconds=clip_start_seconds,
         num_frames_per_clip=num_frames_per_clip,
         seconds_between_frames=seconds_between_frames,
-        end_video_seconds=decoder.metadata.end_stream_seconds,
+        end_stream_seconds=decoder.metadata.end_stream_seconds,
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
 
