@@ -6,6 +6,9 @@ from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import VideoDecoder
 
 
+_EPS = 1e-4
+
+
 def _validate_params(
     *, decoder, num_clips, num_frames_per_clip, num_indices_between_frames, policy
 ):
@@ -216,7 +219,7 @@ def _decode_all_clips_indices(
     return [to_framebatch(clip) for clip in all_clips]
 
 
-def _generic_sampler(
+def _generic_index_based_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
     *,
@@ -290,7 +293,7 @@ def clips_at_random_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
-    return _generic_sampler(
+    return _generic_index_based_sampler(
         kind="random",
         decoder=decoder,
         num_clips=num_clips,
@@ -313,7 +316,7 @@ def clips_at_regular_indices(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> List[FrameBatch]:
 
-    return _generic_sampler(
+    return _generic_index_based_sampler(
         kind="regular",
         decoder=decoder,
         num_clips=num_clips,
@@ -322,4 +325,223 @@ def clips_at_regular_indices(
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
         policy=policy,
+    )
+
+
+def _get_approximate_clip_span_seconds(
+    *,
+    decoder,
+    num_frames_per_clip,
+    seconds_between_frames,
+):
+
+    # Compute clip span, in seconds. We can only compute an approximate value:
+    # we assume the fps are constant. Computing the real value requires
+    # accounting for variable fps.
+
+    assert decoder.metadata.average_fps is not None
+    average_frame_duration_seconds = 1 / decoder.metadata.average_fps
+    if seconds_between_frames is None:
+        approximate_clip_span_seconds = (
+            num_frames_per_clip * average_frame_duration_seconds
+        )
+    else:
+        # aaa, bbb, ccc, ddd are 4 frames within a clip.
+        #
+        #      seconds_between_frames
+        #              |
+        #              v
+        #           < ---- >
+        #   clip = [aaa....bbb....ccc....ddd]
+        #           < ----------------- >
+        #                    ^
+        #                    |
+        #  (num_frames_per_clip - 1) * seconds_between_frames
+        #
+        # Now to compute the clip span, we need to add the duration of the last
+        # frame. The formula is fairly approximate, as we assume fps are
+        # constant, and that
+        # seconds_between_frames > average_frame_duration_seconds. It's good
+        # enough for what we need to do.
+        approximate_clip_span_seconds = (
+            num_frames_per_clip - 1
+        ) * seconds_between_frames + average_frame_duration_seconds
+
+    return approximate_clip_span_seconds
+
+
+def _validate_sampling_range_time_based(
+    *,
+    decoder,
+    num_frames_per_clip,
+    seconds_between_frames,
+    sampling_range_start,
+    sampling_range_end,
+):
+    assert decoder.metadata.end_stream_seconds is not None
+    if sampling_range_start is None:
+        assert decoder.metadata.begin_stream_seconds is not None
+        sampling_range_start = decoder.metadata.begin_stream_seconds
+
+    if sampling_range_end is None:
+        approximate_clip_span_seconds = _get_approximate_clip_span_seconds(
+            decoder=decoder,
+            seconds_between_frames=seconds_between_frames,
+            num_frames_per_clip=num_frames_per_clip,
+        )
+        sampling_range_end = (
+            decoder.metadata.end_stream_seconds - approximate_clip_span_seconds
+        )
+    sampling_range_end = min(
+        sampling_range_end, decoder.metadata.end_stream_seconds - _EPS
+    )
+
+    return sampling_range_start, sampling_range_end
+
+
+def _build_all_clips_timestamps(
+    *,
+    decoder: VideoDecoder,
+    clip_start_seconds: torch.Tensor,  # 1D float tensor
+    num_frames_per_clip: int,
+    seconds_between_frames: Optional[float],
+    end_video_seconds: float,
+    policy_fun: _POLICY_FUNCTION_TYPE,
+) -> list[int]:
+    all_clips_timestamps: list[float] = []
+
+    approximate_clip_span_seconds = _get_approximate_clip_span_seconds(
+        decoder=decoder,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+    )
+
+    if seconds_between_frames is None:
+        average_frame_duration_seconds = 1 / decoder.metadata.average_fps
+        seconds_between_frames = average_frame_duration_seconds
+        # TODO: What we're doing above defeats the purpose of having a
+        # time-based sampler because we are assuming constant fps. We won't
+        # accurately get consecutive frames for variable fps, while this is the
+        # desired behavior when seconds_between_frames is None. I think we need
+        # an API like next_pts = decoder._get_next_pts(current_pts) that returns
+        # the pts of the *next* frame. i.e. if frame i is the one displayed at
+        # current_pts, we want the pts of frame i+1.
+
+    for start_seconds in clip_start_seconds:
+        frame_pts_upper_bound = min(
+            start_seconds + approximate_clip_span_seconds, end_video_seconds - _EPS
+        )
+        # This is correct when seconds_between_frames is specified by the user,
+        # but not quite correct when it's None if fps are variable. See note
+        # above.
+        frame_pts = torch.arange(
+            start_seconds, frame_pts_upper_bound, step=seconds_between_frames
+        ).tolist()
+        if len(frame_pts) < num_frames_per_clip:
+            frame_pts = policy_fun(frame_pts, num_frames_per_clip)
+        all_clips_timestamps += frame_pts
+
+    return all_clips_timestamps
+
+
+def _decode_all_clips_timestamps(
+    decoder: VideoDecoder, all_clips_timestamps: list[int], num_frames_per_clip: int
+) -> list[FrameBatch]:
+    # This is 99% the same as _decode_all_clips_indices. The only change is the
+    # call to .get_frame_displayed_at(pts) instead of .get_frame_at(idx)
+
+    def chunk_list(lst, chunk_size):
+        # return list of sublists of length chunk_size
+        return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+    def to_framebatch(frames: list[Frame]) -> FrameBatch:
+        # IMPORTANT: see other IMPORTANT note below
+        data = torch.stack([frame.data for frame in frames])
+        pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
+        duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
+        return FrameBatch(
+            data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
+        )
+
+    all_clips_timestamps_sorted, argsort = zip(
+        *sorted(
+            (frame_index, i) for (i, frame_index) in enumerate(all_clips_timestamps)
+        )
+    )
+    previous_decoded_frame = None
+    all_decoded_frames = [None] * len(all_clips_timestamps)
+    for i, j in enumerate(argsort):
+        frame_pts_seconds = all_clips_timestamps_sorted[i]
+        if (
+            previous_decoded_frame is not None  # then we know i > 0
+            and frame_pts_seconds == all_clips_timestamps_sorted[i - 1]
+        ):
+            # Avoid decoding the same frame twice.
+            # IMPORTANT: this is only correct because a copy of the frame will
+            # happen within `to_framebatch` when we call torch.stack.
+            # If a copy isn't made, the same underlying memory will be used for
+            # the 2 consecutive frames. When we re-write this, we should make
+            # sure to explicitly copy the data.
+            decoded_frame = previous_decoded_frame
+        else:
+            decoded_frame = decoder.get_frame_displayed_at(seconds=frame_pts_seconds)
+        previous_decoded_frame = decoded_frame
+        all_decoded_frames[j] = decoded_frame
+
+    all_clips: list[list[Frame]] = chunk_list(
+        all_decoded_frames, chunk_size=num_frames_per_clip
+    )
+
+    return [to_framebatch(clip) for clip in all_clips]
+
+
+def clips_at_regular_timestamps(
+    decoder,
+    *,
+    seconds_between_clip_starts: int,  # TODO or its inverse: num_clips_per_seconds?
+    num_frames_per_clip: int = 1,
+    seconds_between_frames: Optional[float] = None,
+    # None means "begining", which may not always be 0
+    sampling_range_start: Optional[float] = None,
+    sampling_range_end: Optional[float] = None,
+    policy: str = "repeat_last",
+) -> List[FrameBatch]:
+
+    # TODO: better validation
+    assert seconds_between_clip_starts > 0
+    assert num_frames_per_clip > 0
+    assert seconds_between_frames is None or seconds_between_frames > 0
+    assert sampling_range_start is None or sampling_range_start >= 0
+    assert sampling_range_end is None or sampling_range_end >= 0
+
+    sampling_range_start, sampling_range_end = _validate_sampling_range_time_based(
+        decoder=decoder,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+    )
+
+    sampling_range_seconds = sampling_range_end - sampling_range_start
+    num_clips = int(round(sampling_range_seconds / seconds_between_clip_starts))
+
+    clip_start_seconds = torch.linspace(
+        sampling_range_start,
+        sampling_range_end,
+        steps=num_clips,
+    )
+
+    all_clips_timestamps = _build_all_clips_timestamps(
+        decoder=decoder,
+        clip_start_seconds=clip_start_seconds,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+        end_video_seconds=decoder.metadata.end_stream_seconds,
+        policy_fun=_POLICY_FUNCTIONS[policy],
+    )
+
+    return _decode_all_clips_timestamps(
+        decoder,
+        all_clips_timestamps=all_clips_timestamps,
+        num_frames_per_clip=num_frames_per_clip,
     )
