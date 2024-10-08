@@ -16,12 +16,11 @@ namespace {
 AVBufferRef* getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
-  int err = 0;
-  AVBufferRef* hw_device_ctx;
   torch::DeviceIndex deviceIndex = device.index();
   deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   std::string deviceOrdinal = std::to_string(deviceIndex);
-  err = av_hwdevice_ctx_create(
+  AVBufferRef* hw_device_ctx;
+  int err = av_hwdevice_ctx_create(
       &hw_device_ctx, type, deviceOrdinal.c_str(), nullptr, 0);
   if (err < 0) {
     TORCH_CHECK(
