@@ -575,7 +575,7 @@ def test_build_all_clips_indices(
     NUM_FRAMES_PER_CLIP = 5
     all_clips_indices = _build_all_clips_indices(
         clip_start_indices=clip_start_indices,
-        num_frames_per_clip=5,
+        num_frames_per_clip=NUM_FRAMES_PER_CLIP,
         num_indices_between_frames=num_indices_between_frames,
         num_frames_in_video=5,
         policy_fun=_POLICY_FUNCTIONS[policy],
@@ -615,7 +615,7 @@ def test_build_all_clips_timestamps(
     NUM_FRAMES_PER_CLIP = 5
     all_clips_timestamps = _build_all_clips_timestamps(
         clip_start_seconds=clip_start_seconds,
-        num_frames_per_clip=5,
+        num_frames_per_clip=NUM_FRAMES_PER_CLIP,
         seconds_between_frames=seconds_between_frames,
         end_stream_seconds=5.0,
         policy_fun=_POLICY_FUNCTIONS[policy],
