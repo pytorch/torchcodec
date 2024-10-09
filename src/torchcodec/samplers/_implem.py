@@ -1,4 +1,4 @@
-from typing import Callable, List, Literal, Optional
+from typing import Callable, List, Literal, Optional, Union
 
 import torch
 
@@ -90,24 +90,29 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     return num_indices_between_frames * (num_frames_per_clip - 1) + 1
 
 
+_LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
+
+
 def _repeat_last_policy(
-    frame_indices: list[int], num_frames_per_clip: int
-) -> list[int]:
-    # frame_indices = [1, 2, 3], num_frames_per_clip = 5
+    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
+    # values = [1, 2, 3], desired_len = 5
     # output = [1, 2, 3, 3, 3]
-    frame_indices += [frame_indices[-1]] * (num_frames_per_clip - len(frame_indices))
-    return frame_indices
+    values += [values[-1]] * (desired_len - len(values))
+    return values
 
 
-def _wrap_policy(frame_indices: list[int], num_frames_per_clip: int) -> list[int]:
-    # frame_indices = [1, 2, 3], num_frames_per_clip = 5
+def _wrap_policy(
+    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
+    # values = [1, 2, 3], desired_len = 5
     # output = [1, 2, 3, 1, 2]
-    return (frame_indices * (num_frames_per_clip // len(frame_indices) + 1))[
-        :num_frames_per_clip
-    ]
+    return (values * (desired_len // len(values) + 1))[:desired_len]
 
 
-def _error_policy(frames_indices: list[int], num_frames_per_clip: int) -> list[int]:
+def _error_policy(
+    frames_indices: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
     raise ValueError(
         "You set the 'error' policy, and the sampler tried to decode a frame "
         "that is beyond the number of frames in the video. "
@@ -115,7 +120,7 @@ def _error_policy(frames_indices: list[int], num_frames_per_clip: int) -> list[i
     )
 
 
-_POLICY_FUNCTION_TYPE = Callable[[list[int], int], list[int]]
+_POLICY_FUNCTION_TYPE = Callable[[_LIST_OF_INT_OR_FLOAT, int], _LIST_OF_INT_OR_FLOAT]
 _POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
     "repeat_last": _repeat_last_policy,
     "wrap": _wrap_policy,
@@ -154,7 +159,7 @@ def _build_all_clips_indices(
             range(start_index, frame_index_upper_bound, num_indices_between_frames)
         )
         if len(frame_indices) < num_frames_per_clip:
-            frame_indices = policy_fun(frame_indices, num_frames_per_clip)
+            frame_indices = policy_fun(frame_indices, num_frames_per_clip)  # type: ignore[assignment]
         all_clips_indices += frame_indices
     return all_clips_indices
 
@@ -434,7 +439,7 @@ def _build_all_clips_timestamps(
     seconds_between_frames: float,
     end_stream_seconds: float,
     policy_fun: _POLICY_FUNCTION_TYPE,
-) -> list[int]:
+) -> list[float]:
 
     all_clips_timestamps: list[float] = []
     for start_seconds in clip_start_seconds:
@@ -549,14 +554,6 @@ def clips_at_regular_timestamps(
         end_stream_seconds=decoder.metadata.end_stream_seconds,
     )
 
-    # from math import ceil
-    # num_clips = int(ceil((sampling_range_end - sampling_range_start) // seconds_between_clip_starts))
-    # clip_start_seconds = torch.linspace(
-    #     sampling_range_start,
-    #     sampling_range_end - 1e-4,
-    #     steps=num_clips,
-    # )
-    # print(clip_start_seconds)
     clip_start_seconds = torch.arange(
         sampling_range_start,
         sampling_range_end,  # excluded

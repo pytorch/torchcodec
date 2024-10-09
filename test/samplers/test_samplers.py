@@ -528,13 +528,11 @@ class TestPolicy:
     )
     def test_policy(self, policy, frame_indices, expected_frame_indices):
         policy_fun = _POLICY_FUNCTIONS[policy]
-        assert (
-            policy_fun(frame_indices, num_frames_per_clip=5) == expected_frame_indices
-        )
+        assert policy_fun(frame_indices, desired_len=5) == expected_frame_indices
 
     def test_error_policy(self):
         with pytest.raises(ValueError, match="beyond the number of frames"):
-            _POLICY_FUNCTIONS["error"]([1, 2, 3], num_frames_per_clip=5)
+            _POLICY_FUNCTIONS["error"]([1, 2, 3], desired_len=5)
 
 
 @pytest.mark.parametrize(
