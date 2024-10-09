@@ -1,6 +1,6 @@
 [**Installation**](#installing-torchcodec) | [**Simple Example**](#using-torchcodec) | [**Detailed Example**](https://pytorch.org/torchcodec/stable/generated_examples/) | [**Documentation**](https://pytorch.org/torchcodec) | [**Contributing**](CONTRIBUTING.md) | [**License**](#license)
 
-# TorchCodec
+# TorchCodec (DEBUG)
 
 TorchCodec is a Python library for decoding videos into PyTorch tensors. It aims
 to be fast, easy to use, and well integrated into the PyTorch ecosystem. If you
