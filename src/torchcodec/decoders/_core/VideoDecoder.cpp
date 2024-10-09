@@ -1293,6 +1293,17 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   return tensor;
 }
 
+VideoDecoder::~VideoDecoder() {
+  for (auto& [streamIndex, stream] : streams_) {
+    auto& device = stream.options.device;
+    if (device.type() == torch::kCPU) {
+    } else if (device.type() == torch::kCUDA) {
+      releaseContextOnCuda(device, stream.codecContext.get());
+    } else {
+    }
+  }
+}
+
 std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats) {

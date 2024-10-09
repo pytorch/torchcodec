@@ -39,4 +39,8 @@ void convertAVFrameToDecodedOutputOnCuda(
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output);
 
+void releaseContextOnCuda(
+    const torch::Device& device,
+    AVCodecContext* codecContext);
+
 } // namespace facebook::torchcodec
