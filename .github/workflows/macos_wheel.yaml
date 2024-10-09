@@ -75,6 +75,8 @@ jobs:
           miniconda-version: "latest"
           activate-environment: test
           python-version: ${{ matrix.python-version }}
+      - name: Activate conda
+        run: conda activate test
       - name: Update pip
         run: python3 -m pip install --upgrade pip
       - name: Install PyTorch
