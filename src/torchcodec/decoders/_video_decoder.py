@@ -144,7 +144,7 @@ class VideoDecoder:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(numbers.Integral or slice): The index or range of frame(s) to retrieve.
+            key(int or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.
@@ -286,15 +286,18 @@ def _get_and_validate_stream_metadata(
 ) -> Tuple[core.VideoStreamMetadata, int]:
     video_metadata = core.get_video_metadata(decoder)
 
-    best_stream_index = video_metadata.best_video_stream_index
-    if best_stream_index is None and stream_index is None:
-        raise ValueError(
-            "The best video stream is unknown and there is no specified stream. "
-            + _ERROR_REPORTING_INSTRUCTIONS
-        )
-
     if stream_index is None:
+        best_stream_index = video_metadata.best_video_stream_index
+        if best_stream_index is None:
+            raise ValueError(
+                "The best video stream is unknown and there is no specified stream. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
         stream_index = best_stream_index
+
+    # This should be logically true because of the above conditions, but type checker
+    # is not clever enough.
+    assert stream_index is not None
 
     stream_metadata = video_metadata.streams[stream_index]
     return (stream_metadata, stream_index)
