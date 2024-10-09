@@ -2,6 +2,7 @@ import contextlib
 import random
 import re
 from copy import copy
+from functools import partial
 
 import pytest
 import torch
@@ -13,7 +14,11 @@ from torchcodec.samplers import (
     clips_at_regular_indices,
     clips_at_regular_timestamps,
 )
-from torchcodec.samplers._implem import _build_all_clips_indices, _POLICY_FUNCTIONS
+from torchcodec.samplers._implem import (
+    _build_all_clips_indices,
+    _build_all_clips_timestamps,
+    _POLICY_FUNCTIONS,
+)
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
@@ -129,20 +134,41 @@ def test_time_based_sampler(seconds_between_frames):
     )
 
 
-@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+# @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 @pytest.mark.parametrize(
-    "sampling_range_start, sampling_range_end, assert_all_equal",
+    "sampler, sampling_range_start, sampling_range_end, assert_all_equal",
     (
-        (10, 11, True),
-        (10, 12, False),
+        (partial(clips_at_random_indices, num_clips=10), 10, 11, True),
+        (partial(clips_at_random_indices, num_clips=10), 10, 12, False),
+        (partial(clips_at_regular_indices, num_clips=10), 10, 11, True),
+        (partial(clips_at_regular_indices, num_clips=10), 10, 12, False),
+        (
+            partial(clips_at_regular_timestamps, seconds_between_clip_starts=1),
+            10.0,
+            11.0,
+            True,
+        ),
+        (
+            partial(clips_at_regular_timestamps, seconds_between_clip_starts=1),
+            10.0,
+            12.0,
+            False,
+        ),
     ),
 )
 def test_sampling_range(
     sampler, sampling_range_start, sampling_range_end, assert_all_equal
 ):
+    # For index-based:
     # Test the sampling_range_start and sampling_range_end parameters by
     # asserting that all clips are equal if the sampling range is of size 1,
     # and that they are not all equal if the sampling range is of size 2.
+    #
+    # For time-based:
+    # The test is similar but with different semantics. We set the sampling
+    # range to be 1 second or 2 seconds. Since we set seconds_between_clip_start
+    # to 1 we expect exactly one clip with the sampling range is of size 1, and
+    # 2 different clips when teh sampling range is 2 seconds.
 
     # When size=2 there's still a (small) non-zero probability of sampling the
     # same indices for clip starts, so we hard-code a seed that works.
@@ -152,7 +178,6 @@ def test_sampling_range(
 
     clips = sampler(
         decoder,
-        num_clips=10,
         num_frames_per_clip=2,
         sampling_range_start=sampling_range_start,
         sampling_range_end=sampling_range_end,
@@ -202,10 +227,10 @@ def test_sampling_range_negative(sampler):
         assert_tensor_equal(clip.data, clips_1[0].data)
 
 
-@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
-def test_sampling_range_default_behavior(sampler):
+def test_sampling_range_default_behavior_random_sampler():
     # This is a functional test for the default behavior of the
-    # sampling_range_end parameter. By default it's None, which means the
+    # sampling_range_end parameter, for the random sampler.
+    # By default it's None, which means the
     # sampler automatically sets its value such that we never sample "beyond"
     # the number of frames in the video. That means that the last few frames of
     # the video are less likely to be part of a clip.
@@ -216,7 +241,7 @@ def test_sampling_range_default_behavior(sampler):
     #
     # In this test we assert that the last clip starts significantly earlier
     # when sampling_range_end=None than when sampling_range_end=len(decoder).
-    # This is only a proxy, for lack of better testing oppportunities.
+    # This is only a proxy, for lack of better testing opportunities.
 
     torch.manual_seed(0)
 
@@ -227,18 +252,19 @@ def test_sampling_range_default_behavior(sampler):
     sampling_range_start = -20
 
     # with default sampling_range_end value
-    clips_default = sampler(
+    clips_default = clips_at_random_indices(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
         sampling_range_start=sampling_range_start,
         sampling_range_end=None,
+        policy="error",
     )
 
     last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
 
     # with manual sampling_range_end value set to last frame
-    clips_manual = sampler(
+    clips_manual = clips_at_random_indices(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
@@ -250,15 +276,64 @@ def test_sampling_range_default_behavior(sampler):
     assert last_clip_start_manual - last_clip_start_default > 0.3
 
 
-@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        partial(
+            clips_at_regular_indices,
+            num_clips=5,
+            sampling_range_start=-30,
+        ),
+        partial(
+            clips_at_regular_timestamps,
+            seconds_between_clip_starts=0.02,
+            sampling_range_start=12.3,
+        ),
+    ),
+)
+def test_sampling_range_default_regular_sampler(sampler):
+    # For a regular sampler, checking the default behavior of sampling_range_end
+    # is slightly easier: we can assert that the last frame of the last clip
+    # *is* the last frame of the video.
+    # Note that this doesn't always happen. It depends on specific values passed
+    # for num_clips / seconds_between_clip_starts, and where the sampling range
+    # starts. We just need to assert that it *can* happen.
+
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    last_frame = decoder.get_frame_at(len(decoder) - 1)
+
+    clips = sampler(decoder, num_frames_per_clip=5, policy="error")
+
+    last_clip = clips[-1]
+    assert last_clip.pts_seconds[-1] == last_frame.pts_seconds
+    assert last_clip.pts_seconds[-2] != last_frame.pts_seconds
+
+
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        partial(
+            clips_at_random_indices, sampling_range_start=-1, sampling_range_end=1000
+        ),
+        partial(
+            clips_at_regular_indices, sampling_range_start=-1, sampling_range_end=1000
+        ),
+        # Note: the hard-coded value of sampling_range_start=12 is because we know
+        # the NASA_VIDEO is 13.01s seconds long
+        partial(
+            clips_at_regular_timestamps,
+            seconds_between_clip_starts=0.1,
+            sampling_range_start=13,
+            sampling_range_end=1000,
+        ),
+    ),
+)
 def test_sampling_range_error_policy(sampler):
     decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(ValueError, match="beyond the number of frames"):
         sampler(
             decoder,
             num_frames_per_clip=10,
-            sampling_range_start=-1,
-            sampling_range_end=len(decoder),
             policy="error",
         )
 
@@ -326,9 +401,6 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
     # Assert clips starts are ordered, i.e. the start indices don't just "wrap
     # around". They're duplicated *and* ordered.
     assert (clip_starts_seconds.diff() >= 0).all()
-
-
-from functools import partial
 
 
 @pytest.mark.parametrize(
@@ -516,3 +588,43 @@ def test_build_all_clips_indices(
     assert all(isinstance(index, int) for index in all_clips_indices)
     assert len(all_clips_indices) == len(clip_start_indices) * NUM_FRAMES_PER_CLIP
     assert all_clips_indices == expected_all_clips_indices
+
+
+@pytest.mark.parametrize(
+    "clip_start_seconds, seconds_between_frames, policy, expected_all_clips_timestamps",
+    (
+        (
+            [0, 1, 2],  # clip_start_seconds
+            1.5,  # seconds_between_frames
+            "repeat_last",  # policy
+            # expected_all_clips_seconds =
+            [0, 1.5, 3, 4.5, 4.5] + [1, 2.5, 4, 4, 4] + [2, 3.5, 3.5, 3.5, 3.5],
+            # Note how 5 isn't in the last clip, as it's not a seekable pts
+            # since we set end_stream_seconds=5
+        ),
+        # Same as above with wrap policy
+        (
+            [0, 1, 2],  # clip_start_seconds
+            1.5,  # seconds_between_frames
+            "wrap",  # policy
+            # expected_all_clips_seconds =
+            [0, 1.5, 3, 4.5, 0] + [1, 2.5, 4, 1, 2.5] + [2, 3.5, 2, 3.5, 2],
+        ),
+    ),
+)
+def test_build_all_clips_timestamps(
+    clip_start_seconds, seconds_between_frames, policy, expected_all_clips_timestamps
+):
+    NUM_FRAMES_PER_CLIP = 5
+    all_clips_timestamps = _build_all_clips_timestamps(
+        clip_start_seconds=clip_start_seconds,
+        num_frames_per_clip=5,
+        seconds_between_frames=seconds_between_frames,
+        end_stream_seconds=5.0,
+        policy_fun=_POLICY_FUNCTIONS[policy],
+    )
+
+    assert isinstance(all_clips_timestamps, list)
+    assert all(isinstance(timestamp, float) for timestamp in all_clips_timestamps)
+    assert len(all_clips_timestamps) == len(clip_start_seconds) * NUM_FRAMES_PER_CLIP
+    assert all_clips_timestamps == expected_all_clips_timestamps

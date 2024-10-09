@@ -445,9 +445,12 @@ def _build_all_clips_timestamps(
         #   ...
         # ]
         clip_timestamps = torch.full(
-            size=(num_frames_per_clip,), fill_value=start_seconds
+            size=(num_frames_per_clip,), fill_value=start_seconds, dtype=torch.float
         )
-        clip_timestamps += torch.arange(num_frames_per_clip) * seconds_between_frames
+        clip_timestamps += (
+            torch.arange(num_frames_per_clip, dtype=torch.float)
+            * seconds_between_frames
+        )
 
         # We clip to valid values, so that we can call the same policies as
         # for index-based samplers.
@@ -546,6 +549,14 @@ def clips_at_regular_timestamps(
         end_stream_seconds=decoder.metadata.end_stream_seconds,
     )
 
+    # from math import ceil
+    # num_clips = int(ceil((sampling_range_end - sampling_range_start) // seconds_between_clip_starts))
+    # clip_start_seconds = torch.linspace(
+    #     sampling_range_start,
+    #     sampling_range_end - 1e-4,
+    #     steps=num_clips,
+    # )
+    # print(clip_start_seconds)
     clip_start_seconds = torch.arange(
         sampling_range_start,
         sampling_range_end,  # excluded
