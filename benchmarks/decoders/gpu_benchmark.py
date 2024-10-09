@@ -77,7 +77,7 @@ def decode_videos_using_threads(
     executor = ThreadPoolExecutor(max_workers=num_threads)
     for i in range(num_videos):
         actual_decode_device = decode_device_string
-        if "cuda" in decode_device_string:
+        if "cuda" in decode_device_string and use_multiple_gpus:
             actual_decode_device = f"cuda:{i % torch.cuda.device_count()}"
         executor.submit(
             decode_full_video, video_path, actual_decode_device, resize_device_string
