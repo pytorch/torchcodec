@@ -531,7 +531,7 @@ def clips_at_regular_timestamps(
 ) -> List[FrameBatch]:
     # Note: *everywhere*, sampling_range_end denotes the upper bound of where a
     # clip can start. This is an *open* upper bound, i.e. we will make sure no
-    # clip start exactly at (or above) sampling_range_end.
+    # clip starts exactly at (or above) sampling_range_end.
 
     _validate_params(
         decoder=decoder,

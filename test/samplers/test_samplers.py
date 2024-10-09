@@ -134,7 +134,6 @@ def test_time_based_sampler(seconds_between_frames):
     )
 
 
-# @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 @pytest.mark.parametrize(
     "sampler, sampling_range_start, sampling_range_end, assert_all_equal",
     (
