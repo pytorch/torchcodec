@@ -25,7 +25,7 @@ defaults:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@macbuildwheel
     with:
       package-type: wheel
       os: macos-arm64
