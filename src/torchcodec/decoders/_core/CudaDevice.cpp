@@ -65,7 +65,7 @@ void initializeContextOnCuda(
   // This is a dummy tensor to initialize the cuda context.
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
-  codecContext->hw_device_ctx = av_buffer_ref(getCudaContext(device));
+  codecContext->hw_device_ctx = getCudaContext(device);
   return;
 }
 
