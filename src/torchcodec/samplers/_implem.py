@@ -443,23 +443,14 @@ def _build_all_clips_timestamps(
 
     all_clips_timestamps: list[float] = []
     for start_seconds in clip_start_seconds:
-        # clip_timestamps = [
-        #   start_seconds + 0 * seconds_between_frames,
-        #   start_seconds + 1 * seconds_between_frames,
-        #   start_seconds + 2 * seconds_between_frames,
-        #   ...
-        # ]
-        clip_timestamps = torch.full(
-            size=(num_frames_per_clip,), fill_value=start_seconds, dtype=torch.float
-        )
-        clip_timestamps += (
-            torch.arange(num_frames_per_clip, dtype=torch.float)
-            * seconds_between_frames
-        )
+        clip_timestamps = [
+            start_seconds + i * seconds_between_frames
+            for i in range(num_frames_per_clip)
+        ]
+        clip_timestamps = [
+            timestamp for timestamp in clip_timestamps if timestamp < end_stream_seconds
+        ]
 
-        # We clip to valid values, so that we can call the same policies as
-        # for index-based samplers.
-        clip_timestamps = clip_timestamps[clip_timestamps < end_stream_seconds].tolist()
         if len(clip_timestamps) < num_frames_per_clip:
             clip_timestamps = policy_fun(clip_timestamps, num_frames_per_clip)
         all_clips_timestamps += clip_timestamps
