@@ -46,8 +46,13 @@ class TestVideoDecoder:
         with pytest.raises(TypeError, match="Unknown source type"):
             decoder = VideoDecoder(123)  # noqa
 
+        # stream index that does not exist
         with pytest.raises(ValueError, match="No valid stream found"):
             decoder = VideoDecoder(NASA_VIDEO.path, stream_index=40)  # noqa
+
+        # stream index that does exist, but it's not video
+        with pytest.raises(ValueError, match="No valid stream found"):
+            decoder = VideoDecoder(NASA_VIDEO.path, stream_index=1)  # noqa
 
     def test_getitem_int(self):
         decoder = VideoDecoder(NASA_VIDEO.path)

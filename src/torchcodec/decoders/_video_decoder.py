@@ -144,7 +144,7 @@ class VideoDecoder:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(numbers.Integral or slice): The index or range of frame(s) to retrieve.
+            key(int or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.
@@ -295,6 +295,10 @@ def _get_and_validate_stream_metadata(
 
     if stream_index is None:
         stream_index = best_stream_index
+
+    # This should be logically true because of the above conditions, but type checker
+    # is not clever enough.
+    assert stream_index is not None
 
     stream_metadata = video_metadata.streams[stream_index]
     return (stream_metadata, stream_index)
