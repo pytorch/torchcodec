@@ -62,6 +62,8 @@ void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   throwErrorIfNonCudaDevice(device);
+  // It is important for pytorch itself to create the cuda context. If ffmpeg
+  // creates the context it may not be compatible with pytorch.
   // This is a dummy tensor to initialize the cuda context.
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
