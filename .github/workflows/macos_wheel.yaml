@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload Mac wheel
-    uses: pytorch/test-infra/.github/workflows/build_wheels_macos.yml@main
+    uses: pytorch/test-infra/.github/workflows/build_wheels_macos.yml@macbuildwheel
     with:
       repository: pytorch/torchcodec
       ref: ""
