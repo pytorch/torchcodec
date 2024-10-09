@@ -428,8 +428,12 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.codecContext.reset(codecContext);
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
-  if (options.device.type() != torch::kCPU) {
-    initializeDeviceContext(options.device, codecContext);
+  if (options.device.type() == torch::kCPU) {
+    // No more initialization needed for CPU.
+  } else if (options.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(options.device, codecContext);
+  } else {
+    throw std::invalid_argument("Invalid device type: " + options.device.str());
   }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
@@ -856,15 +860,18 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
-  if (streamInfo.options.device.type() != torch::kCPU) {
-    convertAVFrameToDecodedOutputOnDevice(
+  if (streamInfo.options.device.type() == torch::kCPU) {
+    convertAVFrameToDecodedOutputOnCPU(rawOutput, output);
+  } else if (streamInfo.options.device.type() == torch::kCUDA) {
+    convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
         streamInfo.codecContext.get(),
         rawOutput,
         output);
   } else {
-    convertAVFrameToDecodedOutputOnCPU(rawOutput, output);
+    throw std::invalid_argument(
+        "Invalid device type: " + streamInfo.options.device.str());
   }
   return output;
 }

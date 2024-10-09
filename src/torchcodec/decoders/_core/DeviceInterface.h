@@ -28,11 +28,11 @@ namespace facebook::torchcodec {
 
 // Initialize the hardware device that is specified in `device`. Some builds
 // support CUDA and others only support CPU.
-void initializeDeviceContext(
+void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext);
 
-void convertAVFrameToDecodedOutputOnDevice(
+void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,

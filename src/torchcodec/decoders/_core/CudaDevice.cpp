@@ -55,7 +55,7 @@ void throwErrorIfNonCudaDevice(const torch::Device& device) {
 }
 } // namespace
 
-void initializeDeviceContext(
+void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   throwErrorIfNonCudaDevice(device);
@@ -66,7 +66,7 @@ void initializeDeviceContext(
   return;
 }
 
-void convertAVFrameToDecodedOutputOnDevice(
+void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,

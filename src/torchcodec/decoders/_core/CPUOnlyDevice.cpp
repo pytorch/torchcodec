@@ -14,7 +14,7 @@ namespace facebook::torchcodec {
   TORCH_CHECK(false, "Unsupported device: " + device.str());
 }
 
-void convertAVFrameToDecodedOutputOnDevice(
+void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
@@ -23,7 +23,7 @@ void convertAVFrameToDecodedOutputOnDevice(
   throwUnsupportedDeviceError(device);
 }
 
-void initializeDeviceContext(
+void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   throwUnsupportedDeviceError(device);
