@@ -19,6 +19,9 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
   torch::DeviceIndex deviceIndex = device.index();
   // FFMPEG cannot handle negative device indices.
+  // For single GPU- machines libtorch returns -1 for the device index. So for
+  // that case we set the device index to 0.
+  // TODO: Double check if this works for multi-GPU machines correctly.
   deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   std::string deviceOrdinal = std::to_string(deviceIndex);
   AVBufferRef* hw_device_ctx;
