@@ -429,7 +429,7 @@ void VideoDecoder::addVideoStreamDecoder(
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   if (options.device.type() != torch::kCPU) {
-    initializeDeviceContext(options.device);
+    initializeDeviceContext(options.device, codecContext);
   }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
@@ -856,6 +856,25 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  if (streamInfo.options.device.type() != torch::kCPU) {
+    convertAVFrameToDecodedOutputOnDevice(
+        streamInfo.options.device,
+        streamInfo.options,
+        streamInfo.codecContext.get(),
+        rawOutput,
+        output);
+  } else {
+    convertAVFrameToDecodedOutputOnCPU(rawOutput, output);
+  }
+  return output;
+}
+
+void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    DecodedOutput& output) {
+  int streamIndex = rawOutput.streamIndex;
+  AVFrame* frame = rawOutput.frame.get();
+  auto& streamInfo = streams_[streamIndex];
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       int width = streamInfo.options.width.value_or(frame->width);
@@ -884,7 +903,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     // audio decoding.
     throw std::runtime_error("Audio is not supported yet.");
   }
-  return output;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
