@@ -1,21 +1,61 @@
 import contextlib
 import random
 import re
+from copy import copy
 
 import pytest
 import torch
 
 from torchcodec import FrameBatch
 from torchcodec.decoders import VideoDecoder
-from torchcodec.samplers import clips_at_random_indices, clips_at_regular_indices
+from torchcodec.samplers import (
+    clips_at_random_indices,
+    clips_at_regular_indices,
+    clips_at_regular_timestamps,
+)
 from torchcodec.samplers._implem import _build_all_clips_indices, _POLICY_FUNCTIONS
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
 
+def _assert_output_type_and_shapes(
+    video, clips, expected_num_clips, num_frames_per_clip
+):
+    assert isinstance(clips, list)
+    assert len(clips) == expected_num_clips
+    assert all(isinstance(clip, FrameBatch) for clip in clips)
+    expected_clip_data_shape = (
+        num_frames_per_clip,
+        3,
+        video.height,
+        video.width,
+    )
+    assert all(clip.data.shape == expected_clip_data_shape for clip in clips)
+
+
+def _assert_regular_sampler(clips, expected_seconds_between_clip_starts=None):
+    # assert regular spacing between sampled clips
+    seconds_between_clip_starts = torch.tensor(
+        [clip.pts_seconds[0] for clip in clips]
+    ).diff()
+    for diff in seconds_between_clip_starts:
+        # Note: need approximate check as actual diff values typically look like
+        # [3.2032, 3.2366, 3.2366, 3.2366]
+        assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
+
+    if expected_seconds_between_clip_starts is not None:
+        # This can only be asserted with the time-based sampler, where
+        # seconds_between_clip_starts is known since it's passed by the user.
+        torch.testing.assert_close(
+            diff, expected_seconds_between_clip_starts, atol=0.01, rtol=0
+        )
+
+    assert (diff > 0).all()  # Also assert clips are sorted by start time
+
+
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 @pytest.mark.parametrize("num_indices_between_frames", [1, 5])
-def test_sampler(sampler, num_indices_between_frames):
+def test_index_based_sampler(sampler, num_indices_between_frames):
     decoder = VideoDecoder(NASA_VIDEO.path)
     num_clips = 5
     num_frames_per_clip = 3
@@ -27,27 +67,15 @@ def test_sampler(sampler, num_indices_between_frames):
         num_indices_between_frames=num_indices_between_frames,
     )
 
-    assert isinstance(clips, list)
-    assert len(clips) == num_clips
-    assert all(isinstance(clip, FrameBatch) for clip in clips)
-    expected_clip_data_shape = (
-        num_frames_per_clip,
-        3,
-        NASA_VIDEO.height,
-        NASA_VIDEO.width,
+    _assert_output_type_and_shapes(
+        video=NASA_VIDEO,
+        clips=clips,
+        expected_num_clips=num_clips,
+        num_frames_per_clip=num_frames_per_clip,
     )
-    assert all(clip.data.shape == expected_clip_data_shape for clip in clips)
 
     if sampler is clips_at_regular_indices:
-        # assert regular spacing between sampled clips
-        # Note: need approximate check as actual values typically look like [3.2032, 3.2366, 3.2366, 3.2366]
-        seconds_between_clip_starts = torch.tensor(
-            [clip.pts_seconds[0] for clip in clips]
-        ).diff()
-        for diff in seconds_between_clip_starts:
-            assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
-
-        assert (diff > 0).all()  # Also assert clips are sorted by start time
+        _assert_regular_sampler(clips=clips, expected_seconds_between_clip_starts=None)
 
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
@@ -58,6 +86,46 @@ def test_sampler(sampler, num_indices_between_frames):
     ).mean()
     assert avg_distance_between_frames_seconds == pytest.approx(
         num_indices_between_frames / decoder.metadata.average_fps, abs=1e-5
+    )
+
+
+@pytest.mark.parametrize("seconds_between_frames", [None, 3])
+def test_time_based_sampler(seconds_between_frames):
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    num_frames_per_clip = 3
+    seconds_between_clip_starts = 2
+
+    clips = clips_at_regular_timestamps(
+        decoder,
+        seconds_between_clip_starts=seconds_between_clip_starts,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+    )
+
+    expeted_num_clips = len(clips)  # no-op check, it's just hard to assert
+    _assert_output_type_and_shapes(
+        video=NASA_VIDEO,
+        clips=clips,
+        expected_num_clips=expeted_num_clips,
+        num_frames_per_clip=num_frames_per_clip,
+    )
+
+    expected_seconds_between_clip_starts = torch.tensor(
+        seconds_between_clip_starts, dtype=torch.float
+    )
+    _assert_regular_sampler(
+        clips=clips,
+        expected_seconds_between_clip_starts=expected_seconds_between_clip_starts,
+    )
+
+    expected_seconds_between_frames = (
+        seconds_between_frames or 1 / decoder.metadata.average_fps
+    )
+    avg_seconds_between_frames_seconds = torch.concat(
+        [clip.pts_seconds.diff() for clip in clips]
+    ).mean()
+    assert avg_seconds_between_frames_seconds == pytest.approx(
+        expected_seconds_between_frames, abs=0.05
     )
 
 
@@ -260,24 +328,26 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
     assert (clip_starts_seconds.diff() >= 0).all()
 
 
-@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
-def test_random_sampler_errors(sampler):
-    decoder = VideoDecoder(NASA_VIDEO.path)
-    with pytest.raises(
-        ValueError, match=re.escape("num_clips (0) must be strictly positive")
-    ):
-        sampler(decoder, num_clips=0)
+from functools import partial
 
+
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        clips_at_random_indices,
+        clips_at_regular_indices,
+        partial(clips_at_regular_timestamps, seconds_between_clip_starts=1),
+    ),
+)
+def test_sampler_errors(sampler):
+    decoder = VideoDecoder(NASA_VIDEO.path)
     with pytest.raises(
         ValueError, match=re.escape("num_frames_per_clip (0) must be strictly positive")
     ):
         sampler(decoder, num_frames_per_clip=0)
 
-    with pytest.raises(
-        ValueError,
-        match=re.escape("num_indices_between_frames (0) must be strictly positive"),
-    ):
-        sampler(decoder, num_indices_between_frames=0)
+    with pytest.raises(ValueError, match="Invalid policy"):
+        sampler(decoder, policy="BAD")
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (1000) must be smaller than")
@@ -285,9 +355,27 @@ def test_random_sampler_errors(sampler):
         sampler(decoder, sampling_range_start=1000)
 
     with pytest.raises(
-        ValueError, match=re.escape("sampling_range_start (4) must be smaller than")
+        ValueError,
+        match=re.escape(
+            "sampling_range_start (4) must be smaller than sampling_range_end"
+        ),
     ):
         sampler(decoder, sampling_range_start=4, sampling_range_end=4)
+
+
+@pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
+def test_index_based_samplers_errors(sampler):
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    with pytest.raises(
+        ValueError, match=re.escape("num_clips (0) must be strictly positive")
+    ):
+        sampler(decoder, num_clips=0)
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("num_indices_between_frames (0) must be strictly positive"),
+    ):
+        sampler(decoder, num_indices_between_frames=0)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (290) must be smaller than")
@@ -304,8 +392,56 @@ def test_random_sampler_errors(sampler):
             sampling_range_end=None,
         )
 
-    with pytest.raises(ValueError, match="Invalid policy"):
-        sampler(decoder, policy="BAD")
+
+def test_time_based_sampler_errors():
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    sampler = partial(clips_at_regular_timestamps, seconds_between_clip_starts=1)
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_start (-1) must be at least 0.0")
+    ):
+        sampler(decoder, sampling_range_start=-1)
+
+    with pytest.raises(
+        ValueError, match=re.escape("sampling_range_end (-1) must be at least 0.0")
+    ):
+        sampler(decoder, sampling_range_end=-1)
+
+    with pytest.raises(
+        ValueError, match=re.escape("seconds_between_clip_starts (-1) must be > 0")
+    ):
+        sampler(decoder, seconds_between_clip_starts=-1)
+
+    @contextlib.contextmanager
+    def restore_metadata():
+        # Context manager helper that restores the decoder's metadata to its
+        # original state upon exit.
+        try:
+            original_metadata = copy(decoder.metadata)
+            yield
+        finally:
+            decoder.metadata = original_metadata
+
+    with restore_metadata():
+        decoder.metadata.begin_stream_seconds = None
+        with pytest.raises(
+            ValueError, match="Could not infer stream end and start from video metadata"
+        ):
+            sampler(decoder)
+
+    with restore_metadata():
+        decoder.metadata.end_stream_seconds = None
+        with pytest.raises(
+            ValueError, match="Could not infer stream end and start from video metadata"
+        ):
+            sampler(decoder)
+
+    with restore_metadata():
+        decoder.metadata.begin_stream_seconds = None
+        decoder.metadata.end_stream_seconds = None
+        decoder.metadata.average_fps_from_header = None
+        with pytest.raises(ValueError, match="Could not infer average fps"):
+            sampler(decoder)
 
 
 class TestPolicy:

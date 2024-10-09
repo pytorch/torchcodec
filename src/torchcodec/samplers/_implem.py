@@ -6,9 +6,6 @@ from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import VideoDecoder
 
 
-_EPS = 1e-4
-
-
 def _validate_params(*, decoder, num_frames_per_clip, policy):
     if len(decoder) < 1:
         raise ValueError(
@@ -339,7 +336,7 @@ def _validate_params_time_based(
 ):
     if seconds_between_clip_starts <= 0:
         raise ValueError(
-            f"seconds_between_clip_starts ({seconds_between_clip_starts}) must be > 0, got"
+            f"seconds_between_clip_starts ({seconds_between_clip_starts}) must be > 0"
         )
 
     if decoder.metadata.average_fps is None:
@@ -379,10 +376,15 @@ def _validate_sampling_range_time_based(
 
     if sampling_range_start is None:
         sampling_range_start = begin_stream_seconds
-    elif sampling_range_start <= begin_stream_seconds:
-        raise ValueError(
-            f"sampling_range_start ({sampling_range_start}) must be at least {begin_stream_seconds}"
-        )
+    else:
+        if sampling_range_start <= begin_stream_seconds:
+            raise ValueError(
+                f"sampling_range_start ({sampling_range_start}) must be at least {begin_stream_seconds}"
+            )
+        if sampling_range_start >= end_stream_seconds:
+            raise ValueError(
+                f"sampling_range_start ({sampling_range_start}) must be smaller than {end_stream_seconds}"
+            )
 
     if sampling_range_end is None:
         # We allow a clip to start anywhere within
@@ -394,7 +396,7 @@ def _validate_sampling_range_time_based(
         # I.e. we want to guarantee that for all frames in any clip we have
         # pts < end_stream_seconds.
         #
-        # The frames of clip will be sampled at the following pts:
+        # The frames of a clip will be sampled at the following pts:
         # clip_timestamps = [
         #  clip_start + 0 * seconds_between_frames,
         #  clip_start + 1 * seconds_between_frames,
@@ -417,7 +419,7 @@ def _validate_sampling_range_time_based(
 
     if sampling_range_start >= sampling_range_end:
         raise ValueError(
-            f"sampling_range_start ({sampling_range_start}) must be less than sampling_range_end ({sampling_range_end})"
+            f"sampling_range_start ({sampling_range_start}) must be smaller than sampling_range_end ({sampling_range_end})"
         )
 
     sampling_range_end = min(sampling_range_end, end_stream_seconds)
@@ -511,7 +513,7 @@ def _decode_all_clips_timestamps(
 def clips_at_regular_timestamps(
     decoder,
     *,
-    seconds_between_clip_starts: int,  # TODO or its inverse: num_clips_per_seconds?
+    seconds_between_clip_starts: float,
     num_frames_per_clip: int = 1,
     seconds_between_frames: Optional[float] = None,
     # None means "begining", which may not always be 0
@@ -519,6 +521,9 @@ def clips_at_regular_timestamps(
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: str = "repeat_last",
 ) -> List[FrameBatch]:
+    # Note: *everywhere*, sampling_range_end denotes the upper bound of where a
+    # clip can start. This is an *open* upper bound, i.e. we will make sure no
+    # clip start exactly at (or above) sampling_range_end.
 
     _validate_params(
         decoder=decoder,
@@ -541,19 +546,10 @@ def clips_at_regular_timestamps(
         end_stream_seconds=decoder.metadata.end_stream_seconds,
     )
 
-    sampling_range_seconds = sampling_range_end - sampling_range_start
-    num_clips = int(round(sampling_range_seconds / seconds_between_clip_starts))
-
-    # Note on sampling_range_end: we want the sampling range to be
-    # [sampling_range_start, sampling_range_end) where the upper bound is open.
-    # This is for consistency with the index-based case.
-    # Because in torch.linspace the upper bound is inclusive, we would risk
-    # getting exactly sampling_range_end as a clip start value. To avoid that,
-    # we substract a small value.
-    clip_start_seconds = torch.linspace(
+    clip_start_seconds = torch.arange(
         sampling_range_start,
-        sampling_range_end - _EPS,
-        steps=num_clips,
+        sampling_range_end,  # excluded
+        seconds_between_clip_starts,
     )
 
     all_clips_timestamps = _build_all_clips_timestamps(
