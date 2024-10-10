@@ -1,8 +1,7 @@
 import argparse
-import os
-import pathlib
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import torch
 
@@ -102,9 +101,7 @@ def main():
     parser.add_argument(
         "--video",
         type=str,
-        default=str(
-            pathlib.Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
-        ),
+        default=str(Path(__file__).parent / "../../test/resources/nasa_13013.mp4"),
     )
     parser.add_argument(
         "--use_torch_benchmark",
@@ -177,7 +174,7 @@ def main():
                         "use_multiple_gpus": args.use_multiple_gpus,
                     },
                     label=label,
-                    description=f"threads={args.num_threads} work={args.num_videos} video={os.path.basename(video_path)}",
+                    description=f"threads={args.num_threads} work={args.num_videos} video={Path(video_path).name}",
                     sub_label=f"D={decode_label} R={resize_label} T={args.num_threads} W={args.num_videos}",
                 ).blocked_autorange()
                 results.append(t)
@@ -191,7 +188,7 @@ def main():
                         "resize_device_string": resize_device_string,
                     },
                     label=label,
-                    description=f"video={os.path.basename(video_path)}",
+                    description=f"video={Path(video_path).name}",
                     sub_label=f"D={decode_label} R={resize_label}",
                 ).blocked_autorange()
                 results.append(t)

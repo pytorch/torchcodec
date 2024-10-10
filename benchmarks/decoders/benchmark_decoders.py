@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 import timeit
+from pathlib import Path
 
 import torch
 import torch.utils.benchmark as benchmark
@@ -303,9 +304,8 @@ def get_test_resource_path(filename: str) -> str:
         resource = importlib.resources.files(__package__).joinpath(filename)
         with importlib.resources.as_file(resource) as path:
             return os.fspath(path)
-    return os.path.join(
-        os.path.dirname(__file__), "..", "..", "test", "resources", filename
-    )
+
+    return str(Path(__file__).parent / f"../../test/resources/{filename}")
 
 
 def create_torchcodec_decoder_from_file(video_file):
