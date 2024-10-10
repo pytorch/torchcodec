@@ -180,9 +180,9 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   EXPECT_EQ(output.pts, 1001);
 
   torch::Tensor tensor0FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+      readTensorFromDisk("nasa_13013.mp4.stream3.frame000000.pt");
   torch::Tensor tensor1FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000001.pt");
+      readTensorFromDisk("nasa_13013.mp4.stream3.frame000001.pt");
 
   EXPECT_EQ(tensor1FromFFMPEG.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_TRUE(torch::equal(tensor0FromOurDecoder, tensor0FromFFMPEG));
@@ -215,7 +215,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
   torch::Tensor tensor0FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+      readTensorFromDisk("nasa_13013.mp4.stream3.frame000000.pt");
   torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
@@ -239,7 +239,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
   torch::Tensor tensor0FromFFMPEG =
-      readTensorFromDisk("nasa_13013.mp4.frame000000.pt");
+      readTensorFromDisk("nasa_13013.mp4.stream3.frame000000.pt");
   torch::Tensor tensorTime6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
 
