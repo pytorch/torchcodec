@@ -17,9 +17,12 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
+// I haven't seen a case where a host is connected to more than 16 GPUs.
 const int MAX_CUDA_GPUS = 16;
-const int MAX_CACHE_SIZE_PER_GPU = 10;
-std::set<AVBufferRef*> g_cached_hw_device_ctxs[MAX_CUDA_GPUS];
+// Set to -1 to have an infinitely sized cache. Set it to 0 to disable caching.
+// Set to a positive number to have a cache of that size.
+const int MAX_DECODERS_PER_GPU_IN_CACHE = 10;
+std::vector<AVBufferRef*> g_cached_hw_device_ctxs[MAX_CUDA_GPUS];
 std::mutex g_cached_hw_device_mutexes[MAX_CUDA_GPUS];
 
 torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
@@ -34,23 +37,27 @@ torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
   return deviceIndex;
 }
 
-void addToCache(const torch::Device& device, AVCodecContext* codecContext) {
+void addToCacheIfCacheHasCapacity(
+    const torch::Device& device,
+    AVCodecContext* codecContext) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
-  if (g_cached_hw_device_ctxs[deviceIndex].size() >= MAX_CACHE_SIZE_PER_GPU) {
+  if (MAX_DECODERS_PER_GPU_IN_CACHE >= 0 &&
+      g_cached_hw_device_ctxs[deviceIndex].size() >=
+          MAX_DECODERS_PER_GPU_IN_CACHE) {
     return;
   }
-  g_cached_hw_device_ctxs[deviceIndex].insert(codecContext->hw_device_ctx);
+  g_cached_hw_device_ctxs[deviceIndex].push_back(codecContext->hw_device_ctx);
   codecContext->hw_device_ctx = nullptr;
 }
 
 AVBufferRef* getFromCache(const torch::Device& device) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
+  auto it = g_cached_hw_device_ctxs[deviceIndex].back();
   if (g_cached_hw_device_ctxs[deviceIndex].size() > 0) {
-    auto it = g_cached_hw_device_ctxs[deviceIndex].begin();
-    AVBufferRef* hw_device_ctx = *it;
-    g_cached_hw_device_ctxs[deviceIndex].erase(it);
+    AVBufferRef* hw_device_ctx = g_cached_hw_device_ctxs[deviceIndex].back();
+    g_cached_hw_device_ctxs[deviceIndex].pop_back();
     return hw_device_ctx;
   }
   return nullptr;
@@ -105,7 +112,7 @@ void releaseContextOnCuda(
     AVCodecContext* codecContext) {
   throwErrorIfNonCudaDevice(device);
   AVBufferRef* hw_device_ctx = codecContext->hw_device_ctx;
-  addToCache(device, codecContext);
+  addToCacheIfCacheHasCapacity(device, codecContext);
 }
 
 void initializeContextOnCuda(
