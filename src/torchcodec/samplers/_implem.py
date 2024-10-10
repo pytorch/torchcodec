@@ -491,6 +491,13 @@ def _decode_all_clips_timestamps(
             and frame_pts_seconds == all_clips_timestamps_sorted[i - 1]
         ):
             # Avoid decoding the same frame twice.
+            # Unfortunatly this is unlikely to lead to speed-up as-is: it's
+            # pretty unlikely that 2 pts will be the same since pts are float
+            # contiguous values. Theoretically the dedup can still happen, but
+            # it would be much more efficient to implement it at the frame index
+            # level. We should do that once we implement that in C++.
+            # See also https://github.com/pytorch/torchcodec/issues/256.
+            #
             # IMPORTANT: this is only correct because a copy of the frame will
             # happen within `_to_framebatch` when we call torch.stack.
             # If a copy isn't made, the same underlying memory will be used for
