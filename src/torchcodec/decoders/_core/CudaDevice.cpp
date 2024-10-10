@@ -107,6 +107,7 @@ void releaseContextOnCuda(
   AVBufferRef* hw_device_ctx = codecContext->hw_device_ctx;
   addToCache(device, codecContext);
 }
+
 void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
