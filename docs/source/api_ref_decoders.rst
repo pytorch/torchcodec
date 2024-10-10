@@ -20,6 +20,4 @@ torchcodec.decoders
     :nosignatures:
     :template: dataclass.rst
 
-    Frame
-    FrameBatch
     VideoStreamMetadata

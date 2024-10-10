@@ -225,7 +225,7 @@ at::Tensor get_frames_at_indices(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
-  auto result = videoDecoder->getFramesAtIndexes(stream_index, frameIndicesVec);
+  auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
   return result.frames;
 }
 

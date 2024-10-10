@@ -4,6 +4,9 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-from . import decoders, samplers  # noqa  # noqa
+# Note: usort wants to put Frame and FrameBatch after decoders and samplers,
+# but that results in circular import.
+from ._frame import Frame, FrameBatch  # usort:skip # noqa
+from . import decoders, samplers  # noqa
 
 __version__ = "0.0.4.dev"

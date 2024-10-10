@@ -210,7 +210,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(bestVideoStreamIndex);
   // Frame with index 180 corresponds to timestamp 6.006.
-  auto output = ourDecoder->getFramesAtIndexes(bestVideoStreamIndex, {0, 180});
+  auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
   auto tensor = output.frames;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
@@ -234,7 +234,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamDecoderOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
-  auto output = ourDecoder->getFramesAtIndexes(bestVideoStreamIndex, {0, 180});
+  auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
   auto tensor = output.frames;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 

@@ -4,70 +4,14 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import dataclasses
 import numbers
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Literal, Tuple, Union
+from typing import Literal, Tuple, Union
 
 from torch import Tensor
 
+from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import _core as core
-
-
-def _frame_repr(self):
-    # Utility to replace Frame and FrameBatch __repr__ method. This prints the
-    # shape of the .data tensor rather than printing the (potentially very long)
-    # data tensor itself.
-    s = self.__class__.__name__ + ":\n"
-    spaces = "  "
-    for field in dataclasses.fields(self):
-        field_name = field.name
-        field_val = getattr(self, field_name)
-        if field_name == "data":
-            field_name = "data (shape)"
-            field_val = field_val.shape
-        s += f"{spaces}{field_name}: {field_val}\n"
-    return s
-
-
-@dataclass
-class Frame(Iterable):
-    """A single video frame with associated metadata."""
-
-    data: Tensor
-    """The frame data as (3-D ``torch.Tensor``)."""
-    pts_seconds: float
-    """The :term:`pts` of the frame, in seconds (float)."""
-    duration_seconds: float
-    """The duration of the frame, in seconds (float)."""
-
-    def __iter__(self) -> Iterator[Union[Tensor, float]]:
-        for field in dataclasses.fields(self):
-            yield getattr(self, field.name)
-
-    def __repr__(self):
-        return _frame_repr(self)
-
-
-@dataclass
-class FrameBatch(Iterable):
-    """Multiple video frames with associated metadata."""
-
-    data: Tensor
-    """The frames data as (4-D ``torch.Tensor``)."""
-    pts_seconds: Tensor
-    """The :term:`pts` of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
-    duration_seconds: Tensor
-    """The duration of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
-
-    def __iter__(self) -> Iterator[Union[Tensor, float]]:
-        for field in dataclasses.fields(self):
-            yield getattr(self, field.name)
-
-    def __repr__(self):
-        return _frame_repr(self)
-
 
 _ERROR_REPORTING_INSTRUCTIONS = """
 This should never happen. Please report an issue following the steps in
@@ -191,7 +135,7 @@ class VideoDecoder:
         """Return frame or frames as tensors, at the given index or range.
 
         Args:
-            key(numbers.Integral or slice): The index or range of frame(s) to retrieve.
+            key(int or slice): The index or range of frame(s) to retrieve.
 
         Returns:
             torch.Tensor: The frame or frames at the given index or range.

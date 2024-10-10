@@ -5,6 +5,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from ._core import VideoStreamMetadata
-from ._video_decoder import Frame, FrameBatch, VideoDecoder  # noqa
+from ._video_decoder import VideoDecoder  # noqa
 
 SimpleVideoDecoder = VideoDecoder

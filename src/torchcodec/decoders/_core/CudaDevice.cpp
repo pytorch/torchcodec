@@ -3,6 +3,7 @@
 #include <npp.h>
 #include <torch/types.h>
 #include <mutex>
+
 #include "src/torchcodec/decoders/_core/DeviceInterface.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
@@ -22,14 +23,14 @@ std::set<AVBufferRef*> g_cached_hw_device_ctxs[MAX_CUDA_GPUS];
 std::mutex g_cached_hw_device_mutexes[MAX_CUDA_GPUS];
 
 torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
-  // FFMPEG cannot handle negative device indices.
-  // For single GPU- machines libtorch returns -1 for the device index. So for
-  // that case we set the device index to 0.
-  // TODO: Double check if this works for multi-GPU machines correctly.
   torch::DeviceIndex deviceIndex = device.index();
   deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   TORCH_CHECK(deviceIndex >= 0, "Device index out of range");
   TORCH_CHECK(deviceIndex < MAX_CUDA_GPUS, "Device index out of range");
+  // FFMPEG cannot handle negative device indices.
+  // For single GPU- machines libtorch returns -1 for the device index. So for
+  // that case we set the device index to 0.
+  // TODO: Double check if this works for multi-GPU machines correctly.
   return deviceIndex;
 }
 
@@ -106,7 +107,6 @@ void releaseContextOnCuda(
   AVBufferRef* hw_device_ctx = codecContext->hw_device_ctx;
   addToCache(device, codecContext);
 }
-
 void initializeContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
