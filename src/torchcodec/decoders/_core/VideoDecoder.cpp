@@ -1300,6 +1300,8 @@ VideoDecoder::~VideoDecoder() {
     } else if (device.type() == torch::kCUDA) {
       releaseContextOnCuda(device, stream.codecContext.get());
     } else {
+      throw std::invalid_argument(
+          "Invalid device type: " + options.device.str());
     }
   }
 }
