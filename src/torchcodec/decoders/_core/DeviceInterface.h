@@ -10,6 +10,11 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
 
 namespace facebook::torchcodec {
 
@@ -23,6 +28,15 @@ namespace facebook::torchcodec {
 
 // Initialize the hardware device that is specified in `device`. Some builds
 // support CUDA and others only support CPU.
-void initializeDeviceContext(const torch::Device& device);
+void initializeContextOnCuda(
+    const torch::Device& device,
+    AVCodecContext* codecContext);
+
+void convertAVFrameToDecodedOutputOnCuda(
+    const torch::Device& device,
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    AVCodecContext* codecContext,
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    VideoDecoder::DecodedOutput& output);
 
 } // namespace facebook::torchcodec
