@@ -43,19 +43,23 @@ def _assert_regular_sampler(clips, expected_seconds_between_clip_starts=None):
     seconds_between_clip_starts = torch.tensor(
         [clip.pts_seconds[0] for clip in clips]
     ).diff()
-    for diff in seconds_between_clip_starts:
-        # Note: need approximate check as actual diff values typically look like
-        # [3.2032, 3.2366, 3.2366, 3.2366]
-        assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
 
     if expected_seconds_between_clip_starts is not None:
         # This can only be asserted with the time-based sampler, where
         # seconds_between_clip_starts is known since it's passed by the user.
         torch.testing.assert_close(
-            diff, expected_seconds_between_clip_starts, atol=0.01, rtol=0
+            seconds_between_clip_starts,
+            expected_seconds_between_clip_starts,
+            atol=0.05,
+            rtol=0,
         )
 
-    assert (diff > 0).all()  # Also assert clips are sorted by start time
+    # Also assert clips are sorted by start time
+    assert (seconds_between_clip_starts > 0).all()
+    # For all samplers, we can at least assert that seconds_between_clip_starts
+    # is constant.
+    for diff in seconds_between_clip_starts:
+        assert diff == pytest.approx(seconds_between_clip_starts[0], abs=0.05)
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
@@ -116,7 +120,7 @@ def test_time_based_sampler(seconds_between_frames):
     )
 
     expected_seconds_between_clip_starts = torch.tensor(
-        seconds_between_clip_starts, dtype=torch.float
+        [seconds_between_clip_starts] * (len(clips) - 1), dtype=torch.float
     )
     _assert_regular_sampler(
         clips=clips,
