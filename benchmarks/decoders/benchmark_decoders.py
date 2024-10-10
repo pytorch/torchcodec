@@ -206,10 +206,10 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
         metadata = json.loads(get_json_metadata(decoder))
         average_fps = metadata["averageFps"]
         best_video_stream = metadata["bestVideoStreamIndex"]
-        indexes_list = [int(pts * average_fps) for pts in pts_list]
+        indices_list = [int(pts * average_fps) for pts in pts_list]
         frames = []
         frames = get_frames_at_indices(
-            decoder, stream_index=best_video_stream, frame_indices=indexes_list
+            decoder, stream_index=best_video_stream, frame_indices=indices_list
         )
         return frames
 

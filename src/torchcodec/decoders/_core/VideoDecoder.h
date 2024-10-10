@@ -233,11 +233,11 @@ class VideoDecoder {
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
   };
-  // Returns frames at the given indexes for a given stream as a single stacked
+  // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
-  BatchDecodedOutput getFramesAtIndexes(
+  BatchDecodedOutput getFramesAtIndices(
       int streamIndex,
-      const std::vector<int64_t>& frameIndexes);
+      const std::vector<int64_t>& frameIndices);
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from
   // the range are:
