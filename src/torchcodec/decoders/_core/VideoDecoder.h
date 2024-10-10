@@ -364,6 +364,9 @@ class VideoDecoder {
       const AVFrame* frame);
   void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
   DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
+  void convertAVFrameToDecodedOutputOnCPU(
+      RawDecodedOutput& rawOutput,
+      DecodedOutput& output);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

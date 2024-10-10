@@ -277,7 +277,7 @@ def test_sampling_range_default_behavior_random_sampler(sampler):
     sampling_range_start = -20 if sampler is clips_at_random_indices else 11.0
 
     # with default sampling_range_end value
-    clips_default = sampler(
+    clips_default = clips_at_random_indices(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
@@ -289,7 +289,7 @@ def test_sampling_range_default_behavior_random_sampler(sampler):
     last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
 
     # with manual sampling_range_end value set to last frame
-    clips_manual = sampler(
+    clips_manual = clips_at_random_indices(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
