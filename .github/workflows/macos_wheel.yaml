@@ -68,15 +68,10 @@ jobs:
         with:
           name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_
           path: pytorch/torchcodec/dist/
-      - name: Setup conda env
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup miniconda
+        uses: pytorch/test-infra/.github/actions/setup-miniconda@macbuildwheel
         with:
-          auto-update-conda: true
-          miniconda-version: "latest"
-          activate-environment: test
           python-version: ${{ matrix.python-version }}
-      - name: Activate conda
-        run: conda activate test
       - name: Update pip
         run: python3 -m pip install --upgrade pip
       - name: Install PyTorch
