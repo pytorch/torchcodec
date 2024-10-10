@@ -967,19 +967,19 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
   return getNextDecodedOutputNoDemux();
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndexes) {
+    const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesAtIndexes");
+  validateScannedAllStreams("getFramesAtIndices");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& options = streams_[streamIndex].options;
-  BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
+  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
   int i = 0;
   const auto& stream = streams_[streamIndex];
-  for (int64_t frameIndex : frameIndexes) {
+  for (int64_t frameIndex : frameIndices) {
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
