@@ -433,7 +433,7 @@ void VideoDecoder::addVideoStreamDecoder(
   } else if (options.device.type() == torch::kCUDA) {
     initializeContextOnCuda(options.device, codecContext);
   } else {
-    throw std::invalid_argument("Invalid device type: " + options.device.str());
+    TORCH_CHECK(false, "Invalid device type: " + options.device.str());
   }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
@@ -870,8 +870,8 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
         rawOutput,
         output);
   } else {
-    throw std::invalid_argument(
-        "Invalid device type: " + streamInfo.options.device.str());
+    TORCH_CHECK(
+        false, "Invalid device type: " + streamInfo.options.device.str());
   }
   return output;
 }
@@ -1291,6 +1291,18 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
     tensor = tensor.permute({2, 0, 1});
   }
   return tensor;
+}
+
+VideoDecoder::~VideoDecoder() {
+  for (auto& [streamIndex, stream] : streams_) {
+    auto& device = stream.options.device;
+    if (device.type() == torch::kCPU) {
+    } else if (device.type() == torch::kCUDA) {
+      releaseContextOnCuda(device, stream.codecContext.get());
+    } else {
+      TORCH_CHECK(false, "Invalid device type: " + device.str());
+    }
+  }
 }
 
 std::ostream& operator<<(

@@ -44,7 +44,7 @@ CHECK_GE(presentation_timestamp, 5.0);
 // Do not call non-const APIs concurrently on the same object.
 class VideoDecoder {
  public:
-  ~VideoDecoder() = default;
+  ~VideoDecoder();
 
   struct DecoderOptions {
     DecoderOptions() {}
