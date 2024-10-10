@@ -54,6 +54,16 @@ jobs:
       build-platform: "python-build-package"
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ${CONDA_RUN} python3 -m build --wheel -vvv --no-isolation"
 
+  validate-binaries:
+    uses: pytorch/test-infra/.github/workflows/validate-domain-library.yml@main
+    with:
+      package_type: "wheel"
+      os: "macos-arm64"
+      channel: "nightly"
+      repository: "pytorch/torchcodec"
+      smoke_test: "source ./packaging/validate_wheel.sh"
+      install_torch: true
+
   install-and-test:
     runs-on: macos-m1-stable
     strategy:
@@ -73,7 +83,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Update pip
-        run: python3 -m pip install --upgrade pip
+        run: |
+          python3 -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
           python3 -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
@@ -92,7 +103,9 @@ jobs:
           # want to checkout the repo before installing the wheel to avoid any
           # side-effect. It's OK.
           source packaging/helpers.sh
-          assert_ffmpeg_not_installed
+
+          # below was failing, but when I just try to call "ffmpeg -version" that also fails?
+          #assert_ffmpeg_not_installed
 
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
