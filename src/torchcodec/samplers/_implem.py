@@ -6,6 +6,60 @@ from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import VideoDecoder
 
 
+def _chunk_list(lst, chunk_size):
+    # return list of sublists of length chunk_size
+    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
+def _to_framebatch(frames: list[Frame]) -> FrameBatch:
+    # IMPORTANT: see other IMPORTANT note in _decode_all_clips_indices and
+    # _decode_all_clips_timestamps
+    data = torch.stack([frame.data for frame in frames])
+    pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
+    duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
+    return FrameBatch(
+        data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
+    )
+
+
+_LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
+
+
+def _repeat_last_policy(
+    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
+    # values = [1, 2, 3], desired_len = 5
+    # output = [1, 2, 3, 3, 3]
+    values += [values[-1]] * (desired_len - len(values))
+    return values
+
+
+def _wrap_policy(
+    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
+    # values = [1, 2, 3], desired_len = 5
+    # output = [1, 2, 3, 1, 2]
+    return (values * (desired_len // len(values) + 1))[:desired_len]
+
+
+def _error_policy(
+    frames_indices: _LIST_OF_INT_OR_FLOAT, desired_len: int
+) -> _LIST_OF_INT_OR_FLOAT:
+    raise ValueError(
+        "You set the 'error' policy, and the sampler tried to decode a frame "
+        "that is beyond the number of frames in the video. "
+        "Try to leave sampling_range_end to its default value?"
+    )
+
+
+_POLICY_FUNCTION_TYPE = Callable[[_LIST_OF_INT_OR_FLOAT, int], _LIST_OF_INT_OR_FLOAT]
+_POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
+    "repeat_last": _repeat_last_policy,
+    "wrap": _wrap_policy,
+    "error": _error_policy,
+}
+
+
 def _validate_params(*, decoder, num_frames_per_clip, policy):
     if len(decoder) < 1:
         raise ValueError(
@@ -90,44 +144,6 @@ def _get_clip_span(*, num_indices_between_frames, num_frames_per_clip):
     return num_indices_between_frames * (num_frames_per_clip - 1) + 1
 
 
-_LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
-
-
-def _repeat_last_policy(
-    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    # values = [1, 2, 3], desired_len = 5
-    # output = [1, 2, 3, 3, 3]
-    values += [values[-1]] * (desired_len - len(values))
-    return values
-
-
-def _wrap_policy(
-    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    # values = [1, 2, 3], desired_len = 5
-    # output = [1, 2, 3, 1, 2]
-    return (values * (desired_len // len(values) + 1))[:desired_len]
-
-
-def _error_policy(
-    frames_indices: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    raise ValueError(
-        "You set the 'error' policy, and the sampler tried to decode a frame "
-        "that is beyond the number of frames in the video. "
-        "Try to leave sampling_range_end to its default value?"
-    )
-
-
-_POLICY_FUNCTION_TYPE = Callable[[_LIST_OF_INT_OR_FLOAT, int], _LIST_OF_INT_OR_FLOAT]
-_POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
-    "repeat_last": _repeat_last_policy,
-    "wrap": _wrap_policy,
-    "error": _error_policy,
-}
-
-
 def _build_all_clips_indices(
     *,
     clip_start_indices: torch.Tensor,  # 1D int tensor
@@ -177,20 +193,7 @@ def _decode_all_clips_indices(
     # - decode all unique frames in sorted order
     # - re-assemble the decoded frames back to their original order
     #
-    # TODO: Write this in C++ so we can avoid the copies that happen in `to_framebatch`
-
-    def chunk_list(lst, chunk_size):
-        # return list of sublists of length chunk_size
-        return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-    def to_framebatch(frames: list[Frame]) -> FrameBatch:
-        # IMPORTANT: see other IMPORTANT note below
-        data = torch.stack([frame.data for frame in frames])
-        pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
-        duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
-        return FrameBatch(
-            data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
-        )
+    # TODO: Write this in C++ so we can avoid the copies that happen in `_to_framebatch`
 
     all_clips_indices_sorted, argsort = zip(
         *sorted((frame_index, i) for (i, frame_index) in enumerate(all_clips_indices))
@@ -205,7 +208,7 @@ def _decode_all_clips_indices(
         ):
             # Avoid decoding the same frame twice.
             # IMPORTANT: this is only correct because a copy of the frame will
-            # happen within `to_framebatch` when we call torch.stack.
+            # happen within `_to_framebatch` when we call torch.stack.
             # If a copy isn't made, the same underlying memory will be used for
             # the 2 consecutive frames. When we re-write this, we should make
             # sure to explicitly copy the data.
@@ -215,11 +218,11 @@ def _decode_all_clips_indices(
         previous_decoded_frame = decoded_frame
         all_decoded_frames[j] = decoded_frame
 
-    all_clips: list[list[Frame]] = chunk_list(
+    all_clips: list[list[Frame]] = _chunk_list(
         all_decoded_frames, chunk_size=num_frames_per_clip
     )
 
-    return [to_framebatch(clip) for clip in all_clips]
+    return [_to_framebatch(clip) for clip in all_clips]
 
 
 def _generic_index_based_sampler(
@@ -444,11 +447,10 @@ def _build_all_clips_timestamps(
     all_clips_timestamps: list[float] = []
     for start_seconds in clip_start_seconds:
         clip_timestamps = [
-            start_seconds + i * seconds_between_frames
+            timestamp
             for i in range(num_frames_per_clip)
-        ]
-        clip_timestamps = [
-            timestamp for timestamp in clip_timestamps if timestamp < end_stream_seconds
+            if (timestamp := start_seconds + i * seconds_between_frames)
+            < end_stream_seconds
         ]
 
         if len(clip_timestamps) < num_frames_per_clip:
@@ -463,19 +465,6 @@ def _decode_all_clips_timestamps(
 ) -> list[FrameBatch]:
     # This is 99% the same as _decode_all_clips_indices. The only change is the
     # call to .get_frame_displayed_at(pts) instead of .get_frame_at(idx)
-
-    def chunk_list(lst, chunk_size):
-        # return list of sublists of length chunk_size
-        return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-    def to_framebatch(frames: list[Frame]) -> FrameBatch:
-        # IMPORTANT: see other IMPORTANT note below
-        data = torch.stack([frame.data for frame in frames])
-        pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
-        duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
-        return FrameBatch(
-            data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
-        )
 
     all_clips_timestamps_sorted, argsort = zip(
         *sorted(
@@ -492,7 +481,7 @@ def _decode_all_clips_timestamps(
         ):
             # Avoid decoding the same frame twice.
             # IMPORTANT: this is only correct because a copy of the frame will
-            # happen within `to_framebatch` when we call torch.stack.
+            # happen within `_to_framebatch` when we call torch.stack.
             # If a copy isn't made, the same underlying memory will be used for
             # the 2 consecutive frames. When we re-write this, we should make
             # sure to explicitly copy the data.
@@ -502,11 +491,11 @@ def _decode_all_clips_timestamps(
         previous_decoded_frame = decoded_frame
         all_decoded_frames[j] = decoded_frame
 
-    all_clips: list[list[Frame]] = chunk_list(
+    all_clips: list[list[Frame]] = _chunk_list(
         all_decoded_frames, chunk_size=num_frames_per_clip
     )
 
-    return [to_framebatch(clip) for clip in all_clips]
+    return [_to_framebatch(clip) for clip in all_clips]
 
 
 def clips_at_regular_timestamps(
