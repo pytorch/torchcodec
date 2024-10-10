@@ -549,6 +549,7 @@ def _generic_time_based_sampler(
     )
 
     if kind == "random":
+        assert num_clips is not None  # appease type-checker
         sampling_range_width = sampling_range_end - sampling_range_start
         # torch.rand() returns in [0, 1)
         # which ensures all clip starts are < sampling_range_end
@@ -556,6 +557,7 @@ def _generic_time_based_sampler(
             torch.rand(num_clips) * sampling_range_width + sampling_range_start
         )
     else:
+        assert seconds_between_clip_starts is not None  # appease type-checker
         clip_start_seconds = torch.arange(
             sampling_range_start,
             sampling_range_end,  # excluded
