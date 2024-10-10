@@ -78,7 +78,7 @@ def _validate_params(*, decoder, num_frames_per_clip, policy):
 
 def _validate_params_index_based(*, num_clips, num_indices_between_frames):
     if num_clips <= 0:
-        raise ValueError(f"num_clips ({num_clips}) must be strictly positive")
+        raise ValueError(f"num_clips ({num_clips}) must be > 0")
 
     if num_indices_between_frames <= 0:
         raise ValueError(
@@ -339,13 +339,24 @@ def clips_at_regular_indices(
 def _validate_params_time_based(
     *,
     decoder,
+    num_clips,
     seconds_between_clip_starts,
     seconds_between_frames,
 ):
-    if seconds_between_clip_starts <= 0:
+
+    if (num_clips is None and seconds_between_clip_starts is None) or (
+        num_clips is not None and seconds_between_clip_starts is not None
+    ):
+        # This is internal only and should never happen
+        raise ValueError("Bad, bad programmer!")
+
+    if seconds_between_clip_starts is not None and seconds_between_clip_starts <= 0:
         raise ValueError(
             f"seconds_between_clip_starts ({seconds_between_clip_starts}) must be > 0"
         )
+
+    if num_clips is not None and num_clips <= 0:
+        raise ValueError(f"num_clips ({num_clips}) must be > 0")
 
     if decoder.metadata.average_fps is None:
         raise ValueError(
@@ -498,15 +509,17 @@ def _decode_all_clips_timestamps(
     return [_to_framebatch(clip) for clip in all_clips]
 
 
-def clips_at_regular_timestamps(
+def _generic_time_based_sampler(
+    kind: Literal["random", "regular"],
     decoder,
     *,
-    seconds_between_clip_starts: float,
-    num_frames_per_clip: int = 1,
-    seconds_between_frames: Optional[float] = None,
+    num_clips: Optional[int],  # mutually exclusive with seconds_between_clip_starts
+    seconds_between_clip_starts: Optional[float],
+    num_frames_per_clip: int,
+    seconds_between_frames: Optional[float],
     # None means "begining", which may not always be 0
-    sampling_range_start: Optional[float] = None,
-    sampling_range_end: Optional[float] = None,  # interval is [start, end).
+    sampling_range_start: Optional[float],
+    sampling_range_end: Optional[float],  # interval is [start, end).
     policy: str = "repeat_last",
 ) -> List[FrameBatch]:
     # Note: *everywhere*, sampling_range_end denotes the upper bound of where a
@@ -521,6 +534,7 @@ def clips_at_regular_timestamps(
 
     seconds_between_frames = _validate_params_time_based(
         decoder=decoder,
+        num_clips=num_clips,
         seconds_between_clip_starts=seconds_between_clip_starts,
         seconds_between_frames=seconds_between_frames,
     )
@@ -534,11 +548,19 @@ def clips_at_regular_timestamps(
         end_stream_seconds=decoder.metadata.end_stream_seconds,
     )
 
-    clip_start_seconds = torch.arange(
-        sampling_range_start,
-        sampling_range_end,  # excluded
-        seconds_between_clip_starts,
-    )
+    if kind == "random":
+        sampling_range_width = sampling_range_end - sampling_range_start
+        # torch.rand() returns in [0, 1)
+        # which ensures all clip starts are < sampling_range_end
+        clip_start_seconds = (
+            torch.rand(num_clips) * sampling_range_width + sampling_range_start
+        )
+    else:
+        clip_start_seconds = torch.arange(
+            sampling_range_start,
+            sampling_range_end,  # excluded
+            seconds_between_clip_starts,
+        )
 
     all_clips_timestamps = _build_all_clips_timestamps(
         clip_start_seconds=clip_start_seconds,
@@ -552,4 +574,52 @@ def clips_at_regular_timestamps(
         decoder,
         all_clips_timestamps=all_clips_timestamps,
         num_frames_per_clip=num_frames_per_clip,
+    )
+
+
+def clips_at_random_timestamps(
+    decoder,
+    *,
+    num_clips: int = 1,
+    num_frames_per_clip: int = 1,
+    seconds_between_frames: Optional[float] = None,
+    # None means "begining", which may not always be 0
+    sampling_range_start: Optional[float] = None,
+    sampling_range_end: Optional[float] = None,  # interval is [start, end).
+    policy: str = "repeat_last",
+) -> List[FrameBatch]:
+    return _generic_time_based_sampler(
+        kind="random",
+        decoder=decoder,
+        num_clips=num_clips,
+        seconds_between_clip_starts=None,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+        policy=policy,
+    )
+
+
+def clips_at_regular_timestamps(
+    decoder,
+    *,
+    seconds_between_clip_starts: float,
+    num_frames_per_clip: int = 1,
+    seconds_between_frames: Optional[float] = None,
+    # None means "begining", which may not always be 0
+    sampling_range_start: Optional[float] = None,
+    sampling_range_end: Optional[float] = None,  # interval is [start, end).
+    policy: str = "repeat_last",
+) -> List[FrameBatch]:
+    return _generic_time_based_sampler(
+        kind="regular",
+        decoder=decoder,
+        num_clips=None,
+        seconds_between_clip_starts=seconds_between_clip_starts,
+        num_frames_per_clip=num_frames_per_clip,
+        seconds_between_frames=seconds_between_frames,
+        sampling_range_start=sampling_range_start,
+        sampling_range_end=sampling_range_end,
+        policy=policy,
     )

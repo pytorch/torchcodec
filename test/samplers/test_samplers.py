@@ -11,6 +11,7 @@ from torchcodec import FrameBatch
 from torchcodec.decoders import VideoDecoder
 from torchcodec.samplers import (
     clips_at_random_indices,
+    clips_at_random_timestamps,
     clips_at_regular_indices,
     clips_at_regular_timestamps,
 )
@@ -98,34 +99,45 @@ def test_index_based_sampler(sampler, num_indices_between_frames):
     )
 
 
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        partial(clips_at_random_timestamps, num_clips=5),
+        partial(clips_at_regular_timestamps, seconds_between_clip_starts=2),
+    ),
+)
 @pytest.mark.parametrize("seconds_between_frames", [None, 3])
-def test_time_based_sampler(seconds_between_frames):
+def test_time_based_sampler(sampler, seconds_between_frames):
     decoder = VideoDecoder(NASA_VIDEO.path)
     num_frames_per_clip = 3
-    seconds_between_clip_starts = 2
 
-    clips = clips_at_regular_timestamps(
+    clips = sampler(
         decoder,
-        seconds_between_clip_starts=seconds_between_clip_starts,
         num_frames_per_clip=num_frames_per_clip,
         seconds_between_frames=seconds_between_frames,
     )
 
-    expeted_num_clips = len(clips)  # no-op check, it's just hard to assert
+    expected_num_clips = (
+        len(clips)  # No-op check, we can't assert with regular sampler
+        if sampler.func is clips_at_regular_timestamps
+        else sampler.keywords["num_clips"]
+    )
     _assert_output_type_and_shapes(
         video=NASA_VIDEO,
         clips=clips,
-        expected_num_clips=expeted_num_clips,
+        expected_num_clips=expected_num_clips,
         num_frames_per_clip=num_frames_per_clip,
     )
 
-    expected_seconds_between_clip_starts = torch.tensor(
-        [seconds_between_clip_starts] * (len(clips) - 1), dtype=torch.float
-    )
-    _assert_regular_sampler(
-        clips=clips,
-        expected_seconds_between_clip_starts=expected_seconds_between_clip_starts,
-    )
+    if sampler.func is clips_at_regular_timestamps:
+        seconds_between_clip_starts = sampler.keywords["seconds_between_clip_starts"]
+        expected_seconds_between_clip_starts = torch.tensor(
+            [seconds_between_clip_starts] * (len(clips) - 1), dtype=torch.float
+        )
+        _assert_regular_sampler(
+            clips=clips,
+            expected_seconds_between_clip_starts=expected_seconds_between_clip_starts,
+        )
 
     expected_seconds_between_frames = (
         seconds_between_frames or 1 / decoder.metadata.average_fps
@@ -157,6 +169,8 @@ def test_time_based_sampler(seconds_between_frames):
             12.0,
             False,
         ),
+        (partial(clips_at_random_indices, num_clips=10), 10, 11, True),
+        (partial(clips_at_random_indices, num_clips=10), 10, 12, False),
     ),
 )
 def test_sampling_range(
@@ -169,9 +183,10 @@ def test_sampling_range(
     #
     # For time-based:
     # The test is similar but with different semantics. We set the sampling
-    # range to be 1 second or 2 seconds. Since we set seconds_between_clip_start
-    # to 1 we expect exactly one clip with the sampling range is of size 1, and
-    # 2 different clips when teh sampling range is 2 seconds.
+    # range to be 1 second or 2 seconds. Since we set
+    # seconds_between_clip_starts to 1 we expect exactly one clip with the
+    # sampling range is of size 1, and 2 different clips when teh sampling range
+    # is 2 seconds.
 
     # When size=2 there's still a (small) non-zero probability of sampling the
     # same indices for clip starts, so we hard-code a seed that works.
@@ -230,7 +245,14 @@ def test_sampling_range_negative(sampler):
         assert_tensor_equal(clip.data, clips_1[0].data)
 
 
-def test_sampling_range_default_behavior_random_sampler():
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        clips_at_random_indices,
+        clips_at_random_timestamps,
+    ),
+)
+def test_sampling_range_default_behavior_random_sampler(sampler):
     # This is a functional test for the default behavior of the
     # sampling_range_end parameter, for the random sampler.
     # By default it's None, which means the
@@ -252,10 +274,10 @@ def test_sampling_range_default_behavior_random_sampler():
 
     num_clips = 20
     num_frames_per_clip = 15
-    sampling_range_start = -20
+    sampling_range_start = -20 if sampler is clips_at_random_indices else 11.0
 
     # with default sampling_range_end value
-    clips_default = clips_at_random_indices(
+    clips_default = sampler(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
@@ -267,7 +289,7 @@ def test_sampling_range_default_behavior_random_sampler():
     last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
 
     # with manual sampling_range_end value set to last frame
-    clips_manual = clips_at_random_indices(
+    clips_manual = sampler(
         decoder,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
@@ -321,11 +343,16 @@ def test_sampling_range_default_regular_sampler(sampler):
         partial(
             clips_at_regular_indices, sampling_range_start=-1, sampling_range_end=1000
         ),
-        # Note: the hard-coded value of sampling_range_start=12 is because we know
+        # Note: the hard-coded value of sampling_range_start=13 is because we know
         # the NASA_VIDEO is 13.01s seconds long
         partial(
             clips_at_regular_timestamps,
             seconds_between_clip_starts=0.1,
+            sampling_range_start=13,
+            sampling_range_end=1000,
+        ),
+        partial(
+            clips_at_random_timestamps,
             sampling_range_start=13,
             sampling_range_end=1000,
         ),
@@ -341,14 +368,17 @@ def test_sampling_range_error_policy(sampler):
         )
 
 
-def test_random_sampler_randomness():
+@pytest.mark.parametrize(
+    "sampler", (clips_at_random_indices, clips_at_random_timestamps)
+)
+def test_random_sampler_randomness(sampler):
     decoder = VideoDecoder(NASA_VIDEO.path)
     num_clips = 5
 
     builtin_random_state_start = random.getstate()
 
     torch.manual_seed(0)
-    clips_1 = clips_at_random_indices(decoder, num_clips=num_clips)
+    clips_1 = sampler(decoder, num_clips=num_clips)
 
     # Assert the clip starts aren't sorted, to make sure we haven't messed up
     # the implementation. (This may fail if we're unlucky, but we hard-coded a
@@ -358,7 +388,7 @@ def test_random_sampler_randomness():
 
     # Call the same sampler again with the same seed, expect same results
     torch.manual_seed(0)
-    clips_2 = clips_at_random_indices(decoder, num_clips=num_clips)
+    clips_2 = sampler(decoder, num_clips=num_clips)
     for clip_1, clip_2 in zip(clips_1, clips_2):
         assert_tensor_equal(clip_1.data, clip_2.data)
         assert_tensor_equal(clip_1.pts_seconds, clip_2.pts_seconds)
@@ -366,7 +396,7 @@ def test_random_sampler_randomness():
 
     # Call with a different seed, expect different results
     torch.manual_seed(1)
-    clips_3 = clips_at_random_indices(decoder, num_clips=num_clips)
+    clips_3 = sampler(decoder, num_clips=num_clips)
     with pytest.raises(AssertionError, match="Tensor-likes are not"):
         assert_tensor_equal(clips_1[0].data, clips_3[0].data)
 
@@ -412,6 +442,7 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
         clips_at_random_indices,
         clips_at_regular_indices,
         partial(clips_at_regular_timestamps, seconds_between_clip_starts=1),
+        clips_at_random_timestamps,
     ),
 )
 def test_sampler_errors(sampler):
@@ -441,9 +472,7 @@ def test_sampler_errors(sampler):
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
 def test_index_based_samplers_errors(sampler):
     decoder = VideoDecoder(NASA_VIDEO.path)
-    with pytest.raises(
-        ValueError, match=re.escape("num_clips (0) must be strictly positive")
-    ):
+    with pytest.raises(ValueError, match=re.escape("num_clips (0) must be > 0")):
         sampler(decoder, num_clips=0)
 
     with pytest.raises(
@@ -468,9 +497,15 @@ def test_index_based_samplers_errors(sampler):
         )
 
 
-def test_time_based_sampler_errors():
+@pytest.mark.parametrize(
+    "sampler",
+    (
+        clips_at_random_timestamps,
+        partial(clips_at_regular_timestamps, seconds_between_clip_starts=1),
+    ),
+)
+def test_time_based_sampler_errors(sampler):
     decoder = VideoDecoder(NASA_VIDEO.path)
-    sampler = partial(clips_at_regular_timestamps, seconds_between_clip_starts=1)
 
     with pytest.raises(
         ValueError, match=re.escape("sampling_range_start (-1) must be at least 0.0")
@@ -482,10 +517,17 @@ def test_time_based_sampler_errors():
     ):
         sampler(decoder, sampling_range_end=-1)
 
-    with pytest.raises(
-        ValueError, match=re.escape("seconds_between_clip_starts (-1) must be > 0")
-    ):
-        sampler(decoder, seconds_between_clip_starts=-1)
+    if sampler is clips_at_random_timestamps:
+        with pytest.raises(
+            ValueError,
+            match=re.escape("num_clips (0) must be > 0"),
+        ):
+            sampler(decoder, num_clips=0)
+    else:
+        with pytest.raises(
+            ValueError, match=re.escape("seconds_between_clip_starts (-1) must be > 0")
+        ):
+            sampler(decoder, seconds_between_clip_starts=-1)
 
     @contextlib.contextmanager
     def restore_metadata():
