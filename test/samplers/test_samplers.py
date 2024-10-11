@@ -15,11 +15,9 @@ from torchcodec.samplers import (
     clips_at_regular_indices,
     clips_at_regular_timestamps,
 )
-from torchcodec.samplers._implem import (
-    _build_all_clips_indices,
-    _build_all_clips_timestamps,
-    _POLICY_FUNCTIONS,
-)
+from torchcodec.samplers._common import _POLICY_FUNCTIONS
+from torchcodec.samplers._index_based import _build_all_clips_indices
+from torchcodec.samplers._time_based import _build_all_clips_timestamps
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
@@ -560,25 +558,6 @@ def test_time_based_sampler_errors(sampler):
         decoder.metadata.average_fps_from_header = None
         with pytest.raises(ValueError, match="Could not infer average fps"):
             sampler(decoder)
-
-
-class TestPolicy:
-    @pytest.mark.parametrize(
-        "policy, frame_indices, expected_frame_indices",
-        (
-            ("repeat_last", [1, 2, 3], [1, 2, 3, 3, 3]),
-            ("repeat_last", [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
-            ("wrap", [1, 2, 3], [1, 2, 3, 1, 2]),
-            ("wrap", [1, 2, 3, 4, 5], [1, 2, 3, 4, 5]),
-        ),
-    )
-    def test_policy(self, policy, frame_indices, expected_frame_indices):
-        policy_fun = _POLICY_FUNCTIONS[policy]
-        assert policy_fun(frame_indices, desired_len=5) == expected_frame_indices
-
-    def test_error_policy(self):
-        with pytest.raises(ValueError, match="beyond the number of frames"):
-            _POLICY_FUNCTIONS["error"]([1, 2, 3], desired_len=5)
 
 
 @pytest.mark.parametrize(
