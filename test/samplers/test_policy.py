@@ -1,5 +1,5 @@
 import pytest
-from torchcodec.samplers._policy import _POLICY_FUNCTIONS
+from torchcodec.samplers._common import _POLICY_FUNCTIONS
 
 
 @pytest.mark.parametrize(

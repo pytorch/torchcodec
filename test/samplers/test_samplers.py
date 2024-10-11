@@ -15,11 +15,9 @@ from torchcodec.samplers import (
     clips_at_regular_indices,
     clips_at_regular_timestamps,
 )
-from torchcodec.samplers._implementation import (
-    _build_all_clips_indices,
-    _build_all_clips_timestamps,
-    _POLICY_FUNCTIONS,
-)
+from torchcodec.samplers._common import _POLICY_FUNCTIONS
+from torchcodec.samplers._index_based import _build_all_clips_indices
+from torchcodec.samplers._time_based import _build_all_clips_timestamps
 
 from ..utils import assert_tensor_equal, NASA_VIDEO
 
