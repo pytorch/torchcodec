@@ -17,11 +17,21 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-// I haven't seen a case where a host is connected to more than 16 GPUs.
-const int MAX_CUDA_GPUS = 16;
+// We reuse cuda contexts across VideoDeoder instances. This is because
+// creating a cuda context is expensive. The cache mechanism is as follows:
+// 1. There is a cache of size MAX_CONTEXTS_PER_GPU_IN_CACHE cuda contexts for
+//    each GPU.
+// 2. When we destroy a VideoDecoder instance we release the cuda context to
+//    the cache if the cache is not full.
+// 3. When we create a VideoDecoder instance we try to get a cuda context from
+//    the cache. If the cache is empty we create a new cuda context.
+
+// Pytorch can only handle up to 128 GPUs.
+// https://github.com/pytorch/pytorch/blob/e30c55ee527b40d67555464b9e402b4b7ce03737/c10/cuda/CUDAMacros.h#L44
+const int MAX_CUDA_GPUS = 128;
 // Set to -1 to have an infinitely sized cache. Set it to 0 to disable caching.
 // Set to a positive number to have a cache of that size.
-const int MAX_DECODERS_PER_GPU_IN_CACHE = 10;
+const int MAX_CONTEXTS_PER_GPU_IN_CACHE = -1;
 std::vector<AVBufferRef*> g_cached_hw_device_ctxs[MAX_CUDA_GPUS];
 std::mutex g_cached_hw_device_mutexes[MAX_CUDA_GPUS];
 
@@ -29,7 +39,6 @@ torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
   torch::DeviceIndex deviceIndex = device.index();
   deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
   TORCH_CHECK(deviceIndex >= 0, "Device index out of range");
-  TORCH_CHECK(deviceIndex < MAX_CUDA_GPUS, "Device index out of range");
   // FFMPEG cannot handle negative device indices.
   // For single GPU- machines libtorch returns -1 for the device index. So for
   // that case we set the device index to 0.
@@ -41,10 +50,13 @@ void addToCacheIfCacheHasCapacity(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
+  if (deviceIndex >= MAX_CUDA_GPUS) {
+    return;
+  }
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
-  if (MAX_DECODERS_PER_GPU_IN_CACHE >= 0 &&
+  if (MAX_CONTEXTS_PER_GPU_IN_CACHE >= 0 &&
       g_cached_hw_device_ctxs[deviceIndex].size() >=
-          MAX_DECODERS_PER_GPU_IN_CACHE) {
+          MAX_CONTEXTS_PER_GPU_IN_CACHE) {
     return;
   }
   g_cached_hw_device_ctxs[deviceIndex].push_back(codecContext->hw_device_ctx);
@@ -53,6 +65,9 @@ void addToCacheIfCacheHasCapacity(
 
 AVBufferRef* getFromCache(const torch::Device& device) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
+  if (deviceIndex >= MAX_CUDA_GPUS) {
+    return nullptr;
+  }
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
   auto it = g_cached_hw_device_ctxs[deviceIndex].back();
   if (g_cached_hw_device_ctxs[deviceIndex].size() > 0) {
