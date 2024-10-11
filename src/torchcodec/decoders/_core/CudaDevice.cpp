@@ -126,7 +126,6 @@ void releaseContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   throwErrorIfNonCudaDevice(device);
-  AVBufferRef* hw_device_ctx = codecContext->hw_device_ctx;
   addToCacheIfCacheHasCapacity(device, codecContext);
 }
 
