@@ -1,9 +1,10 @@
-from typing import Callable, List, Literal, Optional, Union
+from typing import List, Literal, Optional
 
 import torch
 
 from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import VideoDecoder
+from torchcodec.samplers._policy import _POLICY_FUNCTION_TYPE, _POLICY_FUNCTIONS
 
 
 def _chunk_list(lst, chunk_size):
@@ -20,44 +21,6 @@ def _to_framebatch(frames: list[Frame]) -> FrameBatch:
     return FrameBatch(
         data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
     )
-
-
-_LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
-
-
-def _repeat_last_policy(
-    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    # values = [1, 2, 3], desired_len = 5
-    # output = [1, 2, 3, 3, 3]
-    values += [values[-1]] * (desired_len - len(values))
-    return values
-
-
-def _wrap_policy(
-    values: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    # values = [1, 2, 3], desired_len = 5
-    # output = [1, 2, 3, 1, 2]
-    return (values * (desired_len // len(values) + 1))[:desired_len]
-
-
-def _error_policy(
-    frames_indices: _LIST_OF_INT_OR_FLOAT, desired_len: int
-) -> _LIST_OF_INT_OR_FLOAT:
-    raise ValueError(
-        "You set the 'error' policy, and the sampler tried to decode a frame "
-        "that is beyond the number of frames in the video. "
-        "Try to leave sampling_range_end to its default value?"
-    )
-
-
-_POLICY_FUNCTION_TYPE = Callable[[_LIST_OF_INT_OR_FLOAT, int], _LIST_OF_INT_OR_FLOAT]
-_POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
-    "repeat_last": _repeat_last_policy,
-    "wrap": _wrap_policy,
-    "error": _error_policy,
-}
 
 
 def _validate_params(*, decoder, num_frames_per_clip, policy):
