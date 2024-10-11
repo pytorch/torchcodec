@@ -347,8 +347,7 @@ def _validate_params_time_based(
     if (num_clips is None and seconds_between_clip_starts is None) or (
         num_clips is not None and seconds_between_clip_starts is not None
     ):
-        # This is internal only and should never happen
-        raise ValueError("Bad, bad programmer!")
+        raise ValueError("This is internal only and should never happen.")
 
     if seconds_between_clip_starts is not None and seconds_between_clip_starts <= 0:
         raise ValueError(

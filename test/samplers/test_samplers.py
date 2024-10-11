@@ -185,7 +185,7 @@ def test_sampling_range(
     # The test is similar but with different semantics. We set the sampling
     # range to be 1 second or 2 seconds. Since we set
     # seconds_between_clip_starts to 1 we expect exactly one clip with the
-    # sampling range is of size 1, and 2 different clips when teh sampling range
+    # sampling range is of size 1, and 2 different clips when the sampling range
     # is 2 seconds.
 
     # When size=2 there's still a (small) non-zero probability of sampling the
@@ -344,7 +344,8 @@ def test_sampling_range_default_regular_sampler(sampler):
             clips_at_regular_indices, sampling_range_start=-1, sampling_range_end=1000
         ),
         # Note: the hard-coded value of sampling_range_start=13 is because we know
-        # the NASA_VIDEO is 13.01s seconds long
+        # the NASA_VIDEO is ~13.01s seconds long. We just need to clip to start
+        # on, or close to the last frame.
         partial(
             clips_at_regular_timestamps,
             seconds_between_clip_starts=0.1,
