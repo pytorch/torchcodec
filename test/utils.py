@@ -14,10 +14,6 @@ import torch
 
 # Decorator for skipping CUDA tests when CUDA isn't available
 def needs_cuda(test_item):
-    # TODO(ahmads): Get these tests working in FBCODE.
-    # For now they only run on OSS CUDA CI.
-    if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
-        test_item
     if not torch.cuda.is_available():
         return pytest.mark.skip(reason="CUDA not available")(test_item)
     return test_item
