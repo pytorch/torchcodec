@@ -29,10 +29,9 @@ jobs:
       script: |
         echo '::group::Install prereqs'
         nvidia-smi
-        conda create --yes --name test
+        conda create --yes --name test python=${{ matrix.python_version }}
         conda activate test
         conda install --quiet --yes pip cmake pkg-config nasm
-
         pip install --quiet --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu124
         conda install --quiet --yes nvidia::libnpp
         echo '::endgroup::'
@@ -71,5 +70,6 @@ jobs:
         pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
         echo '::endgroup::'
 
-        # TODO: Run actual GPU decoding. We will do that once the implementation is in-place.
+        python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0 --resize_devices=none
+        python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0 --resize_devices=none --num_threads=5 --num_videos=100
         conda deactivate
