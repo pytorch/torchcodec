@@ -50,7 +50,7 @@ void addToCacheIfCacheHasCapacity(
     const torch::Device& device,
     AVCodecContext* codecContext) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
-  if (deviceIndex >= MAX_CUDA_GPUS) {
+  if (static_cast<int>(deviceIndex) >= MAX_CUDA_GPUS) {
     return;
   }
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
@@ -65,11 +65,10 @@ void addToCacheIfCacheHasCapacity(
 
 AVBufferRef* getFromCache(const torch::Device& device) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
-  if (deviceIndex >= MAX_CUDA_GPUS) {
+  if (static_cast<int>(deviceIndex) >= MAX_CUDA_GPUS) {
     return nullptr;
   }
   std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
-  auto it = g_cached_hw_device_ctxs[deviceIndex].back();
   if (g_cached_hw_device_ctxs[deviceIndex].size() > 0) {
     AVBufferRef* hw_device_ctx = g_cached_hw_device_ctxs[deviceIndex].back();
     g_cached_hw_device_ctxs[deviceIndex].pop_back();
