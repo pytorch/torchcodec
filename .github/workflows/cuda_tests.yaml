@@ -32,7 +32,7 @@ jobs:
         conda create --yes --name test
         conda activate test
         conda install --quiet --yes pip cmake pkg-config nasm
-        pip install --quiet --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124
+        pip install --quiet --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu124
         conda install --quiet --yes nvidia::libnpp
         echo '::endgroup::'
 
