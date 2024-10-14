@@ -716,7 +716,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getNextDecodedOutputNoDemux()";
+  VLOG(9) << "Starting getDecodedOutputWithFilter()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
     VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
