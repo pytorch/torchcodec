@@ -168,8 +168,9 @@ void _add_video_stream(
   if (device.has_value()) {
     if (device.value() == "cpu") {
       options.device = torch::Device(torch::kCPU);
-    } else if (device.value() == "cuda") {
-      options.device = torch::Device(torch::kCUDA);
+    } else if (device.value().starts_with("cuda")) {
+      std::string deviceStr(device.value());
+      options.device = torch::Device(deviceStr);
     } else {
       throw std::runtime_error(
           "Invalid device=" + std::string(device.value()) +
@@ -224,7 +225,7 @@ at::Tensor get_frames_at_indices(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
-  auto result = videoDecoder->getFramesAtIndexes(stream_index, frameIndicesVec);
+  auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
   return result.frames;
 }
 

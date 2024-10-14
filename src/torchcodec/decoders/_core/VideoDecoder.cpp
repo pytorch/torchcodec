@@ -428,8 +428,12 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.codecContext.reset(codecContext);
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
-  if (options.device.type() != torch::kCPU) {
-    initializeDeviceContext(options.device);
+  if (options.device.type() == torch::kCPU) {
+    // No more initialization needed for CPU.
+  } else if (options.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(options.device, codecContext);
+  } else {
+    TORCH_CHECK(false, "Invalid device type: " + options.device.str());
   }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
@@ -856,6 +860,28 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  if (streamInfo.options.device.type() == torch::kCPU) {
+    convertAVFrameToDecodedOutputOnCPU(rawOutput, output);
+  } else if (streamInfo.options.device.type() == torch::kCUDA) {
+    convertAVFrameToDecodedOutputOnCuda(
+        streamInfo.options.device,
+        streamInfo.options,
+        streamInfo.codecContext.get(),
+        rawOutput,
+        output);
+  } else {
+    TORCH_CHECK(
+        false, "Invalid device type: " + streamInfo.options.device.str());
+  }
+  return output;
+}
+
+void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    DecodedOutput& output) {
+  int streamIndex = rawOutput.streamIndex;
+  AVFrame* frame = rawOutput.frame.get();
+  auto& streamInfo = streams_[streamIndex];
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       int width = streamInfo.options.width.value_or(frame->width);
@@ -884,7 +910,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     // audio decoding.
     throw std::runtime_error("Audio is not supported yet.");
   }
-  return output;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
@@ -967,19 +992,19 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
   return getNextDecodedOutputNoDemux();
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndexes) {
+    const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesAtIndexes");
+  validateScannedAllStreams("getFramesAtIndices");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& options = streams_[streamIndex].options;
-  BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
+  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
   int i = 0;
   const auto& stream = streams_[streamIndex];
-  for (int64_t frameIndex : frameIndexes) {
+  for (int64_t frameIndex : frameIndices) {
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
@@ -1266,6 +1291,18 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
     tensor = tensor.permute({2, 0, 1});
   }
   return tensor;
+}
+
+VideoDecoder::~VideoDecoder() {
+  for (auto& [streamIndex, stream] : streams_) {
+    auto& device = stream.options.device;
+    if (device.type() == torch::kCPU) {
+    } else if (device.type() == torch::kCUDA) {
+      releaseContextOnCuda(device, stream.codecContext.get());
+    } else {
+      TORCH_CHECK(false, "Invalid device type: " + device.str());
+    }
+  }
 }
 
 std::ostream& operator<<(

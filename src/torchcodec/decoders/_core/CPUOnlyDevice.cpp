@@ -1,4 +1,5 @@
 #include <torch/types.h>
+#include "src/torchcodec/decoders/_core/DeviceInterface.h"
 
 namespace facebook::torchcodec {
 
@@ -6,14 +7,31 @@ namespace facebook::torchcodec {
 // So all functions will throw an error because they should only be called if
 // the device is not CPU.
 
-void throwUnsupportedDeviceError(const torch::Device& device) {
+[[noreturn]] void throwUnsupportedDeviceError(const torch::Device& device) {
   TORCH_CHECK(
       device.type() != torch::kCPU,
       "Device functions should only be called if the device is not CPU.")
-  throw std::runtime_error("Unsupported device: " + device.str());
+  TORCH_CHECK(false, "Unsupported device: " + device.str());
 }
 
-void initializeDeviceContext(const torch::Device& device) {
+void convertAVFrameToDecodedOutputOnCuda(
+    const torch::Device& device,
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    AVCodecContext* codecContext,
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    VideoDecoder::DecodedOutput& output) {
+  throwUnsupportedDeviceError(device);
+}
+
+void initializeContextOnCuda(
+    const torch::Device& device,
+    AVCodecContext* codecContext) {
+  throwUnsupportedDeviceError(device);
+}
+
+void releaseContextOnCuda(
+    const torch::Device& device,
+    AVCodecContext* codecContext) {
   throwUnsupportedDeviceError(device);
 }
 

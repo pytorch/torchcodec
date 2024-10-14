@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 import timeit
+from pathlib import Path
 
 import torch
 import torch.utils.benchmark as benchmark
@@ -206,10 +207,10 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
         metadata = json.loads(get_json_metadata(decoder))
         average_fps = metadata["averageFps"]
         best_video_stream = metadata["bestVideoStreamIndex"]
-        indexes_list = [int(pts * average_fps) for pts in pts_list]
+        indices_list = [int(pts * average_fps) for pts in pts_list]
         frames = []
         frames = get_frames_at_indices(
-            decoder, stream_index=best_video_stream, frame_indices=indexes_list
+            decoder, stream_index=best_video_stream, frame_indices=indices_list
         )
         return frames
 
@@ -303,9 +304,8 @@ def get_test_resource_path(filename: str) -> str:
         resource = importlib.resources.files(__package__).joinpath(filename)
         with importlib.resources.as_file(resource) as path:
             return os.fspath(path)
-    return os.path.join(
-        os.path.dirname(__file__), "..", "..", "test", "resources", filename
-    )
+
+    return str(Path(__file__).parent / f"../../test/resources/{filename}")
 
 
 def create_torchcodec_decoder_from_file(video_file):
