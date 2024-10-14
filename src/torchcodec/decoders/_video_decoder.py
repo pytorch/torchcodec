@@ -6,7 +6,7 @@
 
 import numbers
 from pathlib import Path
-from typing import Literal, Tuple, Union
+from typing import Literal, Optional, Tuple, Union
 
 from torch import Tensor
 
@@ -22,14 +22,16 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 class VideoDecoder:
     """A single-stream video decoder.
 
-    If the video contains multiple video streams, the :term:`best stream` is
-    used. This decoder always performs a :term:`scan` of the video.
+    This decoder always performs a :term:`scan` of the video.
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
 
             - If ``str`` or ``Pathlib.path``: a path to a local video file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
+        stream_index (int, optional): Specifies which stream in the video to decode frames from.
+            Note that this index is absolute across all media types. If left unspecified, then
+            the :term:`best stream` is used.
         dimension_order(str, optional): The dimension order of the decoded frames.
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
@@ -45,11 +47,16 @@ class VideoDecoder:
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.
+        stream_index (int): The stream index that this decoder is retrieving frames from. If a
+            stream index was provided at initialization, this is the same value. If it was left
+            unspecified, this is the :term:`best stream`.
     """
 
     def __init__(
         self,
         source: Union[str, Path, bytes, Tensor],
+        *,
+        stream_index: Optional[int] = None,
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
     ):
         if isinstance(source, str):
@@ -74,10 +81,12 @@ class VideoDecoder:
             )
 
         core.scan_all_streams_to_update_metadata(self._decoder)
-        core.add_video_stream(self._decoder, dimension_order=dimension_order)
+        core.add_video_stream(
+            self._decoder, stream_index=stream_index, dimension_order=dimension_order
+        )
 
-        self.metadata, self._stream_index = _get_and_validate_stream_metadata(
-            self._decoder
+        self.metadata, self.stream_index = _get_and_validate_stream_metadata(
+            self._decoder, stream_index
         )
 
         if self.metadata.num_frames_from_content is None:
@@ -114,7 +123,7 @@ class VideoDecoder:
             )
 
         frame_data, *_ = core.get_frame_at_index(
-            self._decoder, frame_index=key, stream_index=self._stream_index
+            self._decoder, frame_index=key, stream_index=self.stream_index
         )
         return frame_data
 
@@ -124,7 +133,7 @@ class VideoDecoder:
         start, stop, step = key.indices(len(self))
         frame_data, *_ = core.get_frames_in_range(
             self._decoder,
-            stream_index=self._stream_index,
+            stream_index=self.stream_index,
             start=start,
             stop=stop,
             step=step,
@@ -164,7 +173,7 @@ class VideoDecoder:
                 f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
             )
         data, pts_seconds, duration_seconds = core.get_frame_at_index(
-            self._decoder, frame_index=index, stream_index=self._stream_index
+            self._decoder, frame_index=index, stream_index=self.stream_index
         )
         return Frame(
             data=data,
@@ -198,7 +207,7 @@ class VideoDecoder:
             raise IndexError(f"Step ({step}) must be greater than 0.")
         frames = core.get_frames_in_range(
             self._decoder,
-            stream_index=self._stream_index,
+            stream_index=self.stream_index,
             start=start,
             stop=stop,
             step=step,
@@ -264,7 +273,7 @@ class VideoDecoder:
             )
         frames = core.get_frames_by_pts_in_range(
             self._decoder,
-            stream_index=self._stream_index,
+            stream_index=self.stream_index,
             start_seconds=start_seconds,
             stop_seconds=stop_seconds,
         )
@@ -273,14 +282,22 @@ class VideoDecoder:
 
 def _get_and_validate_stream_metadata(
     decoder: Tensor,
+    stream_index: Optional[int] = None,
 ) -> Tuple[core.VideoStreamMetadata, int]:
     video_metadata = core.get_video_metadata(decoder)
 
-    best_stream_index = video_metadata.best_video_stream_index
-    if best_stream_index is None:
-        raise ValueError(
-            "The best video stream is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
-        )
+    if stream_index is None:
+        best_stream_index = video_metadata.best_video_stream_index
+        if best_stream_index is None:
+            raise ValueError(
+                "The best video stream is unknown and there is no specified stream. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        stream_index = best_stream_index
 
-    best_stream_metadata = video_metadata.streams[best_stream_index]
-    return (best_stream_metadata, best_stream_index)
+    # This should be logically true because of the above conditions, but type checker
+    # is not clever enough.
+    assert stream_index is not None
+
+    stream_metadata = video_metadata.streams[stream_index]
+    return (stream_metadata, stream_index)

@@ -22,16 +22,19 @@ VIDEO_PATH=$RESOURCES_DIR/nasa_13013.mp4
 #
 # Note: The naming scheme used here must match the naming scheme used to load
 # tensors in ./utils.py.
+STREAMS=(0 3)
 FRAMES=(0 1 2 3 4 5 6 7 8 9)
 FRAMES+=(15 20 25 30 35)
 FRAMES+=(386 387 388 389)
-for frame in "${FRAMES[@]}"; do
-  # Note that we are using 0-based index naming. Asking ffmpeg to number output
-  # frames would result in 1-based index naming. We enforce 0-based index naming
-  # so that the name of reference frames matches the index when accessing that
-  # frame in the Python decoder.
-  frame_name=$(printf "%06d" "$frame")
-  ffmpeg -y -i "$VIDEO_PATH" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.frame$frame_name.bmp"
+for stream in "${STREAMS[@]}"; do
+  for frame in "${FRAMES[@]}"; do
+    # Note that we are using 0-based index naming. Asking ffmpeg to number output
+    # frames would result in 1-based index naming. We enforce 0-based index naming
+    # so that the name of reference frames matches the index when accessing that
+    # frame in the Python decoder.
+    frame_name=$(printf "%06d" "$frame")
+    ffmpeg -y -i "$VIDEO_PATH" -map 0:"$stream" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.stream$stream.frame$frame_name.bmp"
+  done
 done
 ffmpeg -y -ss 6.0 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time6.000000.bmp"
 ffmpeg -y -ss 6.1 -i "$VIDEO_PATH" -frames:v 1 "$VIDEO_PATH.time6.100000.bmp"
@@ -45,11 +48,12 @@ ffmpeg -y -i "$VIDEO_PATH" -b:a 192K -vn "$VIDEO_PATH.audio.mp3"
 # conda install -c conda-forge x265
 # ./configure --enable-nonfree --enable-gpl --prefix=$(readlink -f ../bin) --enable-libx265  --enable-rpath --extra-ldflags=-Wl,-rpath=$CONDA_PREFIX/lib --enable-filter=drawtext --enable-libfontconfig --enable-libfreetype --enable-libharfbuzz
 # ffmpeg -f lavfi -i color=size=128x128:duration=1:rate=10:color=blue -vf "drawtext=fontsize=30:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text='Frame %{frame_num}'" -vcodec libx265 -pix_fmt yuv420p -g 2 -crf 10 h265_video.mp4 -y
+# Note that this video only has 1 stream, at index 0.
 VIDEO_PATH=$RESOURCES_DIR/h265_video.mp4
 FRAMES=(5)
 for frame in "${FRAMES[@]}"; do
   frame_name=$(printf "%06d" "$frame")
-  ffmpeg -y -i "$VIDEO_PATH" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.frame$frame_name.bmp"
+  ffmpeg -y -i "$VIDEO_PATH" -vf select="eq(n\,$frame)" -vsync vfr -q:v 2 "$VIDEO_PATH.stream0.frame$frame_name.bmp"
 done
 
 for bmp in "$RESOURCES_DIR"/*.bmp
