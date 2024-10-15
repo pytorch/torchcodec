@@ -367,6 +367,7 @@ class VideoDecoder {
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
       DecodedOutput& output);
+  void setCursorPts(int64_t pts);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
@@ -375,9 +376,9 @@ class VideoDecoder {
   // Stores the stream indices of the active streams, i.e. the streams we are
   // decoding and returning to the user.
   std::set<int> activeStreamIndices_;
-  // Set when the user wants to seek and stores the desired pts that the user
-  // wants to seek to.
-  std::optional<double> maybeDesiredPts_;
+  // True when the user wants to seek. The actual pts values to seek to are
+  // stored in the per-stream metadata in discardFramesBeforePts.
+  bool hasDesiredPts_;
 
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
