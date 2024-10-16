@@ -1,3 +1,5 @@
 #!/bin/bash
 
-conda install
+set -x
+
+ffmpeg -v
