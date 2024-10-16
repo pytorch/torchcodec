@@ -847,7 +847,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     VideoDecoder::RawDecodedOutput& rawOutput,
-    torch::Tensor& preAllocatedOutputTensor) {
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
@@ -882,16 +882,16 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
     DecodedOutput& output,
-    torch::Tensor& preAllocatedOutputTensor) {
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       torch::Tensor tensor;
-      if (preAllocatedOutputTensor.numel() != 0) {
+      if (preAllocatedOutputTensor.has_value()) {
         // TODO: check shape of preAllocatedOutputTensor?
-        tensor = preAllocatedOutputTensor;
+        tensor = preAllocatedOutputTensor.value();
       } else {
         int width = streamInfo.options.width.value_or(frame->width);
         int height = streamInfo.options.height.value_or(frame->height);
@@ -993,7 +993,7 @@ void VideoDecoder::validateFrameIndex(
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex,
-    torch::Tensor& preAllocatedOutputTensor) {
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
@@ -1188,12 +1188,8 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
-  auto preAllocatedOutputTensor = torch::empty({0});
-  return VideoDecoder::getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
-}
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
-    torch::Tensor& preAllocatedOutputTensor) {
+      std::optional<torch::Tensor> preAllocatedOutputTensor){
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }

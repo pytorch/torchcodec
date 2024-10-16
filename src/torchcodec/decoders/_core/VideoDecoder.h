@@ -214,9 +214,8 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutputNoDemux();
   DecodedOutput getNextDecodedOutputNoDemux(
-      torch::Tensor& preAllocatedOutputTensor);
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
@@ -227,7 +226,7 @@ class VideoDecoder {
   DecodedOutput getFrameAtIndex(
       int streamIndex,
       int64_t frameIndex,
-      torch::Tensor& preAllocatedOutputTensor);
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
@@ -370,11 +369,11 @@ class VideoDecoder {
   void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
   DecodedOutput convertAVFrameToDecodedOutput(
       RawDecodedOutput& rawOutput,
-      torch::Tensor& preAllocatedOutputTensor);
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
       DecodedOutput& output,
-      torch::Tensor& preAllocatedOutputTensor);
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
