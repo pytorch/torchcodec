@@ -222,7 +222,10 @@ class VideoDecoder {
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
   DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
-  DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  DecodedOutput getFrameAtIndex(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> t = std::nullopt);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;

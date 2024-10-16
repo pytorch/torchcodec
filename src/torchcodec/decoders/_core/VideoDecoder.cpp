@@ -980,7 +980,8 @@ void VideoDecoder::validateFrameIndex(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
-    int64_t frameIndex) {
+    int64_t frameIndex,
+    std::optional<torch::Tensor> t) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
