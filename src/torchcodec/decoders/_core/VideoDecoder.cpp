@@ -1188,6 +1188,10 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   return rawOutput;
 }
 
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+  auto preAllocatedOutputTensor = torch::empty({0});
+  return VideoDecoder::getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
+}
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
     torch::Tensor& preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
