@@ -54,16 +54,6 @@ jobs:
       build-platform: "python-build-package"
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ${CONDA_RUN} python3 -m build --wheel -vvv --no-isolation"
 
-  validate-binaries:
-    uses: pytorch/test-infra/.github/workflows/validate-domain-library.yml@main
-    with:
-      package_type: "wheel"
-      os: "macos-arm64"
-      channel: "nightly"
-      repository: "pytorch/torchcodec"
-      smoke_test: "source ./packaging/validate_wheel.sh"
-      install_torch: true
-
   install-and-test:
     runs-on: macos-m1-stable
     strategy:
@@ -74,65 +64,131 @@ jobs:
     if: ${{ always() }}
     needs: build
     steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_
-          path: pytorch/torchcodec/dist/
       - name: Setup miniconda
         uses: pytorch/test-infra/.github/actions/setup-miniconda@macbuildwheel
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Update pip
+      - name: Check out torchcodec repo
+        uses: actions/checkout@v3
+      - name: Check out tet-infra repo
+        uses: actions/checkout@v3
+        with:
+          repository: pytorch/test-infra
+          ref: macbuildwheel
+          path: test-infra
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_
+          path: pytorch/torchcodec/dist/
+
+## start copying from test-infra/.github/actions/setup-binary-builds/action.yaml
+      - name: Clean conda environment
+        shell: bash -l {0}
         run: |
-          python3 -m pip install --upgrade pip
+          set -euxo pipefail
+          conda info | grep -i 'base environment'
+          conda clean --all --quiet --yes
+      - name: Reset channel priority
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          conda config --set channel_priority false
+      - name: Discover dir structure
+        shell: bash -l {0}
+        run: |
+          echo "pwd"
+          pwd
+          echo "ls -lh"
+          ls -lh
+          echo "ls -lh pytorch/torchcodec"
+          ls -lh pytorch/torchcodec
+          echo "ls -lh pytorch/torchcodec/dist"
+          ls -lh pytorch/torchcodec/dist
+          wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
+          echo "unzip $wheel_path -d unzipped_wheel"
+          unzip $wheel_path -d unzipped_wheel
+          echo "ls -lh unzipped_wheel"
+          ls -lh unzipped_wheel
+      - name: Generate file from pytorch_pkg_helpers
+        # below does not seem necessary in our context
+        #working-directory: "pytorch/torchcodec"
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          CONDA_ENV="${RUNNER_TEMP}/pytorch_pkg_helpers_${GITHUB_RUN_ID}"
+          conda create \
+            --yes --quiet \
+            --prefix "${CONDA_ENV}" \
+            "python=3.9"
+          CONDA_ENV="${CONDA_ENV}"
+          CONDA_RUN="conda run -p ${CONDA_ENV}"
+          ${CONDA_RUN} python -m pip install ${GITHUB_WORKSPACE}/test-infra/tools/pkg-helpers
+          BUILD_ENV_FILE="${RUNNER_TEMP}/build_env_${GITHUB_RUN_ID}"
+          ${CONDA_RUN} python -m pytorch_pkg_helpers > "${BUILD_ENV_FILE}"
+          cat "${BUILD_ENV_FILE}"
+          echo "BUILD_ENV_FILE=${BUILD_ENV_FILE}" >> "${GITHUB_ENV}"
+      - name: Setup conda environment for build
+        shell: bash -l {0}
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          set -euxo pipefail
+          CONDA_ENV="${RUNNER_TEMP}/conda_environment_${GITHUB_RUN_ID}"
+          if [[ "${PACKAGE_TYPE:-}" == "conda" ]]; then
+            # For conda package host python version is irrelevant
+            export PYTHON_VERSION=3.9
+            export CONDA_BUILD_EXTRA="conda=24.4.0 conda-build=24.3.0 python-libarchive-c=2.9"
+          else
+            # For wheel builds we don't need neither conda nor conda-build
+            export CONDA_BUILD_EXTRA=""
+          fi
+
+          conda create \
+            --yes --quiet \
+            --prefix "${CONDA_ENV}" \
+            "python=${PYTHON_VERSION}" \
+            cmake=3.26 \
+            ninja=1.10 \
+            pkg-config=0.29 \
+            ${CONDA_BUILD_EXTRA} \
+            wheel=0.37
+
+          echo "CONDA_ENV=${CONDA_ENV}" >> "${GITHUB_ENV}"
+          echo "CONDA_RUN=conda run -p ${CONDA_ENV}" >> "${GITHUB_ENV}"
+## end copying
+      - name: Run otool
+        shell: bash -l {0}
+        run: |
+          echo "otool -L unzipped_wheel/torchcodec/libtorchcodec*"
+          otool -L unzipped_wheel/torchcodec/libtorchcodec*
+
+      - name: Update pip
+        run: python -m pip install --upgrade pip
+      - name: Install ffmpeg
+        run: |
+          ${CONDA_RUN} conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
+          ${CONDA_RUN} ffmpeg -version
       - name: Install PyTorch
         run: |
-          python3 -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
           echo Installing $wheel_path
-          python3 -m pip install $wheel_path -vvv
-
-      - name: Check out repo
-        uses: actions/checkout@v3
-      - name: Install ffmpeg, post build
-        run: |
-          # Ideally we would have checked for that before installing the wheel,
-          # but we need to checkout the repo to access this file, and we don't
-          # want to checkout the repo before installing the wheel to avoid any
-          # side-effect. It's OK.
-          source packaging/helpers.sh
-
-          # below was failing, but when I just try to call "ffmpeg -version" that also fails?
-          #assert_ffmpeg_not_installed
-
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ffmpeg -version
-
+          ${CONDA_RUN} python -m pip install $wheel_path -vvv
       - name: Install test dependencies
         run: |
-          python3 -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-          # Ideally we would find a way to get those dependencies from pyproject.toml
-          python3 -m pip install numpy pytest pillow
-
+          ${CONDA_RUN} python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+          ${CONDA_RUN} python -m pip install numpy pytest pillow
       - name: Delete the src/ folder just for fun
         run: |
-          # The only reason we checked-out the repo is to get access to the
-          # tests. We don't care about the rest. Out of precaution, we delete
-          # the src/ folder to be extra sure that we're running the code from
-          # the installed wheel rather than from the source.
-          # This is just to be extra cautious and very overkill because a)
-          # there's no way the `torchcodec` package from src/ can be found from
-          # the PythonPath: the main point of `src/` is precisely to protect
-          # against that and b) if we ever were to execute code from
-          # `src/torchcodec`, it would fail loudly because the built .so files
-          # aren't present there.
           rm -r src/
           ls
       - name: Smoke test
         run: |
-          python3 test/decoders/manual_smoke_test.py
+          ${CONDA_RUN} python -X faulthandler test/decoders/manual_smoke_test.py
+          ls -lh
       - name: Run Python tests
         run: |
-          pytest test
+          ${CONDA_RUN} pytest test
