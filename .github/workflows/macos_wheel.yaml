@@ -55,6 +55,7 @@ jobs:
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ${CONDA_RUN} python3 -m build --wheel -vvv --no-isolation"
 
   validate-binaries:
+    needs: build
     uses: pytorch/test-infra/.github/workflows/validate-domain-library.yml@main
     with:
       package_type: "wheel"
@@ -135,4 +136,4 @@ jobs:
           python3 test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          pytest test
+          pytest test -vvv
