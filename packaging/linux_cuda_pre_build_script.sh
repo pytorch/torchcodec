@@ -2,4 +2,4 @@
 
 set -x
 
-ffmpeg -v
+conda info
