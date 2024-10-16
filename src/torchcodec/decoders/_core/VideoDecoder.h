@@ -366,11 +366,7 @@ class VideoDecoder {
   DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
-      DecodedOutput& output,
-      // TODO: Unable to use std::optional<torch::Tensor>& tensor = std::nullopt
-      // on a non-const tensor :( ?
-      torch::Tensor* tensor = nullptr
-      );
+      DecodedOutput& output);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

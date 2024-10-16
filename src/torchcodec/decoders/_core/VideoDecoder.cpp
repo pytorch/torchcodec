@@ -878,9 +878,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
-    DecodedOutput& output,
-    torch::Tensor* tensor
-    ) {
+    DecodedOutput& output) {
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
@@ -888,17 +886,15 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
-        auto tmp = torch::empty(
+      torch::Tensor tensor = torch::empty(
           {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
-        tensor = &(tmp);
-      rawOutput.data = tensor->data_ptr<uint8_t>();
+      rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
 
       if (streamInfo.options.dimensionOrder == "NCHW") {
-        auto tmp = tensor->permute({2, 0, 1});
-        tensor = &(tmp);
+        tensor = tensor.permute({2, 0, 1});
       }
-      output.frame = *tensor;
+      output.frame = tensor;
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
