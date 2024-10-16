@@ -889,7 +889,8 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       torch::Tensor tensor;
-      if (preAllocatedOutputTensor.has_value()) {
+    //   if (preAllocatedOutputTensor.has_value()) {
+      if (false) {
         // TODO: check shape of preAllocatedOutputTensor?
         tensor = preAllocatedOutputTensor.value();
       } else {
