@@ -140,6 +140,7 @@ guide](CONTRIBUTING.md) for more details.
 
 TorchCodec is released under the [BSD 3 license](./LICENSE).
 
-If you build TorchCodec with ENABLE_CUDA=1 or use the CUDA-enabled release of
-torchcodec please review
-[Nvidia licenses](https://docs.nvidia.com/cuda/eula/index.html).
+However, TorchCodec may be used with code not written by Meta which may be
+distributed under different licenses.
+
+For example, if you build TorchCodec with ENABLE_CUDA=1 or use the CUDA-enabled release of torchcodec, please review CUDA's license here: [Nvidia licenses](https://docs.nvidia.com/cuda/eula/index.html).
