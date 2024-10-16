@@ -77,9 +77,10 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
     )
 
 
-    make_torchcodec_library(libtorchcodec5 ffmpeg5)
-    make_torchcodec_library(libtorchcodec6 ffmpeg6)
     make_torchcodec_library(libtorchcodec7 ffmpeg7)
+    make_torchcodec_library(libtorchcodec6 ffmpeg6)
+    make_torchcodec_library(libtorchcodec5 ffmpeg5)
+    make_torchcodec_library(libtorchcodec7 ffmpeg4)
 else()
     message(
         STATUS
