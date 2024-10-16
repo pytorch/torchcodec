@@ -190,10 +190,8 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
 OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
-  auto preAllocatedOutputTensor = torch::empty({0});
   try {
-    result =
-        videoDecoder->getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
+    result = videoDecoder->getNextDecodedOutputNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
