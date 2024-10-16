@@ -378,7 +378,7 @@ class VideoDecoder {
   std::set<int> activeStreamIndices_;
   // True when the user wants to seek. The actual pts values to seek to are
   // stored in the per-stream metadata in discardFramesBeforePts.
-  bool hasDesiredPts_;
+  bool hasDesiredPts_ = false;
 
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
