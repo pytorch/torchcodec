@@ -889,8 +889,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       torch::Tensor tensor;
-    //   if (preAllocatedOutputTensor.has_value()) {
-      if (false) {
+      if (preAllocatedOutputTensor.has_value()) {
         // TODO: check shape of preAllocatedOutputTensor?
         tensor = preAllocatedOutputTensor.value();
       } else {
@@ -957,8 +956,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
   // Convert the frame to tensor.
-  auto preAllocatedOutputTensor = torch::empty({0});
-  return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
+  return convertAVFrameToDecodedOutput(rawOutput);
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
@@ -1190,7 +1188,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
-      std::optional<torch::Tensor> preAllocatedOutputTensor){
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }

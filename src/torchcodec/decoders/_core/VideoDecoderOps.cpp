@@ -214,9 +214,7 @@ OpsDecodedOutput get_frame_at_index(
     int64_t stream_index,
     int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto preAllocatedOutputTensor = torch::empty({0});
-  auto result = videoDecoder->getFrameAtIndex(
-      stream_index, frame_index, preAllocatedOutputTensor);
+  auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
   return makeOpsDecodedOutput(result);
 }
 
