@@ -893,7 +893,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
         // TODO: check shape of preAllocatedOutputTensor?
         tensor = preAllocatedOutputTensor;
       } else {
-        tensor = allocateOutputTensorFromRawOutput(rawOutput);
+        int width = streamInfo.options.width.value_or(frame->width);
+        int height = streamInfo.options.height.value_or(frame->height);
+        tensor = torch::empty(
+            {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
       }
 
       rawOutput.data = tensor.data_ptr<uint8_t>();
@@ -918,16 +921,6 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     // audio decoding.
     throw std::runtime_error("Audio is not supported yet.");
   }
-}
-
-torch::Tensor VideoDecoder::allocateOutputTensorFromRawOutput(
-    RawDecodedOutput& rawOutput) {
-  AVFrame* frame = rawOutput.frame.get();
-  StreamInfo& streamInfo = streams_[rawOutput.streamIndex];
-  int width = streamInfo.options.width.value_or(frame->width);
-  int height = streamInfo.options.height.value_or(frame->height);
-  return torch::empty(
-      {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
@@ -963,7 +956,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
   // Convert the frame to tensor.
-  auto preAllocatedOutputTensor = allocateOutputTensorFromRawOutput(rawOutput);
+  auto preAllocatedOutputTensor = torch::empty({0});
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }
 

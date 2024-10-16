@@ -374,7 +374,6 @@ class VideoDecoder {
       RawDecodedOutput& rawOutput,
       DecodedOutput& output,
       torch::Tensor& preAllocatedOutputTensor);
-  torch::Tensor allocateOutputTensorFromRawOutput(RawDecodedOutput& rawOutput);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
