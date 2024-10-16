@@ -478,6 +478,18 @@ class TestOps:
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
         )
 
+    @needs_cuda
+    def test_lol(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        device = "cuda"
+        add_video_stream(decoder, device=device)
+
+        frames, *_  = get_frames_in_range(decoder, stream_index=3, start=0, stop=10)
+        assert frames.shape == (10, 3, 270, 480)
+        assert frames.device.type == device
+
+
 
 if __name__ == "__main__":
     pytest.main()
