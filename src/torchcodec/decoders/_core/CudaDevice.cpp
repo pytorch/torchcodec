@@ -79,15 +79,17 @@ AVBufferRef* getFromCache(const torch::Device& device) {
 
 AVBufferRef* getFFMPEGContextFromExistingCudaContext(
     const torch::Device& device,
-    torch::DeviceIndex deviceIndex,
+    torch::DeviceIndex nonNegativeDeviceIndex,
     enum AVHWDeviceType type) {
   c10::cuda::CUDAGuard deviceGuard(device);
   // Valid values for the argument to cudaSetDevice are 0 to maxDevices - 1:
   // https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html#group__CUDART__DEVICE_1g159587909ffa0791bbe4b40187a4c6bb
   // So we ensure the deviceIndex is not negative.
-  cudaSetDevice(deviceIndex);
+  // We set the device because we may be called from a different thread than
+  // the one that initialized the cuda context.
+  cudaSetDevice(nonNegativeDeviceIndex);
   AVBufferRef* hw_device_ctx = nullptr;
-  std::string deviceOrdinal = std::to_string(deviceIndex);
+  std::string deviceOrdinal = std::to_string(nonNegativeDeviceIndex);
   int err = av_hwdevice_ctx_create(
       &hw_device_ctx,
       type,
@@ -105,10 +107,10 @@ AVBufferRef* getFFMPEGContextFromExistingCudaContext(
 
 AVBufferRef* getFFMPEGContextFromNewCudaContext(
     const torch::Device& device,
-    torch::DeviceIndex deviceIndex,
+    torch::DeviceIndex nonNegativeDeviceIndex,
     enum AVHWDeviceType type) {
   AVBufferRef* hw_device_ctx = nullptr;
-  std::string deviceOrdinal = std::to_string(deviceIndex);
+  std::string deviceOrdinal = std::to_string(nonNegativeDeviceIndex);
   int err = av_hwdevice_ctx_create(
       &hw_device_ctx, type, deviceOrdinal.c_str(), nullptr, 0);
   if (err < 0) {
@@ -123,7 +125,8 @@ AVBufferRef* getFFMPEGContextFromNewCudaContext(
 AVBufferRef* getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
-  torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
+  torch::DeviceIndex nonNegativeDeviceIndex =
+      getFFMPEGCompatibleDeviceIndex(device);
 
   AVBufferRef* hw_device_ctx = getFromCache(device);
   if (hw_device_ctx != nullptr) {
@@ -133,11 +136,15 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
   // 58.26.100 introduced the concept of reusing the existing cuda context
   // which is much faster and lower memory than creating a new cuda context.
   // So we try to use that if it is available.
+  // FFMPEG 6.1.2 appears to be the earliest release that contains version
+  // 58.26.100 of avutil.
   // https://github.com/FFmpeg/FFmpeg/blob/4acb9b7d1046944345ae506165fb55883d04d8a6/doc/APIchanges#L265
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
-  return getFFMPEGContextFromExistingCudaContext(device, deviceIndex, type);
+  return getFFMPEGContextFromExistingCudaContext(
+      device, nonNegativeDeviceIndex, type);
 #else
-  return getFFMPEGContextFromNewCudaContext(device, deviceIndex, type);
+  return getFFMPEGContextFromNewCudaContext(
+      device, nonNegativeDeviceIndex, type);
 #endif
 }
 
