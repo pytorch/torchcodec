@@ -168,7 +168,7 @@ void _add_video_stream(
   if (device.has_value()) {
     if (device.value() == "cpu") {
       options.device = torch::Device(torch::kCPU);
-    } else if (device.value().starts_with("cuda")) {
+    } else if (device.value().rfind("cuda", 0) == 0) { // starts with "cuda"
       std::string deviceStr(device.value());
       options.device = torch::Device(deviceStr);
     } else {
