@@ -66,9 +66,13 @@ jobs:
     if: ${{ always() }}
     needs: build
     steps:
+      - name: Setup env vars
+        run: |
+          cuda_version_without_periods=$(echo "${{ matrix.cuda-version }}" | sed 's/\.//g')
+          echo cuda_version_without_periods=${cuda_version_without_periods} >> $GITHUB_ENV
       - uses: actions/download-artifact@v3
         with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ matrix.cuda-version }}_x86_64
+          name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
