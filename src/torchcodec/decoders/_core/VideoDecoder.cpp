@@ -1073,8 +1073,10 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    DecodedOutput singleOut =
-        getFrameAtIndex(streamIndex, i, output.frames[f]);
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
+    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
@@ -1166,8 +1168,10 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   int64_t numFrames = stopFrameIndex - startFrameIndex;
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    DecodedOutput singleOut =
-        getFrameAtIndex(streamIndex, i, output.frames[f]);
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
+    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
