@@ -652,8 +652,9 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streams_[streamIndex];
-    streamInfo.discardFramesBeforePts =
-        *maybeDesiredPts_ * streamInfo.timeBase.den;
+    // clang-format off: clang format clashes
+    streamInfo.discardFramesBeforePts = *maybeDesiredPts_ * streamInfo.timeBase.den;
+    // clang-format on
   }
 
   decodeStats_.numSeeksAttempted++;
@@ -1167,8 +1168,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   auto rawOutput =
       getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
-        return frame->pts >=
-            activeStream.discardFramesBeforePts;
+        return frame->pts >= activeStream.discardFramesBeforePts;
       });
   return rawOutput;
 }
