@@ -81,7 +81,10 @@ jobs:
         run: python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ matrix.cuda-version }}
+      - name: Install cuda dependencies
+        run: |
+          conda install --yes nvidia::libnpp
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
