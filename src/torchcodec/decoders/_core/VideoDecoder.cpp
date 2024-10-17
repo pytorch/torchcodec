@@ -1184,7 +1184,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
       getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
         return frame->pts >=
-            activeStream.discardFramesBeforePts.value_or(INT64_MIN);
+            activeStream.discardFramesBeforePts;
       });
   return rawOutput;
 }

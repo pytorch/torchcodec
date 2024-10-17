@@ -311,8 +311,8 @@ class VideoDecoder {
     int64_t currentDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
-    // We set this field if the user requested a seek.
-    std::optional<int64_t> discardFramesBeforePts = 0;
+    // We update this field if the user requested a seek.
+    int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamDecoderOptions options;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
