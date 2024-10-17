@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v3
         with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_${{ matrix.cuda-version }}_x86_64
+          name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ matrix.cuda-version }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
