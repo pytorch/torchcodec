@@ -6,7 +6,12 @@ wheel_path=$(pwd)/$(find dist -type f -name "*.whl")
 echo "Wheel content:"
 unzip -l $wheel_path
 
-for ffmpeg_major_version in 4 5 6 7; do
+ffmpeg_versions=(4 5 6 7)
+if [ "$ENABLE_CUDA" -eq 1 ]; then
+    ffmpeg_versions=(5 6 7)
+fi
+
+for ffmpeg_major_version in ${ffmepg_versions[@]}; do
     assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.so
 done
 assert_not_in_wheel $wheel_path libtorchcodec.so
