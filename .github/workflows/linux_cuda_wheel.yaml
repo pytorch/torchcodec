@@ -61,13 +61,14 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.9']
+        cuda-version: ['124']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     if: ${{ always() }}
     needs: build
     steps:
       - uses: actions/download-artifact@v3
         with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_x86_64
+          name: pytorch_torchcodec__${{ matrix.python-version }}_${{ matrix.cuda-version }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v2
