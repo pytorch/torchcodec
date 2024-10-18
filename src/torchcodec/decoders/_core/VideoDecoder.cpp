@@ -51,7 +51,7 @@ torch::Tensor MaybeHWC2CHW(
     TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
     return hwcTensor.permute({2, 0, 1});
   } else if (numDimensions == 4) {
-    TORCH_CHECK(shape[3] == 3, "Not a HWC tensor: ", shape);
+    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
     return hwcTensor.permute({0, 3, 1, 2});
   } else {
     TORCH_CHECK(
@@ -897,7 +897,6 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
-  auto comes_from_batch = preAllocatedOutputTensor.has_value();
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       torch::Tensor tensor;
@@ -926,14 +925,18 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      output.frame =
-          convertFrameToTensorUsingFilterGraph(streamIndex, frame); // NHWC
+      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
           std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
     }
-    if (!comes_from_batch) {
+    if (!preAllocatedOutputTensor.has_value()) {
+      // We only convert to CHW if a pre-allocated tensor wasn't passed. When a
+      // pre-allocated tensor is passed, it's up to the caller (typically a
+      // batch API) to do the conversion. This is more efficient as it allows
+      // batch NHWC tensors to be permuted only once, instead of permuting HWC
+      // tensors N times.
       output.frame = MaybeHWC2CHW(streamInfo.options, output.frame);
     }
 
