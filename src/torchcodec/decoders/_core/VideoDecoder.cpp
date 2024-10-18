@@ -39,7 +39,7 @@ double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
 // or 4D.
 // Calling permute() is guaranteed to return a view as per the docs:
 // https://pytorch.org/docs/stable/generated/torch.permute.html
-torch::Tensor MaybeHWC2CHW(
+torch::Tensor MaybePermuteHWC2CHW(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     torch::Tensor& hwcTensor) {
   if (options.dimensionOrder == "NHWC") {
@@ -937,7 +937,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       // batch API) to do the conversion. This is more efficient as it allows
       // batch NHWC tensors to be permuted only once, instead of permuting HWC
       // tensors N times.
-      output.frame = MaybeHWC2CHW(streamInfo.options, output.frame);
+      output.frame = MaybePermuteHWC2CHW(streamInfo.options, output.frame);
     }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
@@ -1069,7 +1069,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     }
     i++;
   }
-  output.frames = MaybeHWC2CHW(options, output.frames);
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1105,7 +1105,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = MaybeHWC2CHW(options, output.frames);
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1158,7 +1158,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
-    output.frames = MaybeHWC2CHW(options, output.frames);
+    output.frames = MaybePermuteHWC2CHW(options, output.frames);
     return output;
   }
 
@@ -1201,7 +1201,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = MaybeHWC2CHW(options, output.frames);
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
 
   return output;
 }
