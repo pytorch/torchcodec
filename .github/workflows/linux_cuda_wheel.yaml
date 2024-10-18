@@ -56,7 +56,7 @@ jobs:
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ENABLE_CUDA=1 python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
-    runs-on: ubuntu-latest
+    runs-on: linux.gcp.a100.large
     strategy:
       fail-fast: false
       matrix:
