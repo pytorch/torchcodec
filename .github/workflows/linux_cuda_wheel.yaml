@@ -106,7 +106,7 @@ jobs:
           source packaging/helpers.sh
           assert_ffmpeg_not_installed
 
-          ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
+          ${CONDA_RUN} conda install --yes zlib ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
 
       - name: Install cuda runtime dependencies
         run: |
