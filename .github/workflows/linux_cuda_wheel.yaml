@@ -110,6 +110,7 @@ jobs:
           ${CONDA_RUN} conda update --yes conda
           ${CONDA_RUN} conda config --set channel_priority flexible
           ${CONDA_RUN} conda config --show
+          ${CONDA_INSTALL} --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
           ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
 
       - name: Install cuda runtime dependencies
