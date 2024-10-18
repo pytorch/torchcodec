@@ -134,8 +134,6 @@ jobs:
           find $CONDA_PREFIX -name libtorchcodec\*.so | xargs ldd
           find $CONDA_PREFIX -name libcuda\*.so\*
           echo $CONDA_PREFIX
-          find / -name libcuda.so
-          find / -name libcuda.so.1
           python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
