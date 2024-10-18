@@ -107,6 +107,7 @@ jobs:
           assert_ffmpeg_not_installed
 
           ${CONDA_RUN} conda update --all --yes
+          ${CONDA_RUN} conda config --show
           ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
 
       - name: Install cuda runtime dependencies
