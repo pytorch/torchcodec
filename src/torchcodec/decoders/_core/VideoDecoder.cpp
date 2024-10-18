@@ -1035,39 +1035,23 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   validateScannedAllStreams("getFramesAtIndices");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
-  const auto& options = streams_[streamIndex].options;
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
-  int i = 0;
-  const auto& stream = streams_[streamIndex];
-  for (int64_t frameIndex : frameIndices) {
+  for (auto f = 0; f < frameIndices.size(); ++f) {
+    auto frameIndex = frameIndices[f];
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
-    if (stream.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      // We are using sws_scale to convert the frame to tensor. sws_scale can
-      // convert to a pre-allocated buffer so we can do the color-conversion
-      // in-place on the output tensor's data_ptr.
-      rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
-      convertFrameToBufferUsingSwsScale(rawSingleOutput);
-    } else if (
-        stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      // We are using a filter graph to convert the frame to tensor. The
-      // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
-      // copy the AVFrame to the output tensor.
-      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
-          rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
-      output.frames[i] = frame;
-    } else {
-      throw std::runtime_error(
-          "Invalid color conversion library: " +
-          std::to_string(static_cast<int>(stream.colorConversionLibrary)));
+    DecodedOutput singleOut =
+        getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
     }
-    i++;
+    // Note that for now we ignore the pts and duration parts of the output,
+    // because they're never used in any caller.
   }
   output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
