@@ -425,6 +425,12 @@ class TestOps:
         assert frames.shape[1:] == expected_shape
         assert_tensor_equal(frames[0], frame0_ref)
 
+        frames = get_frames_at_indices(
+            decoder, stream_index=stream_index, frame_indices=[0, 1, 3, 4]
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
     @pytest.mark.parametrize(
         "width_scaling_factor,height_scaling_factor",
         ((1.31, 1.5), (0.71, 0.5), (1.31, 0.7), (0.71, 1.5), (1.0, 1.0)),

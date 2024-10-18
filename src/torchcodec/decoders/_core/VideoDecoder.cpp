@@ -34,6 +34,31 @@ double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
   return ptsToSeconds(pts, timeBase.den);
 }
 
+// Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
+// The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
+// or 4D.
+// Calling permute() is guaranteed to return a view as per the docs:
+// https://pytorch.org/docs/stable/generated/torch.permute.html
+torch::Tensor MaybePermuteHWC2CHW(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    torch::Tensor& hwcTensor) {
+  if (options.dimensionOrder == "NHWC") {
+    return hwcTensor;
+  }
+  auto numDimensions = hwcTensor.dim();
+  auto shape = hwcTensor.sizes();
+  if (numDimensions == 3) {
+    TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
+    return hwcTensor.permute({2, 0, 1});
+  } else if (numDimensions == 4) {
+    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
+    return hwcTensor.permute({0, 3, 1, 2});
+  } else {
+    TORCH_CHECK(
+        false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
+  }
+}
+
 struct AVInput {
   UniqueAVFormatContext formatContext;
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
@@ -167,28 +192,13 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  if (options.dimensionOrder == "NHWC") {
-    frames = torch::empty(
-        {numFrames,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width),
-         3},
-        {torch::kUInt8});
-  } else if (options.dimensionOrder == "NCHW") {
-    frames = torch::empty(
-        {numFrames,
-         3,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width)},
-        torch::TensorOptions()
-            .memory_format(torch::MemoryFormat::ChannelsLast)
-            .dtype({torch::kUInt8}));
-  } else {
-    TORCH_CHECK(
-        false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
-  }
-}
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      frames(torch::empty(
+          {numFrames,
+           options.height.value_or(*metadata.height),
+           options.width.value_or(*metadata.width),
+           3},
+          {torch::kUInt8})) {}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -890,22 +900,27 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       torch::Tensor tensor;
+      int width = streamInfo.options.width.value_or(frame->width);
+      int height = streamInfo.options.height.value_or(frame->height);
       if (preAllocatedOutputTensor.has_value()) {
-        // TODO: check shape of preAllocatedOutputTensor?
         tensor = preAllocatedOutputTensor.value();
+        auto shape = tensor.sizes();
+        TORCH_CHECK(
+            (shape.size() == 3) && (shape[0] == height) &&
+                (shape[1] == width) && (shape[2] == 3),
+            "Expected tensor of shape ",
+            height,
+            "x",
+            width,
+            "x3, got ",
+            shape);
       } else {
-        int width = streamInfo.options.width.value_or(frame->width);
-        int height = streamInfo.options.height.value_or(frame->height);
         tensor = torch::empty(
             {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
       }
-
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
 
-      if (streamInfo.options.dimensionOrder == "NCHW") {
-        tensor = tensor.permute({2, 0, 1});
-      }
       output.frame = tensor;
     } else if (
         streamInfo.colorConversionLibrary ==
@@ -915,6 +930,14 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       throw std::runtime_error(
           "Invalid color conversion library: " +
           std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
+    }
+    if (!preAllocatedOutputTensor.has_value()) {
+      // We only convert to CHW if a pre-allocated tensor wasn't passed. When a
+      // pre-allocated tensor is passed, it's up to the caller (typically a
+      // batch API) to do the conversion. This is more efficient as it allows
+      // batch NHWC tensors to be permuted only once, instead of permuting HWC
+      // tensors N times.
+      output.frame = MaybePermuteHWC2CHW(streamInfo.options, output.frame);
     }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
@@ -1046,6 +1069,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     }
     i++;
   }
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1081,7 +1105,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1134,6 +1158,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
+    output.frames = MaybePermuteHWC2CHW(options, output.frames);
     return output;
   }
 
@@ -1176,6 +1201,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
 
   return output;
 }
@@ -1302,11 +1328,6 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
   StreamInfo& activeStream = streams_[streamIndex];
-  if (activeStream.options.dimensionOrder == "NCHW") {
-    // The docs guaranty this to return a view:
-    // https://pytorch.org/docs/stable/generated/torch.permute.html
-    tensor = tensor.permute({2, 0, 1});
-  }
   return tensor;
 }
 
