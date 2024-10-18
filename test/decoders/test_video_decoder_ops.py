@@ -398,7 +398,6 @@ class TestOps:
         scan_all_streams_to_update_metadata(decoder)
 
         frame0_ref = NASA_VIDEO.get_frame_data_by_index(0)
-        C, H, W = frame0_ref.shape
         if dimension_order == "NHWC":
             frame0_ref = frame0_ref.permute(1, 2, 0)
         expected_shape = frame0_ref.shape
