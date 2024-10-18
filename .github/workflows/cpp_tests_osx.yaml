@@ -1,0 +1,43 @@
+name: Unit-tests on Macos CPU
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+  workflow_dispatch:
+
+env:
+  CHANNEL: "nightly"
+
+jobs:
+  tests:
+    uses: pytorch/test-infra/.github/workflows/macos_job.yml@main
+    with:
+      runner: macos-12
+      repository: pytorch/torchcodec
+      timeout: 180
+      script: |
+        set -euxo pipefail
+        whoami
+        pwd
+        ls
+        conda create --yes --quiet -n test
+        conda activate test
+        conda install --yes pip
+        python3 -m pip install --index-url https://download.pytorch.org/whl/nightly/cpu --pre torch
+        conda install --yes ffmpeg pkg-config cmake pytest
+
+        build_tests_dir="${PWD}/build_tests"
+        mkdir $build_tests_dir
+        pushd $build_tests_dir
+        TORCH_PATH=$(python -c "import pathlib, torch; print(pathlib.Path(torch.__path__[0]))")
+        Torch_DIR="${TORCH_PATH}/share/cmake/Torch"
+        cmake .. -DTorch_DIR=$Torch_DIR -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DCMAKE_VERBOSE_MAKEFILE=ON
+        cmake --build .
+        ctest
+        popd
+
+        CMAKE_BUILD_PARALLEL_LEVEL=8 CXXFLAGS="" CMAKE_BUILD_TYPE=Release ENABLE_CUDA=0 ENABLE_NVTX=0 pip install -e . --no-build-isolation -vv --debug
