@@ -111,6 +111,7 @@ jobs:
           ${CONDA_RUN} conda config --add channels conda-forge
           ${CONDA_RUN} conda config --set channel_priority strict
           ${CONDA_RUN} conda config --show
+          ${CONDA_RUN} $CONDA_PREFIX/bin/conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
           ${CONDA_INSTALL} --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
           ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
 
