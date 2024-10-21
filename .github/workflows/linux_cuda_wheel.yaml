@@ -81,7 +81,7 @@ jobs:
         uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
         with:
           python-version: "3.9"
-          default-packages: "ffmpeg=conda-forge::${{ matrix.ffmpeg-version-for-tests }}"
+          default-packages: "conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
       - name: Check env
         run: |
           ${CONDA_RUN} env
