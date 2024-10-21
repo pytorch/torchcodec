@@ -89,6 +89,7 @@ jobs:
       - name: Install PyTorch
         run: |
           ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -c 'import torch; print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
