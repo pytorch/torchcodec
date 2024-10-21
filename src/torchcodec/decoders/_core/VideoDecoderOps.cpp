@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
-#include <iostream>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
@@ -77,7 +76,6 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 }
 
 OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
-  std::cerr << "makeOpsDecodedOutput" << std::endl;
   return std::make_tuple(
       frame.frame,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
@@ -215,7 +213,6 @@ OpsDecodedOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index) {
-  std::cerr << "get_frame_at_index" << std::endl;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
   return makeOpsDecodedOutput(result);
@@ -283,12 +280,6 @@ bool _test_frame_pts_equality(
     int64_t frame_index,
     double pts_seconds_to_test) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  LOG(INFO) << "pts_seconds_to_test: " << std::setprecision(15)
-            << pts_seconds_to_test << std::endl;
-  LOG(INFO) << "frame pts  : " << std::setprecision(15)
-            << videoDecoder->getPtsSecondsForFrame(stream_index, frame_index)
-            << std::endl
-            << std::endl;
   return pts_seconds_to_test ==
       videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }

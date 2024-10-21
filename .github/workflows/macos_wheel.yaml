@@ -1,4 +1,4 @@
-name: Build and test MacOS wheels
+name: Build and test MacOS wheel
 
 on:
   pull_request:
@@ -24,6 +24,7 @@ defaults:
     shell: bash -l -eo pipefail {0}
 
 jobs:
+
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@macbuildwheel
     with:
@@ -34,6 +35,8 @@ jobs:
       with-xpu: disable
       with-rocm: disable
       with-cuda: disable
+      build-python-only: "disable"
+
   build:
     needs: generate-matrix
     strategy:
@@ -61,134 +64,47 @@ jobs:
       matrix:
         python-version: ['3.9']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-    if: ${{ always() }}
     needs: build
     steps:
-      - name: Setup miniconda
-        uses: pytorch/test-infra/.github/actions/setup-miniconda@macbuildwheel
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Check out torchcodec repo
-        uses: actions/checkout@v3
-      - name: Check out tet-infra repo
-        uses: actions/checkout@v3
-        with:
-          repository: pytorch/test-infra
-          ref: macbuildwheel
-          path: test-infra
       - name: Download wheel
         uses: actions/download-artifact@v3
         with:
           name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_
           path: pytorch/torchcodec/dist/
-
-## start copying from test-infra/.github/actions/setup-binary-builds/action.yaml
-      - name: Clean conda environment
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          conda info | grep -i 'base environment'
-          conda clean --all --quiet --yes
-      - name: Reset channel priority
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          conda config --set channel_priority false
-      - name: Discover dir structure
-        shell: bash -l {0}
-        run: |
-          echo "pwd"
-          pwd
-          echo "ls -lh"
-          ls -lh
-          echo "ls -lh pytorch/torchcodec"
-          ls -lh pytorch/torchcodec
-          echo "ls -lh pytorch/torchcodec/dist"
-          ls -lh pytorch/torchcodec/dist
-          wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
-          echo "unzip $wheel_path -d unzipped_wheel"
-          unzip $wheel_path -d unzipped_wheel
-          echo "ls -lh unzipped_wheel"
-          ls -lh unzipped_wheel
-      - name: Generate file from pytorch_pkg_helpers
-        # below does not seem necessary in our context
-        #working-directory: "pytorch/torchcodec"
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          CONDA_ENV="${RUNNER_TEMP}/pytorch_pkg_helpers_${GITHUB_RUN_ID}"
-          conda create \
-            --yes --quiet \
-            --prefix "${CONDA_ENV}" \
-            "python=3.9"
-          CONDA_ENV="${CONDA_ENV}"
-          CONDA_RUN="conda run -p ${CONDA_ENV}"
-          ${CONDA_RUN} python -m pip install ${GITHUB_WORKSPACE}/test-infra/tools/pkg-helpers
-          BUILD_ENV_FILE="${RUNNER_TEMP}/build_env_${GITHUB_RUN_ID}"
-          ${CONDA_RUN} python -m pytorch_pkg_helpers > "${BUILD_ENV_FILE}"
-          cat "${BUILD_ENV_FILE}"
-          echo "BUILD_ENV_FILE=${BUILD_ENV_FILE}" >> "${GITHUB_ENV}"
-      - name: Setup conda environment for build
-        shell: bash -l {0}
-        env:
-          PYTHON_VERSION: ${{ matrix.python-version }}
-        run: |
-          set -euxo pipefail
-          CONDA_ENV="${RUNNER_TEMP}/conda_environment_${GITHUB_RUN_ID}"
-          if [[ "${PACKAGE_TYPE:-}" == "conda" ]]; then
-            # For conda package host python version is irrelevant
-            export PYTHON_VERSION=3.9
-            export CONDA_BUILD_EXTRA="conda=24.4.0 conda-build=24.3.0 python-libarchive-c=2.9"
-          else
-            # For wheel builds we don't need neither conda nor conda-build
-            export CONDA_BUILD_EXTRA=""
-          fi
-
-          conda create \
-            --yes --quiet \
-            --prefix "${CONDA_ENV}" \
-            "python=${PYTHON_VERSION}" \
-            cmake=3.26 \
-            ninja=1.10 \
-            pkg-config=0.29 \
-            ${CONDA_BUILD_EXTRA} \
-            wheel=0.37
-
-          echo "CONDA_ENV=${CONDA_ENV}" >> "${GITHUB_ENV}"
-          echo "CONDA_RUN=conda run -p ${CONDA_ENV}" >> "${GITHUB_ENV}"
-## end copying
-      - name: Run otool
-        shell: bash -l {0}
-        run: |
-          echo "otool -L unzipped_wheel/torchcodec/libtorchcodec*"
-          otool -L unzipped_wheel/torchcodec/libtorchcodec*
-
+      - name: Setup conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          activate-environment: test
+          python-version: ${{ matrix.python-version }}
       - name: Update pip
         run: python -m pip install --upgrade pip
-      - name: Install ffmpeg
-        run: |
-          ${CONDA_RUN} conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ${CONDA_RUN} ffmpeg -version
       - name: Install PyTorch
         run: |
-          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
           echo Installing $wheel_path
-          ${CONDA_RUN} python -m pip install $wheel_path -vvv
+          python -m pip install $wheel_path -vvv
+      - name: Check out torchcodec repo
+        uses: actions/checkout@v3
+      - name: Install ffmpeg
+        run: |
+          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
+          ffmpeg -version
       - name: Install test dependencies
         run: |
-          ${CONDA_RUN} python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-          ${CONDA_RUN} python -m pip install numpy pytest pillow
+          python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+          python -m pip install numpy pytest pillow
       - name: Delete the src/ folder just for fun
         run: |
           rm -r src/
-          ls
+          ls -lh
       - name: Smoke test
         run: |
-          ${CONDA_RUN} python -X faulthandler test/decoders/manual_smoke_test.py
-          ls -lh
+          python -X faulthandler test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          ${CONDA_RUN} pytest test
+          pytest test -vvv

@@ -1,4 +1,4 @@
-name: Build and test Linux wheels
+name: Build and test Linux wheel
 
 on:
   pull_request:
@@ -24,6 +24,7 @@ defaults:
     shell: bash -l -eo pipefail {0}
 
 jobs:
+
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
@@ -34,6 +35,8 @@ jobs:
       with-xpu: disable
       with-rocm: disable
       with-cuda: disable
+      build-python-only: "disable"
+
   build:
     needs: generate-matrix
     strategy:
@@ -60,7 +63,6 @@ jobs:
       matrix:
         python-version: ['3.9']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-    if: ${{ always() }}
     needs: build
     steps:
       - uses: actions/download-artifact@v3
@@ -121,7 +123,7 @@ jobs:
           ls
       - name: Smoke test
         run: |
-          python test/decoders/manual_smoke_test.py
+          python -X faulthandler test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
           pytest test -vvv
