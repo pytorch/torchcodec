@@ -150,10 +150,12 @@ jobs:
           ls
       - name: Smoke test
         run: |
-          find $CONDA_PREFIX -name libtorchcodec\*.so | xargs ldd
-          find $CONDA_PREFIX -name libtorchcodec\*.so | xargs readelf -d
-          find $CONDA_PREFIX -name libcuda\*.so\*
-          echo $CONDA_PREFIX
+          ${CONDA_RUN} find $CONDA_PREFIX -name av\*.so | xargs ldd
+          ${CONDA_RUN} find $CONDA_PREFIX -name av\*.so | readelf -d
+          ${CONDA_RUN} find $CONDA_PREFIX -name libtorchcodec\*.so | xargs ldd
+          ${CONDA_RUN} find $CONDA_PREFIX -name libtorchcodec\*.so | xargs readelf -d
+          ${CONDA_RUN} find $CONDA_PREFIX -name libcuda\*.so\*
+          ${CONDA_RUN} echo $CONDA_PREFIX
           ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
