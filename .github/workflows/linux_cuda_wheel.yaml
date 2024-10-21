@@ -77,9 +77,10 @@ jobs:
           name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup miniconda using test-infra
-        uses: pytorch/test-infra/.github/actions/setup-miniconda@main
+        uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c2
         with:
           python-version: "3.9"
+          default-packages: ""
       - name: Check env
         run: |
           ${CONDA_RUN} env
@@ -88,7 +89,8 @@ jobs:
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          # ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -m pip install torch torchvision torchaudio
           ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
@@ -106,7 +108,7 @@ jobs:
           # side-effect. It's OK.
           source packaging/helpers.sh
           assert_ffmpeg_not_installed
-          ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
+          ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge -vvv
 
           # ${CONDA_RUN} conda install --yes conda
           # ${CONDA_RUN} conda update --all --yes
