@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <iostream>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
@@ -30,9 +31,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename) -> Tensor");
   m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? color_conversion_library=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -76,6 +77,7 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 }
 
 OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
+  std::cerr << "makeOpsDecodedOutput" << std::endl;
   return std::make_tuple(
       frame.frame,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
@@ -120,7 +122,8 @@ void add_video_stream(
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
-    std::optional<int64_t> stream_index) {
+    std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> device) {
   _add_video_stream(
       decoder,
       width,
@@ -128,7 +131,7 @@ void add_video_stream(
       num_threads,
       dimension_order,
       stream_index,
-      "filtergraph");
+      device);
 }
 
 void _add_video_stream(
@@ -138,6 +141,7 @@ void _add_video_stream(
     std::optional<int64_t> num_threads,
     std::optional<c10::string_view> dimension_order,
     std::optional<int64_t> stream_index,
+    std::optional<c10::string_view> device,
     std::optional<c10::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
@@ -161,6 +165,18 @@ void _add_video_stream(
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
           ". color_conversion_library must be either filtergraph or swscale.");
+    }
+  }
+  if (device.has_value()) {
+    if (device.value() == "cpu") {
+      options.device = torch::Device(torch::kCPU);
+    } else if (device.value().rfind("cuda", 0) == 0) { // starts with "cuda"
+      std::string deviceStr(device.value());
+      options.device = torch::Device(deviceStr);
+    } else {
+      throw std::runtime_error(
+          "Invalid device=" + std::string(device.value()) +
+          ". device must be either cpu or cuda.");
     }
   }
 
@@ -199,6 +215,7 @@ OpsDecodedOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index) {
+  std::cerr << "get_frame_at_index" << std::endl;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
   return makeOpsDecodedOutput(result);
@@ -211,7 +228,7 @@ at::Tensor get_frames_at_indices(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
-  auto result = videoDecoder->getFramesAtIndexes(stream_index, frameIndicesVec);
+  auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
   return result.frames;
 }
 

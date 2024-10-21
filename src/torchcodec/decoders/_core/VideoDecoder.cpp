@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+#include "src/torchcodec/decoders/_core/DeviceInterface.h"
 #include "torch/types.h"
 
 extern "C" {
@@ -31,6 +32,31 @@ double ptsToSeconds(int64_t pts, int den) {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
   return ptsToSeconds(pts, timeBase.den);
+}
+
+// Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
+// The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
+// or 4D.
+// Calling permute() is guaranteed to return a view as per the docs:
+// https://pytorch.org/docs/stable/generated/torch.permute.html
+torch::Tensor MaybePermuteHWC2CHW(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    torch::Tensor& hwcTensor) {
+  if (options.dimensionOrder == "NHWC") {
+    return hwcTensor;
+  }
+  auto numDimensions = hwcTensor.dim();
+  auto shape = hwcTensor.sizes();
+  if (numDimensions == 3) {
+    TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
+    return hwcTensor.permute({2, 0, 1});
+  } else if (numDimensions == 4) {
+    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
+    return hwcTensor.permute({0, 3, 1, 2});
+  } else {
+    TORCH_CHECK(
+        false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
+  }
 }
 
 struct AVInput {
@@ -95,6 +121,19 @@ std::vector<std::string> splitStringWithDelimiters(
   return result;
 }
 
+VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibraryForWidth(
+    int width) {
+  VideoDecoder::ColorConversionLibrary library =
+      VideoDecoder::ColorConversionLibrary::SWSCALE;
+  // However, swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // so we fall back to filtergraph if the width is not a multiple of 32.
+  if (width % 32 != 0) {
+    library = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+  }
+  return library;
+}
+
 } // namespace
 
 VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
@@ -153,28 +192,13 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  if (options.dimensionOrder == "NHWC") {
-    frames = torch::empty(
-        {numFrames,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width),
-         3},
-        {torch::kUInt8});
-  } else if (options.dimensionOrder == "NCHW") {
-    frames = torch::empty(
-        {numFrames,
-         3,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width)},
-        torch::TensorOptions()
-            .memory_format(torch::MemoryFormat::ChannelsLast)
-            .dtype({torch::kUInt8}));
-  } else {
-    TORCH_CHECK(
-        false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
-  }
-}
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      frames(torch::empty(
+          {numFrames,
+           options.height.value_or(*metadata.height),
+           options.width.value_or(*metadata.width),
+           3},
+          {torch::kUInt8})) {}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -414,6 +438,13 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.codecContext.reset(codecContext);
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
+  if (options.device.type() == torch::kCPU) {
+    // No more initialization needed for CPU.
+  } else if (options.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(options.device, codecContext);
+  } else {
+    TORCH_CHECK(false, "Invalid device type: " + options.device.str());
+  }
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
   if (retVal < AVSUCCESS) {
@@ -424,15 +455,26 @@ void VideoDecoder::addVideoStreamDecoder(
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.options = options;
   int width = options.width.value_or(codecContext->width);
-  auto colorConversionLibrary = options.colorConversionLibrary.value_or(
-      ColorConversionLibrary::FILTERGRAPH);
-  bool useFilterGraph =
-      (colorConversionLibrary != ColorConversionLibrary::SWSCALE);
-  if (useFilterGraph) {
+
+  // Use swscale for color conversion by default because it is faster.
+  VideoDecoder::ColorConversionLibrary defaultColorConversionLibrary =
+      getDefaultColorConversionLibraryForWidth(width);
+  // If the user specifies the color conversion library (example in
+  // benchmarks), we use that instead.
+  auto colorConversionLibrary =
+      options.colorConversionLibrary.value_or(defaultColorConversionLibrary);
+
+  if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
     initializeFilterGraphForStream(streamNumber, options);
     streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-  } else {
+  } else if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
     streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+  } else {
+    throw std::invalid_argument(
+        "Invalid colorConversionLibrary=" +
+        std::to_string(static_cast<int>(colorConversionLibrary)) +
+        ". colorConversionLibrary must be either "
+        "filtergraph or swscale.");
   }
 }
 
@@ -615,13 +657,15 @@ bool VideoDecoder::canWeAvoidSeekingForStream(
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
+  std::cerr << "maybeSeekToBeforeDesiredPts" << std::endl;
   if (activeStreamIndices_.size() == 0) {
     return;
   }
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streams_[streamIndex];
-    streamInfo.discardFramesBeforePts =
-        *maybeDesiredPts_ * streamInfo.timeBase.den;
+    // clang-format off: clang format clashes
+    streamInfo.discardFramesBeforePts = *maybeDesiredPts_ * streamInfo.timeBase.den;
+    // clang-format on
   }
 
   decodeStats_.numSeeksAttempted++;
@@ -680,14 +724,17 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
+  std::cerr << "getDecodedOutputWithFilter" << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getNextDecodedOutputNoDemux()";
+  VLOG(9) << "Starting getDecodedOutputWithFilter()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
+    std::cerr << "\thas value" << std::endl;
     VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
+    std::cerr << "\tlogged pts" << std::endl;
     maybeSeekToBeforeDesiredPts();
     maybeDesiredPts_ = std::nullopt;
     VLOG(9) << "seeking done";
@@ -814,7 +861,8 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
-    VideoDecoder::RawDecodedOutput& rawOutput) {
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
@@ -828,18 +876,55 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  if (streamInfo.options.device.type() == torch::kCPU) {
+    convertAVFrameToDecodedOutputOnCPU(
+        rawOutput, output, preAllocatedOutputTensor);
+  } else if (streamInfo.options.device.type() == torch::kCUDA) {
+    // TODO: handle pre-allocated output tensor
+    convertAVFrameToDecodedOutputOnCuda(
+        streamInfo.options.device,
+        streamInfo.options,
+        streamInfo.codecContext.get(),
+        rawOutput,
+        output);
+  } else {
+    TORCH_CHECK(
+        false, "Invalid device type: " + streamInfo.options.device.str());
+  }
+  return output;
+}
+
+void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    DecodedOutput& output,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  int streamIndex = rawOutput.streamIndex;
+  AVFrame* frame = rawOutput.frame.get();
+  auto& streamInfo = streams_[streamIndex];
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+      torch::Tensor tensor;
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
-      torch::Tensor tensor = torch::empty(
-          {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+      if (preAllocatedOutputTensor.has_value()) {
+        tensor = preAllocatedOutputTensor.value();
+        auto shape = tensor.sizes();
+        TORCH_CHECK(
+            (shape.size() == 3) && (shape[0] == height) &&
+                (shape[1] == width) && (shape[2] == 3),
+            "Expected tensor of shape ",
+            height,
+            "x",
+            width,
+            "x3, got ",
+            shape);
+      } else {
+        tensor = torch::empty(
+            {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+      }
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
 
-      if (streamInfo.options.dimensionOrder == "NCHW") {
-        tensor = tensor.permute({2, 0, 1});
-      }
       output.frame = tensor;
     } else if (
         streamInfo.colorConversionLibrary ==
@@ -850,13 +935,20 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
           "Invalid color conversion library: " +
           std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
     }
+    if (!preAllocatedOutputTensor.has_value()) {
+      // We only convert to CHW if a pre-allocated tensor wasn't passed. When a
+      // pre-allocated tensor is passed, it's up to the caller (typically a
+      // batch API) to do the conversion. This is more efficient as it allows
+      // batch NHWC tensors to be permuted only once, instead of permuting HWC
+      // tensors N times.
+      output.frame = MaybePermuteHWC2CHW(streamInfo.options, output.frame);
+    }
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
     // audio decoding.
     throw std::runtime_error("Audio is not supported yet.");
   }
-  return output;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
@@ -927,7 +1019,9 @@ void VideoDecoder::validateFrameIndex(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
-    int64_t frameIndex) {
+    int64_t frameIndex,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  std::cerr << "getFrameAtIndex" << std::endl;
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
@@ -936,50 +1030,35 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  return getNextDecodedOutputNoDemux();
+  return getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndexes(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndexes) {
+    const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesAtIndexes");
+  validateScannedAllStreams("getFramesAtIndices");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
-  const auto& options = streams_[streamIndex].options;
-  BatchDecodedOutput output(frameIndexes.size(), options, streamMetadata);
-
-  int i = 0;
   const auto& stream = streams_[streamIndex];
-  for (int64_t frameIndex : frameIndexes) {
+  const auto& options = stream.options;
+  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
+
+  for (auto f = 0; f < frameIndices.size(); ++f) {
+    auto frameIndex = frameIndices[f];
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
-    if (stream.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      // We are using sws_scale to convert the frame to tensor. sws_scale can
-      // convert to a pre-allocated buffer so we can do the color-conversion
-      // in-place on the output tensor's data_ptr.
-      rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
-      convertFrameToBufferUsingSwsScale(rawSingleOutput);
-    } else if (
-        stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      // We are using a filter graph to convert the frame to tensor. The
-      // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
-      // copy the AVFrame to the output tensor.
-      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
-          rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
-      output.frames[i] = frame;
-    } else {
-      throw std::runtime_error(
-          "Invalid color conversion library: " +
-          std::to_string(static_cast<int>(stream.colorConversionLibrary)));
+    DecodedOutput singleOut =
+        getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
     }
-    i++;
+    // Note that for now we ignore the pts and duration parts of the output,
+    // because they're never used in any caller.
   }
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1008,12 +1087,14 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
-    output.frames[f] = singleOut.frame;
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
+    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
 }
 
@@ -1066,6 +1147,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
+    output.frames = MaybePermuteHWC2CHW(options, output.frames);
     return output;
   }
 
@@ -1101,28 +1183,33 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   int64_t numFrames = stopFrameIndex - startFrameIndex;
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
-    output.frames[f] = singleOut.frame;
+    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+      output.frames[f] = singleOut.frame;
+    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
+  output.frames = MaybePermuteHWC2CHW(options, output.frames);
 
   return output;
 }
 
 VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
+  std::cerr << "getNextRawDecodedOutputNoDemux" << std::endl;
   auto rawOutput =
       getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
-        return frame->pts >=
-            activeStream.discardFramesBeforePts.value_or(INT64_MIN);
+        return frame->pts >= activeStream.discardFramesBeforePts;
       });
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  std::cerr << "getNextDecodedOutputNoDemux" << std::endl;
   auto rawOutput = getNextRawDecodedOutputNoDemux();
-  return convertAVFrameToDecodedOutput(rawOutput);
+  return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
@@ -1232,12 +1319,19 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
   StreamInfo& activeStream = streams_[streamIndex];
-  if (activeStream.options.dimensionOrder == "NCHW") {
-    // The docs guaranty this to return a view:
-    // https://pytorch.org/docs/stable/generated/torch.permute.html
-    tensor = tensor.permute({2, 0, 1});
-  }
   return tensor;
+}
+
+VideoDecoder::~VideoDecoder() {
+  for (auto& [streamIndex, stream] : streams_) {
+    auto& device = stream.options.device;
+    if (device.type() == torch::kCPU) {
+    } else if (device.type() == torch::kCUDA) {
+      releaseContextOnCuda(device, stream.codecContext.get());
+    } else {
+      TORCH_CHECK(false, "Invalid device type: " + device.str());
+    }
+  }
 }
 
 std::ostream& operator<<(

@@ -8,6 +8,7 @@ import os
 
 os.environ["TORCH_LOGS"] = "output_code"
 import json
+import subprocess
 from typing import Tuple
 
 import numpy as np
@@ -26,6 +27,7 @@ from torchcodec.decoders._core import (
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
+    get_frames_by_pts_in_range,
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,
@@ -33,7 +35,7 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
-from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO
+from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO, needs_cuda
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
@@ -342,17 +344,28 @@ class TestOps:
     # test coverage. Some pairs upscale the image while others downscale it.
     @pytest.mark.parametrize(
         "width_scaling_factor,height_scaling_factor",
-        ((1.3, 1.5), (0.7, 0.5), (1.3, 0.7), (0.7, 1.5)),
+        ((1.31, 1.5), (0.71, 0.5), (1.31, 0.7), (0.71, 1.5), (1.0, 1.0)),
     )
-    def test_color_conversion_library_with_down_scaling(
-        self, width_scaling_factor, height_scaling_factor
+    @pytest.mark.parametrize("input_video", [NASA_VIDEO])
+    def test_color_conversion_library_with_scaling(
+        self, input_video, width_scaling_factor, height_scaling_factor
     ):
-        target_height = int(NASA_VIDEO.height * height_scaling_factor)
-        target_width = int(NASA_VIDEO.width * width_scaling_factor)
-        assert target_width != NASA_VIDEO.width
-        assert target_height != NASA_VIDEO.height
+        decoder = create_from_file(str(input_video.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+        metadata = get_json_metadata(decoder)
+        metadata_dict = json.loads(metadata)
+        assert metadata_dict["width"] == input_video.width
+        assert metadata_dict["height"] == input_video.height
 
-        filtergraph_decoder = create_from_file(str(NASA_VIDEO.path))
+        target_height = int(input_video.height * height_scaling_factor)
+        target_width = int(input_video.width * width_scaling_factor)
+        if width_scaling_factor != 1.0:
+            assert target_width != input_video.width
+        if height_scaling_factor != 1.0:
+            assert target_height != input_video.height
+
+        filtergraph_decoder = create_from_file(str(input_video.path))
         _add_video_stream(
             filtergraph_decoder,
             width=target_width,
@@ -361,7 +374,7 @@ class TestOps:
         )
         filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
 
-        swscale_decoder = create_from_file(str(NASA_VIDEO.path))
+        swscale_decoder = create_from_file(str(input_video.path))
         _add_video_stream(
             swscale_decoder,
             width=target_width,
@@ -370,6 +383,148 @@ class TestOps:
         )
         swscale_frame0, _, _ = get_next_frame(swscale_decoder)
         assert_tensor_equal(filtergraph_frame0, swscale_frame0)
+
+    @pytest.mark.parametrize("dimension_order", ("NHWC", "NCHW"))
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library_with_dimension_order(
+        self, dimension_order, color_conversion_library
+    ):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(
+            decoder,
+            color_conversion_library=color_conversion_library,
+            dimension_order=dimension_order,
+        )
+        scan_all_streams_to_update_metadata(decoder)
+
+        frame0_ref = NASA_VIDEO.get_frame_data_by_index(0)
+        if dimension_order == "NHWC":
+            frame0_ref = frame0_ref.permute(1, 2, 0)
+        expected_shape = frame0_ref.shape
+
+        stream_index = 3
+        frame0, *_ = get_frame_at_index(
+            decoder, stream_index=stream_index, frame_index=0
+        )
+        assert frame0.shape == expected_shape
+        assert_tensor_equal(frame0, frame0_ref)
+
+        frame0, *_ = get_frame_at_pts(decoder, seconds=0.0)
+        assert frame0.shape == expected_shape
+        assert_tensor_equal(frame0, frame0_ref)
+
+        frames, *_ = get_frames_in_range(
+            decoder, stream_index=stream_index, start=0, stop=3
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
+        frames, *_ = get_frames_by_pts_in_range(
+            decoder, stream_index=stream_index, start_seconds=0, stop_seconds=1
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
+        frames = get_frames_at_indices(
+            decoder, stream_index=stream_index, frame_indices=[0, 1, 3, 4]
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
+    @pytest.mark.parametrize(
+        "width_scaling_factor,height_scaling_factor",
+        ((1.31, 1.5), (0.71, 0.5), (1.31, 0.7), (0.71, 1.5), (1.0, 1.0)),
+    )
+    @pytest.mark.parametrize("width", [30, 32, 300])
+    @pytest.mark.parametrize("height", [128])
+    def test_color_conversion_library_with_generated_videos(
+        self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
+    ):
+        ffmpeg_cli = "ffmpeg"
+        if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+            import importlib.resources
+
+            ffmpeg_cli = importlib.resources.path(__package__, "ffmpeg")
+        # We consider filtergraph to be the reference color conversion library.
+        # However the video decoder sometimes uses swscale as that is faster.
+        # The exact color conversion library used is an implementation detail
+        # of the video decoder and depends on the video's width.
+        #
+        # In this test we compare the output of filtergraph (which is the
+        # reference) with the output of the video decoder (which may use
+        # swscale if it chooses for certain video widths) to make sure they are
+        # always the same.
+        video_path = f"{tmp_path}/frame_numbers_{width}x{height}.mp4"
+        # We don't specify a particular encoder because the ffmpeg binary could
+        # be configured with different encoders. For the purposes of this test,
+        # the actual encoder is irrelevant.
+        command = [
+            ffmpeg_cli,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=blue",
+            "-pix_fmt",
+            "yuv420p",
+            "-s",
+            f"{width}x{height}",
+            "-frames:v",
+            "1",
+            video_path,
+        ]
+        subprocess.check_call(command)
+
+        decoder = create_from_file(str(video_path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder)
+        metadata = get_json_metadata(decoder)
+        metadata_dict = json.loads(metadata)
+        assert metadata_dict["width"] == width
+        assert metadata_dict["height"] == height
+
+        target_height = int(height * height_scaling_factor)
+        target_width = int(width * width_scaling_factor)
+        if width_scaling_factor != 1.0:
+            assert target_width != width
+        if height_scaling_factor != 1.0:
+            assert target_height != height
+
+        filtergraph_decoder = create_from_file(str(video_path))
+        _add_video_stream(
+            filtergraph_decoder,
+            width=target_width,
+            height=target_height,
+            color_conversion_library="filtergraph",
+        )
+        filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
+
+        auto_decoder = create_from_file(str(video_path))
+        add_video_stream(
+            auto_decoder,
+            width=target_width,
+            height=target_height,
+        )
+        auto_frame0, _, _ = get_next_frame(auto_decoder)
+        assert_tensor_equal(filtergraph_frame0, auto_frame0)
+
+    @needs_cuda
+    def test_cuda_decoder(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder, device="cuda")
+        frame0, pts, duration = get_next_frame(decoder)
+        assert frame0.device.type == "cuda"
+        frame0_cpu = frame0.to("cpu")
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        # GPU decode is not bit-accurate. In the following assertion we ensure
+        # not more than 0.3% of values have a difference greater than 20.
+        diff = (reference_frame0.float() - frame0_cpu.float()).abs()
+        assert (diff > 20).float().mean() <= 0.003
+        assert pts == torch.tensor([0])
+        torch.testing.assert_close(
+            duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
+        )
 
 
 if __name__ == "__main__":

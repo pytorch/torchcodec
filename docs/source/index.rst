@@ -45,7 +45,7 @@ We achieve these capabilities through:
      .. grid-item-card:: :octicon:`file-code;1em`
         API Reference
         :img-top: _static/img/card-background.svg
-        :link: api_ref_decoders.html
+        :link: api_ref_torchcodec.html
         :link-type: url
 
         The API reference for TorchCodec
@@ -73,4 +73,5 @@ We achieve these capabilities through:
    :caption: API Reference
    :hidden:
 
+   api_ref_torchcodec
    api_ref_decoders

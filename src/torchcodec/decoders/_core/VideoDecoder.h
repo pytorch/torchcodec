@@ -44,7 +44,7 @@ CHECK_GE(presentation_timestamp, 5.0);
 // Do not call non-const APIs concurrently on the same object.
 class VideoDecoder {
  public:
-  ~VideoDecoder() = default;
+  ~VideoDecoder();
 
   struct DecoderOptions {
     DecoderOptions() {}
@@ -145,7 +145,9 @@ class VideoDecoder {
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary = FILTERGRAPH;
+    std::optional<ColorConversionLibrary> colorConversionLibrary;
+    // By default we use CPU for decoding for both C++ and python users.
+    torch::Device device = torch::kCPU;
   };
   struct AudioStreamDecoderOptions {};
   void addVideoStreamDecoder(
@@ -212,7 +214,8 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutputNoDemux();
+  DecodedOutput getNextDecodedOutputNoDemux(
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
@@ -220,7 +223,10 @@ class VideoDecoder {
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
   DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
-  DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  DecodedOutput getFrameAtIndex(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
@@ -231,11 +237,11 @@ class VideoDecoder {
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
   };
-  // Returns frames at the given indexes for a given stream as a single stacked
+  // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
-  BatchDecodedOutput getFramesAtIndexes(
+  BatchDecodedOutput getFramesAtIndices(
       int streamIndex,
-      const std::vector<int64_t>& frameIndexes);
+      const std::vector<int64_t>& frameIndices);
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from
   // the range are:
@@ -305,8 +311,8 @@ class VideoDecoder {
     int64_t currentDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
-    // We set this field if the user requested a seek.
-    std::optional<int64_t> discardFramesBeforePts = 0;
+    // We update this field if the user requested a seek.
+    int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamDecoderOptions options;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
@@ -361,7 +367,13 @@ class VideoDecoder {
       int streamIndex,
       const AVFrame* frame);
   void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
-  DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
+  DecodedOutput convertAVFrameToDecodedOutput(
+      RawDecodedOutput& rawOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  void convertAVFrameToDecodedOutputOnCPU(
+      RawDecodedOutput& rawOutput,
+      DecodedOutput& output,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;

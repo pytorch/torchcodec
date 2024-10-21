@@ -12,7 +12,7 @@ torchcodec.decoders
     :nosignatures:
     :template: class.rst
 
-    SimpleVideoDecoder
+    VideoDecoder
 
 
 .. autosummary::
@@ -20,6 +20,4 @@ torchcodec.decoders
     :nosignatures:
     :template: dataclass.rst
 
-    Frame
-    FrameBatch
     VideoStreamMetadata

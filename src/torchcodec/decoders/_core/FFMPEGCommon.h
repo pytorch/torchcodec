@@ -94,6 +94,9 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 int64_t getDuration(const UniqueAVFrame& frame);
 int64_t getDuration(const AVFrame* frame);
 
+// Returns true if sws_scale can handle unaligned data.
+bool canSwsScaleHandleUnalignedData();
+
 // A struct that holds state for reading bytes from an IO context.
 // We give this to FFMPEG and it will pass it back to us when it needs to read
 // or seek in the memory buffer.

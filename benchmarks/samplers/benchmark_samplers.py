@@ -1,227 +1,89 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+from pathlib import Path
+from time import perf_counter_ns
 
-import abc
-import argparse
-import importlib
-import os
-
-import decord
-import numpy as np
 import torch
-
-import torch.utils.benchmark as benchmark
+from torchcodec.decoders import VideoDecoder
 from torchcodec.samplers import (
-    IndexBasedSamplerArgs,
-    TimeBasedSamplerArgs,
-    VideoArgs,
-    VideoClipSampler,
-)
-from torchmultimodal.fb.utils.video_utils import (
-    ClipSamplerType,
-    VideoClipSampler as tmm_vcs,
-)
-from torchvision.datasets.video_clip_sampler import (  # @manual=//pytorch/vision:internal_datasets
-    TVVideoClipDecoder,
-    UniformClipSamplingStrategy,
-    VideoClipSampler as ta_vcs,
+    clips_at_random_indices,
+    clips_at_random_timestamps,
+    clips_at_regular_indices,
+    clips_at_regular_timestamps,
 )
 
 
-class AbstractSampler:
-    def __init__(self):
-        pass
+def bench(f, *args, num_exp=100, warmup=0, **kwargs):
 
-    @abc.abstractmethod
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        pass
+    for _ in range(warmup):
+        f(*args, **kwargs)
 
-
-class TorchCodecTimeBasedSampler(AbstractSampler):
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        arr = np.fromfile(video_file, dtype=np.uint8)
-        video_tensor = torch.from_numpy(arr)
-        video_input = VideoArgs()
-        sampler_input = TimeBasedSamplerArgs(
-            sampler_type="uniform", clips_per_video=clips_per_video, frames_per_clip=1
-        )
-        sampler = VideoClipSampler(video_input, sampler_input)
-        return sampler(video_tensor)
+    times = []
+    for _ in range(num_exp):
+        start = perf_counter_ns()
+        f(*args, **kwargs)
+        end = perf_counter_ns()
+        times.append(end - start)
+    return torch.tensor(times).float()
 
 
-class TorchCodecIndexBasedSampler(AbstractSampler):
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        arr = np.fromfile(video_file, dtype=np.uint8)
-        video_tensor = torch.from_numpy(arr)
-        video_input = VideoArgs()
-        sampler_input = IndexBasedSamplerArgs(
-            sampler_type="uniform", clips_per_video=clips_per_video, frames_per_clip=1
-        )
-        sampler = VideoClipSampler(video_input, sampler_input)
-        return sampler(video_tensor)
-
-
-class TorchCodecIndexBasedSamplerWithStackedOutput(AbstractSampler):
-    """
-    On large batch, torch stack has impact on performance, but it's not obvious locally.
-    """
-
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        arr = np.fromfile(video_file, dtype=np.uint8)
-        video_tensor = torch.from_numpy(arr)
-        video_input = VideoArgs()
-        sampler_input = IndexBasedSamplerArgs(
-            sampler_type="uniform", clips_per_video=clips_per_video, frames_per_clip=1
-        )
-        sampler = VideoClipSampler(video_input, sampler_input)
-        clips = sampler(video_tensor)
-        return torch.stack([clip[0] for clip in clips])
+def report_stats(times, unit="ms"):
+    mul = {
+        "ns": 1,
+        "µs": 1e-3,
+        "ms": 1e-6,
+        "s": 1e-9,
+    }[unit]
+    times = times * mul
+    std = times.std().item()
+    med = times.median().item()
+    print(f"{med = :.2f}{unit} +- {std:.2f}")
+    return med
 
 
-class DecordSampler(AbstractSampler):
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        decord.bridge.set_bridge("torch")
-        av_reader = decord.VideoReader(video_file)
-        num_frames = len(av_reader)
-        frame_indices = np.linspace(0, num_frames - 1, clips_per_video, dtype=int)
-        frames = av_reader.get_batch(frame_indices)
-        return frames
-
-
-class TorchMMSamplerWithTorchVisionBackend(AbstractSampler):
-    """
-    Here we use TorchMultimodal sampler as it's updated version on top of torchvision decoder.
-    """
-
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        arr = np.fromfile(video_file, dtype=np.uint8)
-        video_tensor = torch.from_numpy(arr)
-        sampler = tmm_vcs(
-            clip_sampler_type=ClipSamplerType("UNIFORM"),
-            clips_per_video=clips_per_video,
-            frames_per_clip=1,
-            frame_dilation=1,
-        )
-        return sampler(video_tensor)
-
-
-class TorchVisionNewSamplerWithTorchVisionBackend(AbstractSampler):
-    def __init__(self):
-        pass
-
-    def sample_frames_uniformly(self, video_file, clips_per_video):
-        clip_sampling_strategy = UniformClipSamplingStrategy(
-            clips_per_video=clips_per_video
-        )
-        decoder = TVVideoClipDecoder(clip_length_in_frames=1, read_audio_stream=False)
-        sampler = ta_vcs(clip_sampling_strategy, decoder)
-        return sampler(str(video_file))
-
-
-def main():
-    """Benchmarks the performance of different samplers"""
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--bm_small_video_speed",
-        help="Benchmark small video decoding speed",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-    )
-    parser.add_argument(
-        "--bm_large_video_speed",
-        help="Benchmark large video decoding speed",
-        default=True,
-        action=argparse.BooleanOptionalAction,
-    )
-    parser.add_argument(
-        "--bm_video_speed_min_run_seconds",
-        help="Benchmark minimum run time, in seconds, to wait per datapoint",
-        type=float,
-        default=5.0,
-    )
-    args = parser.parse_args()
-
-    small_video_path = importlib.resources.path(__package__, "nasa_13013.mp4")
-    small_video_path = os.fspath(str(small_video_path))
-
-    large_video_path = importlib.resources.path(__package__, "853.mp4")
-    large_video_path = os.fspath(str(large_video_path))
-
-    clips_per_video = 8
-
-    sampler_dict = {}
-    sampler_dict["TorchCodecTimeBasedSampler"] = TorchCodecTimeBasedSampler()
-    sampler_dict["TorchCodecIndexBasedSampler"] = TorchCodecIndexBasedSampler()
-    sampler_dict["TorchCodecIndexBasedSamplerWithStackedOutput"] = (
-        TorchCodecIndexBasedSamplerWithStackedOutput()
-    )
-    sampler_dict["DecordSampler"] = DecordSampler()
-    sampler_dict["TorchMMSamplerWithTorchVisionBackend"] = (
-        TorchMMSamplerWithTorchVisionBackend()
-    )
-    sampler_dict["TorchVisionNewSamplerWithTorchVisionBackend"] = (
-        TorchVisionNewSamplerWithTorchVisionBackend()
+def sample(sampler, **kwargs):
+    decoder = VideoDecoder(VIDEO_PATH)
+    sampler(
+        decoder,
+        num_frames_per_clip=10,
+        **kwargs,
     )
 
-    results = []
 
-    for sampler_name, sampler in sampler_dict.items():
-        if args.bm_small_video_speed:
-            sampler_result = benchmark.Timer(
-                stmt="sampler.sample_frames_uniformly(video_file, clips_per_video)",
-                globals={
-                    "video_file": small_video_path,
-                    "clips_per_video": clips_per_video,
-                    "sampler": sampler,
-                },
-                label="uniform sampling latency for 700KB video",
-                sub_label=sampler_name,
-                description=f"uniform sampling {clips_per_video} frames",
-            )
-            results.append(
-                sampler_result.blocked_autorange(
-                    min_run_time=args.bm_video_speed_min_run_seconds
-                )
-            )
+VIDEO_PATH = Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
+NUM_EXP = 30
 
-        if args.bm_large_video_speed:
-            if sampler_name == "TorchMMSamplerWithTorchVisionBackend":
-                continue
-            sampler_result = benchmark.Timer(
-                stmt="sampler.sample_frames_uniformly(video_file, clips_per_video)",
-                globals={
-                    "video_file": large_video_path,
-                    "clips_per_video": clips_per_video,
-                    "sampler": sampler,
-                },
-                label="uniform sampling latency for 50MB video",
-                sub_label=sampler_name,
-                description=f"uniform sampling {clips_per_video} frames",
-            )
-            results.append(
-                sampler_result.blocked_autorange(
-                    min_run_time=args.bm_video_speed_min_run_seconds
-                )
-            )
+for num_clips in (1, 50):
+    print("-" * 10)
+    print(f"{num_clips = }")
 
-    compare = benchmark.Compare(results)
-    compare.print()
+    print("clips_at_random_indices     ", end="")
+    times = bench(
+        sample, clips_at_random_indices, num_clips=num_clips, num_exp=NUM_EXP, warmup=2
+    )
+    report_stats(times, unit="ms")
+
+    print("clips_at_regular_indices    ", end="")
+    times = bench(
+        sample, clips_at_regular_indices, num_clips=num_clips, num_exp=NUM_EXP, warmup=2
+    )
+    report_stats(times, unit="ms")
+
+    print("clips_at_random_timestamps  ", end="")
+    times = bench(
+        sample,
+        clips_at_random_timestamps,
+        num_clips=num_clips,
+        num_exp=NUM_EXP,
+        warmup=2,
+    )
+    report_stats(times, unit="ms")
+
+    print("clips_at_regular_timestamps ", end="")
+    seconds_between_clip_starts = 13 / num_clips  # approximate. video is 13s long
+    times = bench(
+        sample,
+        clips_at_regular_timestamps,
+        seconds_between_clip_starts=seconds_between_clip_starts,
+        num_exp=NUM_EXP,
+        warmup=2,
+    )
+    report_stats(times, unit="ms")

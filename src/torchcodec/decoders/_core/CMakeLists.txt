@@ -16,7 +16,13 @@ function(make_torchcodec_library library_name ffmpeg_target)
         VideoDecoder.cpp
         VideoDecoderOps.h
         VideoDecoderOps.cpp
+        DeviceInterface.h
     )
+    if(ENABLE_CUDA)
+        list(APPEND sources CudaDevice.cpp)
+    else()
+        list(APPEND sources CPUOnlyDevice.cpp)
+    endif()
     add_library(${library_name} SHARED ${sources})
     set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
 
@@ -28,12 +34,16 @@ function(make_torchcodec_library library_name ffmpeg_target)
         ${Python3_INCLUDE_DIRS}
     )
 
+    set(NEEDED_LIBRARIES ${ffmpeg_target} ${TORCH_LIBRARIES}
+        ${Python3_LIBRARIES})
+    if(ENABLE_CUDA)
+        list(APPEND NEEDED_LIBRARIES ${CUDA_CUDA_LIBRARY}
+            ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
+    endif()
     target_link_libraries(
         ${library_name}
         PUBLIC
-        ${ffmpeg_target}
-        ${TORCH_LIBRARIES}
-        ${Python3_LIBRARIES}
+        ${NEEDED_LIBRARIES}
     )
 
     # We already set the library_name to be libtorchcodecN, so we don't want
