@@ -88,6 +88,7 @@ jobs:
         run: |
           ${CONDA_RUN} env
           ${CONDA_RUN} conda info
+          ${CONDA_RUN} nvidia-smi
       - name: Update pip
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
