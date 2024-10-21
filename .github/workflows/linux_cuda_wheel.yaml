@@ -105,15 +105,16 @@ jobs:
           # side-effect. It's OK.
           source packaging/helpers.sh
           assert_ffmpeg_not_installed
-
-          ${CONDA_RUN} conda install --yes conda
-          ${CONDA_RUN} conda update --all --yes
-          ${CONDA_RUN} conda config --add channels conda-forge
-          ${CONDA_RUN} conda config --set channel_priority strict
-          ${CONDA_RUN} conda config --show
-          ${CONDA_RUN} $CONDA_PREFIX/bin/conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
-          ${CONDA_INSTALL} --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
           ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
+
+          # ${CONDA_RUN} conda install --yes conda
+          # ${CONDA_RUN} conda update --all --yes
+          # ${CONDA_RUN} conda config --add channels conda-forge
+          # ${CONDA_RUN} conda config --set channel_priority strict
+          # ${CONDA_RUN} conda config --show
+          # ${CONDA_RUN} $CONDA_PREFIX/bin/conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
+          # ${CONDA_INSTALL} --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
+          # ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -c conda-forge
 
       - name: Install cuda runtime dependencies
         run: |
@@ -143,7 +144,7 @@ jobs:
           find $CONDA_PREFIX -name libtorchcodec\*.so | xargs ldd
           find $CONDA_PREFIX -name libcuda\*.so\*
           echo $CONDA_PREFIX
-          python test/decoders/manual_smoke_test.py
+          ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          pytest test -vvv
+          ${CONDA_RUN} pytest test -vvv
