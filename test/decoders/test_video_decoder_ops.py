@@ -27,6 +27,7 @@ from torchcodec.decoders._core import (
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
+    get_frames_by_pts_in_range,
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,
@@ -382,6 +383,53 @@ class TestOps:
         )
         swscale_frame0, _, _ = get_next_frame(swscale_decoder)
         assert_tensor_equal(filtergraph_frame0, swscale_frame0)
+
+    @pytest.mark.parametrize("dimension_order", ("NHWC", "NCHW"))
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library_with_dimension_order(
+        self, dimension_order, color_conversion_library
+    ):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(
+            decoder,
+            color_conversion_library=color_conversion_library,
+            dimension_order=dimension_order,
+        )
+        scan_all_streams_to_update_metadata(decoder)
+
+        frame0_ref = NASA_VIDEO.get_frame_data_by_index(0)
+        if dimension_order == "NHWC":
+            frame0_ref = frame0_ref.permute(1, 2, 0)
+        expected_shape = frame0_ref.shape
+
+        stream_index = 3
+        frame0, *_ = get_frame_at_index(
+            decoder, stream_index=stream_index, frame_index=0
+        )
+        assert frame0.shape == expected_shape
+        assert_tensor_equal(frame0, frame0_ref)
+
+        frame0, *_ = get_frame_at_pts(decoder, seconds=0.0)
+        assert frame0.shape == expected_shape
+        assert_tensor_equal(frame0, frame0_ref)
+
+        frames, *_ = get_frames_in_range(
+            decoder, stream_index=stream_index, start=0, stop=3
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
+        frames, *_ = get_frames_by_pts_in_range(
+            decoder, stream_index=stream_index, start_seconds=0, stop_seconds=1
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
+
+        frames = get_frames_at_indices(
+            decoder, stream_index=stream_index, frame_indices=[0, 1, 3, 4]
+        )
+        assert frames.shape[1:] == expected_shape
+        assert_tensor_equal(frames[0], frame0_ref)
 
     @pytest.mark.parametrize(
         "width_scaling_factor,height_scaling_factor",

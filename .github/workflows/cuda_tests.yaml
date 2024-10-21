@@ -16,7 +16,8 @@ jobs:
         python_version: ["3.9"]
         # TODO: Add more cuda versions.
         cuda_arch_version: ["12.4"]
-        ffmpeg_version: ["origin/release/6.1"]
+        # TODO: Get ffmpeg 4 to work. Currently fails to build with nvcc.
+        ffmpeg_version: ["origin/release/5.1", "origin/release/6.1", "origin/release/7.1"]
       fail-fast: false
     uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
     with:

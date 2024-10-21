@@ -77,6 +77,8 @@ AVBufferRef* getFromCache(const torch::Device& device) {
   return nullptr;
 }
 
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
+
 AVBufferRef* getFFMPEGContextFromExistingCudaContext(
     const torch::Device& device,
     torch::DeviceIndex nonNegativeDeviceIndex,
@@ -105,6 +107,8 @@ AVBufferRef* getFFMPEGContextFromExistingCudaContext(
   return hw_device_ctx;
 }
 
+#else
+
 AVBufferRef* getFFMPEGContextFromNewCudaContext(
     const torch::Device& device,
     torch::DeviceIndex nonNegativeDeviceIndex,
@@ -121,6 +125,8 @@ AVBufferRef* getFFMPEGContextFromNewCudaContext(
   }
   return hw_device_ctx;
 }
+
+#endif
 
 AVBufferRef* getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
