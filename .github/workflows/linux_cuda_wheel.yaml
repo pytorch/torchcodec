@@ -77,7 +77,7 @@ jobs:
           name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup miniconda using test-infra
-        uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c2
+        uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
         with:
           python-version: "3.9"
           default-packages: ""
