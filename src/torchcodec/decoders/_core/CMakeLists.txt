@@ -37,7 +37,7 @@ function(make_torchcodec_library library_name ffmpeg_target)
     set(NEEDED_LIBRARIES ${ffmpeg_target} ${TORCH_LIBRARIES}
         ${Python3_LIBRARIES})
     if(ENABLE_CUDA)
-        list(APPEND NEEDED_LIBRARIES ${CUDA_CUDA_LIBRARY}
+        list(APPEND NEEDED_LIBRARIES
             ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
     endif()
     target_link_libraries(
