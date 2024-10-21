@@ -81,7 +81,7 @@ jobs:
         uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
         with:
           python-version: "3.9"
-          default-packages: ""
+          default-packages: "ffmpeg=conda-forge::${{ matrix.ffmpeg-version-for-tests }}"
       - name: Check env
         run: |
           ${CONDA_RUN} env
@@ -101,16 +101,17 @@ jobs:
 
       - name: Check out repo
         uses: actions/checkout@v3
-      - name: Install ffmpeg, post build
+      - name: Build & install ffmpeg after installing torchcodec
         run: |
           # Ideally we would have checked for that before installing the wheel,
           # but we need to checkout the repo to access this file, and we don't
           # want to checkout the repo before installing the wheel to avoid any
           # side-effect. It's OK.
-          source packaging/helpers.sh
-          assert_ffmpeg_not_installed
-          ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -vv
+          # source packaging/helpers.sh
+          # assert_ffmpeg_not_installed
+          # It seems like conda can't install ffmpeg cleanly in many cases. So we just build it from source.
 
+          # ${CONDA_RUN} conda install --yes ffmpeg=${{ matrix.ffmpeg-version-for-tests }} -vv -c conda-forge
           # ${CONDA_RUN} conda install --yes conda
           # ${CONDA_RUN} conda update --all --yes
           # ${CONDA_RUN} conda config --add channels conda-forge
