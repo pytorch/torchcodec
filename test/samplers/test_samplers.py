@@ -130,7 +130,7 @@ def test_time_based_sampler(sampler, seconds_between_frames):
     if sampler.func is clips_at_regular_timestamps:
         seconds_between_clip_starts = sampler.keywords["seconds_between_clip_starts"]
         expected_seconds_between_clip_starts = torch.tensor(
-            [seconds_between_clip_starts] * (len(clips) - 1), dtype=torch.float
+            [seconds_between_clip_starts] * (len(clips) - 1), dtype=torch.float64
         )
         _assert_regular_sampler(
             clips=clips,

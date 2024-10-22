@@ -1,14 +1,13 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 import torch
 
-from torchcodec import Frame, FrameBatch
+from torchcodec import FrameBatch
 from torchcodec.decoders import VideoDecoder
+from torchcodec.decoders._core import get_frames_at_indices
 from torchcodec.samplers._common import (
-    _chunk_list,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
-    _to_framebatch,
     _validate_common_params,
 )
 
@@ -117,51 +116,6 @@ def _build_all_clips_indices(
     return all_clips_indices
 
 
-def _decode_all_clips_indices(
-    decoder: VideoDecoder, all_clips_indices: list[int], num_frames_per_clip: int
-) -> list[FrameBatch]:
-    # This takes the list of all the frames to decode (in arbitrary order),
-    # decode all the frames, and then packs them into clips of length
-    # num_frames_per_clip.
-    #
-    # To avoid backwards seeks (which are slow), we:
-    # - sort all the frame indices to be decoded
-    # - dedup them
-    # - decode all unique frames in sorted order
-    # - re-assemble the decoded frames back to their original order
-    #
-    # TODO: Write this in C++ so we can avoid the copies that happen in `_to_framebatch`
-
-    all_clips_indices_sorted, argsort = zip(
-        *sorted((frame_index, i) for (i, frame_index) in enumerate(all_clips_indices))
-    )
-    previous_decoded_frame = None
-    all_decoded_frames = [None] * len(all_clips_indices)
-    for i, j in enumerate(argsort):
-        frame_index = all_clips_indices_sorted[i]
-        if (
-            previous_decoded_frame is not None  # then we know i > 0
-            and frame_index == all_clips_indices_sorted[i - 1]
-        ):
-            # Avoid decoding the same frame twice.
-            # IMPORTANT: this is only correct because a copy of the frame will
-            # happen within `_to_framebatch` when we call torch.stack.
-            # If a copy isn't made, the same underlying memory will be used for
-            # the 2 consecutive frames. When we re-write this, we should make
-            # sure to explicitly copy the data.
-            decoded_frame = previous_decoded_frame
-        else:
-            decoded_frame = decoder.get_frame_at(index=frame_index)
-        previous_decoded_frame = decoded_frame
-        all_decoded_frames[j] = decoded_frame
-
-    all_clips: list[list[Frame]] = _chunk_list(
-        all_decoded_frames, chunk_size=num_frames_per_clip
-    )
-
-    return [_to_framebatch(clip) for clip in all_clips]
-
-
 def _generic_index_based_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
@@ -174,7 +128,7 @@ def _generic_index_based_sampler(
     # Important note: sampling_range_end defines the upper bound of where a clip
     # can *start*, not where a clip can end.
     policy: Literal["repeat_last", "wrap", "error"],
-) -> List[FrameBatch]:
+) -> FrameBatch:
 
     _validate_common_params(
         decoder=decoder,
@@ -221,11 +175,27 @@ def _generic_index_based_sampler(
         num_frames_in_video=len(decoder),
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
-    return _decode_all_clips_indices(
-        decoder,
-        all_clips_indices=all_clips_indices,
-        num_frames_per_clip=num_frames_per_clip,
+
+    frames, pts_seconds, duration_seconds = get_frames_at_indices(
+        decoder._decoder,
+        stream_index=decoder.stream_index,
+        frame_indices=all_clips_indices,
+        sort_indices=True,
     )
+    last_3_dims = frames.shape[-3:]
+    out = FrameBatch(
+        data=frames.view(num_clips, num_frames_per_clip, *last_3_dims),
+        pts_seconds=pts_seconds.view(num_clips, num_frames_per_clip),
+        duration_seconds=duration_seconds.view(num_clips, num_frames_per_clip),
+    )
+    return [
+        FrameBatch(
+            out.data[i],
+            out.pts_seconds[i],
+            out.duration_seconds[i],
+        )
+        for i in range(out.data.shape[0])
+    ]
 
 
 def clips_at_random_indices(
@@ -237,7 +207,7 @@ def clips_at_random_indices(
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
     return _generic_index_based_sampler(
         kind="random",
         decoder=decoder,
@@ -259,7 +229,7 @@ def clips_at_regular_indices(
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
 
     return _generic_index_based_sampler(
         kind="regular",

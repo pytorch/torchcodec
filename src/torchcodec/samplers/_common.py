@@ -1,8 +1,5 @@
 from typing import Callable, Union
 
-import torch
-from torchcodec import Frame, FrameBatch
-
 _LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
 
 
@@ -40,22 +37,6 @@ _POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
     "wrap": _wrap_policy,
     "error": _error_policy,
 }
-
-
-def _chunk_list(lst, chunk_size):
-    # return list of sublists of length chunk_size
-    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-
-def _to_framebatch(frames: list[Frame]) -> FrameBatch:
-    # IMPORTANT: see other IMPORTANT note in _decode_all_clips_indices and
-    # _decode_all_clips_timestamps
-    data = torch.stack([frame.data for frame in frames])
-    pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
-    duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
-    return FrameBatch(
-        data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
-    )
 
 
 def _validate_common_params(*, decoder, num_frames_per_clip, policy):
