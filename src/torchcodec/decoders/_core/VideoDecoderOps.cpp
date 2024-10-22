@@ -42,6 +42,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices, bool sort_indices=False) -> (Tensor, Tensor, Tensor)");
   m.def(
+      "get_frames_at_ptss(Tensor(a!) decoder, *, int stream_index, int[] frame_ptss, bool sort_ptss=False) -> (Tensor, Tensor, Tensor)");
+  m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
@@ -208,6 +210,20 @@ OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto result = videoDecoder->getFrameDisplayedAtTimestampNoDemux(seconds);
   return makeOpsDecodedOutput(result);
 }
+
+OpsBatchDecodedOutput get_frames_at_ptss(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    at::IntArrayRef frame_ptss,
+    bool sort_ptss) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  std::vector<int64_t> framePtssVec(
+      frame_ptss.begin(), frame_ptss.end());
+  auto result = videoDecoder->getFramesAtPtss(
+      stream_index, framePtssVec, sort_ptss);
+  return makeOpsBatchDecodedOutput(result);
+}
+
 
 OpsDecodedOutput get_frame_at_index(
     at::Tensor& decoder,
@@ -485,6 +501,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frame_at_pts", &get_frame_at_pts);
   m.impl("get_frame_at_index", &get_frame_at_index);
   m.impl("get_frames_at_indices", &get_frames_at_indices);
+  m.impl("get_frames_at_ptss", &get_frames_at_ptss);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
   m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);

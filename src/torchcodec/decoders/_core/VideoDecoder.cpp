@@ -1088,6 +1088,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
+    int streamIndex,
+    const std::vector<int64_t>& framePtss,
+    const bool sortPtss) {
+        return getFramesAtIndices(streamIndex, framePtss, sortPtss);
+    }
+
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int streamIndex,
     int64_t start,

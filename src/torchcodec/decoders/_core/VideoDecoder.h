@@ -223,6 +223,7 @@ class VideoDecoder {
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
   DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
+
   DecodedOutput getFrameAtIndex(
       int streamIndex,
       int64_t frameIndex,
@@ -243,6 +244,12 @@ class VideoDecoder {
       int streamIndex,
       const std::vector<int64_t>& frameIndices,
       const bool sortIndices = false);
+
+  BatchDecodedOutput getFramesAtPtss(
+      int streamIndex,
+      const std::vector<int64_t>& framePtss,
+      const bool sortPtss = false);
+
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from
   // the range are:
