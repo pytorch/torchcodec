@@ -172,12 +172,13 @@ def get_frame_at_pts_abstract(
         torch.empty([], dtype=torch.float),
     )
 
+
 @register_fake("torchcodec_ns::get_frames_at_ptss")
 def get_frames_at_pts_abstract(
     decoder: torch.Tensor,
     *,
     stream_index: int,
-    frame_ptss: List[int],
+    frame_ptss: List[float],
     sort_ptss: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]

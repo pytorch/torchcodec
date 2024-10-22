@@ -247,7 +247,7 @@ class VideoDecoder {
 
   BatchDecodedOutput getFramesAtPtss(
       int streamIndex,
-      const std::vector<int64_t>& framePtss,
+      const std::vector<double>& framePtss,
       const bool sortPtss = false);
 
   // Returns frames within a given range for a given stream as a single stacked

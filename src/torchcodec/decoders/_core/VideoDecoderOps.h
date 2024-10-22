@@ -79,7 +79,7 @@ OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 OpsBatchDecodedOutput get_frames_at_ptss(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::IntArrayRef frame_ptss,
+    at::ArrayRef<double> frame_ptss,
     bool sort_ptss = false);
 
 // Return the frame that is visible at a given index in the video.

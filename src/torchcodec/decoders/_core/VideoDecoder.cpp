@@ -1090,10 +1090,43 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
     int streamIndex,
-    const std::vector<int64_t>& framePtss,
+    const std::vector<double>& framePtss,
     const bool sortPtss) {
-        return getFramesAtIndices(streamIndex, framePtss, sortPtss);
-    }
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesAtPtss");
+
+  // The frame displayed at timestamp t and the one displayed at timestamp `t +
+  // eps` are probably the same frame, with the same index. The easiest way to
+  // avoid decoding that unique frame twice is to convert the input timestamps
+  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+
+  std::vector<int64_t> frameIndices(framePtss.size());
+  for (auto i = 0; i < framePtss.size(); ++i) {
+    auto framePts = framePtss[i];
+    TORCH_CHECK(
+        framePts >= minSeconds && framePts < maxSeconds,
+        "frame pts is " + std::to_string(framePts) + "; must be in range [" +
+            std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
+            ").");
+
+    auto it = std::lower_bound(
+        stream.allFrames.begin(),
+        stream.allFrames.end(),
+        framePts,
+        [&stream](const FrameInfo& info, double start) {
+          return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
+        });
+    int64_t frameIndex = it - stream.allFrames.begin();
+    frameIndices[i] = frameIndex;
+  }
+
+  return getFramesAtIndices(streamIndex, frameIndices, sortPtss);
+}
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int streamIndex,
