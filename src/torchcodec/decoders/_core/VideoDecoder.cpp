@@ -1050,8 +1050,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
       output.frames[f] = singleOut.frame;
     }
-    // Note that for now we ignore the pts and duration parts of the output,
-    // because they're never used in any caller.
+    output.ptsSeconds[f] = singleOut.ptsSeconds;
+    output.durationSeconds[f] = singleOut.durationSeconds;
   }
   output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;

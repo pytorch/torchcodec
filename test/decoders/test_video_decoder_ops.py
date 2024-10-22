@@ -116,7 +116,7 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
-        frames0and180 = get_frames_at_indices(
+        frames0and180, *_ = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
         )
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -425,7 +425,7 @@ class TestOps:
         assert frames.shape[1:] == expected_shape
         assert_tensor_equal(frames[0], frame0_ref)
 
-        frames = get_frames_at_indices(
+        frames, *_ = get_frames_at_indices(
             decoder, stream_index=stream_index, frame_indices=[0, 1, 3, 4]
         )
         assert frames.shape[1:] == expected_shape
