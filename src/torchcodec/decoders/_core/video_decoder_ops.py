@@ -190,7 +190,6 @@ def get_frames_at_indices_abstract(
     *,
     stream_index: int,
     frame_indices: List[int],
-    sort_indices: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return (

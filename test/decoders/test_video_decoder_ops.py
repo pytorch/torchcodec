@@ -124,8 +124,7 @@ class TestOps:
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
 
-    @pytest.mark.parametrize("sort_indices", (False, True))
-    def test_get_frames_at_indices_with_sort(self, sort_indices):
+    def test_get_frames_at_indices_unsorted_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder)
         scan_all_streams_to_update_metadata(decoder)
@@ -144,7 +143,6 @@ class TestOps:
             decoder,
             stream_index=stream_index,
             frame_indices=frame_indices,
-            sort_indices=sort_indices,
         )
         for frame, expected_frame in zip(frames, expected_frames):
             assert_tensor_equal(frame, expected_frame)

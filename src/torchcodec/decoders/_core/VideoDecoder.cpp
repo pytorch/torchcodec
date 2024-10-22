@@ -1030,8 +1030,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndices,
-    const bool sortIndices) {
+    const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
@@ -1040,12 +1039,15 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
-  // if frameIndices is [13, 10, 12, 11]
-  // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
-  //                                         to use to decode the frames
-  // and argsort is     [ 1,  3,  2,  0]
+  auto indicesAreSorted =
+      std::is_sorted(frameIndices.begin(), frameIndices.end());
+
   std::vector<size_t> argsort;
-  if (sortIndices) {
+  if (!indicesAreSorted) {
+    // if frameIndices is [13, 10, 12, 11]
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+    //                                         to use to decode the frames
+    // and argsort is     [ 1,  3,  2,  0]
     argsort.resize(frameIndices.size());
     for (size_t i = 0; i < argsort.size(); ++i) {
       argsort[i] = i;
@@ -1058,7 +1060,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
 
   auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
-    auto indexInOutput = sortIndices ? argsort[f] : f;
+    auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
     if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
@@ -1066,7 +1068,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     }
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
-      auto previousIndexInOutput = sortIndices ? argsort[f - 1] : f - 1;
+      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
       output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
       output.ptsSeconds[indexInOutput] =
           output.ptsSeconds[previousIndexInOutput];
