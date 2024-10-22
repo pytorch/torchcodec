@@ -83,7 +83,7 @@ jobs:
       - name: Setup miniconda using test-infra
         uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
           default-packages: "conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
       - name: Check env
         run: |
