@@ -1030,7 +1030,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndices) {
+    const std::vector<int64_t>& frameIndices,
+    const bool sortIndices) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
@@ -1039,21 +1040,32 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
+  auto previousFrameIndex = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
     auto frameIndex = frameIndices[f];
     if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(frameIndex));
     }
-    DecodedOutput singleOut =
-        getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
+    if ((f > 0) && (frameIndex == previousFrameIndex)) {
+      // Avoid decoding the same frame twice
+      output.frames[f].copy_(output.frames[f - 1]);
+      output.ptsSeconds[f] = output.ptsSeconds[f - 1];
+      output.durationSeconds[f] = output.durationSeconds[f - 1];
+    } else {
+      DecodedOutput singleOut =
+          getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
+      if (options.colorConversionLibrary ==
+          ColorConversionLibrary::FILTERGRAPH) {
+        output.frames[f] = singleOut.frame;
+      }
+      output.ptsSeconds[f] = singleOut.ptsSeconds;
+      output.durationSeconds[f] = singleOut.durationSeconds;
     }
-    output.ptsSeconds[f] = singleOut.ptsSeconds;
-    output.durationSeconds[f] = singleOut.durationSeconds;
+    previousFrameIndex = frameIndex;
   }
   output.frames = MaybePermuteHWC2CHW(options, output.frames);
+
   return output;
 }
 

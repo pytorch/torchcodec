@@ -241,7 +241,8 @@ class VideoDecoder {
   // Tensor.
   BatchDecodedOutput getFramesAtIndices(
       int streamIndex,
-      const std::vector<int64_t>& frameIndices);
+      const std::vector<int64_t>& frameIndices,
+      const bool sortIndices = false);
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from
   // the range are:
