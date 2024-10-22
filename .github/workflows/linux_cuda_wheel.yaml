@@ -133,4 +133,4 @@ jobs:
           ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          ${CONDA_RUN} pytest test -vvv
+          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -vvv
