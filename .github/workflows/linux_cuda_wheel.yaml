@@ -151,7 +151,7 @@ jobs:
       - name: Smoke test
         run: |
           ${CONDA_RUN} find $CONDA_PREFIX -name libav\*.so | xargs ldd
-          ${CONDA_RUN} find $CONDA_PREFIX -name libav\*.so | readelf -d
+          ${CONDA_RUN} find $CONDA_PREFIX -name libav\*.so | xargs readelf -d
           ${CONDA_RUN} find / -name libnvcuvid\*
           find / -name libnvcuvid\*
           ${CONDA_RUN} find $CONDA_PREFIX -name libtorchcodec\*.so | xargs ldd
