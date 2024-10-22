@@ -1040,32 +1040,46 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
-  auto previousFrameIndex = -1;
+  std::vector<size_t> argsort(frameIndices.size());
+  for (size_t i = 0; i < argsort.size(); ++i) {
+    argsort[i] = i;
+  }
+  if (sortIndices) {
+    std::sort(
+        argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
+          return frameIndices[a] < frameIndices[b];
+        });
+  }
+
+  auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
-    auto frameIndex = frameIndices[f];
-    if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
+    auto indexInOutput = argsort[f];
+    auto indexInVideo = frameIndices[argsort[f]];
+    if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
-          "Invalid frame index=" + std::to_string(frameIndex));
+          "Invalid frame index=" + std::to_string(indexInVideo));
     }
-    if ((f > 0) && (frameIndex == previousFrameIndex)) {
+    if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
-      output.frames[f].copy_(output.frames[f - 1]);
-      output.ptsSeconds[f] = output.ptsSeconds[f - 1];
-      output.durationSeconds[f] = output.durationSeconds[f - 1];
+      auto previousIndexInOutput = argsort[f - 1];
+      output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
+      output.ptsSeconds[indexInOutput] =
+          output.ptsSeconds[previousIndexInOutput];
+      output.durationSeconds[indexInOutput] =
+          output.durationSeconds[previousIndexInOutput];
     } else {
-      DecodedOutput singleOut =
-          getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
+      DecodedOutput singleOut = getFrameAtIndex(
+          streamIndex, indexInVideo, output.frames[indexInOutput]);
       if (options.colorConversionLibrary ==
           ColorConversionLibrary::FILTERGRAPH) {
-        output.frames[f] = singleOut.frame;
+        output.frames[indexInOutput] = singleOut.frame;
       }
-      output.ptsSeconds[f] = singleOut.ptsSeconds;
-      output.durationSeconds[f] = singleOut.durationSeconds;
+      output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
+      output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
-    previousFrameIndex = frameIndex;
+    previousIndexInVideo = indexInVideo;
   }
   output.frames = MaybePermuteHWC2CHW(options, output.frames);
-
   return output;
 }
 

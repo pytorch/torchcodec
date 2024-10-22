@@ -90,7 +90,8 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder);
 OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::IntArrayRef frame_indices);
+    at::IntArrayRef frame_indices,
+    bool sort_indices = false);
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).

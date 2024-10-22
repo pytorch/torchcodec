@@ -124,6 +124,39 @@ class TestOps:
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
 
+    @pytest.mark.parametrize("sort_indices", (False, True))
+    def test_get_frames_at_indices_with_sort(self, sort_indices):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder)
+        scan_all_streams_to_update_metadata(decoder)
+        stream_index = 3
+
+        frame_indices = [2, 0, 1, 0, 2]
+
+        expected_frames = [
+            get_frame_at_index(
+                decoder, stream_index=stream_index, frame_index=frame_index
+            )[0]
+            for frame_index in frame_indices
+        ]
+
+        frames, *_ = get_frames_at_indices(
+            decoder,
+            stream_index=stream_index,
+            frame_indices=frame_indices,
+            sort_indices=sort_indices,
+        )
+        for frame, expected_frame in zip(frames, expected_frames):
+            assert_tensor_equal(frame, expected_frame)
+
+        # first and last frame should be equal, at index 2. We then modify the
+        # first frame and assert that it's now different from the last frame.
+        # This ensures a copy was properly made during the de-duplication logic.
+        assert_tensor_equal(frames[0], frames[-1])
+        frames[0] += 20
+        with pytest.raises(AssertionError):
+            assert_tensor_equal(frames[0], frames[-1])
+
     def test_get_frames_in_range(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
