@@ -40,9 +40,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices, bool sort_indices=False) -> (Tensor, Tensor, Tensor)");
+      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_at_ptss(Tensor(a!) decoder, *, int stream_index, float[] frame_ptss, bool sort_ptss=False) -> (Tensor, Tensor, Tensor)");
+      "get_frames_at_ptss(Tensor(a!) decoder, *, int stream_index, float[] frame_ptss) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -214,12 +214,11 @@ OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
 OpsBatchDecodedOutput get_frames_at_ptss(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::ArrayRef<double> frame_ptss,
-    bool sort_ptss) {
+    at::ArrayRef<double> frame_ptss) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<double> framePtssVec(frame_ptss.begin(), frame_ptss.end());
   auto result =
-      videoDecoder->getFramesAtPtss(stream_index, framePtssVec, sort_ptss);
+      videoDecoder->getFramesAtPtss(stream_index, framePtssVec);
   return makeOpsBatchDecodedOutput(result);
 }
 
@@ -235,13 +234,11 @@ OpsDecodedOutput get_frame_at_index(
 OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::IntArrayRef frame_indices,
-    bool sort_indices) {
+    at::IntArrayRef frame_indices) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
-  auto result = videoDecoder->getFramesAtIndices(
-      stream_index, frameIndicesVec, sort_indices);
+  auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
   return makeOpsBatchDecodedOutput(result);
 }
 
