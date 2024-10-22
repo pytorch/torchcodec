@@ -27,6 +27,7 @@ from torchcodec.decoders._core import (
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
+    get_frames_at_ptss,
     get_frames_by_pts_in_range,
     get_frames_in_range,
     get_json_metadata,
@@ -152,6 +153,37 @@ class TestOps:
         # first and last frame should be equal, at index 2. We then modify the
         # first frame and assert that it's now different from the last frame.
         # This ensures a copy was properly made during the de-duplication logic.
+        assert_tensor_equal(frames[0], frames[-1])
+        frames[0] += 20
+        with pytest.raises(AssertionError):
+            assert_tensor_equal(frames[0], frames[-1])
+
+    @pytest.mark.parametrize("sort_ptss", (False, True))
+    def test_get_frames_at_ptss_with_sort(self, sort_ptss):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder)
+        scan_all_streams_to_update_metadata(decoder)
+        stream_index = 3
+
+        frame_ptss = [2, 0, 1, 0 + 1e-3, 2 + 1e-3]
+
+        expected_frames = [
+            get_frame_at_pts(decoder, seconds=pts)[0] for pts in frame_ptss
+        ]
+
+        frames, *_ = get_frames_at_ptss(
+            decoder,
+            stream_index=stream_index,
+            frame_ptss=frame_ptss,
+            sort_ptss=sort_ptss,
+        )
+        for frame, expected_frame in zip(frames, expected_frames):
+            assert_tensor_equal(frame, expected_frame)
+
+        # # first and last frame should be equal, at pts=2 [+ eps]. We then
+        # modify the # first frame and assert that it's now different from the
+        # last frame.  # This ensures a copy was properly made during the
+        # de-duplication logic.
         assert_tensor_equal(frames[0], frames[-1])
         frames[0] += 20
         with pytest.raises(AssertionError):
