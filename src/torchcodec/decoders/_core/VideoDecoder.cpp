@@ -1040,8 +1040,11 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
+  // if frameIndices is [13, 10, 12, 11]
+  // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+  //                                         to use to decode the frames
+  // and argsort is     [ 1,  3,  2,  0]
   std::vector<size_t> argsort;
-
   if (sortIndices) {
     argsort.resize(frameIndices.size());
     for (size_t i = 0; i < argsort.size(); ++i) {
