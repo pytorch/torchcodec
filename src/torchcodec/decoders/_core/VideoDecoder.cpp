@@ -1040,11 +1040,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
-  std::vector<size_t> argsort(frameIndices.size());
-  for (size_t i = 0; i < argsort.size(); ++i) {
-    argsort[i] = i;
-  }
+  std::vector<size_t> argsort;
+
   if (sortIndices) {
+    argsort.resize(frameIndices.size());
+    for (size_t i = 0; i < argsort.size(); ++i) {
+      argsort[i] = i;
+    }
     std::sort(
         argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
           return frameIndices[a] < frameIndices[b];
@@ -1053,15 +1055,15 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
 
   auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
-    auto indexInOutput = argsort[f];
-    auto indexInVideo = frameIndices[argsort[f]];
+    auto indexInOutput = sortIndices ? argsort[f] : f;
+    auto indexInVideo = frameIndices[indexInOutput];
     if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(indexInVideo));
     }
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
-      auto previousIndexInOutput = argsort[f - 1];
+      auto previousIndexInOutput = sortIndices ? argsort[f - 1] : f - 1;
       output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
       output.ptsSeconds[indexInOutput] =
           output.ptsSeconds[previousIndexInOutput];
