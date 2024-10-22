@@ -191,14 +191,14 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      frames(torch::empty(
+    : frames(torch::empty(
           {numFrames,
            options.height.value_or(*metadata.height),
            options.width.value_or(*metadata.width),
            3},
-          {torch::kUInt8})) {}
+          {torch::kUInt8})),
+      ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
 
 VideoDecoder::VideoDecoder() {}
 
