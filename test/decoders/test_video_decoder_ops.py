@@ -177,10 +177,10 @@ class TestOps:
         for frame, expected_frame in zip(frames, expected_frames):
             assert_tensor_equal(frame, expected_frame)
 
-        # # first and last frame should be equal, at pts=2 [+ eps]. We then
-        # modify the # first frame and assert that it's now different from the
-        # last frame.  # This ensures a copy was properly made during the
-        # de-duplication logic.
+        # first and last frame should be equal, at pts=2 [+ eps]. We then modify
+        # the first frame and assert that it's now different from the last
+        # frame. This ensures a copy was properly made during the de-duplication
+        # logic.
         assert_tensor_equal(frames[0], frames[-1])
         frames[0] += 20
         with pytest.raises(AssertionError):
