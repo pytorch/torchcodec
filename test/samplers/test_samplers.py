@@ -383,14 +383,11 @@ def test_random_sampler_randomness(sampler):
     # Call the same sampler again with the same seed, expect same results
     torch.manual_seed(0)
     clips_2 = sampler(decoder, num_clips=num_clips)
-    for clip_1_data, clip_2_data in zip(clips_1.data, clips_2.data):
-        assert_tensor_equal(clip_1_data, clip_2_data)
-    for clip_1_pts, clip_2_pts in zip(clips_1.pts_seconds, clips_2.pts_seconds):
-        assert_tensor_equal(clip_1_pts, clip_2_pts)
-    for clip_1_duration, clip_2_duration in zip(
-        clips_1.duration_seconds, clips_2.duration_seconds
-    ):
-        assert_tensor_equal(clip_1_duration, clip_2_duration)
+
+    for clip_1, clip_2 in zip(clips_1, clips_2):
+        assert_tensor_equal(clip_1.data, clip_2.data)
+        assert_tensor_equal(clip_1.pts_seconds, clip_2.pts_seconds)
+        assert_tensor_equal(clip_1.duration_seconds, clip_2.duration_seconds)
 
     # Call with a different seed, expect different results
     torch.manual_seed(1)
