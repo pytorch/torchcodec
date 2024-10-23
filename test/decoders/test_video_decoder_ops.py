@@ -163,16 +163,16 @@ class TestOps:
         stream_index = 3
 
         # Note: 13.01 should give the last video frame for the NASA video
-        frame_ptss = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
+        timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
 
         expected_frames = [
-            get_frame_at_pts(decoder, seconds=pts)[0] for pts in frame_ptss
+            get_frame_at_pts(decoder, seconds=pts)[0] for pts in timestamps
         ]
 
         frames, *_ = get_frames_by_pts(
             decoder,
             stream_index=stream_index,
-            frame_ptss=frame_ptss,
+            timestamps=timestamps,
         )
         for frame, expected_frame in zip(frames, expected_frames):
             assert_tensor_equal(frame, expected_frame)

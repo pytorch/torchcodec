@@ -46,7 +46,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] frame_ptss) -> (Tensor, Tensor, Tensor)");
+      "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] timestamps) -> (Tensor, Tensor, Tensor)");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -245,11 +245,11 @@ OpsBatchDecodedOutput get_frames_in_range(
 OpsBatchDecodedOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::ArrayRef<double> frame_ptss) {
+    at::ArrayRef<double> timestamps) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  std::vector<double> framePtssVec(frame_ptss.begin(), frame_ptss.end());
+  std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
   auto result =
-      videoDecoder->getFramesDisplayedByTimestamps(stream_index, framePtssVec);
+      videoDecoder->getFramesDisplayedByTimestamps(stream_index, timestampsVec);
   return makeOpsBatchDecodedOutput(result);
 }
 
