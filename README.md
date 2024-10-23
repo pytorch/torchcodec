@@ -120,7 +120,8 @@ The instructions below assume you're on Linux.
 
 ## Benchmark results
 
-The following results were obtained by running the [benchmark_decoders.ipynb](./benchmarks/decoders/benchmark_decoders.ipynb) on a lightly-loaded 22-core machine. We first get the operation latency for various seek and decode patterns in a loop from a single python thread and then compute the FPS (= 1 / latency). Error bars show the FPS of the p25 and p75 operation latency.
+The following results were obtained by running the [benchmark_decoders.ipynb](./benchmarks/decoders/benchmark_decoders.ipynb) on a lightly-loaded 22-core machine. We first get the operation latency for various seek and decode patterns in a loop from a single python thread
+for a single video and then compute the FPS (= 1 / latency). Error bars show the FPS of the p25 and p75 operation latency.
 
 If you are running multiple copies of the decoder (for example in a DataLoader) on multiple threads, it is best to use `num_threads=1` for the best performance. If you care about the operation latency (not throughput of many concurrent operations) you can set `num_threads=0` to utilize all cores of your computer.
 
