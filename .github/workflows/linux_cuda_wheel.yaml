@@ -139,4 +139,6 @@ jobs:
         run: |
           # We skip test_get_ffmpeg_version because it may not have a micro version.
           ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -k "not test_get_ffmpeg_version" -vvv
+      - name: Run Python benchmark
+        run: |
           ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
