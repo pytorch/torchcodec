@@ -190,9 +190,13 @@ def get_frames_at_indices_abstract(
     *,
     stream_index: int,
     frame_indices: List[int],
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @register_fake("torchcodec_ns::get_frames_in_range")

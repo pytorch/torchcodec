@@ -87,7 +87,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder);
 
 // Return the frames at a given index for a given stream as a single stacked
 // Tensor.
-at::Tensor get_frames_at_indices(
+OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices);

@@ -40,7 +40,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
+      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -218,7 +218,7 @@ OpsDecodedOutput get_frame_at_index(
   return makeOpsDecodedOutput(result);
 }
 
-at::Tensor get_frames_at_indices(
+OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices) {
@@ -226,7 +226,7 @@ at::Tensor get_frames_at_indices(
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
   auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
-  return result.frames;
+  return makeOpsBatchDecodedOutput(result);
 }
 
 OpsBatchDecodedOutput get_frames_in_range(
