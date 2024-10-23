@@ -180,22 +180,13 @@ def _generic_index_based_sampler(
         decoder._decoder,
         stream_index=decoder.stream_index,
         frame_indices=all_clips_indices,
-        sort_indices=True,
     )
     last_3_dims = frames.shape[-3:]
-    out = FrameBatch(
+    return FrameBatch(
         data=frames.view(num_clips, num_frames_per_clip, *last_3_dims),
         pts_seconds=pts_seconds.view(num_clips, num_frames_per_clip),
         duration_seconds=duration_seconds.view(num_clips, num_frames_per_clip),
     )
-    return [
-        FrameBatch(
-            out.data[i],
-            out.pts_seconds[i],
-            out.duration_seconds[i],
-        )
-        for i in range(out.data.shape[0])
-    ]
 
 
 def clips_at_random_indices(

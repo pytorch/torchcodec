@@ -61,5 +61,15 @@ class FrameBatch(Iterable):
         for field in dataclasses.fields(self):
             yield getattr(self, field.name)
 
+    def __getitem__(self, key):
+        return FrameBatch(
+            self.data[key],
+            self.pts_seconds[key],
+            self.duration_seconds[key],
+        )
+
+    def __len__(self):
+        return len(self.data)
+
     def __repr__(self):
         return _frame_repr(self)

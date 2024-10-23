@@ -25,23 +25,21 @@ from ..utils import assert_tensor_equal, NASA_VIDEO
 def _assert_output_type_and_shapes(
     video, clips, expected_num_clips, num_frames_per_clip
 ):
-    assert isinstance(clips, list)
-    assert len(clips) == expected_num_clips
-    assert all(isinstance(clip, FrameBatch) for clip in clips)
-    expected_clip_data_shape = (
+    assert isinstance(clips, FrameBatch)
+    # assert len(clips) == expected_num_clips
+    # assert all(isinstance(clip, FrameBatch) for clip in clips)
+    expected_clips_data_shape = (
+        expected_num_clips,
         num_frames_per_clip,
         3,
         video.height,
         video.width,
     )
-    assert all(clip.data.shape == expected_clip_data_shape for clip in clips)
+    assert clips.data.shape == expected_clips_data_shape
 
 
 def _assert_regular_sampler(clips, expected_seconds_between_clip_starts=None):
-    # assert regular spacing between sampled clips
-    seconds_between_clip_starts = torch.tensor(
-        [clip.pts_seconds[0] for clip in clips]
-    ).diff()
+    seconds_between_clip_starts = clips.pts_seconds[:, 0].diff()
 
     if expected_seconds_between_clip_starts is not None:
         # This can only be asserted with the time-based sampler, where
@@ -88,10 +86,7 @@ def test_index_based_sampler(sampler, num_indices_between_frames):
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
     # distance.
-
-    avg_distance_between_frames_seconds = torch.concat(
-        [clip.pts_seconds.diff() for clip in clips]
-    ).mean()
+    avg_distance_between_frames_seconds = clips.pts_seconds.diff(dim=1).mean()
     assert avg_distance_between_frames_seconds == pytest.approx(
         num_indices_between_frames / decoder.metadata.average_fps, abs=1e-5
     )
@@ -140,10 +135,8 @@ def test_time_based_sampler(sampler, seconds_between_frames):
     expected_seconds_between_frames = (
         seconds_between_frames or 1 / decoder.metadata.average_fps
     )
-    avg_seconds_between_frames_seconds = torch.concat(
-        [clip.pts_seconds.diff() for clip in clips]
-    ).mean()
-    assert avg_seconds_between_frames_seconds == pytest.approx(
+    avg_seconds_between_frames = clips.pts_seconds.diff(dim=1).mean()
+    assert avg_seconds_between_frames == pytest.approx(
         expected_seconds_between_frames, abs=0.05
     )
 
@@ -208,8 +201,8 @@ def test_sampling_range(
         else pytest.raises(AssertionError, match="Tensor-likes are not")
     )
     with cm:
-        for clip in clips:
-            assert_tensor_equal(clip.data, clips[0].data)
+        for clip_data in clips.data:
+            assert_tensor_equal(clip_data, clips.data[0])
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
@@ -236,11 +229,11 @@ def test_sampling_range_negative(sampler):
     )
 
     # There is only one unique clip in clips_1...
-    for clip in clips_1:
-        assert_tensor_equal(clip.data, clips_1[0].data)
+    for clip_data in clips_1.data:
+        assert_tensor_equal(clip_data, clips_1.data[0])
     # ... and it's the same that's in clips_2
-    for clip in clips_2:
-        assert_tensor_equal(clip.data, clips_1[0].data)
+    for clip_data in clips_2.data:
+        assert_tensor_equal(clip_data, clips_1.data[0])
 
 
 @pytest.mark.parametrize(
@@ -284,7 +277,8 @@ def test_sampling_range_default_behavior_random_sampler(sampler):
         policy="error",
     )
 
-    last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
+    # last_clip_start_default = max([clip.pts_seconds[0] for clip in clips_default])
+    last_clip_start_default = clips_default.pts_seconds[:, 0].max()
 
     # with manual sampling_range_end value set to last frame / end of video
     clips_manual = sampler(
@@ -294,7 +288,7 @@ def test_sampling_range_default_behavior_random_sampler(sampler):
         sampling_range_start=sampling_range_start,
         sampling_range_end=1000,
     )
-    last_clip_start_manual = max([clip.pts_seconds[0] for clip in clips_manual])
+    last_clip_start_manual = clips_manual.pts_seconds[:, 0].max()
 
     assert last_clip_start_manual - last_clip_start_default > 0.3
 
@@ -382,22 +376,27 @@ def test_random_sampler_randomness(sampler):
     # Assert the clip starts aren't sorted, to make sure we haven't messed up
     # the implementation. (This may fail if we're unlucky, but we hard-coded a
     # seed, so it will always pass.)
-    clip_starts = [clip.pts_seconds.item() for clip in clips_1]
+    # clip_starts = [clip.pts_seconds.item() for clip in clips_1]
+    clip_starts = clips_1.pts_seconds[:, 0].tolist()
     assert sorted(clip_starts) != clip_starts
 
     # Call the same sampler again with the same seed, expect same results
     torch.manual_seed(0)
     clips_2 = sampler(decoder, num_clips=num_clips)
-    for clip_1, clip_2 in zip(clips_1, clips_2):
-        assert_tensor_equal(clip_1.data, clip_2.data)
-        assert_tensor_equal(clip_1.pts_seconds, clip_2.pts_seconds)
-        assert_tensor_equal(clip_1.duration_seconds, clip_2.duration_seconds)
+    for clip_1_data, clip_2_data in zip(clips_1.data, clips_2.data):
+        assert_tensor_equal(clip_1_data, clip_2_data)
+    for clip_1_pts, clip_2_pts in zip(clips_1.pts_seconds, clips_2.pts_seconds):
+        assert_tensor_equal(clip_1_pts, clip_2_pts)
+    for clip_1_duration, clip_2_duration in zip(
+        clips_1.duration_seconds, clips_2.duration_seconds
+    ):
+        assert_tensor_equal(clip_1_duration, clip_2_duration)
 
     # Call with a different seed, expect different results
     torch.manual_seed(1)
     clips_3 = sampler(decoder, num_clips=num_clips)
     with pytest.raises(AssertionError, match="Tensor-likes are not"):
-        assert_tensor_equal(clips_1[0].data, clips_3[0].data)
+        assert_tensor_equal(clips_1.data[0], clips_3.data[0])
 
     # Make sure we didn't alter the builtin Python RNG
     builtin_random_state_end = random.getstate()
@@ -427,7 +426,7 @@ def test_sample_at_regular_indices_num_clips_large(num_clips, sampling_range_siz
 
     assert len(clips) == num_clips
 
-    clip_starts_seconds = torch.tensor([clip.pts_seconds[0] for clip in clips])
+    clip_starts_seconds = clips.pts_seconds[:, 0]
     assert len(torch.unique(clip_starts_seconds)) == sampling_range_size
 
     # Assert clips starts are ordered, i.e. the start indices don't just "wrap

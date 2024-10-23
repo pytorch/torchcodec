@@ -1,9 +1,9 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 import torch
 
 from torchcodec import FrameBatch
-from torchcodec.decoders._core import get_frames_at_ptss
+from torchcodec.decoders._core import get_frames_by_pts
 from torchcodec.samplers._common import (
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
@@ -209,27 +209,18 @@ def _generic_time_based_sampler(
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
 
-    frames, pts_seconds, duration_seconds = get_frames_at_ptss(
+    frames, pts_seconds, duration_seconds = get_frames_by_pts(
         decoder._decoder,
         stream_index=decoder.stream_index,
         frame_ptss=all_clips_timestamps,
-        sort_ptss=True,
     )
     last_3_dims = frames.shape[-3:]
 
-    out = FrameBatch(
+    return FrameBatch(
         data=frames.view(num_clips, num_frames_per_clip, *last_3_dims),
         pts_seconds=pts_seconds.view(num_clips, num_frames_per_clip),
         duration_seconds=duration_seconds.view(num_clips, num_frames_per_clip),
     )
-    return [
-        FrameBatch(
-            out.data[i],
-            out.pts_seconds[i],
-            out.duration_seconds[i],
-        )
-        for i in range(out.data.shape[0])
-    ]
 
 
 def clips_at_random_timestamps(
