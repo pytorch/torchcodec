@@ -41,7 +41,6 @@ class Frame(Iterable):
     def __post_init__(self):
         if not self.data.ndim == 3:
             raise ValueError(f"data must be 3-dimensional, got {self.data.shape = }")
-
         self.pts_seconds = float(self.pts_seconds)
         self.duration_seconds = float(self.duration_seconds)
 
@@ -92,12 +91,21 @@ class FrameBatch(Iterable):
             )
 
     def __getitem__(self, key) -> Union["FrameBatch", Frame]:
-        cls = Frame if self.data.ndim == 4 else FrameBatch
-        return cls(
-            self.data[key],
-            self.pts_seconds[key],
-            self.duration_seconds[key],
-        )
+        data = self.data[key]
+        pts_seconds = self.pts_seconds[key]
+        duration_seconds = self.duration_seconds[key]
+        if self.data.ndim == 4:
+            return Frame(
+                data=data,
+                pts_seconds=float(pts_seconds.item()),
+                duration_seconds=float(duration_seconds.item()),
+            )
+        else:
+            return FrameBatch(
+                data=data,
+                pts_seconds=pts_seconds,
+                duration_seconds=duration_seconds,
+            )
 
     def __len__(self):
         return len(self.data)
