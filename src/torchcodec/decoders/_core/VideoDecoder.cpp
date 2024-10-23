@@ -1100,6 +1100,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
   // eps` are probably the same frame, with the same index. The easiest way to
   // avoid decoding that unique frame twice is to convert the input timestamps
   // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+  // This means this function requires a scan.
+  // TODO: longer term, we should implement this without requiring a scan
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
@@ -1119,8 +1121,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
         stream.allFrames.begin(),
         stream.allFrames.end() - 1,
         framePts,
-        [&stream](const FrameInfo& info, double start) {
-          return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
+        [&stream](const FrameInfo& info, double framePts) {
+          return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
         });
     int64_t frameIndex = it - stream.allFrames.begin();
     frameIndices[i] = frameIndex;
