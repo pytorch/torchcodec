@@ -1030,22 +1030,19 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
-    const std::vector<int64_t>& frameIndices,
-    const bool sortIndices) {
+    const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
-  const auto& stream = streams_[streamIndex];
-  const auto& options = stream.options;
-  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
+  auto indicesAreSorted =
+      std::is_sorted(frameIndices.begin(), frameIndices.end());
 
-  // if frameIndices is [13, 10, 12, 11]
-  // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
-  //                                         to use to decode the frames
-  // and argsort is     [ 1,  3,  2,  0]
   std::vector<size_t> argsort;
-  if (sortIndices) {
+  if (!indicesAreSorted) {
+    // if frameIndices is [13, 10, 12, 11]
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+    //                                         to use to decode the frames
+    // and argsort is     [ 1,  3,  2,  0]
     argsort.resize(frameIndices.size());
     for (size_t i = 0; i < argsort.size(); ++i) {
       argsort[i] = i;
@@ -1056,9 +1053,14 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
         });
   }
 
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
+  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
+
   auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
-    auto indexInOutput = sortIndices ? argsort[f] : f;
+    auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
     if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
@@ -1066,7 +1068,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     }
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
-      auto previousIndexInOutput = sortIndices ? argsort[f - 1] : f - 1;
+      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
       output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
       output.ptsSeconds[indexInOutput] =
           output.ptsSeconds[previousIndexInOutput];
@@ -1088,12 +1090,11 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
     int streamIndex,
-    const std::vector<double>& framePtss,
-    const bool sortPtss) {
+    const std::vector<double>& framePtss) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesAtPtss");
+  validateScannedAllStreams("getFramesDisplayedByTimestamps");
 
   // The frame displayed at timestamp t and the one displayed at timestamp `t +
   // eps` are probably the same frame, with the same index. The easiest way to
@@ -1116,7 +1117,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
 
     auto it = std::lower_bound(
         stream.allFrames.begin(),
-        stream.allFrames.end(),
+        stream.allFrames.end() - 1,
         framePts,
         [&stream](const FrameInfo& info, double start) {
           return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
@@ -1125,7 +1126,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
     frameIndices[i] = frameIndex;
   }
 
-  return getFramesAtIndices(streamIndex, frameIndices, sortPtss);
+  return getFramesAtIndices(streamIndex, frameIndices);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(

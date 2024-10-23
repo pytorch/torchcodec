@@ -76,11 +76,10 @@ using OpsBatchDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 
 // Return the frames at given ptss for a given stream
-OpsBatchDecodedOutput get_frames_at_ptss(
+OpsBatchDecodedOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::ArrayRef<double> frame_ptss,
-    bool sort_ptss = false);
+    at::ArrayRef<double> frame_ptss);
 
 // Return the frame that is visible at a given index in the video.
 OpsDecodedOutput get_frame_at_index(
@@ -96,8 +95,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder);
 OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
-    at::IntArrayRef frame_indices,
-    bool sort_indices = false);
+    at::IntArrayRef frame_indices);
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
