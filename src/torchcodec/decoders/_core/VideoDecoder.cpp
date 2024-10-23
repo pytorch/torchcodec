@@ -1090,6 +1090,53 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
+    int streamIndex,
+    const std::vector<double>& timestamps) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesDisplayedByTimestamps");
+
+  // The frame displayed at timestamp t and the one displayed at timestamp `t +
+  // eps` are probably the same frame, with the same index. The easiest way to
+  // avoid decoding that unique frame twice is to convert the input timestamps
+  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+  // This means this function requires a scan.
+  // TODO: longer term, we should implement this without requiring a scan
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+
+  std::vector<int64_t> frameIndices(timestamps.size());
+  for (auto i = 0; i < timestamps.size(); ++i) {
+    auto framePts = timestamps[i];
+    TORCH_CHECK(
+        framePts >= minSeconds && framePts < maxSeconds,
+        "frame pts is " + std::to_string(framePts) + "; must be in range [" +
+            std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
+            ").");
+
+    auto it = std::lower_bound(
+        stream.allFrames.begin(),
+        stream.allFrames.end(),
+        framePts,
+        [&stream](const FrameInfo& info, double framePts) {
+          return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
+        });
+    int64_t frameIndex = it - stream.allFrames.begin();
+    // If the frame index is larger than the size of allFrames, that means we
+    // couldn't match the pts value to the pts value of a NEXT FRAME. And
+    // that means that this timestamp falls during the time between when the
+    // last frame is displayed, and the video ends. Hence, it should map to the
+    // index of the last frame.
+    frameIndex = std::min(frameIndex, (int64_t)stream.allFrames.size() - 1);
+    frameIndices[i] = frameIndex;
+  }
+
+  return getFramesAtIndices(streamIndex, frameIndices);
+}
+
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int streamIndex,
     int64_t start,
