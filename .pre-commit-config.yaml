@@ -12,7 +12,7 @@ repos:
         args: [--fix=lf]
       - id: end-of-file-fixer
       - id: check-added-large-files
-        args: ['--maxkb=1000']
+        args: ['--maxkb=10000']
 
   - repo: https://github.com/omnilib/ufmt
     rev: v2.6.0
