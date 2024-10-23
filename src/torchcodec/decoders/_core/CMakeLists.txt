@@ -37,7 +37,7 @@ function(make_torchcodec_library library_name ffmpeg_target)
     set(NEEDED_LIBRARIES ${ffmpeg_target} ${TORCH_LIBRARIES}
         ${Python3_LIBRARIES})
     if(ENABLE_CUDA)
-        list(APPEND NEEDED_LIBRARIES ${CUDA_CUDA_LIBRARY}
+        list(APPEND NEEDED_LIBRARIES
             ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
     endif()
     target_link_libraries(
@@ -76,10 +76,15 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-    make_torchcodec_library(libtorchcodec4 ffmpeg4)
-    make_torchcodec_library(libtorchcodec5 ffmpeg5)
-    make_torchcodec_library(libtorchcodec6 ffmpeg6)
-    make_torchcodec_library(libtorchcodec7 ffmpeg7)
+
+    if(NOT ENABLE_CUDA)
+	    # TODO: Enable more ffmpeg versions for cuda.
+	    make_torchcodec_library(libtorchcodec4 ffmpeg4)
+	endif()
+	make_torchcodec_library(libtorchcodec7 ffmpeg7)
+	make_torchcodec_library(libtorchcodec6 ffmpeg6)
+	make_torchcodec_library(libtorchcodec5 ffmpeg5)
+
 else()
     message(
         STATUS
