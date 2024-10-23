@@ -27,7 +27,7 @@ from torchcodec.decoders._core import (
     get_frame_at_index,
     get_frame_at_pts,
     get_frames_at_indices,
-    get_frames_at_ptss,
+    get_frames_by_pts,
     get_frames_by_pts_in_range,
     get_frames_in_range,
     get_json_metadata,
@@ -156,7 +156,7 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(frames[0], frames[-1])
 
-    def test_get_frames_at_ptss(self):
+    def test_get_frames_by_pts(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder)
         scan_all_streams_to_update_metadata(decoder)
@@ -168,7 +168,7 @@ class TestOps:
             get_frame_at_pts(decoder, seconds=pts)[0] for pts in frame_ptss
         ]
 
-        frames, *_ = get_frames_at_ptss(
+        frames, *_ = get_frames_by_pts(
             decoder,
             stream_index=stream_index,
             frame_ptss=frame_ptss,

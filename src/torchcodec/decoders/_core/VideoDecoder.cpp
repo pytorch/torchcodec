@@ -1090,11 +1090,11 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtPtss(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
     int streamIndex,
-    const std::vector<double>& framePtss){
+    const std::vector<double>& framePtss) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesAtPtss");
+  validateScannedAllStreams("getFramesDisplayedByTimestamps");
 
   // The frame displayed at timestamp t and the one displayed at timestamp `t +
   // eps` are probably the same frame, with the same index. The easiest way to

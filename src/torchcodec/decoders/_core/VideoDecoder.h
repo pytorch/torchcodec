@@ -244,7 +244,7 @@ class VideoDecoder {
       int streamIndex,
       const std::vector<int64_t>& frameIndices);
 
-  BatchDecodedOutput getFramesAtPtss(
+  BatchDecodedOutput getFramesDisplayedByTimestamps(
       int streamIndex,
       const std::vector<double>& framePtss);
 

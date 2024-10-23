@@ -76,7 +76,7 @@ using OpsBatchDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 
 // Return the frames at given ptss for a given stream
-OpsBatchDecodedOutput get_frames_at_ptss(
+OpsBatchDecodedOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
     at::ArrayRef<double> frame_ptss);
