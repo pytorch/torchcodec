@@ -1123,6 +1123,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
           return ptsToSeconds(info.nextPts, stream.timeBase) <= start;
         });
     int64_t frameIndex = it - stream.allFrames.begin();
+    frameIndex = std::min(frameIndex, (int64_t)stream.allFrames.size() - 1);
     frameIndices[i] = frameIndex;
   }
 

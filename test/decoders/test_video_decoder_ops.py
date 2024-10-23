@@ -162,7 +162,8 @@ class TestOps:
         scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
-        frame_ptss = [2, 0, 1, 0 + 1e-3, 2 + 1e-3]
+        # Note: 13.01 should give the last video frame for the NASA video
+        frame_ptss = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
 
         expected_frames = [
             get_frame_at_pts(decoder, seconds=pts)[0] for pts in frame_ptss
