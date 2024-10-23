@@ -118,6 +118,11 @@ The instructions below assume you're on Linux.
      pip install torchcodec
      ```
 
+## Benchmark results
+
+![Benchmark Results](./benchmarks/decoders/benchmark_results.png)
+
+
 ## Planned future work
 
 We are actively working on the following features:
