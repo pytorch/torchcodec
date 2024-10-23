@@ -26,8 +26,6 @@ def _assert_output_type_and_shapes(
     video, clips, expected_num_clips, num_frames_per_clip
 ):
     assert isinstance(clips, FrameBatch)
-    # assert len(clips) == expected_num_clips
-    # assert all(isinstance(clip, FrameBatch) for clip in clips)
     expected_clips_data_shape = (
         expected_num_clips,
         num_frames_per_clip,

@@ -110,15 +110,5 @@ class FrameBatch(Iterable):
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, key):
-        return FrameBatch(
-            self.data[key],
-            self.pts_seconds[key],
-            self.duration_seconds[key],
-        )
-
-    def __len__(self):
-        return len(self.data)
-
     def __repr__(self):
         return _frame_repr(self)
