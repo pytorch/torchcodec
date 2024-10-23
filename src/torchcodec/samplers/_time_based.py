@@ -214,7 +214,7 @@ def _generic_time_based_sampler(
     frames, pts_seconds, duration_seconds = get_frames_by_pts(
         decoder._decoder,
         stream_index=decoder.stream_index,
-        frame_ptss=all_clips_timestamps,
+        timestamps=all_clips_timestamps,
     )
     return _make_5d_framebatch(
         data=frames,
