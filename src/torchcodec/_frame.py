@@ -39,6 +39,8 @@ class Frame(Iterable):
     """The duration of the frame, in seconds (float)."""
 
     def __post_init__(self):
+        # This is called after __init__() when a Frame is created. We can run
+        # input validation checks here.
         if not self.data.ndim == 3:
             raise ValueError(f"data must be 3-dimensional, got {self.data.shape = }")
         self.pts_seconds = float(self.pts_seconds)
@@ -64,6 +66,8 @@ class FrameBatch(Iterable):
     """The duration of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
 
     def __post_init__(self):
+        # This is called after __init__() when a FrameBatch is created. We can
+        # run input validation checks here.
         if self.data.ndim < 4:
             raise ValueError(
                 f"data must be at least 4-dimensional. Got {self.data.shape = } "
