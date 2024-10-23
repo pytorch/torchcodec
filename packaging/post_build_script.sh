@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eux
+set -ex
 
 source packaging/helpers.sh
 
@@ -18,7 +18,12 @@ else
     exit 1
 fi
 
-for ffmpeg_major_version in 4 5 6 7; do
+# TODO: Make ffmpeg4 work with nvcc.
+if [[ "$ENABLE_CUDA" -eq 1 ]]; then
+  ffmpeg_versions=(5 6 7)
+fi
+
+for ffmpeg_major_version in ${ffmpeg_versions[@]}; do
     assert_in_wheel $wheel_path torchcodec/libtorchcodec${ffmpeg_major_version}.${ext}
 done
 assert_not_in_wheel $wheel_path libtorchcodec.${ext}
