@@ -191,14 +191,14 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      frames(torch::empty(
+    : frames(torch::empty(
           {numFrames,
            options.height.value_or(*metadata.height),
            options.width.value_or(*metadata.width),
            3},
-          {torch::kUInt8})) {}
+          {torch::kUInt8})),
+      ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -1034,27 +1034,107 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
+  auto indicesAreSorted =
+      std::is_sorted(frameIndices.begin(), frameIndices.end());
+
+  std::vector<size_t> argsort;
+  if (!indicesAreSorted) {
+    // if frameIndices is [13, 10, 12, 11]
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+    //                                         to use to decode the frames
+    // and argsort is     [ 1,  3,  2,  0]
+    argsort.resize(frameIndices.size());
+    for (size_t i = 0; i < argsort.size(); ++i) {
+      argsort[i] = i;
+    }
+    std::sort(
+        argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
+          return frameIndices[a] < frameIndices[b];
+        });
+  }
+
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
   const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
+  auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
-    auto frameIndex = frameIndices[f];
-    if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
+    auto indexInOutput = indicesAreSorted ? f : argsort[f];
+    auto indexInVideo = frameIndices[indexInOutput];
+    if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
-          "Invalid frame index=" + std::to_string(frameIndex));
+          "Invalid frame index=" + std::to_string(indexInVideo));
     }
-    DecodedOutput singleOut =
-        getFrameAtIndex(streamIndex, frameIndex, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
+    if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
+      // Avoid decoding the same frame twice
+      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
+      output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
+      output.ptsSeconds[indexInOutput] =
+          output.ptsSeconds[previousIndexInOutput];
+      output.durationSeconds[indexInOutput] =
+          output.durationSeconds[previousIndexInOutput];
+    } else {
+      DecodedOutput singleOut = getFrameAtIndex(
+          streamIndex, indexInVideo, output.frames[indexInOutput]);
+      if (options.colorConversionLibrary ==
+          ColorConversionLibrary::FILTERGRAPH) {
+        output.frames[indexInOutput] = singleOut.frame;
+      }
+      output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
+      output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
-    // Note that for now we ignore the pts and duration parts of the output,
-    // because they're never used in any caller.
+    previousIndexInVideo = indexInVideo;
   }
   output.frames = MaybePermuteHWC2CHW(options, output.frames);
   return output;
+}
+
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
+    int streamIndex,
+    const std::vector<double>& timestamps) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesDisplayedByTimestamps");
+
+  // The frame displayed at timestamp t and the one displayed at timestamp `t +
+  // eps` are probably the same frame, with the same index. The easiest way to
+  // avoid decoding that unique frame twice is to convert the input timestamps
+  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+  // This means this function requires a scan.
+  // TODO: longer term, we should implement this without requiring a scan
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+
+  std::vector<int64_t> frameIndices(timestamps.size());
+  for (auto i = 0; i < timestamps.size(); ++i) {
+    auto framePts = timestamps[i];
+    TORCH_CHECK(
+        framePts >= minSeconds && framePts < maxSeconds,
+        "frame pts is " + std::to_string(framePts) + "; must be in range [" +
+            std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
+            ").");
+
+    auto it = std::lower_bound(
+        stream.allFrames.begin(),
+        stream.allFrames.end(),
+        framePts,
+        [&stream](const FrameInfo& info, double framePts) {
+          return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
+        });
+    int64_t frameIndex = it - stream.allFrames.begin();
+    // If the frame index is larger than the size of allFrames, that means we
+    // couldn't match the pts value to the pts value of a NEXT FRAME. And
+    // that means that this timestamp falls during the time between when the
+    // last frame is displayed, and the video ends. Hence, it should map to the
+    // index of the last frame.
+    frameIndex = std::min(frameIndex, (int64_t)stream.allFrames.size() - 1);
+    frameIndices[i] = frameIndex;
+  }
+
+  return getFramesAtIndices(streamIndex, frameIndices);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(

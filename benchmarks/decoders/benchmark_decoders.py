@@ -209,7 +209,7 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
         best_video_stream = metadata["bestVideoStreamIndex"]
         indices_list = [int(pts * average_fps) for pts in pts_list]
         frames = []
-        frames = get_frames_at_indices(
+        frames, *_ = get_frames_at_indices(
             decoder, stream_index=best_video_stream, frame_indices=indices_list
         )
         return frames
@@ -226,7 +226,7 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
         best_video_stream = metadata["bestVideoStreamIndex"]
         frames = []
         indices_list = list(range(numFramesToDecode))
-        frames = get_frames_at_indices(
+        frames, *_ = get_frames_at_indices(
             decoder, stream_index=best_video_stream, frame_indices=indices_list
         )
         return frames

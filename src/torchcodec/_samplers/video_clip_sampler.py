@@ -240,7 +240,7 @@ class VideoClipSampler(nn.Module):
                 clip_start_idx + i * index_based_sampler_args.video_frame_dilation
                 for i in range(index_based_sampler_args.frames_per_clip)
             ]
-            frames = get_frames_at_indices(
+            frames, *_ = get_frames_at_indices(
                 video_decoder,
                 stream_index=metadata_json["bestVideoStreamIndex"],
                 frame_indices=batch_indexes,
