@@ -246,7 +246,7 @@ class VideoDecoder {
 
   BatchDecodedOutput getFramesDisplayedByTimestamps(
       int streamIndex,
-      const std::vector<double>& framePtss);
+      const std::vector<double>& timestamps);
 
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from

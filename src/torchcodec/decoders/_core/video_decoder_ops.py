@@ -178,7 +178,7 @@ def get_frames_by_pts_abstract(
     decoder: torch.Tensor,
     *,
     stream_index: int,
-    frame_ptss: List[float],
+    timestamps: List[float],
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return (

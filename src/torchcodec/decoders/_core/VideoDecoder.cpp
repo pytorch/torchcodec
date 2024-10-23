@@ -1092,7 +1092,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
     int streamIndex,
-    const std::vector<double>& framePtss) {
+    const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesDisplayedByTimestamps");
 
@@ -1106,9 +1106,9 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
   double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
   double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
 
-  std::vector<int64_t> frameIndices(framePtss.size());
-  for (auto i = 0; i < framePtss.size(); ++i) {
-    auto framePts = framePtss[i];
+  std::vector<int64_t> frameIndices(timestamps.size());
+  for (auto i = 0; i < timestamps.size(); ++i) {
+    auto framePts = timestamps[i];
     TORCH_CHECK(
         framePts >= minSeconds && framePts < maxSeconds,
         "frame pts is " + std::to_string(framePts) + "; must be in range [" +
