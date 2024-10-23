@@ -1034,11 +1034,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
-  const auto& stream = streams_[streamIndex];
-  const auto& options = stream.options;
-  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
-
   auto indicesAreSorted =
       std::is_sorted(frameIndices.begin(), frameIndices.end());
 
@@ -1057,6 +1052,11 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
           return frameIndices[a] < frameIndices[b];
         });
   }
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
+  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
   auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
