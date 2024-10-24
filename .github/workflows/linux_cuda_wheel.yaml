@@ -71,7 +71,6 @@ jobs:
     container:
       image: "pytorch/manylinux-builder:cuda${{ matrix.cuda-version }}"
       options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
-    if: ${{ always() }}
     needs: build
     steps:
       - name: Setup env vars
