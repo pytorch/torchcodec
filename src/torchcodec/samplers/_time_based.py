@@ -1,14 +1,13 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 import torch
 
-from torchcodec import Frame, FrameBatch
-from torchcodec.decoders import VideoDecoder
+from torchcodec import FrameBatch
+from torchcodec.decoders._core import get_frames_by_pts
 from torchcodec.samplers._common import (
-    _chunk_list,
+    _make_5d_framebatch,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
-    _to_framebatch,
     _validate_common_params,
 )
 
@@ -147,51 +146,6 @@ def _build_all_clips_timestamps(
     return all_clips_timestamps
 
 
-def _decode_all_clips_timestamps(
-    decoder: VideoDecoder, all_clips_timestamps: list[float], num_frames_per_clip: int
-) -> list[FrameBatch]:
-    # This is 99% the same as _decode_all_clips_indices. The only change is the
-    # call to .get_frame_displayed_at(pts) instead of .get_frame_at(idx)
-
-    all_clips_timestamps_sorted, argsort = zip(
-        *sorted(
-            (frame_index, i) for (i, frame_index) in enumerate(all_clips_timestamps)
-        )
-    )
-    previous_decoded_frame = None
-    all_decoded_frames = [None] * len(all_clips_timestamps)
-    for i, j in enumerate(argsort):
-        frame_pts_seconds = all_clips_timestamps_sorted[i]
-        if (
-            previous_decoded_frame is not None  # then we know i > 0
-            and frame_pts_seconds == all_clips_timestamps_sorted[i - 1]
-        ):
-            # Avoid decoding the same frame twice.
-            # Unfortunatly this is unlikely to lead to speed-up as-is: it's
-            # pretty unlikely that 2 pts will be the same since pts are float
-            # contiguous values. Theoretically the dedup can still happen, but
-            # it would be much more efficient to implement it at the frame index
-            # level. We should do that once we implement that in C++.
-            # See also https://github.com/pytorch/torchcodec/issues/256.
-            #
-            # IMPORTANT: this is only correct because a copy of the frame will
-            # happen within `_to_framebatch` when we call torch.stack.
-            # If a copy isn't made, the same underlying memory will be used for
-            # the 2 consecutive frames. When we re-write this, we should make
-            # sure to explicitly copy the data.
-            decoded_frame = previous_decoded_frame
-        else:
-            decoded_frame = decoder.get_frame_displayed_at(seconds=frame_pts_seconds)
-        previous_decoded_frame = decoded_frame
-        all_decoded_frames[j] = decoded_frame
-
-    all_clips: list[list[Frame]] = _chunk_list(
-        all_decoded_frames, chunk_size=num_frames_per_clip
-    )
-
-    return [_to_framebatch(clip) for clip in all_clips]
-
-
 def _generic_time_based_sampler(
     kind: Literal["random", "regular"],
     decoder,
@@ -204,7 +158,7 @@ def _generic_time_based_sampler(
     sampling_range_start: Optional[float],
     sampling_range_end: Optional[float],  # interval is [start, end).
     policy: str = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
     # Note: *everywhere*, sampling_range_end denotes the upper bound of where a
     # clip can start. This is an *open* upper bound, i.e. we will make sure no
     # clip starts exactly at (or above) sampling_range_end.
@@ -246,6 +200,7 @@ def _generic_time_based_sampler(
             sampling_range_end,  # excluded
             seconds_between_clip_starts,
         )
+        num_clips = len(clip_start_seconds)
 
     all_clips_timestamps = _build_all_clips_timestamps(
         clip_start_seconds=clip_start_seconds,
@@ -255,9 +210,17 @@ def _generic_time_based_sampler(
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
 
-    return _decode_all_clips_timestamps(
-        decoder,
-        all_clips_timestamps=all_clips_timestamps,
+    # TODO: Use public method of decoder, when it exists
+    frames, pts_seconds, duration_seconds = get_frames_by_pts(
+        decoder._decoder,
+        stream_index=decoder.stream_index,
+        timestamps=all_clips_timestamps,
+    )
+    return _make_5d_framebatch(
+        data=frames,
+        pts_seconds=pts_seconds,
+        duration_seconds=duration_seconds,
+        num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
     )
 
@@ -272,7 +235,7 @@ def clips_at_random_timestamps(
     sampling_range_start: Optional[float] = None,
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: str = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
     return _generic_time_based_sampler(
         kind="random",
         decoder=decoder,
@@ -296,7 +259,7 @@ def clips_at_regular_timestamps(
     sampling_range_start: Optional[float] = None,
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: str = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
     return _generic_time_based_sampler(
         kind="regular",
         decoder=decoder,
