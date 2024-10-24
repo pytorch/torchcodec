@@ -1119,8 +1119,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
 
     auto it = std::lower_bound(
         stream.allFrames.begin(),
-        // See https://github.com/pytorch/torchcodec/pull/286 for why the `- 1`
-        // is needed.
+        // We have to end the search at end() - 1 to exclude the last frame from
+        // the search: the last frame's nextPts field is 0, which breaks the
+        // working assumption of std::lower_bound() that the search space must
+        // be sorted. The last frame can still be correctly returned: when the
+        // binary search ends without a match, `end() - 1` will be returned, and
+        // that corresponds to the last frame.
+        // See https://github.com/pytorch/torchcodec/pull/286 for more details.
         stream.allFrames.end() - 1,
         framePts,
         [&stream](const FrameInfo& info, double framePts) {
