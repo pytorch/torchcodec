@@ -383,7 +383,6 @@ def test_random_sampler_randomness(sampler):
     # Assert the clip starts aren't sorted, to make sure we haven't messed up
     # the implementation. (This may fail if we're unlucky, but we hard-coded a
     # seed, so it will always pass.)
-    # clip_starts = [clip.pts_seconds.item() for clip in clips_1]
     clip_starts = clips_1.pts_seconds[:, 0].tolist()
     assert sorted(clip_starts) != clip_starts
 
