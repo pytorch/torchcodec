@@ -209,7 +209,7 @@ def test_sampling_range(
     )
     with cm:
         for clip in clips:
-            assert_tensor_equal(clip.data, clips.data[0])
+            assert_tensor_equal(clip.data, clips[0].data)
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
@@ -236,11 +236,11 @@ def test_sampling_range_negative(sampler):
     )
 
     # There is only one unique clip in clips_1...
-    for clip_1 in clips_1:
-        assert_tensor_equal(clip_1.data, clips_1.data[0])
+    for clip in clips_1:
+        assert_tensor_equal(clip.data, clips_1[0].data)
     # ... and it's the same that's in clips_2
-    for clip_2 in clips_2:
-        assert_tensor_equal(clip_2.data, clips_1.data[0])
+    for clip in clips_2:
+        assert_tensor_equal(clip.data, clips_1[0].data)
 
 
 @pytest.mark.parametrize(
@@ -399,7 +399,7 @@ def test_random_sampler_randomness(sampler):
     torch.manual_seed(1)
     clips_3 = sampler(decoder, num_clips=num_clips)
     with pytest.raises(AssertionError, match="Tensor-likes are not"):
-        assert_tensor_equal(clips_1.data[0], clips_3.data[0])
+        assert_tensor_equal(clips_1[0].data, clips_3[0].data)
 
     # Make sure we didn't alter the builtin Python RNG
     builtin_random_state_end = random.getstate()
