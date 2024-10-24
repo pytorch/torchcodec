@@ -54,7 +54,7 @@ class TestVideoDecoder:
         with pytest.raises(ValueError, match="No valid stream found"):
             decoder = VideoDecoder(NASA_VIDEO.path, stream_index=1)  # noqa
 
-    @pytest.mark.parametrize("num_ffmpeg_threads", ("int", 1, 4))
+    @pytest.mark.parametrize("num_ffmpeg_threads", (1, 4))
     def test_getitem_int(self, num_ffmpeg_threads):
         decoder = VideoDecoder(NASA_VIDEO.path, num_ffmpeg_threads=num_ffmpeg_threads)
 
