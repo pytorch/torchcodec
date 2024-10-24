@@ -1119,6 +1119,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
 
     auto it = std::lower_bound(
         stream.allFrames.begin(),
+        // See https://github.com/pytorch/torchcodec/pull/286 for why the `- 1`
+        // is needed.
         stream.allFrames.end() - 1,
         framePts,
         [&stream](const FrameInfo& info, double framePts) {
