@@ -299,7 +299,7 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
-    int64_t nextPts = 0;
+    int64_t nextPts = INT64_MAX;
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;

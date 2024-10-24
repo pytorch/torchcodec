@@ -1125,12 +1125,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
           return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
         });
     int64_t frameIndex = it - stream.allFrames.begin();
-    // If the frame index is larger than the size of allFrames, that means we
-    // couldn't match the pts value to the pts value of a NEXT FRAME. And
-    // that means that this timestamp falls during the time between when the
-    // last frame is displayed, and the video ends. Hence, it should map to the
-    // index of the last frame.
-    frameIndex = std::min(frameIndex, (int64_t)stream.allFrames.size() - 1);
     frameIndices[i] = frameIndex;
   }
 
