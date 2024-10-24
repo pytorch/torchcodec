@@ -187,7 +187,7 @@ class TestOps:
             assert_tensor_equal(frames[0], frames[-1])
 
     def test_pts_apis_against_index_ref(self):
-        # Non-regression test for https://github.com/pytorch/torchcodec/pull/286
+        # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
