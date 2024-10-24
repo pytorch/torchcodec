@@ -36,6 +36,11 @@ class VideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
+        num_ffmpeg_threads (int, optional): The number of threads to use for decoding.
+            Use 1 for single-threaded decoding which is best if you are running multiple
+            instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
+            decoding which is best if you are running a single instance of ``VideoDecoder``.
+            Default: 1.
 
             .. note::
 
@@ -58,6 +63,7 @@ class VideoDecoder:
         *,
         stream_index: Optional[int] = None,
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
+        num_ffmpeg_threads: int = 1,
     ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
@@ -82,7 +88,10 @@ class VideoDecoder:
 
         core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(
-            self._decoder, stream_index=stream_index, dimension_order=dimension_order
+            self._decoder,
+            stream_index=stream_index,
+            dimension_order=dimension_order,
+            num_threads=num_ffmpeg_threads,
         )
 
         self.metadata, self.stream_index = _get_and_validate_stream_metadata(
