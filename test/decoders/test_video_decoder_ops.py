@@ -187,7 +187,7 @@ class TestOps:
             assert_tensor_equal(frames[0], frames[-1])
 
     def test_pts_apis_against_index_ref(self):
-        # Non-regression test for https://github.com/pytorch/torchcodec/pull/286
+        # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
@@ -225,6 +225,20 @@ class TestOps:
             start_seconds=0,
             stop_seconds=all_pts_seconds_ref[-1] + 1e-4,
         )
+        assert_tensor_equal(pts_seconds, all_pts_seconds_ref)
+
+        _, pts_seconds, _ = zip(
+            *[
+                get_frames_by_pts_in_range(
+                    decoder,
+                    stream_index=stream_index,
+                    start_seconds=pts,
+                    stop_seconds=pts + 1e-4,
+                )
+                for pts in all_pts_seconds_ref
+            ]
+        )
+        pts_seconds = torch.tensor(pts_seconds)
         assert_tensor_equal(pts_seconds, all_pts_seconds_ref)
 
         _, pts_seconds, _ = get_frames_by_pts(
