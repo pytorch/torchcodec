@@ -15,6 +15,8 @@ import torch
 # Decorator for skipping CUDA tests when CUDA isn't available
 def needs_cuda(test_item):
     if not torch.cuda.is_available():
+        if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
+            raise RuntimeError("CUDA is required for this test")
         return pytest.mark.skip(reason="CUDA not available")(test_item)
     return test_item
 
