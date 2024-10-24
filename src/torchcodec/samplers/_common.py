@@ -1,7 +1,7 @@
 from typing import Callable, Union
 
-import torch
-from torchcodec import Frame, FrameBatch
+from torch import Tensor
+from torchcodec import FrameBatch
 
 _LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
 
@@ -42,22 +42,6 @@ _POLICY_FUNCTIONS: dict[str, _POLICY_FUNCTION_TYPE] = {
 }
 
 
-def _chunk_list(lst, chunk_size):
-    # return list of sublists of length chunk_size
-    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-
-def _to_framebatch(frames: list[Frame]) -> FrameBatch:
-    # IMPORTANT: see other IMPORTANT note in _decode_all_clips_indices and
-    # _decode_all_clips_timestamps
-    data = torch.stack([frame.data for frame in frames])
-    pts_seconds = torch.tensor([frame.pts_seconds for frame in frames])
-    duration_seconds = torch.tensor([frame.duration_seconds for frame in frames])
-    return FrameBatch(
-        data=data, pts_seconds=pts_seconds, duration_seconds=duration_seconds
-    )
-
-
 def _validate_common_params(*, decoder, num_frames_per_clip, policy):
     if len(decoder) < 1:
         raise ValueError(
@@ -72,3 +56,19 @@ def _validate_common_params(*, decoder, num_frames_per_clip, policy):
         raise ValueError(
             f"Invalid policy ({policy}). Supported values are {_POLICY_FUNCTIONS.keys()}."
         )
+
+
+def _make_5d_framebatch(
+    *,
+    data: Tensor,
+    pts_seconds: Tensor,
+    duration_seconds: Tensor,
+    num_clips: int,
+    num_frames_per_clip: int,
+) -> FrameBatch:
+    last_3_dims = data.shape[-3:]
+    return FrameBatch(
+        data=data.view(num_clips, num_frames_per_clip, *last_3_dims),
+        pts_seconds=pts_seconds.view(num_clips, num_frames_per_clip),
+        duration_seconds=duration_seconds.view(num_clips, num_frames_per_clip),
+    )
