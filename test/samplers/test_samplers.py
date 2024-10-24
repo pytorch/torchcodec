@@ -26,14 +26,21 @@ def _assert_output_type_and_shapes(
     video, clips, expected_num_clips, num_frames_per_clip
 ):
     assert isinstance(clips, FrameBatch)
-    expected_clips_data_shape = (
+    assert clips.data.shape == (
         expected_num_clips,
         num_frames_per_clip,
         3,
         video.height,
         video.width,
     )
-    assert clips.data.shape == expected_clips_data_shape
+    assert clips.pts_seconds.shape == (
+        expected_num_clips,
+        num_frames_per_clip,
+    )
+    assert clips.duration_seconds.shape == (
+        expected_num_clips,
+        num_frames_per_clip,
+    )
 
 
 def _assert_regular_sampler(clips, expected_seconds_between_clip_starts=None):
@@ -84,10 +91,11 @@ def test_index_based_sampler(sampler, num_indices_between_frames):
     # Check the num_indices_between_frames parameter by asserting that the
     # "time" difference between frames in a clip is the same as the "index"
     # distance.
-    avg_distance_between_frames_seconds = clips.pts_seconds.diff(dim=1).mean()
-    assert avg_distance_between_frames_seconds == pytest.approx(
-        num_indices_between_frames / decoder.metadata.average_fps, abs=1e-5
-    )
+    for clip in clips:
+        avg_distance_between_frames_seconds = clip.pts_seconds.diff().mean()
+        assert avg_distance_between_frames_seconds == pytest.approx(
+            num_indices_between_frames / decoder.metadata.average_fps, abs=1e-5
+        )
 
 
 @pytest.mark.parametrize(
@@ -133,10 +141,11 @@ def test_time_based_sampler(sampler, seconds_between_frames):
     expected_seconds_between_frames = (
         seconds_between_frames or 1 / decoder.metadata.average_fps
     )
-    avg_seconds_between_frames = clips.pts_seconds.diff(dim=1).mean()
-    assert avg_seconds_between_frames == pytest.approx(
-        expected_seconds_between_frames, abs=0.05
-    )
+    for clip in clips:
+        avg_seconds_between_frames = clip.pts_seconds.diff().mean()
+        assert avg_seconds_between_frames == pytest.approx(
+            expected_seconds_between_frames, abs=0.05
+        )
 
 
 @pytest.mark.parametrize(
@@ -199,8 +208,8 @@ def test_sampling_range(
         else pytest.raises(AssertionError, match="Tensor-likes are not")
     )
     with cm:
-        for clip_data in clips.data:
-            assert_tensor_equal(clip_data, clips.data[0])
+        for clip in clips:
+            assert_tensor_equal(clip.data, clips.data[0])
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
@@ -227,11 +236,11 @@ def test_sampling_range_negative(sampler):
     )
 
     # There is only one unique clip in clips_1...
-    for clip_data in clips_1.data:
-        assert_tensor_equal(clip_data, clips_1.data[0])
+    for clip_1 in clips_1:
+        assert_tensor_equal(clip_1.data, clips_1.data[0])
     # ... and it's the same that's in clips_2
-    for clip_data in clips_2.data:
-        assert_tensor_equal(clip_data, clips_1.data[0])
+    for clip_2 in clips_2:
+        assert_tensor_equal(clip_2.data, clips_1.data[0])
 
 
 @pytest.mark.parametrize(
