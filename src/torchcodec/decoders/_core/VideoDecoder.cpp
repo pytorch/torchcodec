@@ -894,8 +894,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 // Callers may pass a pre-allocated tensor, where the output frame tensor will
 // be stored. This parameter is honored in any case, but it only leads to a
 // speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
-// decoded frame directly into `preAllocatedtensor.data_ptr()`. That's not
-// possible with filtegraph, leading to an extra copy.
+// decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
+// found a way to do that with filtegraph.
+// TODO: Figure out whether that's possilbe!
 // Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
