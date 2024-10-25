@@ -68,7 +68,7 @@ jobs:
         which ffmpeg
         # We skip certain tests because they are not relevant to GPU decoding and they always fail with
         # a custom FFMPEG build.
-        pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
+        FAIL_WITHOUT_CUDA=1 pytest -k "not (test_get_metadata or get_ffmpeg_version)" -vvv
         echo '::endgroup::'
 
         python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0 --resize_devices=none
