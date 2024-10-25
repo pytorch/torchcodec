@@ -223,6 +223,28 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
+void testDecoderWithColorConversion(const std::string& colorConversionLibrary) {
+  std::string path = getResourcePath("nasa_13013.mp4");
+  auto preAllocatedOutputTensor = torch::empty({270, 480, 3}, {torch::kUInt8});
+
+  std::unique_ptr<VideoDecoder> ourDecoder =
+      createDecoderFromPath(path, GetParam());
+  ourDecoder->scanFileAndUpdateMetadataAndIndex();
+  int bestVideoStreamIndex =
+      *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
+  ourDecoder->addVideoStreamDecoder(
+      bestVideoStreamIndex,
+      VideoDecoder::VideoStreamDecoderOptions(
+          "color_conversion_library=" + colorConversionLibrary));
+  auto output = ourDecoder->getFrameAtIndex(
+      bestVideoStreamIndex, 0, preAllocatedOutputTensor);
+  EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
+}
+TEST_P(VideoDecoderTest, PreAllocatedTensor) {
+  testDecoderWithColorConversion("swscale");
+  testDecoderWithColorConversion("filtergraph");
+}
+
 TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
