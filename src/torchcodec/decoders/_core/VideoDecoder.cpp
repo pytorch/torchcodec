@@ -890,6 +890,14 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
+// Note [preAllocatedOutputTensor with swscale and filtergraph]:
+// Callers may pass a pre-allocated tensor, where the output frame tensor will
+// be stored. This parameter is honored in any case, but it only leads to a
+// speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
+// decoded frame directly into `preAllocatedtensor.data_ptr()`. That's not
+// possible with filtegraph, leading to an extra copy.
+// Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
+// `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
     DecodedOutput& output,
@@ -926,6 +934,9 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
       output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      if (preAllocatedOutputTensor.has_value()) {
+        preAllocatedOutputTensor.value().copy_(output.frame);
+      }
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
@@ -1077,10 +1088,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     } else {
       DecodedOutput singleOut = getFrameAtIndex(
           streamIndex, indexInVideo, output.frames[indexInOutput]);
-      if (options.colorConversionLibrary ==
-          ColorConversionLibrary::FILTERGRAPH) {
-        output.frames[indexInOutput] = singleOut.frame;
-      }
       output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
       output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
@@ -1157,9 +1164,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
-    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
@@ -1253,9 +1257,6 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
-    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
