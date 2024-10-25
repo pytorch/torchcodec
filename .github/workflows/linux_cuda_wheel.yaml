@@ -85,7 +85,11 @@ jobs:
         uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
         with:
           python-version: ${{ matrix.python-version }}
-          default-packages: "conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
+          #
+          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
+          # So we use the latter convention for libnpp.
+          # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
+          default-packages: "conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }} nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }}"
       - name: Check env
         run: |
           ${CONDA_RUN} env
@@ -106,11 +110,6 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v3
 
-      - name: Install cuda runtime dependencies
-        run: |
-          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
-          # So we use the latter convention for libnpp.
-          ${CONDA_RUN} conda install --yes nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }}
       - name: Install test dependencies
         run: |
           # Ideally we would find a way to get those dependencies from pyproject.toml
