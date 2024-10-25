@@ -71,7 +71,7 @@ def _validate_sampling_range_time_based(
     if sampling_range_start is None:
         sampling_range_start = begin_stream_seconds
     else:
-        if sampling_range_start <= begin_stream_seconds:
+        if sampling_range_start < begin_stream_seconds:
             raise ValueError(
                 f"sampling_range_start ({sampling_range_start}) must be at least {begin_stream_seconds}"
             )
