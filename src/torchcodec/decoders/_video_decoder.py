@@ -37,7 +37,7 @@ class VideoDecoder:
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
         num_ffmpeg_threads (int, optional): The number of threads to use for decoding.
-            Use 1 for single-threaded decoding which is best if you are running multiple
+            Use 1 for single-threaded decoding which may be best if you are running multiple
             instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
             decoding which is best if you are running a single instance of ``VideoDecoder``.
             Default: 1.
