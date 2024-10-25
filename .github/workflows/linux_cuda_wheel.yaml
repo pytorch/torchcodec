@@ -131,7 +131,7 @@ jobs:
           ls
       - name: Smoke test
         run: |
-          ${CONDA_RUN} find $CONDA_PREFIX -name libnvrtc.so\*
+          ${CONDA_RUN} find $CONDA_PREFIX -name libnvrtc.so\* | xargs ldd
           ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
