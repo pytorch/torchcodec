@@ -95,7 +95,7 @@ jobs:
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }} torchvision
           ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
@@ -113,7 +113,6 @@ jobs:
           ${CONDA_RUN} conda install --yes nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }}
       - name: Install test dependencies
         run: |
-          ${CONDA_RUN} python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           # Ideally we would find a way to get those dependencies from pyproject.toml
           ${CONDA_RUN} python -m pip install numpy pytest pillow
 
