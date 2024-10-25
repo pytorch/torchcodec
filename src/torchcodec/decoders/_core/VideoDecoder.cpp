@@ -905,9 +905,9 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
+  torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      torch::Tensor tensor;
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
       if (preAllocatedOutputTensor.has_value()) {
@@ -933,9 +933,12 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      tensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
       if (preAllocatedOutputTensor.has_value()) {
-        preAllocatedOutputTensor.value().copy_(output.frame);
+        preAllocatedOutputTensor.value().copy_(tensor);
+        output.frame = preAllocatedOutputTensor.value();
+      } else {
+        output.frame = tensor;
       }
     } else {
       throw std::runtime_error(
