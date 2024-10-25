@@ -154,29 +154,25 @@ def test_time_based_sampler(sampler, seconds_between_frames):
         partial(
             clips_at_regular_indices,
             num_clips=1,
-            num_frames_per_clip=5,
             sampling_range_start=0,
             sampling_range_end=1,
         ),
         partial(
             clips_at_random_indices,
             num_clips=1,
-            num_frames_per_clip=5,
             sampling_range_start=0,
             sampling_range_end=1,
         ),
         partial(
             clips_at_random_timestamps,
             num_clips=1,
-            num_frames_per_clip=5,
             sampling_range_start=0,
             sampling_range_end=0.01,
         ),
         partial(
             clips_at_regular_timestamps,
             seconds_between_clip_starts=1,
-            seconds_between_frames=0.0335,
-            num_frames_per_clip=5,
+            seconds_between_frames=0.0335,  # forces consecutive frames
             sampling_range_start=0,
             sampling_range_end=0.01,
         ),
@@ -187,9 +183,13 @@ def test_against_ref(sampler):
     # video. We can then assert the exact frame values against our existing test
     # resource reference.
     decoder = VideoDecoder(NASA_VIDEO.path)
-    expected_clip_data = NASA_VIDEO.get_frame_data_by_range(start=0, stop=5)
 
-    clip = sampler(decoder)[0]
+    num_frames_per_clip = 5
+    expected_clip_data = NASA_VIDEO.get_frame_data_by_range(
+        start=0, stop=num_frames_per_clip
+    )
+
+    clip = sampler(decoder, num_frames_per_clip=num_frames_per_clip)[0]
     assert_tensor_equal(clip.data, expected_clip_data)
 
 
