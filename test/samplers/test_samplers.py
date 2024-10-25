@@ -149,6 +149,51 @@ def test_time_based_sampler(sampler, seconds_between_frames):
 
 
 @pytest.mark.parametrize(
+    "sampler",
+    (
+        partial(
+            clips_at_regular_indices,
+            num_clips=1,
+            num_frames_per_clip=5,
+            sampling_range_start=0,
+            sampling_range_end=1,
+        ),
+        partial(
+            clips_at_random_indices,
+            num_clips=1,
+            num_frames_per_clip=5,
+            sampling_range_start=0,
+            sampling_range_end=1,
+        ),
+        partial(
+            clips_at_random_timestamps,
+            num_clips=1,
+            num_frames_per_clip=5,
+            sampling_range_start=0,
+            sampling_range_end=0.01,
+        ),
+        partial(
+            clips_at_regular_timestamps,
+            seconds_between_clip_starts=1,
+            seconds_between_frames=0.0335,
+            num_frames_per_clip=5,
+            sampling_range_start=0,
+            sampling_range_end=0.01,
+        ),
+    ),
+)
+def test_against_ref(sampler):
+    # Force the sampler to sample a clip containing the first 5 frames of the
+    # video. We can then assert the exact frame values against our existing test
+    # resource reference.
+    decoder = VideoDecoder(NASA_VIDEO.path)
+    expected_clip_data = NASA_VIDEO.get_frame_data_by_range(start=0, stop=5)
+
+    clip = sampler(decoder)[0]
+    assert_tensor_equal(clip.data, expected_clip_data)
+
+
+@pytest.mark.parametrize(
     "sampler, sampling_range_start, sampling_range_end, assert_all_equal",
     (
         (partial(clips_at_random_indices, num_clips=10), 10, 11, True),
