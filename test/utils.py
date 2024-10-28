@@ -265,6 +265,8 @@ NASA_VIDEO = TestVideo(
             8: TestFrameInfo(pts_seconds=0.266933, duration_seconds=0.033367),
             9: TestFrameInfo(pts_seconds=0.300300, duration_seconds=0.033367),
             10: TestFrameInfo(pts_seconds=0.333667, duration_seconds=0.033367),
+            25: TestFrameInfo(pts_seconds=0.8342, duration_seconds=0.033367),
+            35: TestFrameInfo(pts_seconds=1.1678, duration_seconds=0.033367),
         },
     },
 )

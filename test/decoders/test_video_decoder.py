@@ -7,6 +7,7 @@
 import numpy
 import pytest
 import torch
+from torchcodec import FrameBatch
 
 from torchcodec.decoders import _core, VideoDecoder
 
@@ -54,8 +55,9 @@ class TestVideoDecoder:
         with pytest.raises(ValueError, match="No valid stream found"):
             decoder = VideoDecoder(NASA_VIDEO.path, stream_index=1)  # noqa
 
-    def test_getitem_int(self):
-        decoder = VideoDecoder(NASA_VIDEO.path)
+    @pytest.mark.parametrize("num_ffmpeg_threads", (1, 4))
+    def test_getitem_int(self, num_ffmpeg_threads):
+        decoder = VideoDecoder(NASA_VIDEO.path, num_ffmpeg_threads=num_ffmpeg_threads)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
@@ -301,9 +303,12 @@ class TestVideoDecoder:
 
         assert_tensor_equal(ref_frame9, frame9.data)
         assert isinstance(frame9.pts_seconds, float)
-        assert frame9.pts_seconds == pytest.approx(0.3003)
+        expected_frame_info = NASA_VIDEO.get_frame_info(9)
+        assert frame9.pts_seconds == pytest.approx(expected_frame_info.pts_seconds)
         assert isinstance(frame9.duration_seconds, float)
-        assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
+        assert frame9.duration_seconds == pytest.approx(
+            expected_frame_info.duration_seconds, rel=1e-3
+        )
 
         # test numpy.int64
         frame9 = decoder.get_frame_at(numpy.int64(9))
@@ -340,40 +345,129 @@ class TestVideoDecoder:
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(10000)  # noqa
 
-    def test_get_frame_displayed_at(self):
+    def test_get_frames_at(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        frames = decoder.get_frames_at([35, 25])
+
+        assert isinstance(frames, FrameBatch)
+
+        assert_tensor_equal(frames[0].data, NASA_VIDEO.get_frame_data_by_index(35))
+        assert_tensor_equal(frames[1].data, NASA_VIDEO.get_frame_data_by_index(25))
+
+        expected_pts_seconds = torch.tensor(
+            [
+                NASA_VIDEO.get_frame_info(35).pts_seconds,
+                NASA_VIDEO.get_frame_info(25).pts_seconds,
+            ],
+            dtype=torch.float64,
+        )
+        torch.testing.assert_close(
+            frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
+        )
+
+        expected_duration_seconds = torch.tensor(
+            [
+                NASA_VIDEO.get_frame_info(35).duration_seconds,
+                NASA_VIDEO.get_frame_info(25).duration_seconds,
+            ],
+            dtype=torch.float64,
+        )
+        torch.testing.assert_close(
+            frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
+        )
+
+    def test_get_frames_at_fails(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(RuntimeError, match="Invalid frame index=-1"):
+            decoder.get_frames_at([-1])
+
+        with pytest.raises(RuntimeError, match="Invalid frame index=390"):
+            decoder.get_frames_at([390])
+
+        with pytest.raises(RuntimeError, match="Expected a value of type"):
+            decoder.get_frames_at([0.3])
+
+    def test_get_frame_played_at(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
 
         ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.006).data)
-        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.02).data)
-        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(6.039366).data)
-        assert isinstance(decoder.get_frame_displayed_at(6.02).pts_seconds, float)
-        assert isinstance(decoder.get_frame_displayed_at(6.02).duration_seconds, float)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.006).data)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.02).data)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.039366).data)
+        assert isinstance(decoder.get_frame_played_at(6.02).pts_seconds, float)
+        assert isinstance(decoder.get_frame_played_at(6.02).duration_seconds, float)
 
-    def test_get_frame_displayed_at_h265(self):
+    def test_get_frame_played_at_h265(self):
         # Non-regression test for https://github.com/pytorch/torchcodec/issues/179
         decoder = VideoDecoder(H265_VIDEO.path)
         ref_frame6 = H265_VIDEO.get_frame_data_by_index(5)
-        assert_tensor_equal(ref_frame6, decoder.get_frame_displayed_at(0.5).data)
+        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(0.5).data)
 
-    def test_get_frame_displayed_at_fails(self):
+    def test_get_frame_played_at_fails(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(IndexError, match="Invalid pts in seconds"):
-            frame = decoder.get_frame_displayed_at(-1.0)  # noqa
+            frame = decoder.get_frame_played_at(-1.0)  # noqa
 
         with pytest.raises(IndexError, match="Invalid pts in seconds"):
-            frame = decoder.get_frame_displayed_at(100.0)  # noqa
+            frame = decoder.get_frame_played_at(100.0)  # noqa
+
+    def test_get_frames_played_at(self):
+
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        # Note: We know the frame at ~0.84s has index 25, the one at 1.16s has
+        # index 35. We use those indices as reference to test against.
+        seconds = [0.84, 1.17, 0.85]
+        reference_indices = [25, 35, 25]
+        frames = decoder.get_frames_played_at(seconds)
+
+        assert isinstance(frames, FrameBatch)
+
+        for i in range(len(reference_indices)):
+            assert_tensor_equal(
+                frames.data[i], NASA_VIDEO.get_frame_data_by_index(reference_indices[i])
+            )
+
+        expected_pts_seconds = torch.tensor(
+            [NASA_VIDEO.get_frame_info(i).pts_seconds for i in reference_indices],
+            dtype=torch.float64,
+        )
+        torch.testing.assert_close(
+            frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
+        )
+
+        expected_duration_seconds = torch.tensor(
+            [NASA_VIDEO.get_frame_info(i).duration_seconds for i in reference_indices],
+            dtype=torch.float64,
+        )
+        torch.testing.assert_close(
+            frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
+        )
+
+    def test_get_frames_played_at_fails(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(RuntimeError, match="must be in range"):
+            decoder.get_frames_played_at([-1])
+
+        with pytest.raises(RuntimeError, match="must be in range"):
+            decoder.get_frames_played_at([14])
+
+        with pytest.raises(RuntimeError, match="Expected a value of type"):
+            decoder.get_frames_played_at(["bad"])
 
     @pytest.mark.parametrize("stream_index", [0, 3, None])
-    def test_get_frames_at(self, stream_index):
+    def test_get_frames_in_range(self, stream_index):
         decoder = VideoDecoder(NASA_VIDEO.path, stream_index=stream_index)
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
             start=9, stop=10, stream_index=stream_index
         )
-        frames9 = decoder.get_frames_at(start=9, stop=10)
+        frames9 = decoder.get_frames_in_range(start=9, stop=10)
 
         assert_tensor_equal(ref_frames9, frames9.data)
         assert frames9.pts_seconds[0].item() == pytest.approx(
@@ -389,7 +483,7 @@ class TestVideoDecoder:
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(
             start=0, stop=10, stream_index=stream_index
         )
-        frames0_9 = decoder.get_frames_at(start=0, stop=10)
+        frames0_9 = decoder.get_frames_in_range(start=0, stop=10)
         assert frames0_9.data.shape == torch.Size(
             [
                 10,
@@ -412,7 +506,7 @@ class TestVideoDecoder:
         ref_frames0_8_2 = NASA_VIDEO.get_frame_data_by_range(
             start=0, stop=10, step=2, stream_index=stream_index
         )
-        frames0_8_2 = decoder.get_frames_at(start=0, stop=10, step=2)
+        frames0_8_2 = decoder.get_frames_in_range(start=0, stop=10, step=2)
         assert frames0_8_2.data.shape == torch.Size(
             [
                 5,
@@ -434,13 +528,13 @@ class TestVideoDecoder:
         )
 
         # test numpy.int64 for indices
-        frames0_8_2 = decoder.get_frames_at(
+        frames0_8_2 = decoder.get_frames_in_range(
             start=numpy.int64(0), stop=numpy.int64(10), step=numpy.int64(2)
         )
         assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
 
         # an empty range is valid!
-        empty_frames = decoder.get_frames_at(5, 5)
+        empty_frames = decoder.get_frames_in_range(5, 5)
         assert_tensor_equal(
             empty_frames.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index),
@@ -456,10 +550,11 @@ class TestVideoDecoder:
         (
             lambda decoder: decoder[0],
             lambda decoder: decoder.get_frame_at(0).data,
-            lambda decoder: decoder.get_frames_at(0, 4).data,
-            lambda decoder: decoder.get_frame_displayed_at(0).data,
-            # TODO: uncomment once D60001893 lands
-            # lambda decoder: decoder.get_frames_displayed_at(0, 1).data,
+            lambda decoder: decoder.get_frames_at([0, 1]).data,
+            lambda decoder: decoder.get_frames_in_range(0, 4).data,
+            lambda decoder: decoder.get_frame_played_at(0).data,
+            lambda decoder: decoder.get_frames_played_at([0, 1]).data,
+            lambda decoder: decoder.get_frames_played_in_range(0, 1).data,
         ),
     )
     def test_dimension_order(self, dimension_order, frame_getter):
@@ -487,7 +582,7 @@ class TestVideoDecoder:
         decoder = VideoDecoder(NASA_VIDEO.path, stream_index=stream_index)
 
         # Note that we are comparing the results of VideoDecoder's method:
-        #   get_frames_displayed_at()
+        #   get_frames_played_in_range()
         # With the testing framework's method:
         #   get_frame_data_by_range()
         # That is, we are testing the correctness of a pts-based range against an index-
@@ -504,7 +599,7 @@ class TestVideoDecoder:
         # value for frame 5 that we have access to on the Python side is slightly less than the pts
         # value on the C++ side. This test still produces the correct result because a slightly
         # less value still falls into the correct window.
-        frames0_4 = decoder.get_frames_displayed_at(
+        frames0_4 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(0).pts_seconds, decoder.get_frame_at(5).pts_seconds
         )
         assert_tensor_equal(
@@ -513,7 +608,7 @@ class TestVideoDecoder:
         )
 
         # Range where the stop seconds is about halfway between pts values for two frames.
-        also_frames0_4 = decoder.get_frames_displayed_at(
+        also_frames0_4 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(0).pts_seconds,
             decoder.get_frame_at(4).pts_seconds + HALF_DURATION,
         )
@@ -521,7 +616,7 @@ class TestVideoDecoder:
 
         # Again, the intention here is to provide the exact values we care about. In practice, our
         # pts values are slightly smaller, so we nudge the start upwards.
-        frames5_9 = decoder.get_frames_displayed_at(
+        frames5_9 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(5).pts_seconds,
             decoder.get_frame_at(10).pts_seconds,
         )
@@ -533,7 +628,7 @@ class TestVideoDecoder:
         # Range where we provide start_seconds and stop_seconds that are different, but
         # also should land in the same window of time between two frame's pts values. As
         # a result, we should only get back one frame.
-        frame6 = decoder.get_frames_displayed_at(
+        frame6 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(6).pts_seconds,
             decoder.get_frame_at(6).pts_seconds + HALF_DURATION,
         )
@@ -543,7 +638,7 @@ class TestVideoDecoder:
         )
 
         # Very small range that falls in the same frame.
-        frame35 = decoder.get_frames_displayed_at(
+        frame35 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(35).pts_seconds,
             decoder.get_frame_at(35).pts_seconds + 1e-10,
         )
@@ -555,7 +650,7 @@ class TestVideoDecoder:
         # Single frame where the start seconds is before frame i's pts, and the stop is
         # after frame i's pts, but before frame i+1's pts. In that scenario, we expect
         # to see frames i-1 and i.
-        frames7_8 = decoder.get_frames_displayed_at(
+        frames7_8 = decoder.get_frames_played_in_range(
             NASA_VIDEO.get_frame_info(8, stream_index=stream_index).pts_seconds
             - HALF_DURATION,
             NASA_VIDEO.get_frame_info(8, stream_index=stream_index).pts_seconds
@@ -567,7 +662,7 @@ class TestVideoDecoder:
         )
 
         # Start and stop seconds are the same value, which should not return a frame.
-        empty_frame = decoder.get_frames_displayed_at(
+        empty_frame = decoder.get_frames_played_in_range(
             NASA_VIDEO.get_frame_info(4, stream_index=stream_index).pts_seconds,
             NASA_VIDEO.get_frame_info(4, stream_index=stream_index).pts_seconds,
         )
@@ -583,7 +678,7 @@ class TestVideoDecoder:
         )
 
         # Start and stop seconds land within the first frame.
-        frame0 = decoder.get_frames_displayed_at(
+        frame0 = decoder.get_frames_played_in_range(
             NASA_VIDEO.get_frame_info(0, stream_index=stream_index).pts_seconds,
             NASA_VIDEO.get_frame_info(0, stream_index=stream_index).pts_seconds
             + HALF_DURATION,
@@ -595,7 +690,7 @@ class TestVideoDecoder:
 
         # We should be able to get all frames by giving the beginning and ending time
         # for the stream.
-        all_frames = decoder.get_frames_displayed_at(
+        all_frames = decoder.get_frames_played_in_range(
             decoder.metadata.begin_stream_seconds, decoder.metadata.end_stream_seconds
         )
         assert_tensor_equal(all_frames.data, decoder[:])
@@ -604,13 +699,13 @@ class TestVideoDecoder:
         decoder = VideoDecoder(NASA_VIDEO.path)
 
         with pytest.raises(ValueError, match="Invalid start seconds"):
-            frame = decoder.get_frames_displayed_at(100.0, 1.0)  # noqa
+            frame = decoder.get_frames_played_in_range(100.0, 1.0)  # noqa
 
         with pytest.raises(ValueError, match="Invalid start seconds"):
-            frame = decoder.get_frames_displayed_at(20, 23)  # noqa
+            frame = decoder.get_frames_played_in_range(20, 23)  # noqa
 
         with pytest.raises(ValueError, match="Invalid stop seconds"):
-            frame = decoder.get_frames_displayed_at(0, 23)  # noqa
+            frame = decoder.get_frames_played_in_range(0, 23)  # noqa
 
 
 if __name__ == "__main__":

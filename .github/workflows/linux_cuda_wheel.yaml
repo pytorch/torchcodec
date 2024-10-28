@@ -82,20 +82,25 @@ jobs:
           name: pytorch_torchcodec__3.9_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup miniconda using test-infra
-        uses: ahmadsharif1/test-infra/.github/actions/setup-miniconda@14bc3c29f88d13b0237ab4ddf00aa409e45ade40
+        uses: pytorch/test-infra/.github/actions/setup-miniconda@main
         with:
           python-version: ${{ matrix.python-version }}
-          default-packages: "conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
+          #
+          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
+          # So we use the latter convention for libnpp.
+          # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
+          default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
       - name: Check env
         run: |
           ${CONDA_RUN} env
           ${CONDA_RUN} conda info
           ${CONDA_RUN} nvidia-smi
+          ${CONDA_RUN} conda list
       - name: Update pip
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          ${CONDA_RUN} python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
           ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
@@ -106,14 +111,8 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v3
 
-      - name: Install cuda runtime dependencies
-        run: |
-          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
-          # So we use the latter convention for libnpp.
-          ${CONDA_RUN} conda install --yes nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }}
       - name: Install test dependencies
         run: |
-          ${CONDA_RUN} python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           # Ideally we would find a way to get those dependencies from pyproject.toml
           ${CONDA_RUN} python -m pip install numpy pytest pillow
 

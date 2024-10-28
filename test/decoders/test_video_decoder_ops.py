@@ -96,7 +96,7 @@ class TestOps:
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
-        # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
+        # The frame that is played at 6 seconds is frame 180 from a 0-based index.
         frame6, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
