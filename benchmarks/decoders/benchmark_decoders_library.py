@@ -1,6 +1,11 @@
 import abc
 import json
+import os
 import timeit
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 import torch
 import torch.utils.benchmark as benchmark
@@ -118,10 +123,11 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
 
 
 class TorchcodecNonCompiledWithOptions(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None):
+    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
+        self._device = device
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
@@ -129,6 +135,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
         frames = []
         times = []
@@ -292,6 +299,97 @@ def create_torchcodec_decoder_from_file(video_file):
     return video_decoder
 
 
+def plot_data(df_data, plot_path):
+    # Creating the DataFrame
+    df = pd.DataFrame(df_data)
+
+    # Sorting by video, type, and frame_count
+    df_sorted = df.sort_values(by=["video", "type", "frame_count"])
+
+    # Group by video first
+    grouped_by_video = df_sorted.groupby("video")
+
+    # Define colors (consistent across decoders)
+    colors = plt.get_cmap("tab10")
+
+    # Find the unique combinations of (type, frame_count) per video
+    video_type_combinations = {
+        video: video_group.groupby(["type", "frame_count"]).ngroups
+        for video, video_group in grouped_by_video
+    }
+
+    # Get the unique videos and the maximum number of (type, frame_count) combinations per video
+    unique_videos = list(video_type_combinations.keys())
+    max_combinations = max(video_type_combinations.values())
+
+    # Create subplots: each row is a video, and each column is for a unique (type, frame_count)
+    fig, axes = plt.subplots(
+        nrows=len(unique_videos),
+        ncols=max_combinations,
+        figsize=(max_combinations * 6, len(unique_videos) * 4),
+        sharex=True,
+        sharey=True,
+    )
+
+    # Handle cases where there's only one row or column
+    if len(unique_videos) == 1:
+        axes = np.array([axes])  # Make sure axes is a list of lists
+    if max_combinations == 1:
+        axes = np.expand_dims(axes, axis=1)  # Ensure a 2D array for axes
+
+    # Loop through each video and its sub-groups
+    for row, (video, video_group) in enumerate(grouped_by_video):
+        sub_group = video_group.groupby(["type", "frame_count"])
+
+        # Loop through each (type, frame_count) group for this video
+        for col, ((vtype, vcount), group) in enumerate(sub_group):
+            ax = axes[row, col]  # Select the appropriate axis
+
+            # Set the title for the subplot
+            base_video = os.path.basename(video)
+            ax.set_title(
+                f"video={base_video}\ndecode_pattern={vcount} x {vtype}", fontsize=12
+            )
+
+            # Plot bars with error bars
+            ax.barh(
+                group["decoder"],
+                group["fps"],
+                xerr=[group["fps"] - group["fps_p75"], group["fps_p25"] - group["fps"]],
+                color=[colors(i) for i in range(len(group))],
+                align="center",
+                capsize=5,
+            )
+
+            # Set the labels
+            ax.set_xlabel("FPS")
+            ax.set_ylabel("Decoder")
+
+            # Reverse the order of the handles and labels to match the order of the bars
+            handles = [
+                plt.Rectangle((0, 0), 1, 1, color=colors(i)) for i in range(len(group))
+            ]
+            ax.legend(
+                handles[::-1],
+                group["decoder"][::-1],
+                title="Decoder",
+                loc="upper right",
+            )
+
+    # Remove any empty subplots for videos with fewer combinations
+    for row in range(len(unique_videos)):
+        for col in range(video_type_combinations[unique_videos[row]], max_combinations):
+            fig.delaxes(axes[row, col])
+
+    # Adjust layout to avoid overlap
+    plt.tight_layout()
+
+    # Show plot
+    plt.savefig(
+        plot_path,
+    )
+
+
 def run_benchmarks(
     decoder_dict,
     video_paths,
@@ -300,9 +398,11 @@ def run_benchmarks(
     benchmark_video_creation,
 ):
     results = []
+    df_data = []
+    print(f"video_paths={video_paths}")
     verbose = False
     for decoder_name, decoder in decoder_dict.items():
-        for video_path in video_paths.split(","):
+        for video_path in video_paths:
             print(f"video={video_path}, decoder={decoder_name}")
             # We only use the VideoDecoder to get the metadata and get
             # the list of PTS values to seek to.
@@ -331,6 +431,19 @@ def run_benchmarks(
             results.append(
                 seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
             )
+            df_item = {}
+            df_item["decoder"] = decoder_name
+            df_item["video"] = video_path
+            df_item["description"] = results[-1].description
+            df_item["frame_count"] = num_uniform_samples
+            df_item["median"] = results[-1].median
+            df_item["iqr"] = results[-1].iqr
+            df_item["type"] = "seek()+next()"
+            df_item["fps"] = 1.0 * num_uniform_samples / results[-1].median
+            df_item["fps_p75"] = 1.0 * num_uniform_samples / results[-1]._p75
+            df_item["fps_p25"] = 1.0 * num_uniform_samples / results[-1]._p25
+            df_data.append(df_item)
+
             for num_consecutive_nexts in [1, 10]:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
@@ -348,8 +461,20 @@ def run_benchmarks(
                         min_run_time=min_runtime_seconds
                     )
                 )
+                df_item = {}
+                df_item["decoder"] = decoder_name
+                df_item["video"] = video_path
+                df_item["description"] = results[-1].description
+                df_item["frame_count"] = num_consecutive_nexts
+                df_item["median"] = results[-1].median
+                df_item["iqr"] = results[-1].iqr
+                df_item["type"] = "next()"
+                df_item["fps"] = 1.0 * num_consecutive_nexts / results[-1].median
+                df_item["fps_p75"] = 1.0 * num_consecutive_nexts / results[-1]._p75
+                df_item["fps_p25"] = 1.0 * num_consecutive_nexts / results[-1]._p25
+                df_data.append(df_item)
 
-        first_video_path = video_paths.split(",")[0]
+        first_video_path = video_paths[0]
         if benchmark_video_creation:
             simple_decoder = VideoDecoder(first_video_path)
             metadata = simple_decoder.metadata
@@ -371,3 +496,4 @@ def run_benchmarks(
             )
     compare = benchmark.Compare(results)
     compare.print()
+    return df_data

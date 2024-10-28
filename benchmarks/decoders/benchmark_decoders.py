@@ -11,6 +11,7 @@ from pathlib import Path
 
 from benchmark_decoders_library import (
     DecordNonBatchDecoderAccurateSeek,
+    plot_data,
     run_benchmarks,
     TorchAudioDecoder,
     TorchcodecCompiled,
@@ -71,6 +72,18 @@ def main() -> None:
         type=str,
         default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,tcoptions:num_threads=1",
     )
+    parser.add_argument(
+        "--bm_video_dir",
+        help="Directory where video files reside. We will run benchmarks on all .mp4 files in this directory.",
+        type=str,
+        default="",
+    )
+    parser.add_argument(
+        "--plot_path",
+        help="Path where the generated plot is stored, if non-empty",
+        type=str,
+        default="",
+    )
 
     args = parser.parse_args()
     decoders = set(args.decoders.split(","))
@@ -118,13 +131,21 @@ def main() -> None:
             decoder_dict["TorchcodecNonCompiled:" + options] = (
                 TorchcodecNonCompiledWithOptions(**kwargs_dict)
             )
-    run_benchmarks(
+    video_paths = args.bm_video_paths.split(",")
+    if args.bm_video_dir:
+        video_paths = []
+        for entry in os.scandir(args.bm_video_dir):
+            if entry.is_file() and entry.name.endswith(".mp4"):
+                video_paths.append(entry.path)
+
+    df_data = run_benchmarks(
         decoder_dict,
-        args.bm_video_paths,
+        video_paths,
         num_uniform_samples,
         args.bm_video_speed_min_run_seconds,
         args.bm_video_creation,
     )
+    plot_data(df_data, args.plot_path)
 
 
 if __name__ == "__main__":
