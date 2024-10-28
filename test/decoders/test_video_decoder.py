@@ -302,9 +302,12 @@ class TestVideoDecoder:
 
         assert_tensor_equal(ref_frame9, frame9.data)
         assert isinstance(frame9.pts_seconds, float)
-        assert frame9.pts_seconds == pytest.approx(0.3003)
+        expected_frame_info = NASA_VIDEO.get_frame_info(9)
+        assert frame9.pts_seconds == pytest.approx(expected_frame_info.pts_seconds)
         assert isinstance(frame9.duration_seconds, float)
-        assert frame9.duration_seconds == pytest.approx(0.03337, rel=1e-3)
+        assert frame9.duration_seconds == pytest.approx(
+            expected_frame_info.duration_seconds, rel=1e-3
+        )
 
         # test numpy.int64
         frame9 = decoder.get_frame_at(numpy.int64(9))
@@ -344,22 +347,31 @@ class TestVideoDecoder:
     def test_get_frames_at(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
 
-        indices = [35, 25]
-        frames = decoder.get_frames_at(indices)
+        frames = decoder.get_frames_at([35, 25])
 
         assert isinstance(frames, FrameBatch)
 
-        for i in range(len(indices)):
-            assert_tensor_equal(
-                frames[i].data, NASA_VIDEO.get_frame_data_by_index(indices[i])
-            )
+        assert_tensor_equal(frames[0].data, NASA_VIDEO.get_frame_data_by_index(35))
+        assert_tensor_equal(frames[1].data, NASA_VIDEO.get_frame_data_by_index(25))
 
-        expected_pts_seconds = torch.tensor([1.1678, 0.8342], dtype=torch.float64)
+        expected_pts_seconds = torch.tensor(
+            [
+                NASA_VIDEO.get_frame_info(35).pts_seconds,
+                NASA_VIDEO.get_frame_info(25).pts_seconds,
+            ],
+            dtype=torch.float64,
+        )
         torch.testing.assert_close(
             frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
         )
 
-        expected_duration_seconds = torch.tensor([0.0334, 0.0334], dtype=torch.float64)
+        expected_duration_seconds = torch.tensor(
+            [
+                NASA_VIDEO.get_frame_info(35).duration_seconds,
+                NASA_VIDEO.get_frame_info(25).duration_seconds,
+            ],
+            dtype=torch.float64,
+        )
         torch.testing.assert_close(
             frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
         )
@@ -404,27 +416,31 @@ class TestVideoDecoder:
     def test_get_frames_displayed_at(self):
 
         decoder = VideoDecoder(NASA_VIDEO.path)
-        ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        ref_frame10 = NASA_VIDEO.get_frame_by_name("time10.000000")
 
-        seconds = [6.02, 10.01, 6.01]
+        # Note: We know the frame at ~0.84s has index 25, the one at 1.16s has
+        # index 35. We use those indices as reference to test against.
+        seconds = [0.84, 1.17, 0.85]
+        reference_indices = [25, 35, 25]
         frames = decoder.get_frames_displayed_at(seconds)
 
         assert isinstance(frames, FrameBatch)
 
-        assert_tensor_equal(frames.data[0], ref_frame6)
-        assert_tensor_equal(frames.data[1], ref_frame10)
-        assert_tensor_equal(frames.data[2], ref_frame6)
+        for i in range(len(reference_indices)):
+            assert_tensor_equal(
+                frames.data[i], NASA_VIDEO.get_frame_data_by_index(reference_indices[i])
+            )
 
         expected_pts_seconds = torch.tensor(
-            [6.0060, 10.0100, 6.0060], dtype=torch.float64
+            [NASA_VIDEO.get_frame_info(i).pts_seconds for i in reference_indices],
+            dtype=torch.float64,
         )
         torch.testing.assert_close(
             frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
         )
 
         expected_duration_seconds = torch.tensor(
-            [0.0334, 0.0334, 0.0334], dtype=torch.float64
+            [NASA_VIDEO.get_frame_info(i).duration_seconds for i in reference_indices],
+            dtype=torch.float64,
         )
         torch.testing.assert_close(
             frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
