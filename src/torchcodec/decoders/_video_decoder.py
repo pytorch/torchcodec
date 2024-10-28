@@ -267,6 +267,13 @@ class VideoDecoder:
     def get_frames_displayed_at(self, seconds: list[float]) -> FrameBatch:
         """Return frames displayed at the given timestamps in seconds.
 
+        .. note::
+
+            Calling this method is more efficient that repeated individual calls
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_displayed_at`.
+            This method makes sure not to decode the same frame twice, and also
+            avoids "backwards seek" operations, which are slow.
+
         Args:
             seconds (list of float): The timestamps in seconds when the frames are displayed.
 
