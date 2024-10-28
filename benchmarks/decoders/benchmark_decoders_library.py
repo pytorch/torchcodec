@@ -1,7 +1,9 @@
 import abc
 import json
 import os
+import subprocess
 import timeit
+from concurrent.futures import ThreadPoolExecutor
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -297,6 +299,55 @@ def create_torchcodec_decoder_from_file(video_file):
     _add_video_stream(video_decoder)
     get_next_frame(video_decoder)
     return video_decoder
+
+
+def generate_video(command):
+    print(command)
+    print(" ".join(command))
+    subprocess.check_call(command)
+
+
+def generate_videos(
+    resolutions,
+    encodings,
+    fpses,
+    gop_sizes,
+    durations,
+    pix_fmts,
+    ffmpeg_cli,
+    output_dir,
+):
+    executor = ThreadPoolExecutor(max_workers=20)
+    video_count = 0
+    for resolution in resolutions:
+        for duration in durations:
+            for fps in fpses:
+                for gop_size in gop_sizes:
+                    for encoding in encodings:
+                        for pix_fmt in pix_fmts:
+                            outfile = f"{output_dir}/{resolution}_{duration}s_{fps}fps_{gop_size}gop_{encoding}_{pix_fmt}.mp4"
+                            command = [
+                                ffmpeg_cli,
+                                "-y",
+                                "-f",
+                                "lavfi",
+                                "-i",
+                                f"color=c=blue:s={resolution}:d={duration}",
+                                "-c:v",
+                                encoding,
+                                "-r",
+                                f"{fps}",
+                                "-g",
+                                f"{gop_size}",
+                                "-pix_fmt",
+                                pix_fmt,
+                                outfile,
+                            ]
+                            executor.submit(generate_video, command)
+                            video_count += 1
+
+    executor.shutdown(wait=True)
+    print(f"Generated {video_count} videos")
 
 
 def plot_data(df_data, plot_path):
