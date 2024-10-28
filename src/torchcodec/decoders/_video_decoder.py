@@ -238,7 +238,7 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_displayed_at(
+    def get_frames_displayed_in_range(
         self, start_seconds: float, stop_seconds: float
     ) -> FrameBatch:
         """Returns multiple frames in the given range.
