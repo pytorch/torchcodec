@@ -536,6 +536,7 @@ class TestVideoDecoder:
             lambda decoder: decoder.get_frames_at([0, 1]).data,
             lambda decoder: decoder.get_frames_in_range(0, 4).data,
             lambda decoder: decoder.get_frame_displayed_at(0).data,
+            lambda decoder: decoder.get_frames_displayed_at([0, 1]).data,
             lambda decoder: decoder.get_frames_displayed_in_range(0, 1).data,
         ),
     )
