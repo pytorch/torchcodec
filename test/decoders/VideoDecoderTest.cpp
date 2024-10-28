@@ -261,24 +261,23 @@ TEST_P(VideoDecoderTest, SeeksCloseToEof) {
   EXPECT_THROW(ourDecoder->getNextDecodedOutputNoDemux(), std::exception);
 }
 
-TEST_P(VideoDecoderTest, GetsFrameDisplayedAtTimestamp) {
+TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
-  auto output = ourDecoder->getFrameDisplayedAtTimestampNoDemux(6.006);
+  auto output = ourDecoder->getFramePlayedAtTimestampNoDemux(6.006);
   EXPECT_EQ(output.ptsSeconds, 6.006);
   // The frame's duration is 0.033367 according to ffprobe,
-  // so the next frame is displayed at timestamp=6.039367.
+  // so the next frame is played at timestamp=6.039367.
   const double kNextFramePts = 6.039366666666667;
-  // The frame that is displayed a microsecond before the next frame is still
+  // The frame that is played a microsecond before the next frame is still
   // the previous frame.
-  output =
-      ourDecoder->getFrameDisplayedAtTimestampNoDemux(kNextFramePts - 1e-6);
+  output = ourDecoder->getFramePlayedAtTimestampNoDemux(kNextFramePts - 1e-6);
   EXPECT_EQ(output.ptsSeconds, 6.006);
-  // The frame that is displayed at the exact pts of the frame is the next
+  // The frame that is played at the exact pts of the frame is the next
   // frame.
-  output = ourDecoder->getFrameDisplayedAtTimestampNoDemux(kNextFramePts);
+  output = ourDecoder->getFramePlayedAtTimestampNoDemux(kNextFramePts);
   EXPECT_EQ(output.ptsSeconds, kNextFramePts);
 
   // This is the timestamp of the last frame in this video.
@@ -288,7 +287,7 @@ TEST_P(VideoDecoderTest, GetsFrameDisplayedAtTimestamp) {
       kPtsOfLastFrameInVideoStream + kDurationOfLastFrameInVideoStream;
   // Sanity check: make sure duration is strictly positive.
   EXPECT_GT(kPtsPlusDurationOfLastFrame, kPtsOfLastFrameInVideoStream);
-  output = ourDecoder->getFrameDisplayedAtTimestampNoDemux(
+  output = ourDecoder->getFramePlayedAtTimestampNoDemux(
       kPtsPlusDurationOfLastFrame - 1e-6);
   EXPECT_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
 }

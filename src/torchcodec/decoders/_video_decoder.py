@@ -240,14 +240,14 @@ class VideoDecoder:
         )
         return FrameBatch(*frames)
 
-    def get_frame_displayed_at(self, seconds: float) -> Frame:
-        """Return a single frame displayed at the given timestamp in seconds.
+    def get_frame_played_at(self, seconds: float) -> Frame:
+        """Return a single frame played at the given timestamp in seconds.
 
         Args:
-            seconds (float): The time stamp in seconds when the frame is displayed.
+            seconds (float): The time stamp in seconds when the frame is played.
 
         Returns:
-            Frame: The frame that is displayed at ``seconds``.
+            Frame: The frame that is played at ``seconds``.
         """
         if not self._begin_stream_seconds <= seconds < self._end_stream_seconds:
             raise IndexError(
@@ -264,21 +264,21 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_displayed_at(self, seconds: list[float]) -> FrameBatch:
-        """Return frames displayed at the given timestamps in seconds.
+    def get_frames_played_at(self, seconds: list[float]) -> FrameBatch:
+        """Return frames played at the given timestamps in seconds.
 
         .. note::
 
             Calling this method is more efficient that repeated individual calls
-            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_displayed_at`.
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at`.
             This method makes sure not to decode the same frame twice, and also
             avoids "backwards seek" operations, which are slow.
 
         Args:
-            seconds (list of float): The timestamps in seconds when the frames are displayed.
+            seconds (list of float): The timestamps in seconds when the frames are played.
 
         Returns:
-            FrameBatch: The frames that are displayed at ``seconds``.
+            FrameBatch: The frames that are played at ``seconds``.
         """
         data, pts_seconds, duration_seconds = core.get_frames_by_pts(
             self._decoder, timestamps=seconds, stream_index=self.stream_index
@@ -289,7 +289,7 @@ class VideoDecoder:
             duration_seconds=duration_seconds,
         )
 
-    def get_frames_displayed_in_range(
+    def get_frames_played_in_range(
         self, start_seconds: float, stop_seconds: float
     ) -> FrameBatch:
         """Returns multiple frames in the given range.

@@ -947,7 +947,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
+VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
@@ -1090,13 +1090,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
     int streamIndex,
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesDisplayedByTimestamps");
+  validateScannedAllStreams("getFramesPlayedByTimestamps");
 
-  // The frame displayed at timestamp t and the one displayed at timestamp `t +
+  // The frame played at timestamp t and the one played at timestamp `t +
   // eps` are probably the same frame, with the same index. The easiest way to
   // avoid decoding that unique frame twice is to convert the input timestamps
   // to indices, and leverage the de-duplication logic of getFramesAtIndices.
@@ -1168,12 +1168,12 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 }
 
 VideoDecoder::BatchDecodedOutput
-VideoDecoder::getFramesDisplayedByTimestampInRange(
+VideoDecoder::getFramesPlayedByTimestampInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+  validateScannedAllStreams("getFramesPlayedByTimestampInRange");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
@@ -1224,7 +1224,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // abstract player displays frames starting at the pts for that frame until
   // the pts for the next frame. There are two consequences:
   //
-  //   1. We ignore the duration for a frame. A frame is displayed until the
+  //   1. We ignore the duration for a frame. A frame is played until the
   //   next frame replaces it. This model is robust to durations being 0 or
   //   incorrect; our source of truth is the pts for frames. If duration is
   //   accurate, the nextPts for a frame would be equivalent to pts + duration.
