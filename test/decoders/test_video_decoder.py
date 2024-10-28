@@ -7,6 +7,7 @@
 import numpy
 import pytest
 import torch
+from torchcodec import FrameBatch
 
 from torchcodec.decoders import _core, VideoDecoder
 
@@ -340,6 +341,38 @@ class TestVideoDecoder:
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(10000)  # noqa
 
+    def test_get_frames_at(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        indices = [35, 25]
+        frames = decoder.get_frames_at(indices)
+
+        assert isinstance(frames, FrameBatch)
+
+        for i in range(len(indices)):
+            assert_tensor_equal(
+                frames[i].data, NASA_VIDEO.get_frame_data_by_index(indices[i])
+            )
+
+        expected_pts_seconds = torch.tensor([1.1678, 0.8342], dtype=torch.float64)
+        torch.testing.assert_close(
+            frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
+        )
+
+        expected_duration_seconds = torch.tensor([0.0334, 0.0334], dtype=torch.float64)
+        torch.testing.assert_close(
+            frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
+        )
+
+    def test_get_frames_at_fails(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+        with pytest.raises(RuntimeError, match="Invalid frame index=-1"):
+            decoder.get_frames_at([-1])
+        with pytest.raises(RuntimeError, match="Invalid frame index=390"):
+            decoder.get_frames_at([390])
+        with pytest.raises(RuntimeError, match="Expected a value of type"):
+            decoder.get_frames_at([0.3])
+
     def test_get_frame_displayed_at(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
 
@@ -456,10 +489,10 @@ class TestVideoDecoder:
         (
             lambda decoder: decoder[0],
             lambda decoder: decoder.get_frame_at(0).data,
+            lambda decoder: decoder.get_frames_at([0, 1]).data,
             lambda decoder: decoder.get_frames_in_range(0, 4).data,
             lambda decoder: decoder.get_frame_displayed_at(0).data,
-            # TODO: uncomment once D60001893 lands
-            # lambda decoder: decoder.get_frames_displayed_in_range(0, 1).data,
+            lambda decoder: decoder.get_frames_displayed_in_range(0, 1).data,
         ),
     )
     def test_dimension_order(self, dimension_order, frame_getter):
