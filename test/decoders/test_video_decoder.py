@@ -366,14 +366,14 @@ class TestVideoDecoder:
             frame = decoder.get_frame_displayed_at(100.0)  # noqa
 
     @pytest.mark.parametrize("stream_index", [0, 3, None])
-    def test_get_frames_at(self, stream_index):
+    def test_get_frames_in_range(self, stream_index):
         decoder = VideoDecoder(NASA_VIDEO.path, stream_index=stream_index)
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
             start=9, stop=10, stream_index=stream_index
         )
-        frames9 = decoder.get_frames_at(start=9, stop=10)
+        frames9 = decoder.get_frames_in_range(start=9, stop=10)
 
         assert_tensor_equal(ref_frames9, frames9.data)
         assert frames9.pts_seconds[0].item() == pytest.approx(
@@ -389,7 +389,7 @@ class TestVideoDecoder:
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(
             start=0, stop=10, stream_index=stream_index
         )
-        frames0_9 = decoder.get_frames_at(start=0, stop=10)
+        frames0_9 = decoder.get_frames_in_range(start=0, stop=10)
         assert frames0_9.data.shape == torch.Size(
             [
                 10,
@@ -412,7 +412,7 @@ class TestVideoDecoder:
         ref_frames0_8_2 = NASA_VIDEO.get_frame_data_by_range(
             start=0, stop=10, step=2, stream_index=stream_index
         )
-        frames0_8_2 = decoder.get_frames_at(start=0, stop=10, step=2)
+        frames0_8_2 = decoder.get_frames_in_range(start=0, stop=10, step=2)
         assert frames0_8_2.data.shape == torch.Size(
             [
                 5,
@@ -434,13 +434,13 @@ class TestVideoDecoder:
         )
 
         # test numpy.int64 for indices
-        frames0_8_2 = decoder.get_frames_at(
+        frames0_8_2 = decoder.get_frames_in_range(
             start=numpy.int64(0), stop=numpy.int64(10), step=numpy.int64(2)
         )
         assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
 
         # an empty range is valid!
-        empty_frames = decoder.get_frames_at(5, 5)
+        empty_frames = decoder.get_frames_in_range(5, 5)
         assert_tensor_equal(
             empty_frames.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index),
@@ -456,7 +456,7 @@ class TestVideoDecoder:
         (
             lambda decoder: decoder[0],
             lambda decoder: decoder.get_frame_at(0).data,
-            lambda decoder: decoder.get_frames_at(0, 4).data,
+            lambda decoder: decoder.get_frames_in_range(0, 4).data,
             lambda decoder: decoder.get_frame_displayed_at(0).data,
             # TODO: uncomment once D60001893 lands
             # lambda decoder: decoder.get_frames_displayed_at(0, 1).data,
