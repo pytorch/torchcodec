@@ -366,10 +366,13 @@ class TestVideoDecoder:
 
     def test_get_frames_at_fails(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
+
         with pytest.raises(RuntimeError, match="Invalid frame index=-1"):
             decoder.get_frames_at([-1])
+
         with pytest.raises(RuntimeError, match="Invalid frame index=390"):
             decoder.get_frames_at([390])
+
         with pytest.raises(RuntimeError, match="Expected a value of type"):
             decoder.get_frames_at([0.3])
 
@@ -397,6 +400,47 @@ class TestVideoDecoder:
 
         with pytest.raises(IndexError, match="Invalid pts in seconds"):
             frame = decoder.get_frame_displayed_at(100.0)  # noqa
+
+    def test_get_frames_displayed_at(self):
+
+        decoder = VideoDecoder(NASA_VIDEO.path)
+        ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
+        ref_frame10 = NASA_VIDEO.get_frame_by_name("time10.000000")
+
+        seconds = [6.02, 10.01, 6.01]
+        frames = decoder.get_frames_displayed_at(seconds)
+
+        assert isinstance(frames, FrameBatch)
+
+        assert_tensor_equal(frames.data[0], ref_frame6)
+        assert_tensor_equal(frames.data[1], ref_frame10)
+        assert_tensor_equal(frames.data[2], ref_frame6)
+
+        expected_pts_seconds = torch.tensor(
+            [6.0060, 10.0100, 6.0060], dtype=torch.float64
+        )
+        torch.testing.assert_close(
+            frames.pts_seconds, expected_pts_seconds, atol=1e-4, rtol=0
+        )
+
+        expected_duration_seconds = torch.tensor(
+            [0.0334, 0.0334, 0.0334], dtype=torch.float64
+        )
+        torch.testing.assert_close(
+            frames.duration_seconds, expected_duration_seconds, atol=1e-4, rtol=0
+        )
+
+    def test_get_frames_displayed_at_fails(self):
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        with pytest.raises(RuntimeError, match="must be in range"):
+            decoder.get_frames_displayed_at([-1])
+
+        with pytest.raises(RuntimeError, match="must be in range"):
+            decoder.get_frames_displayed_at([14])
+
+        with pytest.raises(RuntimeError, match="Expected a value of type"):
+            decoder.get_frames_displayed_at(["bad"])
 
     @pytest.mark.parametrize("stream_index", [0, 3, None])
     def test_get_frames_in_range(self, stream_index):

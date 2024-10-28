@@ -264,6 +264,24 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
+    def get_frames_displayed_at(self, seconds: list[float]) -> FrameBatch:
+        """Return frames displayed at the given timestamps in seconds.
+
+        Args:
+            seconds (list of float): The timestamps in seconds when the frames are displayed.
+
+        Returns:
+            FrameBatch: The frames that are displayed at ``seconds``.
+        """
+        data, pts_seconds, duration_seconds = core.get_frames_by_pts(
+            self._decoder, timestamps=seconds, stream_index=self.stream_index
+        )
+        return FrameBatch(
+            data=data,
+            pts_seconds=pts_seconds,
+            duration_seconds=duration_seconds,
+        )
+
     def get_frames_displayed_in_range(
         self, start_seconds: float, stop_seconds: float
     ) -> FrameBatch:
