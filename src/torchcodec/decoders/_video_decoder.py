@@ -181,6 +181,32 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
+    def get_frames_at(self, indices: list[int]) -> FrameBatch:
+        """Return frames at the given indices.
+
+        .. note::
+
+            Calling this method is more efficient that repeated individual calls
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at`. This
+            method makes sure not to decode the same frame twice, and also
+            avoids "backwards seek" operations, which are slow.
+
+        Args:
+            indices (list of int): The indices of the frames to retrieve.
+
+        Returns:
+            FrameBatch: The frames at the given indices.
+        """
+
+        data, pts_seconds, duration_seconds = core.get_frames_at_indices(
+            self._decoder, stream_index=self.stream_index, frame_indices=indices
+        )
+        return FrameBatch(
+            data=data,
+            pts_seconds=pts_seconds,
+            duration_seconds=duration_seconds,
+        )
+
     def get_frames_in_range(self, start: int, stop: int, step: int = 1) -> FrameBatch:
         """Return multiple frames at the given index range.
 
@@ -236,6 +262,31 @@ class VideoDecoder:
             data=data,
             pts_seconds=pts_seconds.item(),
             duration_seconds=duration_seconds.item(),
+        )
+
+    def get_frames_displayed_at(self, seconds: list[float]) -> FrameBatch:
+        """Return frames displayed at the given timestamps in seconds.
+
+        .. note::
+
+            Calling this method is more efficient that repeated individual calls
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_displayed_at`.
+            This method makes sure not to decode the same frame twice, and also
+            avoids "backwards seek" operations, which are slow.
+
+        Args:
+            seconds (list of float): The timestamps in seconds when the frames are displayed.
+
+        Returns:
+            FrameBatch: The frames that are displayed at ``seconds``.
+        """
+        data, pts_seconds, duration_seconds = core.get_frames_by_pts(
+            self._decoder, timestamps=seconds, stream_index=self.stream_index
+        )
+        return FrameBatch(
+            data=data,
+            pts_seconds=pts_seconds,
+            duration_seconds=duration_seconds,
         )
 
     def get_frames_displayed_in_range(
