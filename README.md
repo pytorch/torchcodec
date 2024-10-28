@@ -65,7 +65,7 @@ decoder.get_frame_at(len(decoder) - 1)
 #   pts_seconds: 9.960000038146973
 #   duration_seconds: 0.03999999910593033
 
-decoder.get_frames_at(start=10, stop=30, step=5)
+decoder.get_frames_in_range(start=10, stop=30, step=5)
 # FrameBatch:
 #   data (shape): torch.Size([4, 3, 400, 640])
 #   pts_seconds: tensor([0.4000, 0.6000, 0.8000, 1.0000])

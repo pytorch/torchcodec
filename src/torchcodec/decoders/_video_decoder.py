@@ -190,7 +190,7 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
+    def get_frames_in_range(self, start: int, stop: int, step: int = 1) -> FrameBatch:
         """Return multiple frames at the given index range.
 
         Frames are in [start, stop).
@@ -247,7 +247,7 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_displayed_at(
+    def get_frames_displayed_in_range(
         self, start_seconds: float, stop_seconds: float
     ) -> FrameBatch:
         """Returns multiple frames in the given range.
