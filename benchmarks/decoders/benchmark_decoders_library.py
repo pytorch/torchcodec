@@ -369,5 +369,5 @@ def run_benchmarks(
                     min_run_time=2.0,
                 )
             )
-        compare = benchmark.Compare(results)
-        compare.print()
+    compare = benchmark.Compare(results)
+    compare.print()
