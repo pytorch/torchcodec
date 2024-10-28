@@ -72,7 +72,7 @@ decoder.get_frames_in_range(start=10, stop=30, step=5)
 #   duration_seconds: tensor([0.0400, 0.0400, 0.0400, 0.0400])
 
 # Time-based indexing with PTS and duration info
-decoder.get_frame_displayed_at(pts_seconds=2)
+decoder.get_frame_played_at(pts_seconds=2)
 # Frame:
 #   data (shape): torch.Size([3, 400, 640])
 #   pts_seconds: 2.0

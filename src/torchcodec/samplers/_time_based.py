@@ -209,7 +209,7 @@ def _generic_time_based_sampler(
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
 
-    frames = decoder.get_frames_displayed_at(seconds=all_clips_timestamps)
+    frames = decoder.get_frames_played_at(seconds=all_clips_timestamps)
     return _reshape_4d_framebatch_into_5d(
         frames=frames,
         num_clips=num_clips,
