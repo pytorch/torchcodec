@@ -292,12 +292,6 @@ bool _test_frame_pts_equality(
     int64_t frame_index,
     double pts_seconds_to_test) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  LOG(INFO) << "pts_seconds_to_test: " << std::setprecision(15)
-            << pts_seconds_to_test << std::endl;
-  LOG(INFO) << "frame pts  : " << std::setprecision(15)
-            << videoDecoder->getPtsSecondsForFrame(stream_index, frame_index)
-            << std::endl
-            << std::endl;
   return pts_seconds_to_test ==
       videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }

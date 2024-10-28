@@ -676,9 +676,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     int64_t desiredPtsForStream = *maybeDesiredPts_ * streamInfo.timeBase.den;
     if (!canWeAvoidSeekingForStream(
             streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
-      VLOG(5) << "Seeking is needed for streamIndex=" << streamIndex
-              << " desiredPts=" << desiredPtsForStream
-              << " currentPts=" << streamInfo.currentPts;
       mustSeek = true;
       break;
     }
@@ -727,13 +724,10 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getDecodedOutputWithFilter()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
-    VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
     maybeSeekToBeforeDesiredPts();
     maybeDesiredPts_ = std::nullopt;
-    VLOG(9) << "seeking done";
   }
   auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
@@ -748,13 +742,9 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       StreamInfo& streamInfo = streams_[streamIndex];
       ffmpegStatus =
           avcodec_receive_frame(streamInfo.codecContext.get(), frame.get());
-      VLOG(9) << "received frame" << " status=" << ffmpegStatus
-              << " streamIndex=" << streamInfo.stream->index;
       bool gotNonRetriableError =
           ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN);
       if (gotNonRetriableError) {
-        VLOG(9) << "Got non-retriable error from decoder: "
-                << getFFMPEGErrorStringFromErrorCode(ffmpegStatus);
         gotPermanentErrorOnAnyActiveStream = true;
         break;
       }
@@ -784,7 +774,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     UniqueAVPacket packet(av_packet_alloc());
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
-    VLOG(9) << "av_read_frame returned status: " << ffmpegStatus;
     if (ffmpegStatus == AVERROR_EOF) {
       // End of file reached. We must drain all codecs by sending a nullptr
       // packet.
@@ -807,8 +796,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
           "Could not read frame from input file: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
     }
-    VLOG(9) << "Got packet: stream_index=" << packet->stream_index
-            << " pts=" << packet->pts << " size=" << packet->size;
     if (activeStreamIndices_.count(packet->stream_index) == 0) {
       // This packet is not for any of the active streams.
       continue;
@@ -846,10 +833,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
   auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
       decodeDone - seekDone);
-  VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
-          << " pts=" << frame->pts << " stats=" << decodeStats_
-          << " startToSeekDone=" << startToSeekDone.count() << "ms"
-          << " seekToDecodeDone=" << seekToDecodeDone.count() << "ms";
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
