@@ -46,9 +46,7 @@ for line in symbol_matches:
         all_symbols.add(match.group(0))
 
 if not all_symbols:
-    raise ValueError(
-        f"No GLIBCXX symbols found in {symbol_matches}. Something is wrong."
-    )
+    raise ValueError(f"No GLIBCXX symbols found in {symbol_matches}. Something is wrong.")
 
 all_versions = (symbol.split("_")[1].split(".") for symbol in all_symbols)
 all_versions = (tuple(int(v) for v in version) for version in all_versions)
