@@ -57,6 +57,12 @@ class ReferenceDecoder:
         seek_to_pts(self.decoder, pts)
 
 
+# Asserts that at most percentage of the elements are different by more than abs_tolerance.
+def assert_tensor_nearly_equal(frame1, frame2, percentage=0.3, abs_tolerance=20):
+    diff = (frame2.float() - frame1.float()).abs()
+    assert (diff > abs_tolerance).float().mean() <= percentage / 100.0
+
+
 class TestOps:
     def test_seek_and_next(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -136,6 +142,24 @@ class TestOps:
         )
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
+
+    @needs_cuda
+    def test_get_frames_at_indices_with_cuda(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder, device="cuda")
+        frames0and180, *_ = get_frames_at_indices(
+            decoder, stream_index=3, frame_indices=[0, 180]
+        )
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
+        assert frames0and180.device.type == "cuda"
+        assert_tensor_nearly_equal(frames0and180[0].to("cpu"), reference_frame0)
+        assert_tensor_nearly_equal(
+            frames0and180[1].to("cpu"), reference_frame180, 0.3, 30
+        )
 
     def test_get_frames_at_indices_unsorted_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -657,8 +681,8 @@ class TestOps:
         assert frame0.device.type == "cuda"
         frame0_cpu = frame0.to("cpu")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        # GPU decode is not bit-accurate. In the following assertion we ensure
-        # not more than 0.3% of values have a difference greater than 20.
+        # GPU decode is not bit-accurate. So we allow some tolerance.
+        assert_tensor_nearly_equal(frame0_cpu, reference_frame0)
         diff = (reference_frame0.float() - frame0_cpu.float()).abs()
         assert (diff > 20).float().mean() <= 0.003
         assert pts == torch.tensor([0])

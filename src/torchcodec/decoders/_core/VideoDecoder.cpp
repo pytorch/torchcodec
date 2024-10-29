@@ -196,7 +196,7 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
            options.height.value_or(*metadata.height),
            options.width.value_or(*metadata.width),
            3},
-          {torch::kUInt8})),
+          at::TensorOptions(options.device).dtype(torch::kUInt8))),
       ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
 
@@ -859,13 +859,14 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCPU(
         rawOutput, output, preAllocatedOutputTensor);
   } else if (streamInfo.options.device.type() == torch::kCUDA) {
-    // TODO: handle pre-allocated output tensor
+    // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
         streamInfo.codecContext.get(),
         rawOutput,
-        output);
+        output,
+        preAllocatedOutputTensor);
   } else {
     TORCH_CHECK(
         false, "Invalid device type: " + streamInfo.options.device.str());
