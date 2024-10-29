@@ -1009,6 +1009,16 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  auto output = getFrameAtIndexInternal(
+      streamIndex, frameIndex, preAllocatedOutputTensor);
+  output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
+  return output;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
+    int streamIndex,
+    int64_t frameIndex,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
@@ -1017,12 +1027,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  auto output = getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
-
-  if (!preAllocatedOutputTensor.has_value()) {
-    output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
-  }
-  return output;
+  return getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
@@ -1072,7 +1077,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
       output.durationSeconds[indexInOutput] =
           output.durationSeconds[previousIndexInOutput];
     } else {
-      DecodedOutput singleOut = getFrameAtIndex(
+      DecodedOutput singleOut = getFrameAtIndexInternal(
           streamIndex, indexInVideo, output.frames[indexInOutput]);
       output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
       output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
@@ -1149,7 +1154,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    DecodedOutput singleOut =
+        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
@@ -1242,7 +1248,8 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   int64_t numFrames = stopFrameIndex - startFrameIndex;
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
+    DecodedOutput singleOut =
+        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }

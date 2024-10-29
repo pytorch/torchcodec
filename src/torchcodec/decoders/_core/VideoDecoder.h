@@ -389,6 +389,11 @@ class VideoDecoder {
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  DecodedOutput getFrameAtIndexInternal(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
