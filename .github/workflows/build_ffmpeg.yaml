@@ -11,6 +11,9 @@ name: Build non-GPL FFmpeg from source
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - packaging/build_ffmpeg.sh
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 
@@ -46,13 +49,12 @@ jobs:
       fail-fast: false
       matrix:
         ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
-        runner: ["macos-m1-stable"]
     uses: pytorch/test-infra/.github/workflows/macos_job.yml@main
     with:
       job-name: Build
       upload-artifact: ffmpeg-lgpl
       repository: pytorch/torchcodec
-      runner: "${{ matrix.runner }}"
+      runner: macos-14-xlarge
       script: |
         export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
         export FFMPEG_ROOT="${PWD}/ffmpeg"

@@ -222,7 +222,7 @@ class VideoDecoder {
   // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
-  DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
+  DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
 
   DecodedOutput getFrameAtIndex(
       int streamIndex,
@@ -244,7 +244,7 @@ class VideoDecoder {
       int streamIndex,
       const std::vector<int64_t>& frameIndices);
 
-  BatchDecodedOutput getFramesDisplayedByTimestamps(
+  BatchDecodedOutput getFramesPlayedByTimestamps(
       int streamIndex,
       const std::vector<double>& timestamps);
 
@@ -265,7 +265,7 @@ class VideoDecoder {
   // frame. Otherwise, the moment in time immediately before stopSeconds is in
   // the range, and that time maps to the same frame as stopSeconds.
   //
-  // The frames returned are the frames that would be displayed by our abstract
+  // The frames returned are the frames that would be played by our abstract
   // player. Our abstract player displays frames based on pts only. It displays
   // frame i starting at the pts for frame i, and stops at the pts for frame
   // i+1. This model ignores a frame's reported duration.
@@ -273,7 +273,7 @@ class VideoDecoder {
   // Valid values for startSeconds and stopSeconds are:
   //
   //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
-  BatchDecodedOutput getFramesDisplayedByTimestampInRange(
+  BatchDecodedOutput getFramesPlayedByTimestampInRange(
       int streamIndex,
       double startSeconds,
       double stopSeconds);

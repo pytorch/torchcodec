@@ -4,7 +4,7 @@ Glossary
 .. glossary::
 
     pts
-       Presentation Time Stamp. The time at which a frame should be displayed.
+       Presentation Time Stamp. The time at which a frame should be played.
        In TorchCodec, pts are expressed in seconds.
 
     best stream

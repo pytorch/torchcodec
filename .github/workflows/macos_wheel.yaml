@@ -1,4 +1,4 @@
-name: Build and test MacOS
+name: Build and test MacOS wheel
 
 on:
   pull_request:
@@ -24,15 +24,54 @@ defaults:
     shell: bash -l -eo pipefail {0}
 
 jobs:
+
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: macos-arm64
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-xpu: disable
+      with-rocm: disable
+      with-cuda: disable
+      build-python-only: "disable"
+
+  build:
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+    name: Build and Upload Mac wheel
+    uses: pytorch/test-infra/.github/workflows/build_wheels_macos.yml@main
+    with:
+      repository: pytorch/torchcodec
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      post-script: packaging/post_build_script.sh
+      smoke-test-script: packaging/fake_smoke_test.py
+      runner-type: macos-m1-stable
+      package-name: torchcodec
+      trigger-event: ${{ github.event_name }}
+      build-platform: "python-build-package"
+      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
+
   install-and-test:
-    runs-on: macos-m1-stable
+    runs-on: macos-14-xlarge
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.9']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-    if: ${{ always() }}
+    needs: build
     steps:
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_
+          path: pytorch/torchcodec/dist/
+
       - name: Setup conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -42,36 +81,49 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Update pip
         run: python -m pip install --upgrade pip
+
       - name: Install PyTorch
         run: |
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
-      - name: Check out repo
-        uses: actions/checkout@v3
-      - name: Install compile from source dependencies
+
+      - name: Install torchcodec from the wheel
         run: |
-          conda install cmake pkg-config -c conda-forge
+          wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
+          echo Installing $wheel_path
+          python -m pip install $wheel_path -vvv
+
+      - name: Check out torchcodec repo
+        uses: actions/checkout@v3
+
+      - name: Install ffmpeg
+        run: |
+          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
+          ffmpeg -version
+
       - name: Install test dependencies
         run: |
           python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-          # Ideally we would find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow
-      - name: Install torchcodec from source, building against non-GPL FFmpeg
-        run: |
-          BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install -e ".[dev]" --no-build-isolation
-      - name: Install ffmpeg, post build
-        run: |
-          # Ideally we would have checked for that before installing the wheel,
-          # but we need to checkout the repo to access this file, and we don't
-          # want to checkout the repo before installing the wheel to avoid any
-          # side-effect. It's OK.
-          source packaging/helpers.sh
-          assert_ffmpeg_not_installed
 
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ffmpeg -version
+      - name: Delete the src/ folder just for fun
+        run: |
+          # The only reason we checked-out the repo is to get access to the
+          # tests. We don't care about the rest. Out of precaution, we delete
+          # the src/ folder to be extra sure that we're running the code from
+          # the installed wheel rather than from the source.
+          # This is just to be extra cautious and very overkill because a)
+          # there's no way the `torchcodec` package from src/ can be found from
+          # the PythonPath: the main point of `src/` is precisely to protect
+          # against that and b) if we ever were to execute code from
+          # `src/torchcodec`, it would fail loudly because the built .so files
+          # aren't present there.
+          rm -r src/
+          ls -lh
+
       - name: Smoke test
         run: |
-          python test/decoders/manual_smoke_test.py
+          python -X faulthandler test/decoders/manual_smoke_test.py
+
       - name: Run Python tests
         run: |
           pytest test -vvv
