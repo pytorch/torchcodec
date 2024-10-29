@@ -148,7 +148,7 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   streamOptions.width = 100;
   streamOptions.height = 120;
   decoder->addVideoStreamDecoder(-1, streamOptions);
-  torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
+  torch::Tensor tensor = decoder->getNextFrame().frame;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
 
@@ -159,7 +159,7 @@ TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   VideoDecoder::VideoStreamDecoderOptions streamOptions;
   streamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStreamDecoder(-1, streamOptions);
-  torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
+  torch::Tensor tensor = decoder->getNextFrame().frame;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
 
@@ -168,12 +168,12 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
-  auto output = ourDecoder->getNextDecodedOutputNoDemux();
+  auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor0FromOurDecoder = output.frame;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
   EXPECT_EQ(output.pts, 0);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   torch::Tensor tensor1FromOurDecoder = output.frame;
   EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
@@ -254,11 +254,11 @@ TEST_P(VideoDecoderTest, SeeksCloseToEof) {
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
   ourDecoder->setCursorPtsInSeconds(388388. / 30'000);
-  auto output = ourDecoder->getNextDecodedOutputNoDemux();
+  auto output = ourDecoder->getNextFrame();
   EXPECT_EQ(output.ptsSeconds, 388'388. / 30'000);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
-  EXPECT_THROW(ourDecoder->getNextDecodedOutputNoDemux(), std::exception);
+  EXPECT_THROW(ourDecoder->getNextFrame(), std::exception);
 }
 
 TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
@@ -298,7 +298,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
   ourDecoder->setCursorPtsInSeconds(6.0);
-  auto output = ourDecoder->getNextDecodedOutputNoDemux();
+  auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor6FromOurDecoder = output.frame;
   EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
   torch::Tensor tensor6FromFFMPEG =
@@ -314,7 +314,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   EXPECT_GT(ourDecoder->getDecodeStats().numPacketsSentToDecoder, 180);
 
   ourDecoder->setCursorPtsInSeconds(6.1);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   torch::Tensor tensor61FromOurDecoder = output.frame;
   EXPECT_EQ(output.ptsSeconds, 183'183. / 30'000);
   torch::Tensor tensor61FromFFMPEG =
@@ -334,7 +334,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   EXPECT_LT(ourDecoder->getDecodeStats().numPacketsSentToDecoder, 10);
 
   ourDecoder->setCursorPtsInSeconds(10.0);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   torch::Tensor tensor10FromOurDecoder = output.frame;
   EXPECT_EQ(output.ptsSeconds, 300'300. / 30'000);
   torch::Tensor tensor10FromFFMPEG =
@@ -351,7 +351,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   EXPECT_GT(ourDecoder->getDecodeStats().numPacketsSentToDecoder, 60);
 
   ourDecoder->setCursorPtsInSeconds(6.0);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   tensor6FromOurDecoder = output.frame;
   EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
   EXPECT_TRUE(torch::equal(tensor6FromOurDecoder, tensor6FromFFMPEG));
@@ -366,7 +366,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
 
   constexpr double kPtsOfLastFrameInVideoStream = 389'389. / 30'000; // ~12.9
   ourDecoder->setCursorPtsInSeconds(kPtsOfLastFrameInVideoStream);
-  output = ourDecoder->getNextDecodedOutputNoDemux();
+  output = ourDecoder->getNextFrame();
   torch::Tensor tensor7FromOurDecoder = output.frame;
   EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
   torch::Tensor tensor7FromFFMPEG =
