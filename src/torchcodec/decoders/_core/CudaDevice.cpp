@@ -240,11 +240,6 @@ void convertAVFrameToDecodedOutputOnCuda(
   std::chrono::duration<double, std::micro> duration = end - start;
   VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
           << " took: " << duration.count() << "us" << std::endl;
-  if (options.dimensionOrder == "NCHW") {
-    // The docs guaranty this to return a view:
-    // https://pytorch.org/docs/stable/generated/torch.permute.html
-    dst = dst.permute({2, 0, 1});
-  }
 }
 
 } // namespace facebook::torchcodec
