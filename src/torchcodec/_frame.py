@@ -68,10 +68,9 @@ class FrameBatch(Iterable):
     def __post_init__(self):
         # This is called after __init__() when a FrameBatch is created. We can
         # run input validation checks here.
-        if self.data.ndim < 4:
+        if self.data.ndim < 3:
             raise ValueError(
-                f"data must be at least 4-dimensional. Got {self.data.shape = } "
-                "For 3-dimensional data, create a Frame object instead."
+                f"data must be at least 3-dimensional, got {self.data.shape = }"
             )
 
         leading_dims = self.data.shape[:-3]
@@ -83,33 +82,22 @@ class FrameBatch(Iterable):
                 f"{self.pts_seconds.shape = } and {self.duration_seconds.shape = }."
             )
 
-    def __iter__(self) -> Union[Iterator["FrameBatch"], Iterator[Frame]]:
-        cls = Frame if self.data.ndim == 4 else FrameBatch
+    def __iter__(self) -> Iterator["FrameBatch"]:
         for data, pts_seconds, duration_seconds in zip(
             self.data, self.pts_seconds, self.duration_seconds
         ):
-            yield cls(
+            yield FrameBatch(
                 data=data,
                 pts_seconds=pts_seconds,
                 duration_seconds=duration_seconds,
             )
 
-    def __getitem__(self, key) -> Union["FrameBatch", Frame]:
-        data = self.data[key]
-        pts_seconds = self.pts_seconds[key]
-        duration_seconds = self.duration_seconds[key]
-        if self.data.ndim == 4:
-            return Frame(
-                data=data,
-                pts_seconds=float(pts_seconds.item()),
-                duration_seconds=float(duration_seconds.item()),
-            )
-        else:
-            return FrameBatch(
-                data=data,
-                pts_seconds=pts_seconds,
-                duration_seconds=duration_seconds,
-            )
+    def __getitem__(self, key) -> "FrameBatch":
+        return FrameBatch(
+            data=self.data[key],
+            pts_seconds=self.pts_seconds[key],
+            duration_seconds=self.duration_seconds[key],
+        )
 
     def __len__(self):
         return len(self.data)
