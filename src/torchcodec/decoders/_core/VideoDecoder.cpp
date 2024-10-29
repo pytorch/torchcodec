@@ -1027,7 +1027,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
 
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  return getNextDecodedOutputNoDemux(preAllocatedOutputTensor);
+  return getNextFrameOutputNoDemuxInternal(preAllocatedOutputTensor);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
@@ -1268,12 +1268,12 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
-  auto output = getNextDecodedOutputNoDemux();
+  auto output = getNextFrameOutputNoDemuxInternal();
   output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrameOutputNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
