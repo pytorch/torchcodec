@@ -1282,7 +1282,7 @@ double VideoDecoder::getPtsSecondsForFrame(
     int streamIndex,
     int64_t frameIndex) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFrameAtIndex");
+  validateScannedAllStreams("getPtsSecondsForFrame");
 
   const auto& stream = streams_[streamIndex];
   validateFrameIndex(stream, frameIndex);
