@@ -36,6 +36,11 @@ class VideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
+        num_ffmpeg_threads (int, optional): The number of threads to use for decoding.
+            Use 1 for single-threaded decoding which may be best if you are running multiple
+            instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
+            decoding which is best if you are running a single instance of ``VideoDecoder``.
+            Default: 1.
 
             .. note::
 
@@ -58,6 +63,7 @@ class VideoDecoder:
         *,
         stream_index: Optional[int] = None,
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
+        num_ffmpeg_threads: int = 1,
     ):
         if isinstance(source, str):
             self._decoder = core.create_from_file(source)
@@ -82,7 +88,10 @@ class VideoDecoder:
 
         core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(
-            self._decoder, stream_index=stream_index, dimension_order=dimension_order
+            self._decoder,
+            stream_index=stream_index,
+            dimension_order=dimension_order,
+            num_threads=num_ffmpeg_threads,
         )
 
         self.metadata, self.stream_index = _get_and_validate_stream_metadata(
@@ -181,7 +190,33 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_at(self, start: int, stop: int, step: int = 1) -> FrameBatch:
+    def get_frames_at(self, indices: list[int]) -> FrameBatch:
+        """Return frames at the given indices.
+
+        .. note::
+
+            Calling this method is more efficient that repeated individual calls
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at`. This
+            method makes sure not to decode the same frame twice, and also
+            avoids "backwards seek" operations, which are slow.
+
+        Args:
+            indices (list of int): The indices of the frames to retrieve.
+
+        Returns:
+            FrameBatch: The frames at the given indices.
+        """
+
+        data, pts_seconds, duration_seconds = core.get_frames_at_indices(
+            self._decoder, stream_index=self.stream_index, frame_indices=indices
+        )
+        return FrameBatch(
+            data=data,
+            pts_seconds=pts_seconds,
+            duration_seconds=duration_seconds,
+        )
+
+    def get_frames_in_range(self, start: int, stop: int, step: int = 1) -> FrameBatch:
         """Return multiple frames at the given index range.
 
         Frames are in [start, stop).
@@ -214,14 +249,14 @@ class VideoDecoder:
         )
         return FrameBatch(*frames)
 
-    def get_frame_displayed_at(self, seconds: float) -> Frame:
-        """Return a single frame displayed at the given timestamp in seconds.
+    def get_frame_played_at(self, seconds: float) -> Frame:
+        """Return a single frame played at the given timestamp in seconds.
 
         Args:
-            seconds (float): The time stamp in seconds when the frame is displayed.
+            seconds (float): The time stamp in seconds when the frame is played.
 
         Returns:
-            Frame: The frame that is displayed at ``seconds``.
+            Frame: The frame that is played at ``seconds``.
         """
         if not self._begin_stream_seconds <= seconds < self._end_stream_seconds:
             raise IndexError(
@@ -238,7 +273,32 @@ class VideoDecoder:
             duration_seconds=duration_seconds.item(),
         )
 
-    def get_frames_displayed_at(
+    def get_frames_played_at(self, seconds: list[float]) -> FrameBatch:
+        """Return frames played at the given timestamps in seconds.
+
+        .. note::
+
+            Calling this method is more efficient that repeated individual calls
+            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at`.
+            This method makes sure not to decode the same frame twice, and also
+            avoids "backwards seek" operations, which are slow.
+
+        Args:
+            seconds (list of float): The timestamps in seconds when the frames are played.
+
+        Returns:
+            FrameBatch: The frames that are played at ``seconds``.
+        """
+        data, pts_seconds, duration_seconds = core.get_frames_by_pts(
+            self._decoder, timestamps=seconds, stream_index=self.stream_index
+        )
+        return FrameBatch(
+            data=data,
+            pts_seconds=pts_seconds,
+            duration_seconds=duration_seconds,
+        )
+
+    def get_frames_played_in_range(
         self, start_seconds: float, stop_seconds: float
     ) -> FrameBatch:
         """Returns multiple frames in the given range.

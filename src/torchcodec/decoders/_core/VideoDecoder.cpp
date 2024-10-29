@@ -676,9 +676,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     int64_t desiredPtsForStream = *maybeDesiredPts_ * streamInfo.timeBase.den;
     if (!canWeAvoidSeekingForStream(
             streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
-      VLOG(5) << "Seeking is needed for streamIndex=" << streamIndex
-              << " desiredPts=" << desiredPtsForStream
-              << " currentPts=" << streamInfo.currentPts;
       mustSeek = true;
       break;
     }
@@ -727,13 +724,10 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getDecodedOutputWithFilter()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
-    VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
     maybeSeekToBeforeDesiredPts();
     maybeDesiredPts_ = std::nullopt;
-    VLOG(9) << "seeking done";
   }
   auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
@@ -748,13 +742,9 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       StreamInfo& streamInfo = streams_[streamIndex];
       ffmpegStatus =
           avcodec_receive_frame(streamInfo.codecContext.get(), frame.get());
-      VLOG(9) << "received frame" << " status=" << ffmpegStatus
-              << " streamIndex=" << streamInfo.stream->index;
       bool gotNonRetriableError =
           ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN);
       if (gotNonRetriableError) {
-        VLOG(9) << "Got non-retriable error from decoder: "
-                << getFFMPEGErrorStringFromErrorCode(ffmpegStatus);
         gotPermanentErrorOnAnyActiveStream = true;
         break;
       }
@@ -784,7 +774,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     UniqueAVPacket packet(av_packet_alloc());
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
-    VLOG(9) << "av_read_frame returned status: " << ffmpegStatus;
     if (ffmpegStatus == AVERROR_EOF) {
       // End of file reached. We must drain all codecs by sending a nullptr
       // packet.
@@ -807,8 +796,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
           "Could not read frame from input file: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
     }
-    VLOG(9) << "Got packet: stream_index=" << packet->stream_index
-            << " pts=" << packet->pts << " size=" << packet->size;
     if (activeStreamIndices_.count(packet->stream_index) == 0) {
       // This packet is not for any of the active streams.
       continue;
@@ -846,10 +833,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
   auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
       decodeDone - seekDone);
-  VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
-          << " pts=" << frame->pts << " stats=" << decodeStats_
-          << " startToSeekDone=" << startToSeekDone.count() << "ms"
-          << " seekToDecodeDone=" << seekToDecodeDone.count() << "ms";
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
@@ -890,6 +873,15 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
+// Note [preAllocatedOutputTensor with swscale and filtergraph]:
+// Callers may pass a pre-allocated tensor, where the output frame tensor will
+// be stored. This parameter is honored in any case, but it only leads to a
+// speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
+// decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
+// found a way to do that with filtegraph.
+// TODO: Figure out whether that's possilbe!
+// Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
+// `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
     DecodedOutput& output,
@@ -897,9 +889,9 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
+  torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      torch::Tensor tensor;
       int width = streamInfo.options.width.value_or(frame->width);
       int height = streamInfo.options.height.value_or(frame->height);
       if (preAllocatedOutputTensor.has_value()) {
@@ -925,7 +917,13 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      tensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      if (preAllocatedOutputTensor.has_value()) {
+        preAllocatedOutputTensor.value().copy_(tensor);
+        output.frame = preAllocatedOutputTensor.value();
+      } else {
+        output.frame = tensor;
+      }
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
@@ -947,7 +945,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
+VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
@@ -1077,10 +1075,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     } else {
       DecodedOutput singleOut = getFrameAtIndex(
           streamIndex, indexInVideo, output.frames[indexInOutput]);
-      if (options.colorConversionLibrary ==
-          ColorConversionLibrary::FILTERGRAPH) {
-        output.frames[indexInOutput] = singleOut.frame;
-      }
       output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
       output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
@@ -1090,13 +1084,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   return output;
 }
 
-VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesDisplayedByTimestamps(
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
     int streamIndex,
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesDisplayedByTimestamps");
+  validateScannedAllStreams("getFramesPlayedByTimestamps");
 
-  // The frame displayed at timestamp t and the one displayed at timestamp `t +
+  // The frame played at timestamp t and the one played at timestamp `t +
   // eps` are probably the same frame, with the same index. The easiest way to
   // avoid decoding that unique frame twice is to convert the input timestamps
   // to indices, and leverage the de-duplication logic of getFramesAtIndices.
@@ -1157,9 +1151,6 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
-    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
@@ -1168,12 +1159,12 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 }
 
 VideoDecoder::BatchDecodedOutput
-VideoDecoder::getFramesDisplayedByTimestampInRange(
+VideoDecoder::getFramesPlayedByTimestampInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+  validateScannedAllStreams("getFramesPlayedByTimestampInRange");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
@@ -1224,7 +1215,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // abstract player displays frames starting at the pts for that frame until
   // the pts for the next frame. There are two consequences:
   //
-  //   1. We ignore the duration for a frame. A frame is displayed until the
+  //   1. We ignore the duration for a frame. A frame is played until the
   //   next frame replaces it. This model is robust to durations being 0 or
   //   incorrect; our source of truth is the pts for frames. If duration is
   //   accurate, the nextPts for a frame would be equivalent to pts + duration.
@@ -1253,9 +1244,6 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     DecodedOutput singleOut = getFrameAtIndex(streamIndex, i, output.frames[f]);
-    if (options.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      output.frames[f] = singleOut.frame;
-    }
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }

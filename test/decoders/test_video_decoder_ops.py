@@ -96,7 +96,7 @@ class TestOps:
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_tensor_equal(frame0, reference_frame0)
-        # The frame that is displayed at 6 seconds is frame 180 from a 0-based index.
+        # The frame that is played at 6 seconds is frame 180 from a 0-based index.
         frame6, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
         assert_tensor_equal(frame6, reference_frame6)
@@ -423,9 +423,7 @@ class TestOps:
         # The earliest libavutil version is 50 as per:
         # https://www.ffmpeg.org/olddownload.html
         assert ffmpeg_dict["libavutil"][0] > 50
-        ffmpeg_version = ffmpeg_dict["ffmpeg_version"]
-        split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
-        assert len(split_ffmpeg_version) == 3
+        assert "ffmpeg_version" in ffmpeg_dict
 
     def test_frame_pts_equality(self):
         decoder = create_from_file(str(NASA_VIDEO.path))

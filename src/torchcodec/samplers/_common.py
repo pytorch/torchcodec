@@ -1,6 +1,5 @@
 from typing import Callable, Union
 
-from torch import Tensor
 from torchcodec import FrameBatch
 
 _LIST_OF_INT_OR_FLOAT = Union[list[int], list[float]]
@@ -58,17 +57,15 @@ def _validate_common_params(*, decoder, num_frames_per_clip, policy):
         )
 
 
-def _make_5d_framebatch(
+def _reshape_4d_framebatch_into_5d(
     *,
-    data: Tensor,
-    pts_seconds: Tensor,
-    duration_seconds: Tensor,
+    frames: FrameBatch,
     num_clips: int,
     num_frames_per_clip: int,
 ) -> FrameBatch:
-    last_3_dims = data.shape[-3:]
+    last_3_dims = frames.data.shape[-3:]
     return FrameBatch(
-        data=data.view(num_clips, num_frames_per_clip, *last_3_dims),
-        pts_seconds=pts_seconds.view(num_clips, num_frames_per_clip),
-        duration_seconds=duration_seconds.view(num_clips, num_frames_per_clip),
+        data=frames.data.view(num_clips, num_frames_per_clip, *last_3_dims),
+        pts_seconds=frames.pts_seconds.view(num_clips, num_frames_per_clip),
+        duration_seconds=frames.duration_seconds.view(num_clips, num_frames_per_clip),
     )

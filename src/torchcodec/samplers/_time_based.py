@@ -3,11 +3,10 @@ from typing import Literal, Optional
 import torch
 
 from torchcodec import FrameBatch
-from torchcodec.decoders._core import get_frames_by_pts
 from torchcodec.samplers._common import (
-    _make_5d_framebatch,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
+    _reshape_4d_framebatch_into_5d,
     _validate_common_params,
 )
 
@@ -210,16 +209,9 @@ def _generic_time_based_sampler(
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
 
-    # TODO: Use public method of decoder, when it exists
-    frames, pts_seconds, duration_seconds = get_frames_by_pts(
-        decoder._decoder,
-        stream_index=decoder.stream_index,
-        timestamps=all_clips_timestamps,
-    )
-    return _make_5d_framebatch(
-        data=frames,
-        pts_seconds=pts_seconds,
-        duration_seconds=duration_seconds,
+    frames = decoder.get_frames_played_at(seconds=all_clips_timestamps)
+    return _reshape_4d_framebatch_into_5d(
+        frames=frames,
         num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
     )
