@@ -36,7 +36,13 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
-from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO, needs_cuda
+from ..utils import (
+    assert_tensor_equal,
+    assert_tensor_nearly_equal,
+    NASA_AUDIO,
+    NASA_VIDEO,
+    needs_cuda,
+)
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
@@ -55,12 +61,6 @@ class ReferenceDecoder:
     def seek(self, pts: float):
         assert self.decoder is not None
         seek_to_pts(self.decoder, pts)
-
-
-# Asserts that at most percentage of the elements are different by more than abs_tolerance.
-def assert_tensor_nearly_equal(frame1, frame2, percentage=0.3, abs_tolerance=20):
-    diff = (frame2.float() - frame1.float()).abs()
-    assert (diff > abs_tolerance).float().mean() <= percentage / 100.0
 
 
 class TestOps:

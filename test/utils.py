@@ -33,6 +33,12 @@ def assert_tensor_equal(*args, **kwargs):
     torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
 
 
+# Asserts that at most percentage of the elements are different by more than abs_tolerance.
+def assert_tensor_nearly_equal(frame1, frame2, percentage=0.3, abs_tolerance=20):
+    diff = (frame2.float() - frame1.float()).abs()
+    assert (diff > abs_tolerance).float().mean() <= percentage / 100.0
+
+
 # For use with floating point metadata, or in other instances where we are not confident
 # that reference and test tensors can be exactly equal. This is true for pts and duration
 # in seconds, as the reference values are from ffprobe's JSON output. In that case, it is
