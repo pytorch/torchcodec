@@ -19,7 +19,8 @@ void convertAVFrameToDecodedOutputOnCuda(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
     VideoDecoder::RawDecodedOutput& rawOutput,
-    VideoDecoder::DecodedOutput& output) {
+    VideoDecoder::DecodedOutput& output,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   throwUnsupportedDeviceError(device);
 }
 
