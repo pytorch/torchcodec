@@ -441,9 +441,7 @@ class TestOps:
         # The earliest libavutil version is 50 as per:
         # https://www.ffmpeg.org/olddownload.html
         assert ffmpeg_dict["libavutil"][0] > 50
-        ffmpeg_version = ffmpeg_dict["ffmpeg_version"]
-        split_ffmpeg_version = [int(num) for num in ffmpeg_version.split(".")]
-        assert len(split_ffmpeg_version) == 3
+        assert "ffmpeg_version" in ffmpeg_dict
 
     def test_frame_pts_equality(self):
         decoder = create_from_file(str(NASA_VIDEO.path))

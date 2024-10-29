@@ -387,6 +387,42 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   }
 }
 
+TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
+  std::string path = getResourcePath("nasa_13013.mp4");
+  auto preAllocatedOutputTensor = torch::empty({270, 480, 3}, {torch::kUInt8});
+
+  std::unique_ptr<VideoDecoder> ourDecoder =
+      VideoDecoderTest::createDecoderFromPath(path, GetParam());
+  ourDecoder->scanFileAndUpdateMetadataAndIndex();
+  int bestVideoStreamIndex =
+      *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
+  ourDecoder->addVideoStreamDecoder(
+      bestVideoStreamIndex,
+      VideoDecoder::VideoStreamDecoderOptions(
+          "color_conversion_library=filtergraph"));
+  auto output = ourDecoder->getFrameAtIndex(
+      bestVideoStreamIndex, 0, preAllocatedOutputTensor);
+  EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
+}
+
+TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
+  std::string path = getResourcePath("nasa_13013.mp4");
+  auto preAllocatedOutputTensor = torch::empty({270, 480, 3}, {torch::kUInt8});
+
+  std::unique_ptr<VideoDecoder> ourDecoder =
+      VideoDecoderTest::createDecoderFromPath(path, GetParam());
+  ourDecoder->scanFileAndUpdateMetadataAndIndex();
+  int bestVideoStreamIndex =
+      *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
+  ourDecoder->addVideoStreamDecoder(
+      bestVideoStreamIndex,
+      VideoDecoder::VideoStreamDecoderOptions(
+          "color_conversion_library=swscale"));
+  auto output = ourDecoder->getFrameAtIndex(
+      bestVideoStreamIndex, 0, preAllocatedOutputTensor);
+  EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
+}
+
 TEST_P(VideoDecoderTest, GetAudioMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4.audio.mp3");
   std::unique_ptr<VideoDecoder> decoder =

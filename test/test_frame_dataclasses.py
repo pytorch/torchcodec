@@ -23,7 +23,18 @@ def test_frame_error():
 
 
 def test_framebatch_error():
-    with pytest.raises(ValueError, match="data must be at least 4-dimensional"):
+    with pytest.raises(ValueError, match="data must be at least 3-dimensional"):
+        FrameBatch(
+            data=torch.rand(2, 3),
+            pts_seconds=torch.rand(1),
+            duration_seconds=torch.rand(1),
+        )
+
+    # Note: this is expected to fail because pts_seconds and duration_seconds
+    # are expected to have a shape of size([]) instead of size([1]).
+    with pytest.raises(
+        ValueError, match="leading dimensions of the inputs do not match"
+    ):
         FrameBatch(
             data=torch.rand(1, 2, 3),
             pts_seconds=torch.rand(1),
@@ -82,10 +93,14 @@ def test_framebatch_iteration():
         assert sub_fb.pts_seconds.shape == (N,)
         assert sub_fb.duration_seconds.shape == (N,)
         for frame in sub_fb:
-            assert isinstance(frame, Frame)
+            assert isinstance(frame, FrameBatch)
             assert frame.data.shape == (C, H, W)
-            assert isinstance(frame.pts_seconds, float)
-            assert isinstance(frame.duration_seconds, float)
+            # pts_seconds and duration_seconds are 0-dim tensors but they still
+            # contain a value
+            assert frame.pts_seconds.shape == tuple()
+            assert frame.duration_seconds.shape == tuple()
+            frame.pts_seconds.item()
+            frame.duration_seconds.item()
 
     # Check unpacking behavior
     first_sub_fb, *_ = fb
@@ -107,10 +122,15 @@ def test_framebatch_indexing():
         assert fb[i].pts_seconds.shape == (N,)
         assert fb[i].duration_seconds.shape == (N,)
         for j in range(len(fb[i])):
-            assert isinstance(fb[i][j], Frame)
-            assert fb[i][j].data.shape == (C, H, W)
-            assert isinstance(fb[i][j].pts_seconds, float)
-            assert isinstance(fb[i][j].duration_seconds, float)
+            frame = fb[i][j]
+            assert isinstance(frame, FrameBatch)
+            assert frame.data.shape == (C, H, W)
+            # pts_seconds and duration_seconds are 0-dim tensors but they still
+            # contain a value
+            assert frame.pts_seconds.shape == tuple()
+            assert frame.duration_seconds.shape == tuple()
+            frame.pts_seconds.item()
+            frame.duration_seconds.item()
 
     fb_fancy = fb[torch.arange(3)]
     assert isinstance(fb_fancy, FrameBatch)
