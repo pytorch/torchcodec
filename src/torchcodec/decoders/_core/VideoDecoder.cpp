@@ -1267,7 +1267,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextFrame() {
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextDecodedOutputNoDemux();
   output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;

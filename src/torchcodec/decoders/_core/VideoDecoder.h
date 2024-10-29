@@ -216,7 +216,7 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextFrame();
+  DecodedOutput getNextFrameNoDemux();
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
