@@ -4,6 +4,7 @@ import os
 import subprocess
 import timeit
 from concurrent.futures import ThreadPoolExecutor
+from itertools import product
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -319,32 +320,30 @@ def generate_videos(
 ):
     executor = ThreadPoolExecutor(max_workers=20)
     video_count = 0
-    for resolution in resolutions:
-        for duration in durations:
-            for fps in fpses:
-                for gop_size in gop_sizes:
-                    for encoding in encodings:
-                        for pix_fmt in pix_fmts:
-                            outfile = f"{output_dir}/{resolution}_{duration}s_{fps}fps_{gop_size}gop_{encoding}_{pix_fmt}.mp4"
-                            command = [
-                                ffmpeg_cli,
-                                "-y",
-                                "-f",
-                                "lavfi",
-                                "-i",
-                                f"color=c=blue:s={resolution}:d={duration}",
-                                "-c:v",
-                                encoding,
-                                "-r",
-                                f"{fps}",
-                                "-g",
-                                f"{gop_size}",
-                                "-pix_fmt",
-                                pix_fmt,
-                                outfile,
-                            ]
-                            executor.submit(generate_video, command)
-                            video_count += 1
+
+    for resolution, duration, fps, gop_size, encoding, pix_fmt in product(
+        resolutions, durations, fpses, gop_sizes, encodings, pix_fmts
+    ):
+        outfile = f"{output_dir}/{resolution}_{duration}s_{fps}fps_{gop_size}gop_{encoding}_{pix_fmt}.mp4"
+        command = [
+            ffmpeg_cli,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=blue:s={resolution}:d={duration}",
+            "-c:v",
+            encoding,
+            "-r",
+            f"{fps}",
+            "-g",
+            f"{gop_size}",
+            "-pix_fmt",
+            pix_fmt,
+            outfile,
+        ]
+        executor.submit(generate_video, command)
+        video_count += 1
 
     executor.shutdown(wait=True)
     print(f"Generated {video_count} videos")

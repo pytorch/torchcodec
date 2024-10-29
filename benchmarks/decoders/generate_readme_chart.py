@@ -68,7 +68,7 @@ def main() -> None:
     )
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
 
-    output_png = Path(__file__) / "benchmark_readme_chart.png"
+    output_png = Path(__file__).parent / "benchmark_readme_chart.png"
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_uniform_samples = 10
     df_data = run_benchmarks(
