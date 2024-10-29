@@ -216,6 +216,7 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
+  DecodedOutput getNextFrame();
   DecodedOutput getNextDecodedOutputNoDemux(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   // Decodes the first frame in any added stream that is visible at a given

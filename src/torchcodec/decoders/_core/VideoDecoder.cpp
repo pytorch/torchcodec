@@ -1260,6 +1260,12 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   return rawOutput;
 }
 
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrame() {
+  auto output = getNextDecodedOutputNoDemux();
+  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  return output;
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();

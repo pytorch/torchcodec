@@ -193,7 +193,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
   try {
-    result = videoDecoder->getNextDecodedOutputNoDemux();
+    result = videoDecoder->getNextFrame();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
@@ -202,8 +202,6 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
         "image_size is unexpected. Expected 3, got: " +
         std::to_string(result.frame.sizes().size()));
   }
-  result.frame =
-      videoDecoder->MaybePermuteHWC2CHW(result.streamIndex, result.frame);
   return makeOpsDecodedOutput(result);
 }
 
