@@ -202,6 +202,8 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
         "image_size is unexpected. Expected 3, got: " +
         std::to_string(result.frame.sizes().size()));
   }
+  result.frame =
+      videoDecoder->MaybePermuteHWC2CHW(result.streamIndex, result.frame);
   return makeOpsDecodedOutput(result);
 }
 
