@@ -222,6 +222,40 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(frames[0], frames[-1])
 
+    # TODO: Figure out how to parameterize this test to run on both CPU and CUDA.abs
+    # The question is how to have the @needs_cuda decorator with the pytest.mark.parametrize
+    # decorator on the same test.
+    @needs_cuda
+    def test_get_frames_by_pts_with_cuda(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, device="cuda")
+        scan_all_streams_to_update_metadata(decoder)
+        stream_index = 3
+
+        # Note: 13.01 should give the last video frame for the NASA video
+        timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
+
+        expected_frames = [
+            get_frame_at_pts(decoder, seconds=pts)[0] for pts in timestamps
+        ]
+
+        frames, *_ = get_frames_by_pts(
+            decoder,
+            stream_index=stream_index,
+            timestamps=timestamps,
+        )
+        for frame, expected_frame in zip(frames, expected_frames):
+            assert_tensor_equal(frame, expected_frame)
+
+        # first and last frame should be equal, at pts=2 [+ eps]. We then modify
+        # the first frame and assert that it's now different from the last
+        # frame. This ensures a copy was properly made during the de-duplication
+        # logic.
+        assert_tensor_equal(frames[0], frames[-1])
+        frames[0] += 20
+        with pytest.raises(AssertionError):
+            assert_tensor_equal(frames[0], frames[-1])
+
     def test_pts_apis_against_index_ref(self):
         # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
