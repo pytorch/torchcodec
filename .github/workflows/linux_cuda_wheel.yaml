@@ -96,6 +96,9 @@ jobs:
           ${CONDA_RUN} conda info
           ${CONDA_RUN} nvidia-smi
           ${CONDA_RUN} conda list
+      - name: Assert ffmpeg exists
+        run: |
+          ${CONDA_RUN} ffmpeg -buildconf
       - name: Update pip
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
