@@ -22,6 +22,7 @@ def needs_cuda(test_item):
 
 
 def cpu_and_cuda():
+    # TODO: Figure out how to dedupe this logic in needs_cuda() and here.
     if not torch.cuda.is_available():
         if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
             raise RuntimeError("CUDA is required for this test")
