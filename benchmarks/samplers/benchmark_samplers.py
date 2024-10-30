@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from time import perf_counter_ns
 
@@ -45,8 +46,7 @@ def report_stats(times, num_frames, unit="ms"):
     return med, fps
 
 
-def sample(sampler, **kwargs):
-    decoder = VideoDecoder(VIDEO_PATH)
+def sample(decoder, sampler, **kwargs):
     return sampler(
         decoder,
         num_frames_per_clip=10,
@@ -54,42 +54,68 @@ def sample(sampler, **kwargs):
     )
 
 
-VIDEO_PATH = Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
-NUM_EXP = 30
+def run_sampler_benchmarks(device, video):
+    NUM_EXP = 30
 
-for num_clips in (1, 50):
-    print("-" * 10)
-    print(f"{num_clips = }")
+    for num_clips in (1, 50):
+        print("-" * 10)
+        print(f"{num_clips = }")
 
-    print("clips_at_random_indices     ", end="")
-    times, num_frames = bench(
-        sample, clips_at_random_indices, num_clips=num_clips, num_exp=NUM_EXP, warmup=2
-    )
-    report_stats(times, num_frames, unit="ms")
+        print("clips_at_random_indices     ", end="")
+        decoder = VideoDecoder(video, device=device)
+        times, num_frames = bench(
+            sample,
+            decoder,
+            clips_at_random_indices,
+            num_clips=num_clips,
+            num_exp=NUM_EXP,
+            warmup=2,
+        )
+        report_stats(times, num_frames, unit="ms")
 
-    print("clips_at_regular_indices    ", end="")
-    times, num_frames = bench(
-        sample, clips_at_regular_indices, num_clips=num_clips, num_exp=NUM_EXP, warmup=2
-    )
-    report_stats(times, num_frames, unit="ms")
+        print("clips_at_regular_indices    ", end="")
+        times, num_frames = bench(
+            sample,
+            decoder,
+            clips_at_regular_indices,
+            num_clips=num_clips,
+            num_exp=NUM_EXP,
+            warmup=2,
+        )
+        report_stats(times, num_frames, unit="ms")
 
-    print("clips_at_random_timestamps  ", end="")
-    times, num_frames = bench(
-        sample,
-        clips_at_random_timestamps,
-        num_clips=num_clips,
-        num_exp=NUM_EXP,
-        warmup=2,
-    )
-    report_stats(times, num_frames, unit="ms")
+        print("clips_at_random_timestamps  ", end="")
+        times, num_frames = bench(
+            sample,
+            decoder,
+            clips_at_random_timestamps,
+            num_clips=num_clips,
+            num_exp=NUM_EXP,
+            warmup=2,
+        )
+        report_stats(times, num_frames, unit="ms")
 
-    print("clips_at_regular_timestamps ", end="")
-    seconds_between_clip_starts = 13 / num_clips  # approximate. video is 13s long
-    times, num_frames = bench(
-        sample,
-        clips_at_regular_timestamps,
-        seconds_between_clip_starts=seconds_between_clip_starts,
-        num_exp=NUM_EXP,
-        warmup=2,
-    )
-    report_stats(times, num_frames, unit="ms")
+        print("clips_at_regular_timestamps ", end="")
+        seconds_between_clip_starts = 13 / num_clips  # approximate. video is 13s long
+        times, num_frames = bench(
+            sample,
+            decoder,
+            clips_at_regular_timestamps,
+            seconds_between_clip_starts=seconds_between_clip_starts,
+            num_exp=NUM_EXP,
+            warmup=2,
+        )
+        report_stats(times, num_frames, unit="ms")
+
+
+def main():
+    DEFAULT_VIDEO_PATH = Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument("--video", type=str, default=str(DEFAULT_VIDEO_PATH))
+    args = parser.parse_args()
+    run_sampler_benchmarks(args.device, args.video)
+
+
+if __name__ == "__main__":
+    main()
