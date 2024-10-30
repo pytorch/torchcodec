@@ -1007,10 +1007,8 @@ void VideoDecoder::validateFrameIndex(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
-    int64_t frameIndex,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  auto output = getFrameAtIndexInternal(
-      streamIndex, frameIndex, preAllocatedOutputTensor);
+    int64_t frameIndex) {
+  auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
   output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }
