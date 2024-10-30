@@ -226,6 +226,9 @@ class VideoDecoder {
   DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
 
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  // This is morally private but needs to be exposed for C++ tests. Once
+  // getFrameAtIndex supports the preAllocatedOutputTensor parameter, we can
+  // move it back to private.
   DecodedOutput getFrameAtIndexInternal(
       int streamIndex,
       int64_t frameIndex,
