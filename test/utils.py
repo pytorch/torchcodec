@@ -22,6 +22,10 @@ def needs_cuda(test_item):
 
 
 def cpu_and_cuda():
+    if not torch.cuda.is_available():
+        if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
+            raise RuntimeError("CUDA is required for this test")
+        return ("cpu",)
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
