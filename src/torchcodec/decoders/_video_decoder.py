@@ -36,14 +36,6 @@ class VideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
-        num_ffmpeg_threads (int, optional): The number of threads to use for decoding.
-            Use 1 for single-threaded decoding which may be best if you are running multiple
-            instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
-            decoding which is best if you are running a single instance of ``VideoDecoder``.
-            Default: 1.
-        device (str or torch.device, optional): The device to use for decoding.
-
-
             .. note::
 
                 Frames are natively decoded in NHWC format by the underlying
@@ -51,6 +43,13 @@ class VideoDecoder:
                 cheap no-copy operation that allows these frames to be
                 transformed using the `torchvision transforms
                 <https://pytorch.org/vision/stable/transforms.html>`_.
+        num_ffmpeg_threads (int, optional): The number of threads to use for decoding.
+            Use 1 for single-threaded decoding which may be best if you are running multiple
+            instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
+            decoding which is best if you are running a single instance of ``VideoDecoder``.
+            Default: 1.
+        device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
+
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.

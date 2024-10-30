@@ -855,11 +855,11 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
   if (streamInfo.options.device.type() == torch::kCPU) {
     convertAVFrameToDecodedOutputOnCPU(
         rawOutput, output, preAllocatedOutputTensor);
   } else if (streamInfo.options.device.type() == torch::kCUDA) {
-    // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,

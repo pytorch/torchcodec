@@ -37,8 +37,8 @@ from torchcodec.decoders._core import (
 )
 
 from ..utils import (
+    assert_tensor_close_on_at_least,
     assert_tensor_equal,
-    assert_tensor_nearly_equal,
     NASA_AUDIO,
     NASA_VIDEO,
     needs_cuda,
@@ -156,8 +156,8 @@ class TestOps:
             INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert frames0and180.device.type == "cuda"
-        assert_tensor_nearly_equal(frames0and180[0].to("cpu"), reference_frame0)
-        assert_tensor_nearly_equal(
+        assert_tensor_close_on_at_least(frames0and180[0].to("cpu"), reference_frame0)
+        assert_tensor_close_on_at_least(
             frames0and180[1].to("cpu"), reference_frame180, 0.3, 30
         )
 
@@ -716,7 +716,7 @@ class TestOps:
         frame0_cpu = frame0.to("cpu")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         # GPU decode is not bit-accurate. So we allow some tolerance.
-        assert_tensor_nearly_equal(frame0_cpu, reference_frame0)
+        assert_tensor_close_on_at_least(frame0_cpu, reference_frame0)
         diff = (reference_frame0.float() - frame0_cpu.float()).abs()
         assert (diff > 20).float().mean() <= 0.003
         assert pts == torch.tensor([0])
