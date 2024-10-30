@@ -20,3 +20,10 @@ def prevent_leaking_rng():
     random.setstate(builtin_rng_state)
     if torch.cuda.is_available():
         torch.cuda.set_rng_state(cuda_rng_state)
+
+
+def pytest_configure(config):
+    # register an additional marker (see pytest_collection_modifyitems)
+    config.addinivalue_line(
+        "markers", "needs_cuda: mark for tests that rely on a CUDA device"
+    )

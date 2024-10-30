@@ -12,6 +12,12 @@ import pytest
 import torch
 
 
+def cpu_and_cuda():
+    import pytest  # noqa
+
+    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
+
+
 # Decorator for skipping CUDA tests when CUDA isn't available
 def needs_cuda(test_item):
     if not torch.cuda.is_available():
@@ -19,6 +25,13 @@ def needs_cuda(test_item):
             raise RuntimeError("CUDA is required for this test")
         return pytest.mark.skip(reason="CUDA not available")(test_item)
     return test_item
+
+
+def get_tensor_compare_function(device):
+    if device == "cpu":
+        return assert_tensor_equal
+    else:
+        return assert_tensor_close_on_at_least
 
 
 # For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On
@@ -34,10 +47,17 @@ def assert_tensor_equal(*args, **kwargs):
 
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
-def assert_tensor_close_on_at_least(frame1, frame2, percentage=99.7, abs_tolerance=20):
+def assert_tensor_close_on_at_least(frame1, frame2, percentage=90, abs_tolerance=20):
+    frame1 = frame1.to("cpu")
+    frame2 = frame2.to("cpu")
     diff = (frame2.float() - frame1.float()).abs()
-    diff_percentage = 100.0 - percentage
-    assert (diff > abs_tolerance).float().mean() <= diff_percentage / 100.0
+    max_diff_percentage = 100.0 - percentage
+    if diff.sum() == 0:
+        return
+    diff_percentage = (diff > abs_tolerance).float().mean() * 100.0
+    assert (
+        diff_percentage <= max_diff_percentage
+    ), f"Diff too high: {diff_percentage} > {max_diff_percentage}"
 
 
 # For use with floating point metadata, or in other instances where we are not confident

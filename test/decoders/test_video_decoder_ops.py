@@ -39,6 +39,8 @@ from torchcodec.decoders._core import (
 from ..utils import (
     assert_tensor_close_on_at_least,
     assert_tensor_equal,
+    cpu_and_cuda,
+    get_tensor_compare_function,
     NASA_AUDIO,
     NASA_VIDEO,
     needs_cuda,
@@ -129,10 +131,12 @@ class TestOps:
         assert pts.item() == pytest.approx(6.006, rel=1e-3)
         assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
-    def test_get_frames_at_indices(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices(self, device):
+        tensor_compare_function = get_tensor_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
         frames0and180, *_ = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
         )
@@ -140,30 +144,13 @@ class TestOps:
         reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frames0and180[0], reference_frame0)
-        assert_tensor_equal(frames0and180[1], reference_frame180)
+        tensor_compare_function(frames0and180[0], reference_frame0)
+        tensor_compare_function(frames0and180[1], reference_frame180)
 
-    @needs_cuda
-    def test_get_frames_at_indices_with_cuda(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder, device="cuda")
-        frames0and180, *_ = get_frames_at_indices(
-            decoder, stream_index=3, frame_indices=[0, 180]
-        )
-        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_FRAME_AT_6_SECONDS
-        )
-        assert frames0and180.device.type == "cuda"
-        assert_tensor_close_on_at_least(frames0and180[0].to("cpu"), reference_frame0)
-        assert_tensor_close_on_at_least(
-            frames0and180[1].to("cpu"), reference_frame180, 0.3, 30
-        )
-
-    def test_get_frames_at_indices_unsorted_indices(self):
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        _add_video_stream(decoder)
+        _add_video_stream(decoder, device=device)
         scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
@@ -192,9 +179,10 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(frames[0], frames[-1])
 
-    def test_get_frames_by_pts(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        _add_video_stream(decoder)
+        _add_video_stream(decoder, device=device)
         scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
@@ -222,13 +210,10 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(frames[0], frames[-1])
 
-    # TODO: Figure out how to parameterize this test to run on both CPU and CUDA.abs
-    # The question is how to have the @needs_cuda decorator with the pytest.mark.parametrize
-    # decorator on the same test.
-    @needs_cuda
-    def test_get_frames_by_pts_with_cuda(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_by_pts_with_cuda(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        _add_video_stream(decoder, device="cuda")
+        _add_video_stream(decoder, device=device)
         scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
@@ -256,14 +241,15 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_tensor_equal(frames[0], frames[-1])
 
-    def test_pts_apis_against_index_ref(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_pts_apis_against_index_ref(self, device):
         # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
 
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -316,55 +302,57 @@ class TestOps:
         )
         assert_tensor_equal(pts_seconds, all_pts_seconds_ref)
 
-    def test_get_frames_in_range(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_in_range(self, device):
+        tensor_compare_function = get_tensor_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
 
         # ensure that the degenerate case of a range of size 1 works
         ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
         bulk_frame0, *_ = get_frames_in_range(decoder, stream_index=3, start=0, stop=1)
-        assert_tensor_equal(ref_frame0, bulk_frame0)
+        tensor_compare_function(ref_frame0, bulk_frame0)
 
         ref_frame1 = NASA_VIDEO.get_frame_data_by_range(1, 2)
         bulk_frame1, *_ = get_frames_in_range(decoder, stream_index=3, start=1, stop=2)
-        assert_tensor_equal(ref_frame1, bulk_frame1)
+        tensor_compare_function(ref_frame1, bulk_frame1)
 
         ref_frame389 = NASA_VIDEO.get_frame_data_by_range(389, 390)
         bulk_frame389, *_ = get_frames_in_range(
             decoder, stream_index=3, start=389, stop=390
         )
-        assert_tensor_equal(ref_frame389, bulk_frame389)
+        tensor_compare_function(ref_frame389, bulk_frame389)
 
         # contiguous ranges
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
         bulk_frames0_9, *_ = get_frames_in_range(
             decoder, stream_index=3, start=0, stop=9
         )
-        assert_tensor_equal(ref_frames0_9, bulk_frames0_9)
+        tensor_compare_function(ref_frames0_9, bulk_frames0_9)
 
         ref_frames4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8)
         bulk_frames4_8, *_ = get_frames_in_range(
             decoder, stream_index=3, start=4, stop=8
         )
-        assert_tensor_equal(ref_frames4_8, bulk_frames4_8)
+        tensor_compare_function(ref_frames4_8, bulk_frames4_8)
 
         # ranges with a stride
         ref_frames15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5)
         bulk_frames15_35, *_ = get_frames_in_range(
             decoder, stream_index=3, start=15, stop=36, step=5
         )
-        assert_tensor_equal(ref_frames15_35, bulk_frames15_35)
+        tensor_compare_function(ref_frames15_35, bulk_frames15_35)
 
         ref_frames0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2)
         bulk_frames0_9_2, *_ = get_frames_in_range(
             decoder, stream_index=3, start=0, stop=9, step=2
         )
-        assert_tensor_equal(ref_frames0_9_2, bulk_frames0_9_2)
+        tensor_compare_function(ref_frames0_9_2, bulk_frames0_9_2)
 
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
-        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_chw_tensor)
+        tensor_compare_function(empty_frame, NASA_VIDEO.empty_chw_tensor)
 
     def test_throws_exception_at_eof(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
