@@ -12,12 +12,6 @@ import pytest
 import torch
 
 
-def cpu_and_cuda():
-    import pytest  # noqa
-
-    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
-
-
 # Decorator for skipping CUDA tests when CUDA isn't available
 def needs_cuda(test_item):
     if not torch.cuda.is_available():
@@ -25,6 +19,10 @@ def needs_cuda(test_item):
             raise RuntimeError("CUDA is required for this test")
         return pytest.mark.skip(reason="CUDA not available")(test_item)
     return test_item
+
+
+def cpu_and_cuda():
+    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
 def get_tensor_compare_function(device):
