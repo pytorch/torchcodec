@@ -193,7 +193,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
   try {
-    result = videoDecoder->getNextDecodedOutputNoDemux();
+    result = videoDecoder->getNextFrameNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }

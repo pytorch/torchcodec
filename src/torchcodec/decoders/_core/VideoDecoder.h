@@ -157,10 +157,12 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
 
+  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextDecodedOutputNoDemux() will return the first frame at or
-  // after this position.
+  // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
+  // or after this position.
   void setCursorPtsInSeconds(double seconds);
   // This is an internal structure that is used to store the decoded output
   // from decoding a frame through color conversion. Example usage is:
@@ -214,8 +216,7 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutputNoDemux(
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  DecodedOutput getNextFrameNoDemux();
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
@@ -384,6 +385,13 @@ class VideoDecoder {
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
       DecodedOutput& output,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  DecodedOutput getFrameAtIndexInternal(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   DecoderOptions options_;

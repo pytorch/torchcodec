@@ -63,7 +63,7 @@ void runNDecodeIterations(
     decoder->addVideoStreamDecoder(-1);
     for (double pts : ptsList) {
       decoder->setCursorPtsInSeconds(pts);
-      torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
+      torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
@@ -95,7 +95,7 @@ void runNdecodeIterationsGrabbingConsecutiveFrames(
         VideoDecoder::createFromFilePath(videoPath);
     decoder->addVideoStreamDecoder(-1);
     for (int j = 0; j < consecutiveFrameCount; ++j) {
-      torch::Tensor tensor = decoder->getNextDecodedOutputNoDemux().frame;
+      torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
     }
     if (i + 1 == warmupIterations) {
       start = std::chrono::high_resolution_clock::now();
