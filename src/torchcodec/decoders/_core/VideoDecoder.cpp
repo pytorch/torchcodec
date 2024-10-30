@@ -187,16 +187,23 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
   }
 }
 
+torch::Tensor
+makeEmptyHWCTensor(int height, int width, std::optional<int> numFrames = std::nullopt) {
+  if (numFrames.has_value()) {
+    return torch::empty({numFrames.value(), height, width, 3}, {torch::kUInt8});
+  } else {
+    return torch::empty({height, width, 3}, {torch::kUInt8});
+  }
+}
+
 VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : frames(torch::empty(
-          {numFrames,
-           options.height.value_or(*metadata.height),
-           options.width.value_or(*metadata.width),
-           3},
-          {torch::kUInt8})),
+    : frames(makeEmptyHWCTensor(
+          options.height.value_or(*metadata.height),
+          options.width.value_or(*metadata.width),
+          numFrames)),
       ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
 
@@ -1007,10 +1014,14 @@ void VideoDecoder::validateFrameIndex(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
-    int64_t frameIndex,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  auto output = getFrameAtIndexInternal(
-      streamIndex, frameIndex, preAllocatedOutputTensor);
+    int64_t frameIndex){
+
+    auto metadata = containerMetadata_.streams[streamIndex];
+    auto options = streams_[streamIndex].options;
+    auto height = options.height.value_or(*metadata.height);
+    auto width = options.width.value_or(*metadata.width);
+    auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto output = getFrameAtIndexInternal(streamIndex, frameIndex, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }
