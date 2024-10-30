@@ -54,7 +54,7 @@ def sample(decoder, sampler, **kwargs):
     )
 
 
-def main(device, video):
+def run_sampler_benchmarks(device, video):
     NUM_EXP = 30
 
     for num_clips in (1, 50):
@@ -108,10 +108,14 @@ def main(device, video):
         report_stats(times, num_frames, unit="ms")
 
 
-if __name__ == "__main__":
+def main():
     DEFAULT_VIDEO_PATH = Path(__file__).parent / "../../test/resources/nasa_13013.mp4"
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--video", type=str, default=str(DEFAULT_VIDEO_PATH))
     args = parser.parse_args()
-    main(args.device, args.video)
+    run_sampler_benchmarks(args.device, args.video)
+
+
+if __name__ == "__main__":
+    main()
