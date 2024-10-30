@@ -225,9 +225,7 @@ class VideoDecoder {
   // seconds=5.999, etc.
   DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
 
-  DecodedOutput getFrameAtIndex(
-      int streamIndex,
-      int64_t frameIndex);
+  DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
