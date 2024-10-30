@@ -226,6 +226,10 @@ class VideoDecoder {
   DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
 
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  DecodedOutput getFrameAtIndexInternal(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
@@ -384,10 +388,6 @@ class VideoDecoder {
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecodedOutput getFrameAtIndexInternal(
-      int streamIndex,
-      int64_t frameIndex,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
