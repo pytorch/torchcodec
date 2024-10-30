@@ -152,9 +152,6 @@ class TestContainerFile:
 
         return self.frames[stream_index][idx]
 
-    def get_frame_by_name(self, name: str) -> torch.Tensor:
-        return _load_tensor_from_file(f"{self.filename}.{name}.pt")
-
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
         return torch.empty([0], dtype=torch.float64)

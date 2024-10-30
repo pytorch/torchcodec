@@ -61,8 +61,8 @@ class TestVideoDecoder:
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
-        ref_frame180 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        ref_frame_last = NASA_VIDEO.get_frame_by_name("time12.979633")
+        ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
 
         assert_tensor_equal(ref_frame0, decoder[0])
         assert_tensor_equal(ref_frame1, decoder[1])
@@ -74,8 +74,8 @@ class TestVideoDecoder:
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
-        ref_frame180 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        ref_frame_last = NASA_VIDEO.get_frame_by_name("time12.979633")
+        ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
 
         # test against numpy.int64
         assert_tensor_equal(ref_frame0, decoder[numpy.int64(0)])
@@ -140,7 +140,7 @@ class TestVideoDecoder:
         )
         assert_tensor_equal(ref8, slice8)
 
-        ref180 = NASA_VIDEO.get_frame_by_name("time6.000000")
+        ref180 = NASA_VIDEO.get_frame_data_by_index(180)
         slice180 = decoder[180:181]
         assert slice180.shape == torch.Size(
             [
@@ -258,8 +258,8 @@ class TestVideoDecoder:
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9)
         ref_frame35 = NASA_VIDEO.get_frame_data_by_index(35)
-        ref_frame180 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        ref_frame_last = NASA_VIDEO.get_frame_by_name("time12.979633")
+        ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
 
         # Access an arbitrary frame to make sure that the later iteration
         # still works as expected. The underlying C++ decoder object is
@@ -392,10 +392,16 @@ class TestVideoDecoder:
     def test_get_frame_played_at(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
 
-        ref_frame6 = NASA_VIDEO.get_frame_by_name("time6.000000")
-        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.006).data)
-        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.02).data)
-        assert_tensor_equal(ref_frame6, decoder.get_frame_played_at(6.039366).data)
+        ref_frame_played_at_6 = NASA_VIDEO.get_frame_data_by_index(180)
+        assert_tensor_equal(
+            ref_frame_played_at_6, decoder.get_frame_played_at(6.006).data
+        )
+        assert_tensor_equal(
+            ref_frame_played_at_6, decoder.get_frame_played_at(6.02).data
+        )
+        assert_tensor_equal(
+            ref_frame_played_at_6, decoder.get_frame_played_at(6.039366).data
+        )
         assert isinstance(decoder.get_frame_played_at(6.02).pts_seconds, float)
         assert isinstance(decoder.get_frame_played_at(6.02).duration_seconds, float)
 
