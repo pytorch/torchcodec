@@ -54,6 +54,7 @@ jobs:
       runner-type: macos-14-xlarge
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
+      setup-miniconda: true
       build-platform: "python-build-package"
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
 
