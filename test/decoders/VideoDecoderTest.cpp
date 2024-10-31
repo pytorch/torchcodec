@@ -400,7 +400,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamDecoderOptions(
           "color_conversion_library=filtergraph"));
-  auto output = ourDecoder->getFrameAtIndex(
+  auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
   EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
@@ -418,7 +418,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamDecoderOptions(
           "color_conversion_library=swscale"));
-  auto output = ourDecoder->getFrameAtIndex(
+  auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
   EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
