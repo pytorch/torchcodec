@@ -232,7 +232,7 @@ class VideoDecoder {
   DecodedOutput getFrameAtIndexInternal(
       int streamIndex,
       int64_t frameIndex,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      torch::Tensor preAllocatedOutputTensor);
 
   struct BatchDecodedOutput {
     torch::Tensor frames;

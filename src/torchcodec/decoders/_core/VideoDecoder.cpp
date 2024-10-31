@@ -1032,7 +1032,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
     int streamIndex,
     int64_t frameIndex,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    torch::Tensor preAllocatedOutputTensor) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
