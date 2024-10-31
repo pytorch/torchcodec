@@ -214,6 +214,7 @@ void convertAVFrameToDecodedOutputOnCuda(
       preAllocatedOutputTensor.stride(0),
       oSizeROI);
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+  output.frame = preAllocatedOutputTensor;
   // Make the pytorch stream wait for the npp kernel to finish before using the
   // output.
   at::cuda::CUDAEvent nppDoneEvent;
