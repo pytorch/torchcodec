@@ -12,21 +12,14 @@ import pytest
 import torch
 
 
-# Decorator for skipping CUDA tests when CUDA isn't available
+# Decorator for skipping CUDA tests when CUDA isn't available. The tests are
+# effectively marked to be skipped in pytest_collection_modifyitems() of
+# conftest.py
 def needs_cuda(test_item):
-    if not torch.cuda.is_available():
-        if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
-            raise RuntimeError("CUDA is required for this test")
-        return pytest.mark.skip(reason="CUDA not available")(test_item)
-    return test_item
+    return pytest.mark.needs_cuda(test_item)
 
 
 def cpu_and_cuda():
-    # TODO: Figure out how to dedupe this logic in needs_cuda() and here.
-    if not torch.cuda.is_available():
-        if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
-            raise RuntimeError("CUDA is required for this test")
-        return ("cpu",)
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
