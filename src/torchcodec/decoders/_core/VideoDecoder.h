@@ -225,7 +225,11 @@ class VideoDecoder {
   // seconds=5.999, etc.
   DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
 
-  DecodedOutput getFrameAtIndex(
+  DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  // This is morally private but needs to be exposed for C++ tests. Once
+  // getFrameAtIndex supports the preAllocatedOutputTensor parameter, we can
+  // move it back to private.
+  DecodedOutput getFrameAtIndexInternal(
       int streamIndex,
       int64_t frameIndex,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -387,10 +391,6 @@ class VideoDecoder {
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecodedOutput getFrameAtIndexInternal(
-      int streamIndex,
-      int64_t frameIndex,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
