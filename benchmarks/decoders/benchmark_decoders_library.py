@@ -451,7 +451,7 @@ def run_benchmarks(
     num_uniform_samples,
     min_runtime_seconds,
     benchmark_video_creation,
-):
+) -> list[dict[str, str | float | int]]:
     results = []
     df_data = []
     print(f"video_files_paths={video_files_paths}")
