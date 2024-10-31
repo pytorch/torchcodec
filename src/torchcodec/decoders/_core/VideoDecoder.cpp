@@ -887,7 +887,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
-// Callers may pass a pre-allocated tensor, where the output frame tensor will
+// Callers must pass a pre-allocated tensor, where the output frame tensor will
 // be stored. This parameter is honored in any case, but it only leads to a
 // speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
 // decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
@@ -898,50 +898,25 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
     DecodedOutput& output,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    torch::Tensor preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
-  torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int width = streamInfo.options.width.value_or(frame->width);
-      int height = streamInfo.options.height.value_or(frame->height);
-      if (preAllocatedOutputTensor.has_value()) {
-        tensor = preAllocatedOutputTensor.value();
-        auto shape = tensor.sizes();
-        TORCH_CHECK(
-            (shape.size() == 3) && (shape[0] == height) &&
-                (shape[1] == width) && (shape[2] == 3),
-            "Expected tensor of shape ",
-            height,
-            "x",
-            width,
-            "x3, got ",
-            shape);
-      } else {
-        tensor = torch::empty(
-            {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
-      }
-      rawOutput.data = tensor.data_ptr<uint8_t>();
+      rawOutput.data = preAllocatedOutputTensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
-
-      output.frame = tensor;
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      tensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
-      if (preAllocatedOutputTensor.has_value()) {
-        preAllocatedOutputTensor.value().copy_(tensor);
-        output.frame = preAllocatedOutputTensor.value();
-      } else {
-        output.frame = tensor;
-      }
+      auto tmpTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      preAllocatedOutputTensor.copy_(tmpTensor);
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
           std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
     }
+    output.frame = preAllocatedOutputTensor;
 
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
