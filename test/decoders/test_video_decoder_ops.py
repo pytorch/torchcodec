@@ -36,7 +36,13 @@ from torchcodec.decoders._core import (
     seek_to_pts,
 )
 
-from ..utils import assert_tensor_equal, NASA_AUDIO, NASA_VIDEO, needs_cuda
+from ..utils import (
+    assert_tensor_close_on_at_least,
+    assert_tensor_equal,
+    NASA_AUDIO,
+    NASA_VIDEO,
+    needs_cuda,
+)
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
@@ -137,6 +143,24 @@ class TestOps:
         assert_tensor_equal(frames0and180[0], reference_frame0)
         assert_tensor_equal(frames0and180[1], reference_frame180)
 
+    @needs_cuda
+    def test_get_frames_at_indices_with_cuda(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder, device="cuda")
+        frames0and180, *_ = get_frames_at_indices(
+            decoder, stream_index=3, frame_indices=[0, 180]
+        )
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
+        assert frames0and180.device.type == "cuda"
+        assert_tensor_close_on_at_least(frames0and180[0].to("cpu"), reference_frame0)
+        assert_tensor_close_on_at_least(
+            frames0and180[1].to("cpu"), reference_frame180, 0.3, 30
+        )
+
     def test_get_frames_at_indices_unsorted_indices(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder)
@@ -171,6 +195,40 @@ class TestOps:
     def test_get_frames_by_pts(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder)
+        scan_all_streams_to_update_metadata(decoder)
+        stream_index = 3
+
+        # Note: 13.01 should give the last video frame for the NASA video
+        timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
+
+        expected_frames = [
+            get_frame_at_pts(decoder, seconds=pts)[0] for pts in timestamps
+        ]
+
+        frames, *_ = get_frames_by_pts(
+            decoder,
+            stream_index=stream_index,
+            timestamps=timestamps,
+        )
+        for frame, expected_frame in zip(frames, expected_frames):
+            assert_tensor_equal(frame, expected_frame)
+
+        # first and last frame should be equal, at pts=2 [+ eps]. We then modify
+        # the first frame and assert that it's now different from the last
+        # frame. This ensures a copy was properly made during the de-duplication
+        # logic.
+        assert_tensor_equal(frames[0], frames[-1])
+        frames[0] += 20
+        with pytest.raises(AssertionError):
+            assert_tensor_equal(frames[0], frames[-1])
+
+    # TODO: Figure out how to parameterize this test to run on both CPU and CUDA.abs
+    # The question is how to have the @needs_cuda decorator with the pytest.mark.parametrize
+    # decorator on the same test.
+    @needs_cuda
+    def test_get_frames_by_pts_with_cuda(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, device="cuda")
         scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
@@ -657,8 +715,8 @@ class TestOps:
         assert frame0.device.type == "cuda"
         frame0_cpu = frame0.to("cpu")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        # GPU decode is not bit-accurate. In the following assertion we ensure
-        # not more than 0.3% of values have a difference greater than 20.
+        # GPU decode is not bit-accurate. So we allow some tolerance.
+        assert_tensor_close_on_at_least(frame0_cpu, reference_frame0)
         diff = (reference_frame0.float() - frame0_cpu.float()).abs()
         assert (diff > 20).float().mean() <= 0.003
         assert pts == torch.tensor([0])

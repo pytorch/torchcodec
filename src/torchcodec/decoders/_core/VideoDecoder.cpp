@@ -187,8 +187,10 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
   }
 }
 
-torch::Tensor
-makeEmptyHWCTensor(int height, int width, std::optional<int> numFrames = std::nullopt) {
+torch::Tensor makeEmptyHWCTensor(
+    int height,
+    int width,
+    std::optional<int> numFrames = std::nullopt) {
   if (numFrames.has_value()) {
     return torch::empty({numFrames.value(), height, width, 3}, {torch::kUInt8});
   } else {
@@ -862,17 +864,18 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
   if (streamInfo.options.device.type() == torch::kCPU) {
     convertAVFrameToDecodedOutputOnCPU(
         rawOutput, output, preAllocatedOutputTensor);
   } else if (streamInfo.options.device.type() == torch::kCUDA) {
-    // TODO: handle pre-allocated output tensor
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
         streamInfo.codecContext.get(),
         rawOutput,
-        output);
+        output,
+        preAllocatedOutputTensor);
   } else {
     TORCH_CHECK(
         false, "Invalid device type: " + streamInfo.options.device.str());
@@ -1014,14 +1017,14 @@ void VideoDecoder::validateFrameIndex(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
-    int64_t frameIndex){
-
-    auto metadata = containerMetadata_.streams[streamIndex];
-    auto options = streams_[streamIndex].options;
-    auto height = options.height.value_or(*metadata.height);
-    auto width = options.width.value_or(*metadata.width);
-    auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
-  auto output = getFrameAtIndexInternal(streamIndex, frameIndex, preAllocatedOutputTensor);
+    int64_t frameIndex) {
+  auto metadata = containerMetadata_.streams[streamIndex];
+  auto options = streams_[streamIndex].options;
+  auto height = options.height.value_or(*metadata.height);
+  auto width = options.width.value_or(*metadata.width);
+  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto output = getFrameAtIndexInternal(
+      streamIndex, frameIndex, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }

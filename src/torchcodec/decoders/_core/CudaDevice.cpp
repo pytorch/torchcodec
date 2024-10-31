@@ -201,7 +201,8 @@ void convertAVFrameToDecodedOutputOnCuda(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     AVCodecContext* codecContext,
     VideoDecoder::RawDecodedOutput& rawOutput,
-    VideoDecoder::DecodedOutput& output) {
+    VideoDecoder::DecodedOutput& output,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   AVFrame* src = rawOutput.frame.get();
 
   TORCH_CHECK(
@@ -213,7 +214,21 @@ void convertAVFrameToDecodedOutputOnCuda(
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {src->data[0], src->data[1]};
   torch::Tensor& dst = output.frame;
-  dst = allocateDeviceTensor({height, width, 3}, options.device);
+  if (preAllocatedOutputTensor.has_value()) {
+    dst = preAllocatedOutputTensor.value();
+    auto shape = dst.sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
+            (shape[2] == 3),
+        "Expected tensor of shape ",
+        height,
+        "x",
+        width,
+        "x3, got ",
+        shape);
+  } else {
+    dst = allocateDeviceTensor({height, width, 3}, options.device);
+  }
 
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device);
