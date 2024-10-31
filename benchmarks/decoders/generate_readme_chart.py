@@ -42,10 +42,10 @@ def main() -> None:
     gop_sizes = [600]
     durations = [10]
     pix_fmts = ["yuv420p"]
-    ffmpeg_path = "/usr/local/bin/ffmpeg"
-    videos_path = "/tmp/videos"
-    shutil.rmtree(videos_path)
-    os.makedirs(videos_path)
+    ffmpeg_path = "ffmpeg"
+    videos_dir_path = "/tmp/torchcodec_benchmarking_videos"
+    shutil.rmtree(videos_dir_path, ignore_errors=True)
+    os.makedirs(videos_dir_path)
     generate_videos(
         resolutions,
         encodings,
@@ -54,9 +54,9 @@ def main() -> None:
         durations,
         pix_fmts,
         ffmpeg_path,
-        videos_path,
+        videos_dir_path,
     )
-    video_paths = glob.glob(f"{videos_path}/*.mp4")
+    video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
 
     decoder_dict = {}
     decoder_dict["TorchCodec"] = TorchcodecNonCompiledWithOptions()
@@ -73,7 +73,7 @@ def main() -> None:
     num_uniform_samples = 10
     df_data = run_benchmarks(
         decoder_dict,
-        video_paths,
+        video_files_paths,
         num_uniform_samples,
         10,
         False,

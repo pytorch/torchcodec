@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 import timeit
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from itertools import product
 
 import matplotlib.pyplot as plt
@@ -306,6 +306,7 @@ def generate_video(command):
     print(command)
     print(" ".join(command))
     subprocess.check_call(command)
+    return True
 
 
 def generate_videos(
@@ -321,6 +322,7 @@ def generate_videos(
     executor = ThreadPoolExecutor(max_workers=20)
     video_count = 0
 
+    futures = []
     for resolution, duration, fps, gop_size, encoding, pix_fmt in product(
         resolutions, durations, fpses, gop_sizes, encodings, pix_fmts
     ):
@@ -342,9 +344,12 @@ def generate_videos(
             pix_fmt,
             outfile,
         ]
-        executor.submit(generate_video, command)
+        futures.append(executor.submit(generate_video, command))
         video_count += 1
 
+    wait(futures)
+    for f in futures:
+        assert f.result()
     executor.shutdown(wait=True)
     print(f"Generated {video_count} videos")
 
@@ -442,21 +447,21 @@ def plot_data(df_data, plot_path):
 
 def run_benchmarks(
     decoder_dict,
-    video_paths,
+    video_files_paths,
     num_uniform_samples,
     min_runtime_seconds,
     benchmark_video_creation,
 ):
     results = []
     df_data = []
-    print(f"video_paths={video_paths}")
+    print(f"video_files_paths={video_files_paths}")
     verbose = False
     for decoder_name, decoder in decoder_dict.items():
-        for video_path in video_paths:
-            print(f"video={video_path}, decoder={decoder_name}")
+        for video_file_path in video_files_paths:
+            print(f"video={video_file_path}, decoder={decoder_name}")
             # We only use the VideoDecoder to get the metadata and get
             # the list of PTS values to seek to.
-            simple_decoder = VideoDecoder(video_path)
+            simple_decoder = VideoDecoder(video_file_path)
             duration = simple_decoder.metadata.duration_seconds
             pts_list = [
                 i * duration / num_uniform_samples for i in range(num_uniform_samples)
@@ -465,16 +470,16 @@ def run_benchmarks(
             metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
             if verbose:
                 print(
-                    f"video={video_path}, decoder={decoder_name}, pts_list={pts_list}"
+                    f"video={video_file_path}, decoder={decoder_name}, pts_list={pts_list}"
                 )
             seeked_result = benchmark.Timer(
                 stmt="decoder.get_frames_from_video(video_file, pts_list)",
                 globals={
-                    "video_file": video_path,
+                    "video_file": video_file_path,
                     "pts_list": pts_list,
                     "decoder": decoder,
                 },
-                label=f"video={video_path} {metadata_string}",
+                label=f"video={video_file_path} {metadata_string}",
                 sub_label=decoder_name,
                 description=f"{num_uniform_samples} seek()+next()",
             )
@@ -483,7 +488,7 @@ def run_benchmarks(
             )
             df_item = {}
             df_item["decoder"] = decoder_name
-            df_item["video"] = video_path
+            df_item["video"] = video_file_path
             df_item["description"] = results[-1].description
             df_item["frame_count"] = num_uniform_samples
             df_item["median"] = results[-1].median
@@ -498,11 +503,11 @@ def run_benchmarks(
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={
-                        "video_file": video_path,
+                        "video_file": video_file_path,
                         "consecutive_frames_to_extract": num_consecutive_nexts,
                         "decoder": decoder,
                     },
-                    label=f"video={video_path} {metadata_string}",
+                    label=f"video={video_file_path} {metadata_string}",
                     sub_label=decoder_name,
                     description=f"{num_consecutive_nexts} next()",
                 )
@@ -513,7 +518,7 @@ def run_benchmarks(
                 )
                 df_item = {}
                 df_item["decoder"] = decoder_name
-                df_item["video"] = video_path
+                df_item["video"] = video_file_path
                 df_item["description"] = results[-1].description
                 df_item["frame_count"] = num_consecutive_nexts
                 df_item["median"] = results[-1].median
@@ -524,18 +529,18 @@ def run_benchmarks(
                 df_item["fps_p25"] = 1.0 * num_consecutive_nexts / results[-1]._p25
                 df_data.append(df_item)
 
-        first_video_path = video_paths[0]
+        first_video_file_path = video_files_paths[0]
         if benchmark_video_creation:
-            simple_decoder = VideoDecoder(first_video_path)
+            simple_decoder = VideoDecoder(first_video_file_path)
             metadata = simple_decoder.metadata
             metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
             creation_result = benchmark.Timer(
                 stmt="create_torchcodec_decoder_from_file(video_file)",
                 globals={
-                    "video_file": first_video_path,
+                    "video_file": first_video_file_path,
                     "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
                 },
-                label=f"video={first_video_path} {metadata_string}",
+                label=f"video={first_video_file_path} {metadata_string}",
                 sub_label="TorchcodecNonCompiled",
                 description="create()+next()",
             )
