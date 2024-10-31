@@ -154,18 +154,6 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 #endif
 }
 
-torch::Tensor allocateDeviceTensor(
-    at::IntArrayRef shape,
-    torch::Device device,
-    const torch::Dtype dtype = torch::kUInt8) {
-  return torch::empty(
-      shape,
-      torch::TensorOptions()
-          .dtype(dtype)
-          .layout(torch::kStrided)
-          .device(device));
-}
-
 void throwErrorIfNonCudaDevice(const torch::Device& device) {
   TORCH_CHECK(
       device.type() != torch::kCPU,
@@ -202,7 +190,7 @@ void convertAVFrameToDecodedOutputOnCuda(
     AVCodecContext* codecContext,
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    torch::Tensor preAllocatedOutputTensor) {
   AVFrame* src = rawOutput.frame.get();
 
   TORCH_CHECK(
@@ -213,22 +201,6 @@ void convertAVFrameToDecodedOutputOnCuda(
   int height = options.height.value_or(codecContext->height);
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {src->data[0], src->data[1]};
-  torch::Tensor& dst = output.frame;
-  if (preAllocatedOutputTensor.has_value()) {
-    dst = preAllocatedOutputTensor.value();
-    auto shape = dst.sizes();
-    TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
-            (shape[2] == 3),
-        "Expected tensor of shape ",
-        height,
-        "x",
-        width,
-        "x3, got ",
-        shape);
-  } else {
-    dst = allocateDeviceTensor({height, width, 3}, options.device);
-  }
 
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device);
@@ -238,8 +210,8 @@ void convertAVFrameToDecodedOutputOnCuda(
   NppStatus status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],
-      static_cast<Npp8u*>(dst.data_ptr()),
-      dst.stride(0),
+      static_cast<Npp8u*>(preAllocatedOutputTensor.data_ptr()),
+      preAllocatedOutputTensor.stride(0),
       oSizeROI);
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
   // Make the pytorch stream wait for the npp kernel to finish before using the

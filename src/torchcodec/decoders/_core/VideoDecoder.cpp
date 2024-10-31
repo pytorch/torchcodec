@@ -195,10 +195,14 @@ torch::Tensor VideoDecoder::allocateEmptyHWCTensorForStream(
   auto height = options.height.value_or(*metadata.height);
   auto width = options.width.value_or(*metadata.width);
 
+  auto tensorOptions = torch::TensorOptions()
+                           .dtype(torch::kUInt8)
+                           .layout(torch::kStrided)
+                           .device(options.device.type());
   if (numFrames.has_value()) {
-    return torch::empty({numFrames.value(), height, width, 3}, {torch::kUInt8});
+    return torch::empty({numFrames.value(), height, width, 3}, tensorOptions);
   } else {
-    return torch::empty({height, width, 3}, {torch::kUInt8});
+    return torch::empty({height, width, 3}, tensorOptions);
   }
 }
 
