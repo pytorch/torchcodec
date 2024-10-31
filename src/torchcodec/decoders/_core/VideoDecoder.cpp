@@ -980,7 +980,13 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
   // Convert the frame to tensor.
-  auto output = convertAVFrameToDecodedOutput(rawOutput);
+  auto streamIndex = rawOutput.streamIndex;
+  auto metadata = containerMetadata_.streams[streamIndex];
+  auto options = streams_[streamIndex].options;
+  auto height = options.height.value_or(*metadata.height);
+  auto width = options.width.value_or(*metadata.width);
+  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto output = convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
