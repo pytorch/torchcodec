@@ -850,7 +850,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     VideoDecoder::RawDecodedOutput& rawOutput,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    torch::Tensor preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
@@ -986,7 +986,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   auto height = options.height.value_or(*metadata.height);
   auto width = options.width.value_or(*metadata.width);
   auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
-  auto output = convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
+  auto output =
+      convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
@@ -1288,13 +1289,21 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
-  auto output = getNextFrameOutputNoDemuxInternal();
+  auto rawOutput = getNextRawDecodedOutputNoDemux();
+  auto streamIndex = rawOutput.streamIndex;
+  auto metadata = containerMetadata_.streams[streamIndex];
+  auto options = streams_[streamIndex].options;
+  auto height = options.height.value_or(*metadata.height);
+  auto width = options.width.value_or(*metadata.width);
+  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto output =
+      convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameOutputNoDemuxInternal(
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    torch::Tensor preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }

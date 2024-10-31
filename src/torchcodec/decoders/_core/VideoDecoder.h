@@ -386,14 +386,14 @@ class VideoDecoder {
   void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
   DecodedOutput convertAVFrameToDecodedOutput(
       RawDecodedOutput& rawOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      torch::Tensor preAllocatedOutputTensor);
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   DecodedOutput getNextFrameOutputNoDemuxInternal(
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      torch::Tensor preAllocatedOutputTensor);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
