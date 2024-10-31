@@ -187,10 +187,14 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
   }
 }
 
-torch::Tensor makeEmptyHWCTensor(
-    int height,
-    int width,
-    std::optional<int> numFrames = std::nullopt) {
+torch::Tensor VideoDecoder::allocateEmptyHWCTensorForStream(
+    int streamIndex,
+    std::optional<int> numFrames) {
+  auto metadata = containerMetadata_.streams[streamIndex];
+  auto options = streams_[streamIndex].options;
+  auto height = options.height.value_or(*metadata.height);
+  auto width = options.width.value_or(*metadata.width);
+
   if (numFrames.has_value()) {
     return torch::empty({numFrames.value(), height, width, 3}, {torch::kUInt8});
   } else {
@@ -198,16 +202,15 @@ torch::Tensor makeEmptyHWCTensor(
   }
 }
 
-VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
-    int64_t numFrames,
-    const VideoStreamDecoderOptions& options,
-    const StreamMetadata& metadata)
-    : frames(makeEmptyHWCTensor(
-          options.height.value_or(*metadata.height),
-          options.width.value_or(*metadata.width),
-          numFrames)),
-      ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
+VideoDecoder::BatchDecodedOutput VideoDecoder::allocateBatchDecodedOutput(
+    int streamIndex,
+    int64_t numFrames) {
+  BatchDecodedOutput output;
+  output.frames = allocateEmptyHWCTensorForStream(streamIndex, numFrames);
+  output.ptsSeconds = torch::empty({numFrames}, {torch::kFloat64});
+  output.durationSeconds = torch::empty({numFrames}, {torch::kFloat64});
+  return output;
+}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -981,14 +984,10 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
       });
   // Convert the frame to tensor.
   auto streamIndex = rawOutput.streamIndex;
-  auto metadata = containerMetadata_.streams[streamIndex];
-  auto options = streams_[streamIndex].options;
-  auto height = options.height.value_or(*metadata.height);
-  auto width = options.width.value_or(*metadata.width);
-  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto preAllocatedOutputTensor = allocateEmptyHWCTensorForStream(streamIndex);
   auto output =
       convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
-  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }
 
@@ -1025,11 +1024,7 @@ void VideoDecoder::validateFrameIndex(
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
-  auto metadata = containerMetadata_.streams[streamIndex];
-  auto options = streams_[streamIndex].options;
-  auto height = options.height.value_or(*metadata.height);
-  auto width = options.width.value_or(*metadata.width);
-  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto preAllocatedOutputTensor = allocateEmptyHWCTensorForStream(streamIndex);
   auto output = getFrameAtIndexInternal(
       streamIndex, frameIndex, preAllocatedOutputTensor);
   output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
@@ -1079,7 +1074,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
   const auto& options = stream.options;
-  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
+  BatchDecodedOutput output =
+      allocateBatchDecodedOutput(streamIndex, frameIndices.size());
 
   auto previousIndexInVideo = -1;
   for (auto f = 0; f < frameIndices.size(); ++f) {
@@ -1171,8 +1167,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
       step > 0, "Step must be greater than 0; is " + std::to_string(step));
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
-  const auto& options = stream.options;
-  BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
+  BatchDecodedOutput output =
+      allocateBatchDecodedOutput(streamIndex, numOutputFrames);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     DecodedOutput singleOut =
@@ -1211,9 +1207,6 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
           "; must be less than or equal to " + std::to_string(maxSeconds) +
           ").");
 
-  const auto& stream = streams_[streamIndex];
-  const auto& options = stream.options;
-
   // Special case needed to implement a half-open range. At first glance, this
   // may seem unnecessary, as our search for stopFrame can return the end, and
   // we don't include stopFramIndex in our output. However, consider the
@@ -1232,7 +1225,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
-    BatchDecodedOutput output(0, options, streamMetadata);
+    BatchDecodedOutput output = allocateBatchDecodedOutput(streamIndex, 0);
     output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
   }
@@ -1248,6 +1241,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   //   2. In order to establish if the start of an interval maps to a particular
   //   frame, we need to figure out if it is ordered after the frame's pts, but
   //   before the next frames's pts.
+  const auto& stream = streams_[streamIndex];
   auto startFrame = std::lower_bound(
       stream.allFrames.begin(),
       stream.allFrames.end(),
@@ -1267,7 +1261,8 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   int64_t startFrameIndex = startFrame - stream.allFrames.begin();
   int64_t stopFrameIndex = stopFrame - stream.allFrames.begin();
   int64_t numFrames = stopFrameIndex - startFrameIndex;
-  BatchDecodedOutput output(numFrames, options, streamMetadata);
+  BatchDecodedOutput output =
+      allocateBatchDecodedOutput(streamIndex, numFrames);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     DecodedOutput singleOut =
         getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
@@ -1291,14 +1286,10 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   auto streamIndex = rawOutput.streamIndex;
-  auto metadata = containerMetadata_.streams[streamIndex];
-  auto options = streams_[streamIndex].options;
-  auto height = options.height.value_or(*metadata.height);
-  auto width = options.width.value_or(*metadata.width);
-  auto preAllocatedOutputTensor = makeEmptyHWCTensor(height, width);
+  auto preAllocatedOutputTensor = allocateEmptyHWCTensorForStream(streamIndex);
   auto output =
       convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
-  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }
 

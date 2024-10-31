@@ -157,8 +157,6 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
 
-  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
-
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
   // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
@@ -238,12 +236,10 @@ class VideoDecoder {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
     torch::Tensor durationSeconds;
-
-    explicit BatchDecodedOutput(
-        int64_t numFrames,
-        const VideoStreamDecoderOptions& options,
-        const StreamMetadata& metadata);
   };
+  BatchDecodedOutput allocateBatchDecodedOutput(
+      int streamIndex,
+      int64_t numFrames);
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
   BatchDecodedOutput getFramesAtIndices(
@@ -301,6 +297,14 @@ class VideoDecoder {
   void resetDecodeStats();
 
   double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+
+  // --------------------------------------------------------------------------
+  // Tensor (frames) manipulation APIs
+  // --------------------------------------------------------------------------
+  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+  torch::Tensor allocateEmptyHWCTensorForStream(
+      int streamIndex,
+      std::optional<int> numFrames = std::nullopt);
 
  private:
   struct FrameInfo {
