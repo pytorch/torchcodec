@@ -1,0 +1,153 @@
+[
+    {
+        "decoder": "TorchCodec",
+        "description": "10 seek()+next()",
+        "fps": 296.7497929852154,
+        "fps_p25": 304.82592121401444,
+        "fps_p75": 286.39866868882336,
+        "frame_count": 10,
+        "iqr": 0.0021107543725520372,
+        "median": 0.03369842283427715,
+        "type": "seek()+next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchCodec",
+        "description": "1 next()",
+        "fps": 141.80053650468176,
+        "fps_p25": 144.12265279456386,
+        "fps_p75": 128.28507218641042,
+        "frame_count": 1,
+        "iqr": 0.0008566047297790648,
+        "median": 0.007052159495651722,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchCodec",
+        "description": "10 next()",
+        "fps": 638.7876251007046,
+        "fps_p25": 647.626546889273,
+        "fps_p75": 629.6538548699413,
+        "frame_count": 10,
+        "iqr": 0.00044074421748518944,
+        "median": 0.015654655173420906,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchCodec[num_threads=1]",
+        "description": "10 seek()+next()",
+        "fps": 126.6773946375974,
+        "fps_p25": 128.33021600580943,
+        "fps_p75": 124.2963412180317,
+        "frame_count": 10,
+        "iqr": 0.00252892030403018,
+        "median": 0.07894068257883191,
+        "type": "seek()+next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchCodec[num_threads=1]",
+        "description": "1 next()",
+        "fps": 410.70043288059617,
+        "fps_p25": 416.39979027639464,
+        "fps_p75": 405.8298526819803,
+        "frame_count": 1,
+        "iqr": 6.25486485660077e-05,
+        "median": 0.0024348647333681584,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchCodec[num_threads=1]",
+        "description": "10 next()",
+        "fps": 758.7565583035099,
+        "fps_p25": 766.9872077345758,
+        "fps_p75": 751.3583938952637,
+        "frame_count": 10,
+        "iqr": 0.00027120066806674004,
+        "median": 0.013179457746446133,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchVision[backend=VideoReader]",
+        "description": "10 seek()+next()",
+        "fps": 7.880664295730362,
+        "fps_p25": 7.924876540397429,
+        "fps_p75": 7.827668314297991,
+        "frame_count": 10,
+        "iqr": 0.01567032840102911,
+        "median": 1.2689285604283214,
+        "type": "seek()+next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchVision[backend=VideoReader]",
+        "description": "1 next()",
+        "fps": 209.3834723742803,
+        "fps_p25": 211.77546088016425,
+        "fps_p75": 199.25812670019334,
+        "frame_count": 1,
+        "iqr": 0.0002966334810480479,
+        "median": 0.00477592614479363,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchVision[backend=VideoReader]",
+        "description": "10 next()",
+        "fps": 531.7221665034224,
+        "fps_p25": 538.7259880033903,
+        "fps_p75": 522.8300241450709,
+        "frame_count": 10,
+        "iqr": 0.0005643628537654877,
+        "median": 0.018806814216077328,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchAudio",
+        "description": "10 seek()+next()",
+        "fps": 27.403418366590216,
+        "fps_p25": 27.57563496650987,
+        "fps_p75": 27.276339015442346,
+        "frame_count": 10,
+        "iqr": 0.003979140194132924,
+        "median": 0.36491797724738717,
+        "type": "seek()+next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchAudio",
+        "description": "1 next()",
+        "fps": 243.36030386646544,
+        "fps_p25": 246.1182470856226,
+        "fps_p75": 240.91573311529928,
+        "frame_count": 1,
+        "iqr": 8.774134330451558e-05,
+        "median": 0.004109133593738079,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "decoder": "TorchAudio",
+        "description": "10 next()",
+        "fps": 564.5307153840273,
+        "fps_p25": 572.2932075367765,
+        "fps_p75": 558.1691247911658,
+        "frame_count": 10,
+        "iqr": 0.00044215633533895016,
+        "median": 0.01771382801234722,
+        "type": "next()",
+        "video": "/tmp/torchcodec_benchmarking_videos/640x480_10s_30fps_600gop_libx264_yuv420p.mp4"
+    },
+    {
+        "cpu_count": 56,
+        "machine": "x86_64",
+        "processor": "x86_64",
+        "python_version": "3.11.10",
+        "system": "Linux"
+    }
+]
