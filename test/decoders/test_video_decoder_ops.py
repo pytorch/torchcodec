@@ -52,9 +52,9 @@ INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
 class ReferenceDecoder:
-    def __init__(self):
+    def __init__(self, device="cpu"):
         self.decoder: torch.Tensor = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(self.decoder)
+        add_video_stream(self.decoder, device=device)
 
     def get_next_frame(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         assert self.decoder is not None
@@ -66,74 +66,82 @@ class ReferenceDecoder:
 
 
 class TestOps:
-    def test_seek_and_next(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        assert_tensor_equal(frame0, reference_frame0)
+        frame_compare_function(frame0, reference_frame0.to(device))
         reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         frame1, _, _ = get_next_frame(decoder)
-        assert_tensor_equal(frame1, reference_frame1)
+        frame_compare_function(frame1, reference_frame1.to(device))
         seek_to_pts(decoder, 6.0)
         frame_time6, _, _ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame_time6, reference_frame_time6)
+        frame_compare_function(frame_time6, reference_frame_time6.to(device))
 
-    def test_get_frame_at_pts(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frame_at_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
         frame6, _, _ = get_frame_at_pts(decoder, 6.006)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame6, reference_frame6)
+        frame_compare_function(frame6, reference_frame6.to(device))
         frame6, _, _ = get_frame_at_pts(decoder, 6.02)
-        assert_tensor_equal(frame6, reference_frame6)
+        frame_compare_function(frame6, reference_frame6.to(device))
         frame6, _, _ = get_frame_at_pts(decoder, 6.039366)
-        assert_tensor_equal(frame6, reference_frame6)
+        frame_compare_function(frame6, reference_frame6.to(device))
         # Note that this timestamp is exactly on a frame boundary, so it should
         # return the next frame since the right boundary of the interval is
         # open.
         next_frame, _, _ = get_frame_at_pts(decoder, 6.039367)
         with pytest.raises(AssertionError):
-            assert_tensor_equal(next_frame, reference_frame6)
+            frame_compare_function(next_frame, reference_frame6.to(device))
 
-    def test_get_frame_at_index(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        assert_tensor_equal(frame0, reference_frame0)
+        frame_compare_function(frame0, reference_frame0.to(device))
         # The frame that is played at 6 seconds is frame 180 from a 0-based index.
         frame6, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame6, reference_frame6)
+        frame_compare_function(frame6, reference_frame6.to(device))
 
-    def test_get_frame_with_info_at_index(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         frame6, pts, duration = get_frame_at_index(
             decoder, stream_index=3, frame_index=180
         )
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame6, reference_frame6)
+        frame_compare_function(frame6, reference_frame6.to(device))
         assert pts.item() == pytest.approx(6.006, rel=1e-3)
         assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices(self, device):
-        tensor_compare_function = get_frame_compare_function(device)
+        frame_compare_function = get_frame_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
@@ -144,8 +152,8 @@ class TestOps:
         reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        tensor_compare_function(frames0and180[0], reference_frame0)
-        tensor_compare_function(frames0and180[1], reference_frame180)
+        frame_compare_function(frames0and180[0], reference_frame0.to(device))
+        frame_compare_function(frames0and180[1], reference_frame180.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices_unsorted_indices(self, device):
@@ -273,7 +281,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_in_range(self, device):
-        tensor_compare_function = get_frame_compare_function(device)
+        frame_compare_function = get_frame_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
@@ -281,73 +289,77 @@ class TestOps:
         # ensure that the degenerate case of a range of size 1 works
         ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
         bulk_frame0, *_ = get_frames_in_range(decoder, stream_index=3, start=0, stop=1)
-        tensor_compare_function(ref_frame0, bulk_frame0)
+        frame_compare_function(bulk_frame0, ref_frame0.to(device))
 
         ref_frame1 = NASA_VIDEO.get_frame_data_by_range(1, 2)
         bulk_frame1, *_ = get_frames_in_range(decoder, stream_index=3, start=1, stop=2)
-        tensor_compare_function(ref_frame1, bulk_frame1)
+        frame_compare_function(bulk_frame1, ref_frame1.to(device))
 
         ref_frame389 = NASA_VIDEO.get_frame_data_by_range(389, 390)
         bulk_frame389, *_ = get_frames_in_range(
             decoder, stream_index=3, start=389, stop=390
         )
-        tensor_compare_function(ref_frame389, bulk_frame389)
+        frame_compare_function(bulk_frame389, ref_frame389.to(device))
 
         # contiguous ranges
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
         bulk_frames0_9, *_ = get_frames_in_range(
             decoder, stream_index=3, start=0, stop=9
         )
-        tensor_compare_function(ref_frames0_9, bulk_frames0_9)
+        frame_compare_function(bulk_frames0_9, ref_frames0_9.to(device))
 
         ref_frames4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8)
         bulk_frames4_8, *_ = get_frames_in_range(
             decoder, stream_index=3, start=4, stop=8
         )
-        tensor_compare_function(ref_frames4_8, bulk_frames4_8)
+        frame_compare_function(bulk_frames4_8, ref_frames4_8.to(device))
 
         # ranges with a stride
         ref_frames15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5)
         bulk_frames15_35, *_ = get_frames_in_range(
             decoder, stream_index=3, start=15, stop=36, step=5
         )
-        tensor_compare_function(ref_frames15_35, bulk_frames15_35)
+        frame_compare_function(bulk_frames15_35, ref_frames15_35.to(device))
 
         ref_frames0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2)
         bulk_frames0_9_2, *_ = get_frames_in_range(
             decoder, stream_index=3, start=0, stop=9, step=2
         )
-        tensor_compare_function(ref_frames0_9_2, bulk_frames0_9_2)
+        frame_compare_function(bulk_frames0_9_2, ref_frames0_9_2.to(device))
 
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
-        tensor_compare_function(empty_frame, NASA_VIDEO.empty_chw_tensor)
+        frame_compare_function(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
-    def test_throws_exception_at_eof(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_throws_exception_at_eof(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
         reference_last_frame = NASA_VIDEO.get_frame_data_by_index(289)
-        assert_tensor_equal(last_frame, reference_last_frame)
+        frame_compare_function(last_frame, reference_last_frame.to(device))
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
-    def test_throws_exception_if_seek_too_far(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_throws_exception_if_seek_too_far(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
         # pts=12.979633 is the last frame in the video.
         seek_to_pts(decoder, 12.979633 + 1.0e-4)
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
-    def test_compile_seek_and_next(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_compile_seek_and_next(self, device):
         # TODO_OPEN_ISSUE Scott (T180277797): Get this to work with the inductor stack. Right now
         # compilation fails because it can't handle tensors of size unknown at
         # compile-time.
         @torch.compile(fullgraph=True, backend="eager")
         def get_frame1_and_frame_time6(decoder):
-            add_video_stream(decoder)
+            add_video_stream(decoder, device=device)
             frame0, _, _ = get_next_frame(decoder)
             seek_to_pts(decoder, 6.0)
             frame_time6, _, _ = get_next_frame(decoder)
@@ -356,15 +368,17 @@ class TestOps:
         # NB: create needs to happen outside the torch.compile region,
         # for now. Otherwise torch.compile constant-props it.
         decoder = create_from_file(str(NASA_VIDEO.path))
+        frame_compare_function = get_frame_compare_function(device)
         frame0, frame_time6 = get_frame1_and_frame_time6(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame0, reference_frame0)
-        assert_tensor_equal(frame_time6, reference_frame_time6)
+        frame_compare_function(frame0, reference_frame0.to(device))
+        frame_compare_function(frame_time6, reference_frame_time6.to(device))
 
-    def test_class_based_compile_seek_and_next(self):
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_class_based_compile_seek_and_next(self, device):
         # TODO_OPEN_ISSUE Scott (T180277797): Ditto as above.
         @torch.compile(fullgraph=True, backend="eager")
         def class_based_get_frame1_and_frame_time6(
@@ -375,17 +389,19 @@ class TestOps:
             frame_time6, _, _ = decoder.get_next_frame()
             return frame0, frame_time6
 
-        decoder = ReferenceDecoder()
+        decoder = ReferenceDecoder(device=device)
+        frame_compare_function = get_frame_compare_function(device)
         frame0, frame_time6 = class_based_get_frame1_and_frame_time6(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame0, reference_frame0)
-        assert_tensor_equal(frame_time6, reference_frame_time6)
+        frame_compare_function(frame0, reference_frame0.to(device))
+        frame_compare_function(frame_time6, reference_frame_time6.to(device))
 
+    @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("create_from", ("file", "tensor", "bytes"))
-    def test_create_decoder(self, create_from):
+    def test_create_decoder(self, create_from, device):
         path = str(NASA_VIDEO.path)
         if create_from == "file":
             decoder = create_from_file(path)
@@ -398,19 +414,20 @@ class TestOps:
                 video_bytes = f.read()
             decoder = create_from_bytes(video_bytes)
 
-        add_video_stream(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        assert_tensor_equal(frame0, reference_frame0)
+        frame_compare_function(frame0, reference_frame0.to(device))
         reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         frame1, _, _ = get_next_frame(decoder)
-        assert_tensor_equal(frame1, reference_frame1)
+        frame_compare_function(frame1, reference_frame1.to(device))
         seek_to_pts(decoder, 6.0)
         frame_time6, _, _ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
-        assert_tensor_equal(frame_time6, reference_frame_time6)
+        frame_compare_function(frame_time6, reference_frame_time6.to(device))
 
     # Keeping the metadata tests below for now, but we should remove them
     # once we remove get_json_metadata().

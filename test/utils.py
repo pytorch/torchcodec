@@ -43,10 +43,13 @@ def assert_tensor_equal(*args, **kwargs):
 
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
-def assert_tensor_close_on_at_least(tensor1, tensor2, percentage=90, abs_tolerance=20):
-    tensor1 = tensor1.to("cpu")
-    tensor2 = tensor2.to("cpu")
-    diff = (tensor2.float() - tensor1.float()).abs()
+def assert_tensor_close_on_at_least(
+    actual_tensor, ref_tensor, percentage=90, abs_tolerance=20
+):
+    assert (
+        actual_tensor.device == ref_tensor.device
+    ), f"Devices don't match: {actual_tensor.device} vs {ref_tensor.device}"
+    diff = (ref_tensor.float() - actual_tensor.float()).abs()
     max_diff_percentage = 100.0 - percentage
     if diff.sum() == 0:
         return
