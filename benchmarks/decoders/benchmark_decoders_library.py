@@ -414,27 +414,33 @@ def plot_data(df_data, plot_path):
                 color=[colors(i) for i in range(len(group))],
                 align="center",
                 capsize=5,
+                label=group["decoder"],
             )
 
             # Set the labels
             ax.set_xlabel("FPS")
-            ax.set_ylabel("Decoder")
 
-            # Reverse the order of the handles and labels to match the order of the bars
-            handles = [
-                plt.Rectangle((0, 0), 1, 1, color=colors(i)) for i in range(len(group))
-            ]
-            ax.legend(
-                handles[::-1],
-                group["decoder"][::-1],
-                title="Decoder",
-                loc="upper right",
-            )
+            # No need for y-axis label past the plot on the far left
+            if col == 0:
+                ax.set_ylabel("Decoder")
 
     # Remove any empty subplots for videos with fewer combinations
     for row in range(len(unique_videos)):
         for col in range(video_type_combinations[unique_videos[row]], max_combinations):
             fig.delaxes(axes[row, col])
+
+    # If we just call fig.legend, we'll get duplicate labels, as each label appears on
+    # each subplot. We take advantage of dicts having unique keys to de-dupe.
+    handles, labels = plt.gca().get_legend_handles_labels()
+    unique_labels = dict(zip(labels, handles))
+
+    # Reverse the order of the handles and labels to match the order of the bars
+    fig.legend(
+        handles=reversed(unique_labels.values()),
+        labels=reversed(unique_labels.keys()),
+        frameon=True,
+        loc="right",
+    )
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
