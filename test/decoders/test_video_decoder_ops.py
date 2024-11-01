@@ -40,7 +40,7 @@ from ..utils import (
     assert_tensor_close_on_at_least,
     assert_tensor_equal,
     cpu_and_cuda,
-    get_tensor_compare_function,
+    get_frame_compare_function,
     NASA_AUDIO,
     NASA_VIDEO,
     needs_cuda,
@@ -133,7 +133,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices(self, device):
-        tensor_compare_function = get_tensor_compare_function(device)
+        tensor_compare_function = get_frame_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
@@ -181,37 +181,6 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_by_pts(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        _add_video_stream(decoder, device=device)
-        scan_all_streams_to_update_metadata(decoder)
-        stream_index = 3
-
-        # Note: 13.01 should give the last video frame for the NASA video
-        timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
-
-        expected_frames = [
-            get_frame_at_pts(decoder, seconds=pts)[0] for pts in timestamps
-        ]
-
-        frames, *_ = get_frames_by_pts(
-            decoder,
-            stream_index=stream_index,
-            timestamps=timestamps,
-        )
-        for frame, expected_frame in zip(frames, expected_frames):
-            assert_tensor_equal(frame, expected_frame)
-
-        # first and last frame should be equal, at pts=2 [+ eps]. We then modify
-        # the first frame and assert that it's now different from the last
-        # frame. This ensures a copy was properly made during the de-duplication
-        # logic.
-        assert_tensor_equal(frames[0], frames[-1])
-        frames[0] += 20
-        with pytest.raises(AssertionError):
-            assert_tensor_equal(frames[0], frames[-1])
-
-    @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_by_pts_with_cuda(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
         scan_all_streams_to_update_metadata(decoder)
@@ -304,7 +273,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_in_range(self, device):
-        tensor_compare_function = get_tensor_compare_function(device)
+        tensor_compare_function = get_frame_compare_function(device)
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)

@@ -23,7 +23,7 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
-def get_tensor_compare_function(device):
+def get_frame_compare_function(device):
     if device == "cpu":
         return assert_tensor_equal
     else:
@@ -43,10 +43,10 @@ def assert_tensor_equal(*args, **kwargs):
 
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
-def assert_tensor_close_on_at_least(frame1, frame2, percentage=90, abs_tolerance=20):
-    frame1 = frame1.to("cpu")
-    frame2 = frame2.to("cpu")
-    diff = (frame2.float() - frame1.float()).abs()
+def assert_tensor_close_on_at_least(tensor1, tensor2, percentage=90, abs_tolerance=20):
+    tensor1 = tensor1.to("cpu")
+    tensor2 = tensor2.to("cpu")
+    diff = (tensor2.float() - tensor1.float()).abs()
     max_diff_percentage = 100.0 - percentage
     if diff.sum() == 0:
         return
