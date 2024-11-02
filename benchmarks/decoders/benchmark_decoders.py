@@ -14,10 +14,11 @@ from benchmark_decoders_library import (
     plot_data,
     run_benchmarks,
     TorchAudioDecoder,
-    TorchcodecCompiled,
-    TorchCodecNonCompiledBatch,
-    TorchcodecNonCompiledWithOptions,
-    TVNewAPIDecoderWithBackend,
+    TorchCodecCoreCompiled,
+    TorchCodecCoreBatch,
+    TorchCodecCore,
+    TorchCodecPublic,
+    TorchVision,
 )
 
 
@@ -70,7 +71,7 @@ def main() -> None:
             "For torchcodec, you can specify options with tcoptions:<plus-separated-options>. "
         ),
         type=str,
-        default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,tcoptions:num_threads=1",
+        default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,torchcodec_public,tcoptions:num_threads=1,tcbatchoptions:",
     )
     parser.add_argument(
         "--bm_video_dir",
@@ -98,14 +99,16 @@ def main() -> None:
                 DecordNonBatchDecoderAccurateSeek()
             )
         elif decoder == "torchcodec":
-            decoder_dict["TorchCodecNonCompiled"] = TorchcodecNonCompiledWithOptions()
+            decoder_dict["TorchCodecCore:"] = TorchCodecCore()
         elif decoder == "torchcodec_compiled":
-            decoder_dict["TorchcodecCompiled"] = TorchcodecCompiled()
+            decoder_dict["TorchCodecCoreCompiled"] = TorchCodecCoreCompiled()
+        elif decoder == "torchcodec_public":
+            decoder_dict["TorchCodecPublic"] = TorchCodecPublic()
         elif decoder == "torchvision":
-            decoder_dict["TVNewAPIDecoderWithBackendVideoReader"] = (
+            decoder_dict["TorchVision[backend=video_reader]"] = (
                 # We don't compare TorchVision's "pyav" backend because it doesn't support
                 # accurate seeks.
-                TVNewAPIDecoderWithBackend("video_reader")
+                TorchVision("video_reader")
             )
         elif decoder == "torchaudio":
             decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
@@ -117,8 +120,8 @@ def main() -> None:
                     continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
-            decoder_dict["TorchCodecNonCompiledBatch:" + options] = (
-                TorchCodecNonCompiledBatch(**kwargs_dict)
+            decoder_dict["TorchCodecCoreBatch" + options] = (
+                TorchCodecCoreBatch(**kwargs_dict)
             )
         elif decoder.startswith("tcoptions:"):
             options = decoder[len("tcoptions:") :]
@@ -128,8 +131,8 @@ def main() -> None:
                     continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
-            decoder_dict["TorchcodecNonCompiled:" + options] = (
-                TorchcodecNonCompiledWithOptions(**kwargs_dict)
+            decoder_dict["TorchCodecCore:" + options] = (
+                TorchCodecCore(**kwargs_dict)
             )
     video_paths = args.bm_video_paths.split(",")
     if args.bm_video_dir:

@@ -15,8 +15,8 @@ from benchmark_decoders_library import (
     generate_videos,
     run_benchmarks,
     TorchAudioDecoder,
-    TorchcodecNonCompiledWithOptions,
-    TVNewAPIDecoderWithBackend,
+    TorchCodecPublic,
+    TorchVision,
 )
 
 
@@ -46,22 +46,22 @@ def main() -> None:
     video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
 
     decoder_dict = {}
-    decoder_dict["TorchCodec"] = TorchcodecNonCompiledWithOptions()
-    decoder_dict["TorchCodec[num_threads=1]"] = TorchcodecNonCompiledWithOptions(
-        num_threads=1
+    decoder_dict["TorchCodec"] = TorchCodecPublic()
+    decoder_dict["TorchCodec[num_threads=1]"] = TorchCodecPublic(
+        num_ffmpeg_threads=1
     )
-    decoder_dict["TorchVision[backend=VideoReader]"] = TVNewAPIDecoderWithBackend(
+    decoder_dict["TorchVision[backend=video_reader]"] = TorchVision(
         "video_reader"
     )
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
-    num_uniform_samples = 10
+    num_samples = 10
     df_data = run_benchmarks(
         decoder_dict,
         video_files_paths,
-        num_uniform_samples,
-        10,
+        num_samples,
+        30,
         False,
     )
     df_data.append(
