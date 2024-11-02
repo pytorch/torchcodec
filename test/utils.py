@@ -12,13 +12,22 @@ import pytest
 import torch
 
 
-# Decorator for skipping CUDA tests when CUDA isn't available
+# Decorator for skipping CUDA tests when CUDA isn't available. The tests are
+# effectively marked to be skipped in pytest_collection_modifyitems() of
+# conftest.py
 def needs_cuda(test_item):
-    if not torch.cuda.is_available():
-        if os.environ.get("FAIL_WITHOUT_CUDA") == "1":
-            raise RuntimeError("CUDA is required for this test")
-        return pytest.mark.skip(reason="CUDA not available")(test_item)
-    return test_item
+    return pytest.mark.needs_cuda(test_item)
+
+
+def cpu_and_cuda():
+    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
+
+
+def get_frame_compare_function(device):
+    if device == "cpu":
+        return assert_tensor_equal
+    else:
+        return assert_tensor_close_on_at_least
 
 
 # For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On
@@ -34,10 +43,20 @@ def assert_tensor_equal(*args, **kwargs):
 
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
-def assert_tensor_close_on_at_least(frame1, frame2, percentage=99.7, abs_tolerance=20):
-    diff = (frame2.float() - frame1.float()).abs()
-    diff_percentage = 100.0 - percentage
-    assert (diff > abs_tolerance).float().mean() <= diff_percentage / 100.0
+def assert_tensor_close_on_at_least(
+    actual_tensor, ref_tensor, percentage=90, abs_tolerance=20
+):
+    assert (
+        actual_tensor.device == ref_tensor.device
+    ), f"Devices don't match: {actual_tensor.device} vs {ref_tensor.device}"
+    diff = (ref_tensor.float() - actual_tensor.float()).abs()
+    max_diff_percentage = 100.0 - percentage
+    if diff.sum() == 0:
+        return
+    diff_percentage = (diff > abs_tolerance).float().mean() * 100.0
+    assert (
+        diff_percentage <= max_diff_percentage
+    ), f"Diff too high: {diff_percentage} > {max_diff_percentage}"
 
 
 # For use with floating point metadata, or in other instances where we are not confident
