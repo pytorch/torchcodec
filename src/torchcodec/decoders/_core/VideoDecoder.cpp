@@ -34,6 +34,10 @@ double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
   return ptsToSeconds(pts, timeBase.den);
 }
 
+int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
+  return static_cast<int64_t>(std::round(seconds * timeBase.den));
+}
+
 struct AVInput {
   UniqueAVFormatContext formatContext;
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
@@ -663,7 +667,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streams_[streamIndex];
     // clang-format off: clang format clashes
-    streamInfo.discardFramesBeforePts = *maybeDesiredPts_ * streamInfo.timeBase.den;
+    streamInfo.discardFramesBeforePts = secondsToClosestPts(*maybeDesiredPts_, streamInfo.timeBase);
     // clang-format on
   }
 
@@ -686,7 +690,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streams_[firstActiveStreamIndex];
-  int64_t desiredPts = *maybeDesiredPts_ * firstStreamInfo.timeBase.den;
+  int64_t desiredPts =
+      secondsToClosestPts(*maybeDesiredPts_, firstStreamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -696,6 +701,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   if (!firstStreamInfo.keyFrames.empty()) {
     int desiredKeyFrameIndex =
         getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
+    desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = firstStreamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 

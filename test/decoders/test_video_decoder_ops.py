@@ -85,6 +85,21 @@ class TestOps:
         frame_compare_function(frame_time6, reference_frame_time6.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_seek_to_negative_pts(self, device):
+        device = "cpu"
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        scan_all_streams_to_update_metadata(decoder)
+        add_video_stream(decoder, device=device)
+        frame_compare_function = get_frame_compare_function(device)
+        frame0, _, _ = get_next_frame(decoder)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        frame_compare_function(frame0, reference_frame0.to(device))
+
+        seek_to_pts(decoder, -1e-4)
+        frame0, _, _ = get_next_frame(decoder)
+        frame_compare_function(frame0, reference_frame0.to(device))
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
