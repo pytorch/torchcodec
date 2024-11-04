@@ -86,7 +86,6 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_to_negative_pts(self, device):
-        device = "cpu"
         decoder = create_from_file(str(NASA_VIDEO.path))
         scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
