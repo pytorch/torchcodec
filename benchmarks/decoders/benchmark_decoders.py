@@ -145,8 +145,9 @@ def main() -> None:
         decoder_dict,
         video_paths,
         num_uniform_samples,
-        args.bm_video_speed_min_run_seconds,
-        args.bm_video_creation,
+        num_sequential_frames_from_start=[1, 10, 100],
+        min_runtime_seconds=args.bm_video_speed_min_run_seconds,
+        benchmark_video_creation=args.bm_video_creation,
     )
     plot_data(df_data, args.plot_path)
 

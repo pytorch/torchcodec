@@ -472,28 +472,37 @@ def get_metadata(video_file_path: str) -> VideoStreamMetadata:
     return VideoDecoder(video_file_path).metadata
 
 def run_benchmarks(
-    decoder_dict,
-    video_files_paths,
-    num_samples,
-    min_runtime_seconds,
-    benchmark_video_creation,
+    decoder_dict: dict[str, AbstractDecoder],
+    video_files_paths: list[str],
+    num_samples: int,
+    num_sequential_frames_from_start: list[int],
+    min_runtime_seconds: float,
+    benchmark_video_creation: bool,
 ) -> list[dict[str, str | float | int]]:
+    # Ensure that we have the same seed across benchmark runs.
+    torch.manual_seed(0)
+
+    print(f"video_files_paths={video_files_paths}")
+
     results = []
     df_data = []
-    print(f"video_files_paths={video_files_paths}")
     verbose = False
-    for decoder_name, decoder in decoder_dict.items():
-        for video_file_path in video_files_paths:
+    for video_file_path in video_files_paths:
+        metadata = get_metadata(video_file_path)
+        metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
+
+        duration = metadata.duration_seconds
+        uniform_pts_list = [
+            i * duration / num_samples for i in range(num_samples)
+        ]
+
+        # Note that we are using the same random pts values for all decoders for the same
+        # video. However, because we use the duration as part of this calculation, we
+        # are using different random pts values across videos.
+        random_pts_list = (torch.rand(num_samples) * duration).tolist()
+
+        for decoder_name, decoder in decoder_dict.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
-            metadata = get_metadata(video_file_path)
-            metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
-
-            duration = metadata.duration_seconds
-            uniform_pts_list = [
-                i * duration / num_samples for i in range(num_samples)
-            ]
-
-            random_pts_list = (torch.rand(num_samples) * duration).tolist()
 
             for kind, pts_list in [("uniform", uniform_pts_list), ("random", random_pts_list)]:
                 if verbose:
@@ -527,7 +536,7 @@ def run_benchmarks(
                 df_item["fps_p25"] = 1.0 * num_samples / results[-1]._p25
                 df_data.append(df_item)
 
-            for num_consecutive_nexts in [100]:
+            for num_consecutive_nexts in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={

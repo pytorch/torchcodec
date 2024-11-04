@@ -61,8 +61,9 @@ def main() -> None:
         decoder_dict,
         video_files_paths,
         num_samples,
-        30,
-        False,
+        num_sequential_frames_from_start=[100],
+        min_runtime_seconds=30,
+        benchmark_video_creation=False,
     )
     df_data.append(
         {
