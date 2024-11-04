@@ -243,6 +243,7 @@ class VideoDecoder {
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
   };
+
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
   BatchDecodedOutput getFramesAtIndices(
@@ -412,6 +413,20 @@ class VideoDecoder {
   // Whether or not we have already scanned all streams to update the metadata.
   bool scanned_all_streams_ = false;
 };
+
+std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata);
+
+std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    AVFrame* avFrame);
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames = std::nullopt);
 
 // Prints the VideoDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(

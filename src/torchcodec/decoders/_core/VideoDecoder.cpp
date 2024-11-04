@@ -191,14 +191,13 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : frames(torch::empty(
-          {numFrames,
-           options.height.value_or(*metadata.height),
-           options.width.value_or(*metadata.width),
-           3},
-          at::TensorOptions(options.device).dtype(torch::kUInt8))),
-      ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
+  int height, width;
+  std::tie(height, width) =
+      getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
+}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -893,8 +892,9 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int width = streamInfo.options.width.value_or(frame->width);
-      int height = streamInfo.options.height.value_or(frame->height);
+      int height, width;
+      std::tie(height, width) =
+          getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
       if (preAllocatedOutputTensor.has_value()) {
         tensor = preAllocatedOutputTensor.value();
         auto shape = tensor.sizes();
@@ -908,8 +908,8 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
             "x3, got ",
             shape);
       } else {
-        tensor = torch::empty(
-            {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+        tensor = allocateEmptyHWCTensor(
+            height, width, streamInfo.options.device.type());
       }
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
@@ -1397,6 +1397,38 @@ VideoDecoder::~VideoDecoder() {
     } else {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
+  }
+}
+
+std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata) {
+  return std::make_tuple(
+      options.height.value_or(*metadata.height),
+      options.width.value_or(*metadata.width));
+}
+
+std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    AVFrame* avFrame) {
+  return std::make_tuple(
+      options.height.value_or(avFrame->height),
+      options.width.value_or(avFrame->width));
+}
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames) {
+  auto tensorOptions = torch::TensorOptions()
+                           .dtype(torch::kUInt8)
+                           .layout(torch::kStrided)
+                           .device(device);
+  if (numFrames.has_value()) {
+    return torch::empty({numFrames.value(), height, width, 3}, tensorOptions);
+  } else {
+    return torch::empty({height, width, 3}, tensorOptions);
   }
 }
 
