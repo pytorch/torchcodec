@@ -699,8 +699,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   // See https://github.com/pytorch/torchcodec/issues/179 for more details.
   // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
   if (!firstStreamInfo.keyFrames.empty()) {
-    int desiredKeyFrameIndex =
-        getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
+    int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
+        firstStreamInfo.keyFrames, desiredPts);
     desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = firstStreamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
