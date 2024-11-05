@@ -8,8 +8,8 @@ import argparse
 import importlib.resources
 import os
 import typing
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from benchmark_decoders_library import (
     AbstractDecoder,
@@ -20,11 +20,12 @@ from benchmark_decoders_library import (
     TorchAudioDecoder,
     TorchCodecCore,
     TorchCodecCoreBatch,
-    TorchCodecCoreNonBatch,
     TorchCodecCoreCompiled,
+    TorchCodecCoreNonBatch,
     TorchCodecPublic,
     TorchVision,
 )
+
 
 @dataclass
 class DecoderKind:
@@ -32,17 +33,25 @@ class DecoderKind:
     kind: typing.Type[AbstractDecoder]
     default_options: dict = field(default_factory=dict)
 
+
 decoder_registry = {
     "decord": DecoderKind("DecordAccurate", DecordAccurate),
     "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
     "torchcodec_core": DecoderKind("TorchCodecCore:", TorchCodecCore),
     "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
-    "torchcodec_core_nonbatch": DecoderKind("TorchCodecCoreNonBatch", TorchCodecCoreNonBatch),
-    "torchcodec_core_compiled": DecoderKind("TorchCodecCoreCompiled", TorchCodecCoreCompiled),
+    "torchcodec_core_nonbatch": DecoderKind(
+        "TorchCodecCoreNonBatch", TorchCodecCoreNonBatch
+    ),
+    "torchcodec_core_compiled": DecoderKind(
+        "TorchCodecCoreCompiled", TorchCodecCoreCompiled
+    ),
     "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
-    "torchvision": DecoderKind("TorchVision[backend=video_reader]", TorchVision, {"backend": "video_reader"}),
+    "torchvision": DecoderKind(
+        "TorchVision[backend=video_reader]", TorchVision, {"backend": "video_reader"}
+    ),
     "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
 }
+
 
 def in_fbcode() -> bool:
     return "FB_PAR_RUNTIME_FILES" in os.environ
@@ -89,17 +98,19 @@ def main() -> None:
         "--decoders",
         help=(
             "Comma-separated list of decoders to benchmark. "
-            "Choices are: " + ", ".join(decoder_registry.keys()) + ". " +
-            "To specify options, append a ':' and then value pairs seperated by a '+'. "
+            "Choices are: "
+            + ", ".join(decoder_registry.keys())
+            + ". "
+            + "To specify options, append a ':' and then value pairs seperated by a '+'. "
             "For example, torchcodec:num_threads=1+color_conversion_library=filtergraph."
         ),
         type=str,
         default=(
-            "decord,decord_batch," +
-            "torchvision," +
-            "torchaudio," +
-            "torchcodec_core,torchcodec_core:num_threads=1,torchcodec_core_batch,torchcodec_core_nonbatch," +
-            "torchcodec_public"
+            "decord,decord_batch,"
+            + "torchvision,"
+            + "torchaudio,"
+            + "torchcodec_core,torchcodec_core:num_threads=1,torchcodec_core_batch,torchcodec_core_nonbatch,"
+            + "torchcodec_public"
         ),
     )
     parser.add_argument(

@@ -2,7 +2,6 @@ import abc
 import json
 import os
 import subprocess
-import timeit
 from concurrent.futures import ThreadPoolExecutor, wait
 from itertools import product
 
@@ -146,6 +145,7 @@ class TorchCodecCore(AbstractDecoder):
             frames.append(frame)
 
         return frames
+
 
 class TorchCodecCoreNonBatch(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
