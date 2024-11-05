@@ -47,12 +47,8 @@ def main() -> None:
 
     decoder_dict = {}
     decoder_dict["TorchCodec"] = TorchCodecPublic()
-    decoder_dict["TorchCodec[num_threads=1]"] = TorchCodecPublic(
-        num_ffmpeg_threads=1
-    )
-    decoder_dict["TorchVision[backend=video_reader]"] = TorchVision(
-        "video_reader"
-    )
+    decoder_dict["TorchCodec[num_threads=1]"] = TorchCodecPublic(num_ffmpeg_threads=1)
+    decoder_dict["TorchVision[backend=video_reader]"] = TorchVision("video_reader")
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.

@@ -14,9 +14,9 @@ from benchmark_decoders_library import (
     plot_data,
     run_benchmarks,
     TorchAudioDecoder,
-    TorchCodecCoreCompiled,
-    TorchCodecCoreBatch,
     TorchCodecCore,
+    TorchCodecCoreBatch,
+    TorchCodecCoreCompiled,
     TorchCodecPublic,
     TorchVision,
 )
@@ -120,8 +120,8 @@ def main() -> None:
                     continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
-            decoder_dict["TorchCodecCoreBatch" + options] = (
-                TorchCodecCoreBatch(**kwargs_dict)
+            decoder_dict["TorchCodecCoreBatch" + options] = TorchCodecCoreBatch(
+                **kwargs_dict
             )
         elif decoder.startswith("tcoptions:"):
             options = decoder[len("tcoptions:") :]
@@ -131,9 +131,7 @@ def main() -> None:
                     continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
-            decoder_dict["TorchCodecCore:" + options] = (
-                TorchCodecCore(**kwargs_dict)
-            )
+            decoder_dict["TorchCodecCore:" + options] = TorchCodecCore(**kwargs_dict)
     video_paths = args.bm_video_paths.split(",")
     if args.bm_video_dir:
         video_paths = []
