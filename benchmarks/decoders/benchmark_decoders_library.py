@@ -227,9 +227,12 @@ class TorchCodecCoreBatch(AbstractDecoder):
         )
         return frames
 
+
 class TorchCodecPublic(AbstractDecoder):
     def __init__(self, num_ffmpeg_threads=None):
-        self._num_ffmpeg_threads = int(num_ffmpeg_threads) if num_ffmpeg_threads else None
+        self._num_ffmpeg_threads = (
+            int(num_ffmpeg_threads) if num_ffmpeg_threads else None
+        )
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = VideoDecoder(video_file, num_ffmpeg_threads=self._num_ffmpeg_threads)
@@ -245,6 +248,7 @@ class TorchCodecPublic(AbstractDecoder):
             if count == numFramesToDecode:
                 break
         return frames
+
 
 @torch.compile(fullgraph=True, backend="eager")
 def compiled_seek_and_next(decoder, pts):
@@ -468,8 +472,10 @@ def plot_data(df_data, plot_path):
         plot_path,
     )
 
+
 def get_metadata(video_file_path: str) -> VideoStreamMetadata:
     return VideoDecoder(video_file_path).metadata
+
 
 def run_benchmarks(
     decoder_dict: dict[str, AbstractDecoder],
@@ -492,9 +498,7 @@ def run_benchmarks(
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
 
         duration = metadata.duration_seconds
-        uniform_pts_list = [
-            i * duration / num_samples for i in range(num_samples)
-        ]
+        uniform_pts_list = [i * duration / num_samples for i in range(num_samples)]
 
         # Note that we are using the same random pts values for all decoders for the same
         # video. However, because we use the duration as part of this calculation, we
@@ -504,7 +508,10 @@ def run_benchmarks(
         for decoder_name, decoder in decoder_dict.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
 
-            for kind, pts_list in [("uniform", uniform_pts_list), ("random", random_pts_list)]:
+            for kind, pts_list in [
+                ("uniform", uniform_pts_list),
+                ("random", random_pts_list),
+            ]:
                 if verbose:
                     print(
                         f"video={video_file_path}, decoder={decoder_name}, pts_list={pts_list}"
