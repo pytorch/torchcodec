@@ -7,20 +7,42 @@
 import argparse
 import importlib.resources
 import os
+import typing
 from pathlib import Path
+from dataclasses import dataclass, field
 
 from benchmark_decoders_library import (
-    DecordNonBatchDecoderAccurateSeek,
+    AbstractDecoder,
+    DecordAccurate,
+    DecordAccurateBatch,
     plot_data,
     run_benchmarks,
     TorchAudioDecoder,
     TorchCodecCore,
     TorchCodecCoreBatch,
+    TorchCodecCoreNonBatch,
     TorchCodecCoreCompiled,
     TorchCodecPublic,
     TorchVision,
 )
 
+@dataclass
+class DecoderKind:
+    display_name: str
+    kind: typing.Type[AbstractDecoder]
+    default_options: dict = field(default_factory=dict)
+
+decoder_registry = {
+    "decord": DecoderKind("DecordAccurate", DecordAccurate),
+    "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
+    "torchcodec_core": DecoderKind("TorchCodecCore:", TorchCodecCore),
+    "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
+    "torchcodec_core_nonbatch": DecoderKind("TorchCodecCoreNonBatch", TorchCodecCoreNonBatch),
+    "torchcodec_core_compiled": DecoderKind("TorchCodecCoreCompiled", TorchCodecCoreCompiled),
+    "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
+    "torchvision": DecoderKind("TorchVision[backend=video_reader]", TorchVision, {"backend": "video_reader"}),
+    "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
+}
 
 def in_fbcode() -> bool:
     return "FB_PAR_RUNTIME_FILES" in os.environ
@@ -67,11 +89,18 @@ def main() -> None:
         "--decoders",
         help=(
             "Comma-separated list of decoders to benchmark. "
-            "Choices are torchcodec, torchaudio, torchvision, decord, tcoptions:num_threads=1+color_conversion_library=filtergraph, torchcodec_compiled"
-            "For torchcodec, you can specify options with tcoptions:<plus-separated-options>. "
+            "Choices are: " + ", ".join(decoder_registry.keys()) + ". " +
+            "To specify options, append a ':' and then value pairs seperated by a '+'. "
+            "For example, torchcodec:num_threads=1+color_conversion_library=filtergraph."
         ),
         type=str,
-        default="decord,tcoptions:,torchvision,torchaudio,torchcodec_compiled,torchcodec_public,tcoptions:num_threads=1,tcbatchoptions:",
+        default=(
+            "decord,decord_batch," +
+            "torchvision," +
+            "torchaudio," +
+            "torchcodec_core,torchcodec_core:num_threads=1,torchcodec_core_batch,torchcodec_core_nonbatch," +
+            "torchcodec_public"
+        ),
     )
     parser.add_argument(
         "--bm_video_dir",
@@ -87,51 +116,35 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    decoders = set(args.decoders.split(","))
+    specified_decoders = set(args.decoders.split(","))
 
     # These are the PTS values we want to extract from the small video.
     num_uniform_samples = 10
 
-    decoder_dict = {}
-    for decoder in decoders:
-        if decoder == "decord":
-            decoder_dict["DecordNonBatchDecoderAccurateSeek"] = (
-                DecordNonBatchDecoderAccurateSeek()
-            )
-        elif decoder == "torchcodec":
-            decoder_dict["TorchCodecCore:"] = TorchCodecCore()
-        elif decoder == "torchcodec_compiled":
-            decoder_dict["TorchCodecCoreCompiled"] = TorchCodecCoreCompiled()
-        elif decoder == "torchcodec_public":
-            decoder_dict["TorchCodecPublic"] = TorchCodecPublic()
-        elif decoder == "torchvision":
-            decoder_dict["TorchVision[backend=video_reader]"] = (
-                # We don't compare TorchVision's "pyav" backend because it doesn't support
-                # accurate seeks.
-                TorchVision("video_reader")
-            )
-        elif decoder == "torchaudio":
-            decoder_dict["TorchAudioDecoder"] = TorchAudioDecoder()
-        elif decoder.startswith("tcbatchoptions:"):
-            options = decoder[len("tcbatchoptions:") :]
+    decoders_to_run = {}
+    for decoder in specified_decoders:
+        if ":" in decoder:
+            decoder_name, _, options = decoder.partition(":")
+            assert decoder_name in decoder_registry
+
             kwargs_dict = {}
             for item in options.split("+"):
                 if item.strip() == "":
                     continue
                 k, v = item.split("=")
                 kwargs_dict[k] = v
-            decoder_dict["TorchCodecCoreBatch" + options] = TorchCodecCoreBatch(
-                **kwargs_dict
-            )
-        elif decoder.startswith("tcoptions:"):
-            options = decoder[len("tcoptions:") :]
-            kwargs_dict = {}
-            for item in options.split("+"):
-                if item.strip() == "":
-                    continue
-                k, v = item.split("=")
-                kwargs_dict[k] = v
-            decoder_dict["TorchCodecCore:" + options] = TorchCodecCore(**kwargs_dict)
+
+            display_name = decoder_registry[decoder_name].display_name
+            kind = decoder_registry[decoder_name].kind
+            decoders_to_run[display_name + options] = kind(**kwargs_dict)
+        elif decoder in decoder_registry:
+            display_name = decoder_registry[decoder].display_name
+            kind = decoder_registry[decoder].kind
+            default_options = decoder_registry[decoder].default_options
+            decoders_to_run[display_name] = kind(**default_options)
+        else:
+            raise ValueError(f"Unknown decoder: {decoder}")
+
     video_paths = args.bm_video_paths.split(",")
     if args.bm_video_dir:
         video_paths = []
@@ -140,7 +153,7 @@ def main() -> None:
                 video_paths.append(entry.path)
 
     df_data = run_benchmarks(
-        decoder_dict,
+        decoders_to_run,
         video_paths,
         num_uniform_samples,
         num_sequential_frames_from_start=[1, 10, 100],
