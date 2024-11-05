@@ -193,7 +193,7 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  int height, width;
+  int height = 0, width = 0;
   std::tie(height, width) =
       getHeightAndWidthFromOptionsOrMetadata(options, metadata);
   frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
@@ -359,12 +359,10 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
   char description[512];
-  int width = activeStream.codecContext->width;
-  int height = activeStream.codecContext->height;
-  if (options.height.has_value() && options.width.has_value()) {
-    width = *options.width;
-    height = *options.height;
-  }
+  int height = 0, width = 0;
+  std::tie(height, width) = getHeightAndWidthFromOptionsOrMetadata(
+      options, containerMetadata_.streams[streamIndex]);
+
   std::snprintf(
       description,
       sizeof(description),
@@ -862,7 +860,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        streamInfo.codecContext.get(),
+        containerMetadata_.streams[streamIndex],
         rawOutput,
         output,
         preAllocatedOutputTensor);
@@ -1309,8 +1307,9 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  int outputWidth = activeStream.options.width.value_or(frame->width);
-  int outputHeight = activeStream.options.height.value_or(frame->height);
+  int outputHeight = 0, outputWidth = 0;
+  std::tie(outputHeight, outputWidth) =
+      getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, frame);
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext* swsContext = sws_getContext(
         frame->width,

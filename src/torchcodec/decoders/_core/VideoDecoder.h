@@ -414,6 +414,10 @@ class VideoDecoder {
   bool scanned_all_streams_ = false;
 };
 
+// --------------------------------------------------------------------------
+// FRAME TENSOR ALLOCATION APIs
+// --------------------------------------------------------------------------
+
 std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     const VideoDecoder::StreamMetadata& metadata);

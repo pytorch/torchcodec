@@ -154,18 +154,6 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 #endif
 }
 
-torch::Tensor allocateDeviceTensor(
-    at::IntArrayRef shape,
-    torch::Device device,
-    const torch::Dtype dtype = torch::kUInt8) {
-  return torch::empty(
-      shape,
-      torch::TensorOptions()
-          .dtype(dtype)
-          .layout(torch::kStrided)
-          .device(device));
-}
-
 void throwErrorIfNonCudaDevice(const torch::Device& device) {
   TORCH_CHECK(
       device.type() != torch::kCPU,
@@ -199,7 +187,7 @@ void initializeContextOnCuda(
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    AVCodecContext* codecContext,
+    const VideoDecoder::StreamMetadata& metadata,
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -209,8 +197,9 @@ void convertAVFrameToDecodedOutputOnCuda(
       src->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
-  int width = options.width.value_or(codecContext->width);
-  int height = options.height.value_or(codecContext->height);
+  int height = 0, width = 0;
+  std::tie(height, width) =
+      getHeightAndWidthFromOptionsOrMetadata(options, metadata);
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {src->data[0], src->data[1]};
   torch::Tensor& dst = output.frame;
@@ -227,7 +216,7 @@ void convertAVFrameToDecodedOutputOnCuda(
         "x3, got ",
         shape);
   } else {
-    dst = allocateDeviceTensor({height, width, 3}, options.device);
+    dst = allocateEmptyHWCTensor(height, width, options.device);
   }
 
   // Use the user-requested GPU for running the NPP kernel.
