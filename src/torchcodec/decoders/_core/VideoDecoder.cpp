@@ -901,7 +901,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       int height = 0;
       int width = 0;
       std::tie(height, width) =
-          getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
+          getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
       if (preAllocatedOutputTensor.has_value()) {
         tensor = preAllocatedOutputTensor.value();
         auto shape = tensor.sizes();
@@ -1318,7 +1318,7 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   int outputHeight = 0;
   int outputWidth = 0;
   std::tie(outputHeight, outputWidth) =
-      getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, frame);
+      getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, *frame);
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
@@ -1387,7 +1387,7 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   int height = 0;
   int width = 0;
   std::tie(height, width) = getHeightAndWidthFromOptionsOrAVFrame(
-      streams_[streamIndex].options, filteredFrame.get());
+      streams_[streamIndex].options, *filteredFrame.get());
   std::vector<int64_t> shape = {height, width, 3};
 
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
@@ -1423,10 +1423,10 @@ std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
 
 std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    AVFrame* avFrame) {
+    const AVFrame& avFrame) {
   return std::make_tuple(
-      options.height.value_or(avFrame->height),
-      options.width.value_or(avFrame->width));
+      options.height.value_or(avFrame.height),
+      options.width.value_or(avFrame.width));
 }
 
 torch::Tensor allocateEmptyHWCTensor(

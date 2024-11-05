@@ -463,7 +463,7 @@ std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
 
 std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    AVFrame* avFrame);
+    const AVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
     int height,
