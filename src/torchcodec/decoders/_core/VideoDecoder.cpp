@@ -197,7 +197,8 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  int height = 0, width = 0;
+  int height = 0;
+  int width = 0;
   std::tie(height, width) =
       getHeightAndWidthFromOptionsOrMetadata(options, metadata);
   frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
@@ -363,7 +364,8 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
   char description[512];
-  int height = 0, width = 0;
+  int height = 0;
+  int width = 0;
   std::tie(height, width) = getHeightAndWidthFromOptionsOrMetadata(
       options, containerMetadata_.streams[streamIndex]);
 
@@ -896,7 +898,8 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int height = 0, width = 0;
+      int height = 0;
+      int width = 0;
       std::tie(height, width) =
           getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
       if (preAllocatedOutputTensor.has_value()) {
@@ -1312,7 +1315,8 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  int outputHeight = 0, outputWidth = 0;
+  int outputHeight = 0;
+  int outputWidth = 0;
   std::tie(outputHeight, outputWidth) =
       getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, frame);
   if (activeStream.swsContext.get() == nullptr) {
@@ -1380,7 +1384,8 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  int height = 0, width = 0;
+  int height = 0;
+  int width = 0;
   std::tie(height, width) = getHeightAndWidthFromOptionsOrAVFrame(
       streams_[streamIndex].options, filteredFrame.get());
   std::vector<int64_t> shape = {height, width, 3};
