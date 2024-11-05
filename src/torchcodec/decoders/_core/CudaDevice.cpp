@@ -197,9 +197,9 @@ void convertAVFrameToDecodedOutputOnCuda(
       src->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
-  int height = 0, width = 0;
-  std::tie(height, width) =
-      getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  int height = frameDims.height;
+  int width = frameDims.width;
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {src->data[0], src->data[1]};
   torch::Tensor& dst = output.frame;

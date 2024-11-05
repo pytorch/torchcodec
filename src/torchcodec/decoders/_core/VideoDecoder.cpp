@@ -197,10 +197,9 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  int height = 0;
-  int width = 0;
-  std::tie(height, width) =
-      getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  int height = frameDims.height;
+  int width = frameDims.width;
   frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
 }
 
@@ -364,10 +363,10 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
   char description[512];
-  int height = 0;
-  int width = 0;
-  std::tie(height, width) = getHeightAndWidthFromOptionsOrMetadata(
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
       options, containerMetadata_.streams[streamIndex]);
+  int height = frameDims.height;
+  int width = frameDims.width;
 
   std::snprintf(
       description,
@@ -898,10 +897,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int height = 0;
-      int width = 0;
-      std::tie(height, width) =
+      auto frameDims =
           getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
+      int height = frameDims.height;
+      int width = frameDims.width;
       if (preAllocatedOutputTensor.has_value()) {
         tensor = preAllocatedOutputTensor.value();
         auto shape = tensor.sizes();
@@ -1315,10 +1314,10 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  int outputHeight = 0;
-  int outputWidth = 0;
-  std::tie(outputHeight, outputWidth) =
+  auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, *frame);
+  int outputHeight = frameDims.height;
+  int outputWidth = frameDims.width;
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
@@ -1384,12 +1383,11 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  int height = 0;
-  int width = 0;
-  std::tie(height, width) = getHeightAndWidthFromOptionsOrAVFrame(
+  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
       streams_[streamIndex].options, *filteredFrame.get());
+  int height = frameDims.height;
+  int width = frameDims.width;
   std::vector<int64_t> shape = {height, width, 3};
-
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
   AVFrame* filteredFramePtr = filteredFrame.release();
   auto deleter = [filteredFramePtr](void*) {
@@ -1413,18 +1411,18 @@ VideoDecoder::~VideoDecoder() {
   }
 }
 
-std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     const VideoDecoder::StreamMetadata& metadata) {
-  return std::make_tuple(
+  return FrameDims(
       options.height.value_or(*metadata.height),
       options.width.value_or(*metadata.width));
 }
 
-std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     const AVFrame& avFrame) {
-  return std::make_tuple(
+  return FrameDims(
       options.height.value_or(avFrame.height),
       options.width.value_or(avFrame.width));
 }

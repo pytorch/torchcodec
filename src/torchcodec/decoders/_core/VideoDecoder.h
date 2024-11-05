@@ -457,11 +457,17 @@ class VideoDecoder {
 // it is very important to check the height and width assumptions where the
 // tensors memory is used/filled in order to avoid segfaults.
 
-std::tuple<int, int> getHeightAndWidthFromOptionsOrMetadata(
+struct FrameDims {
+  int height;
+  int width;
+  FrameDims(int h, int w) : height(h), width(w) {}
+};
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     const VideoDecoder::StreamMetadata& metadata);
 
-std::tuple<int, int> getHeightAndWidthFromOptionsOrAVFrame(
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamDecoderOptions& options,
     const AVFrame& avFrame);
 
