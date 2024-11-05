@@ -896,7 +896,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int height, width;
+      int height = 0, width = 0;
       std::tie(height, width) =
           getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
       if (preAllocatedOutputTensor.has_value()) {
@@ -1380,7 +1380,11 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  std::vector<int64_t> shape = {filteredFrame->height, filteredFrame->width, 3};
+  int height = 0, width = 0;
+  std::tie(height, width) = getHeightAndWidthFromOptionsOrAVFrame(
+      streams_[streamIndex].options, filteredFrame.get());
+  std::vector<int64_t> shape = {height, width, 3};
+
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
   AVFrame* filteredFramePtr = filteredFrame.release();
   auto deleter = [filteredFramePtr](void*) {
