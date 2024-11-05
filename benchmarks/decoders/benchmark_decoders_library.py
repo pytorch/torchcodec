@@ -12,7 +12,7 @@ import pandas as pd
 
 import torch
 import torch.utils.benchmark as benchmark
-from torchcodec.decoders import VideoDecoder
+from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
 from torchcodec.decoders._core import (
     _add_video_stream,
@@ -78,7 +78,7 @@ class DecordNonBatchDecoderAccurateSeek(AbstractDecoder):
         return frames
 
 
-class TVNewAPIDecoderWithBackend(AbstractDecoder):
+class TorchVision(AbstractDecoder):
     def __init__(self, backend):
         self._backend = backend
         self._print_each_iteration_time = False
@@ -125,7 +125,7 @@ class TVNewAPIDecoderWithBackend(AbstractDecoder):
         return frames
 
 
-class TorchcodecNonCompiledWithOptions(AbstractDecoder):
+class TorchCodecCore(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
@@ -186,7 +186,7 @@ class TorchcodecNonCompiledWithOptions(AbstractDecoder):
         return frames
 
 
-class TorchCodecNonCompiledBatch(AbstractDecoder):
+class TorchCodecCoreBatch(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
@@ -227,6 +227,24 @@ class TorchCodecNonCompiledBatch(AbstractDecoder):
         )
         return frames
 
+class TorchCodecPublic(AbstractDecoder):
+    def __init__(self, num_ffmpeg_threads=None):
+        self._num_ffmpeg_threads = int(num_ffmpeg_threads) if num_ffmpeg_threads else None
+
+    def get_frames_from_video(self, video_file, pts_list):
+        decoder = VideoDecoder(video_file, num_ffmpeg_threads=self._num_ffmpeg_threads)
+        return decoder.get_frames_played_at(pts_list)
+
+    def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        decoder = VideoDecoder(video_file, num_ffmpeg_threads=self._num_ffmpeg_threads)
+        frames = []
+        count = 0
+        for frame in decoder:
+            frames.append(frame)
+            count += 1
+            if count == numFramesToDecode:
+                break
+        return frames
 
 @torch.compile(fullgraph=True, backend="eager")
 def compiled_seek_and_next(decoder, pts):
@@ -239,7 +257,7 @@ def compiled_next(decoder):
     return get_next_frame(decoder)
 
 
-class TorchcodecCompiled(AbstractDecoder):
+class TorchCodecCoreCompiled(AbstractDecoder):
     def __init__(self):
         pass
 
@@ -414,27 +432,33 @@ def plot_data(df_data, plot_path):
                 color=[colors(i) for i in range(len(group))],
                 align="center",
                 capsize=5,
+                label=group["decoder"],
             )
 
             # Set the labels
             ax.set_xlabel("FPS")
-            ax.set_ylabel("Decoder")
 
-            # Reverse the order of the handles and labels to match the order of the bars
-            handles = [
-                plt.Rectangle((0, 0), 1, 1, color=colors(i)) for i in range(len(group))
-            ]
-            ax.legend(
-                handles[::-1],
-                group["decoder"][::-1],
-                title="Decoder",
-                loc="upper right",
-            )
+            # No need for y-axis label past the plot on the far left
+            if col == 0:
+                ax.set_ylabel("Decoder")
 
     # Remove any empty subplots for videos with fewer combinations
     for row in range(len(unique_videos)):
         for col in range(video_type_combinations[unique_videos[row]], max_combinations):
             fig.delaxes(axes[row, col])
+
+    # If we just call fig.legend, we'll get duplicate labels, as each label appears on
+    # each subplot. We take advantage of dicts having unique keys to de-dupe.
+    handles, labels = plt.gca().get_legend_handles_labels()
+    unique_labels = dict(zip(labels, handles))
+
+    # Reverse the order of the handles and labels to match the order of the bars
+    fig.legend(
+        handles=reversed(unique_labels.values()),
+        labels=reversed(unique_labels.keys()),
+        frameon=True,
+        loc="right",
+    )
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
@@ -444,62 +468,75 @@ def plot_data(df_data, plot_path):
         plot_path,
     )
 
+def get_metadata(video_file_path: str) -> VideoStreamMetadata:
+    return VideoDecoder(video_file_path).metadata
 
 def run_benchmarks(
-    decoder_dict,
-    video_files_paths,
-    num_uniform_samples,
-    min_runtime_seconds,
-    benchmark_video_creation,
+    decoder_dict: dict[str, AbstractDecoder],
+    video_files_paths: list[str],
+    num_samples: int,
+    num_sequential_frames_from_start: list[int],
+    min_runtime_seconds: float,
+    benchmark_video_creation: bool,
 ) -> list[dict[str, str | float | int]]:
+    # Ensure that we have the same seed across benchmark runs.
+    torch.manual_seed(0)
+
+    print(f"video_files_paths={video_files_paths}")
+
     results = []
     df_data = []
-    print(f"video_files_paths={video_files_paths}")
     verbose = False
-    for decoder_name, decoder in decoder_dict.items():
-        for video_file_path in video_files_paths:
-            print(f"video={video_file_path}, decoder={decoder_name}")
-            # We only use the VideoDecoder to get the metadata and get
-            # the list of PTS values to seek to.
-            simple_decoder = VideoDecoder(video_file_path)
-            duration = simple_decoder.metadata.duration_seconds
-            pts_list = [
-                i * duration / num_uniform_samples for i in range(num_uniform_samples)
-            ]
-            metadata = simple_decoder.metadata
-            metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
-            if verbose:
-                print(
-                    f"video={video_file_path}, decoder={decoder_name}, pts_list={pts_list}"
-                )
-            seeked_result = benchmark.Timer(
-                stmt="decoder.get_frames_from_video(video_file, pts_list)",
-                globals={
-                    "video_file": video_file_path,
-                    "pts_list": pts_list,
-                    "decoder": decoder,
-                },
-                label=f"video={video_file_path} {metadata_string}",
-                sub_label=decoder_name,
-                description=f"{num_uniform_samples} seek()+next()",
-            )
-            results.append(
-                seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
-            )
-            df_item = {}
-            df_item["decoder"] = decoder_name
-            df_item["video"] = video_file_path
-            df_item["description"] = results[-1].description
-            df_item["frame_count"] = num_uniform_samples
-            df_item["median"] = results[-1].median
-            df_item["iqr"] = results[-1].iqr
-            df_item["type"] = "seek()+next()"
-            df_item["fps"] = 1.0 * num_uniform_samples / results[-1].median
-            df_item["fps_p75"] = 1.0 * num_uniform_samples / results[-1]._p75
-            df_item["fps_p25"] = 1.0 * num_uniform_samples / results[-1]._p25
-            df_data.append(df_item)
+    for video_file_path in video_files_paths:
+        metadata = get_metadata(video_file_path)
+        metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
 
-            for num_consecutive_nexts in [1, 10]:
+        duration = metadata.duration_seconds
+        uniform_pts_list = [
+            i * duration / num_samples for i in range(num_samples)
+        ]
+
+        # Note that we are using the same random pts values for all decoders for the same
+        # video. However, because we use the duration as part of this calculation, we
+        # are using different random pts values across videos.
+        random_pts_list = (torch.rand(num_samples) * duration).tolist()
+
+        for decoder_name, decoder in decoder_dict.items():
+            print(f"video={video_file_path}, decoder={decoder_name}")
+
+            for kind, pts_list in [("uniform", uniform_pts_list), ("random", random_pts_list)]:
+                if verbose:
+                    print(
+                        f"video={video_file_path}, decoder={decoder_name}, pts_list={pts_list}"
+                    )
+                seeked_result = benchmark.Timer(
+                    stmt="decoder.get_frames_from_video(video_file, pts_list)",
+                    globals={
+                        "video_file": video_file_path,
+                        "pts_list": pts_list,
+                        "decoder": decoder,
+                    },
+                    label=f"video={video_file_path} {metadata_label}",
+                    sub_label=decoder_name,
+                    description=f"{kind} {num_samples} seek()+next()",
+                )
+                results.append(
+                    seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
+                )
+                df_item = {}
+                df_item["decoder"] = decoder_name
+                df_item["video"] = video_file_path
+                df_item["description"] = results[-1].description
+                df_item["frame_count"] = num_samples
+                df_item["median"] = results[-1].median
+                df_item["iqr"] = results[-1].iqr
+                df_item["type"] = f"{kind}:seek()+next()"
+                df_item["fps"] = 1.0 * num_samples / results[-1].median
+                df_item["fps_p75"] = 1.0 * num_samples / results[-1]._p75
+                df_item["fps_p25"] = 1.0 * num_samples / results[-1]._p25
+                df_data.append(df_item)
+
+            for num_consecutive_nexts in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={
@@ -507,7 +544,7 @@ def run_benchmarks(
                         "consecutive_frames_to_extract": num_consecutive_nexts,
                         "decoder": decoder,
                     },
-                    label=f"video={video_file_path} {metadata_string}",
+                    label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
                     description=f"{num_consecutive_nexts} next()",
                 )
@@ -531,17 +568,16 @@ def run_benchmarks(
 
         first_video_file_path = video_files_paths[0]
         if benchmark_video_creation:
-            simple_decoder = VideoDecoder(first_video_file_path)
-            metadata = simple_decoder.metadata
-            metadata_string = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
+            metadata = get_metadata(video_file_path)
+            metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
             creation_result = benchmark.Timer(
                 stmt="create_torchcodec_decoder_from_file(video_file)",
                 globals={
                     "video_file": first_video_file_path,
                     "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
                 },
-                label=f"video={first_video_file_path} {metadata_string}",
-                sub_label="TorchcodecNonCompiled",
+                label=f"video={first_video_file_path} {metadata_label}",
+                sub_label="TorchCodecCore:",
                 description="create()+next()",
             )
             results.append(
