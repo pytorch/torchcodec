@@ -11,7 +11,7 @@ defaults:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: linux.g5.4xlarge.nvidia.gpu
     strategy:
       fail-fast: false
     steps:
