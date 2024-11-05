@@ -906,8 +906,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
             "x3, got ",
             shape);
       } else {
-        tensor = allocateEmptyHWCTensor(
-            height, width, streamInfo.options.device.type());
+        tensor = allocateEmptyHWCTensor(height, width, torch::kCPU);
       }
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
