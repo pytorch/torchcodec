@@ -10,6 +10,7 @@ This tutorial shows how to use NVIDIA’s hardware video decoder (NVDEC)
 with TorchCodec, and how it improves the performance of video decoding.
 """
 
+# %%
 ######################################################################
 #
 # .. note::
@@ -18,21 +19,14 @@ with TorchCodec, and how it improves the performance of video decoding.
 #    acceleration enabled.
 #
 #
-
 import torch
 
 print(torch.__version__)
-print(torchaudio.__version__)
-
-######################################################################
-#
-
-import matplotlib.pyplot as plt
-from torchcodec import VideoDecoder
-
-print("Avaialbe GPU:")
+print(torch.cuda.is_available())
 print(torch.cuda.get_device_properties(0))
 
+
+# %%
 ######################################################################
 #
 # We will use the following video which has the following properties;
@@ -50,11 +44,16 @@ print(torch.cuda.get_device_properties(0))
 
 ######################################################################
 #
+import urllib.request
 
-src = torchaudio.utils.download_asset(
-    "tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4_small.mp4"
+video_file = "video.mp4"
+urllib.request.urlretrieve(
+    "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4_small.mp4",
+    video_file,
 )
 
+
+# %%
 ######################################################################
 # Decoding videos with NVDEC
 # --------------------------
@@ -63,25 +62,28 @@ src = torchaudio.utils.download_asset(
 # defining the output video stream by passing ``decoder`` option to
 # :py:meth:`~torchaudio.io.StreamReader.add_video_stream` method.
 #
+from torchcodec import VideoDecoder
 
-vd = VideoDecoder(src)
+vd = VideoDecoder(video_file)
 vd.add_video_stream(0, device="cuda:0")
 frame = vd[0]
 
+# %%
 ######################################################################
 #
 # The video frames are decoded and returned as tensor of NCHW format.
 
 print(frame.data.shape, frame.data.dtype)
 
+# %%
 ######################################################################
 #
-# By default, the decoded frames are sent back to CPU memory, and
-# CPU tensors are created.
+# The video frames are left on the GPU memory.
 
 print(frame.data.device)
 
 
+# %%
 ######################################################################
 # .. note::
 #
@@ -119,6 +121,7 @@ print(frame.data.device)
 #        hw_accel="cuda:1",
 #    )
 
+
 ######################################################################
 # Visualization
 # -------------
@@ -128,26 +131,18 @@ print(frame.data.device)
 #
 # The following function seeks into the given timestamp and decode one
 # frame with the specificed decoder.
+import matplotlib.pyplot as plt
 
 
 def test_decode(decoder: str, seek: float):
-    vd = VideoDecoder(src)
+    vd = VideoDecoder(video_file)
     return vd.get_frame_played_at(seek)
 
-
-######################################################################
-#
 
 timestamps = [12, 19, 45, 131, 180]
 
 cpu_frames = [test_decode(decoder="h264", seek=ts) for ts in timestamps]
 cuda_frames = [test_decode(decoder="h264_cuvid", seek=ts) for ts in timestamps]
-
-
-######################################################################
-#
-# Now we visualize the resutls.
-#
 
 
 def plot_cpu_and_cuda():
@@ -165,6 +160,7 @@ def plot_cpu_and_cuda():
 
 plot_cpu_and_cuda()
 
+# %%
 ######################################################################
 #
 # They are indistinguishable to the eyes of the author.
