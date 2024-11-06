@@ -56,7 +56,10 @@ class Frame(Iterable):
 
 @dataclass
 class FrameBatch(Iterable):
-    """Multiple video frames with associated metadata."""
+    """Multiple video frames with associated metadata.
+
+    TODO: correctly document dimensions.
+    """
 
     data: Tensor
     """The frames data as (4-D ``torch.Tensor``)."""

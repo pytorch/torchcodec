@@ -5,6 +5,7 @@ import torch
 from torchcodec import FrameBatch
 from torchcodec.decoders import VideoDecoder
 from torchcodec.samplers._common import (
+    _FRAMEBATCH_RETURN_DOCS,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
     _reshape_4d_framebatch_into_5d,
@@ -216,7 +217,6 @@ def clips_at_regular_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
-
     return _generic_index_based_sampler(
         kind="regular",
         decoder=decoder,
@@ -227,3 +227,57 @@ def clips_at_regular_indices(
         sampling_range_end=sampling_range_end,
         policy=policy,
     )
+
+
+_COMMON_DOCS = f"""
+    Args:
+        decoder (VideoDecoder): The :class:`~torchcodec.decoders.VideoDecoder`
+            instance to sample clips from.
+        num_clips (int, optional): The number of clips to sample. Default: 1.
+        num_frames_per_clip (int, optional): The number of frames per clips. Default: 1.
+        num_indices_between_frames(int, optional): The number of indices between
+            the frames *within* a clip. Default: 1, which means frames are
+            consecutive. This is sometimes refered-to as "dilation".
+        sampling_range_start (int, optional): The start of the sampling range,
+            which defines the first index that a clip may *start* at. Default:
+            0, i.e. the start of the video.
+        sampling_range_end (int or None, optional): The end of the sampling
+            range, which defines the last index that a clip may *start* at. This
+            value is exclusive, i.e. a clip may only start within
+            [``sampling_range_start``, ``sampling_range_end``). If None
+            (default), the value is set automatically such that the clips never
+            span beyond the end of the video. For example if the last valid
+            index in a video is 99 and the clips span 10 frames, this value is
+            set to 99 - 10 + 1 = 90. Negative values are accepted and are
+            equivalent to ``len(video) - val``. When a clip spans beyond the end
+            of the video, the ``policy`` parameter defines how to construct such
+            clip.
+        policy (str, optional): Defines how to construct clips that span beyond
+            the end of the video. This is best described with an example:
+            assuming the last valid index in a video is 99, and a clip was
+            sampled to start at index 95, with ``num_frames_per_clip=5`` and
+            ``num_indices_between_frames=2``, the indices of the frames in the
+            clip are supposed to be [95, 97, 99, 101, 103]. But 101 and 103 are
+            invalid indices, so the ``policy`` parameter defines how to replace
+            those frames, with valid indices:
+
+            - "repeat": repeats the last valid frame of the clip. We would get
+              [95, 97, 99, 99, 99].
+            - "wrap": wraps around to the beginning of the clip. We would get
+              [95, 97, 99, 95, 97].
+            - "error": raises an error.
+
+            Default is "repeat". Note that when ``sampling_range_end=None``
+            (default), this policy parameter is unlikely to be relevant.
+
+    {_FRAMEBATCH_RETURN_DOCS}
+"""
+
+clips_at_random_indices.__doc__ = f"""Sample clips at random indices.
+{_COMMON_DOCS}
+"""
+
+
+clips_at_regular_indices.__doc__ = f"""Sample clips at regular (equally-spaced) indices.
+{_COMMON_DOCS}
+"""
