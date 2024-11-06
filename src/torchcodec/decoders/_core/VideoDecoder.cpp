@@ -1403,7 +1403,10 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  std::vector<int64_t> shape = {filteredFrame->height, filteredFrame->width, 3};
+  auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredFrame.get());
+  int height = frameDims.height;
+  int width = frameDims.width;
+  std::vector<int64_t> shape = {height, width, 3};
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
   AVFrame* filteredFramePtr = filteredFrame.release();
   auto deleter = [filteredFramePtr](void*) {
@@ -1424,6 +1427,10 @@ VideoDecoder::~VideoDecoder() {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
   }
+}
+
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
+  return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
 }
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
