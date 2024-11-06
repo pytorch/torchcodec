@@ -195,14 +195,13 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
     const VideoStreamDecoderOptions& options,
     const StreamMetadata& metadata)
-    : frames(torch::empty(
-          {numFrames,
-           options.height.value_or(*metadata.height),
-           options.width.value_or(*metadata.width),
-           3},
-          at::TensorOptions(options.device).dtype(torch::kUInt8))),
-      ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {}
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  int height = frameDims.height;
+  int width = frameDims.width;
+  frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
+}
 
 VideoDecoder::VideoDecoder() {}
 
@@ -364,12 +363,11 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
   char description[512];
-  int width = activeStream.codecContext->width;
-  int height = activeStream.codecContext->height;
-  if (options.height.has_value() && options.width.has_value()) {
-    width = *options.width;
-    height = *options.height;
-  }
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
+      options, containerMetadata_.streams[streamIndex]);
+  int height = frameDims.height;
+  int width = frameDims.width;
+
   std::snprintf(
       description,
       sizeof(description),
@@ -835,10 +833,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo& activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
-  auto startToSeekDone =
-      std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
-  auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
-      decodeDone - seekDone);
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
@@ -869,7 +863,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        streamInfo.codecContext.get(),
+        containerMetadata_.streams[streamIndex],
         rawOutput,
         output,
         preAllocatedOutputTensor);
@@ -899,8 +893,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   torch::Tensor tensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int width = streamInfo.options.width.value_or(frame->width);
-      int height = streamInfo.options.height.value_or(frame->height);
+      auto frameDims =
+          getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
+      int height = frameDims.height;
+      int width = frameDims.width;
       if (preAllocatedOutputTensor.has_value()) {
         tensor = preAllocatedOutputTensor.value();
         auto shape = tensor.sizes();
@@ -914,8 +910,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
             "x3, got ",
             shape);
       } else {
-        tensor = torch::empty(
-            {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
+        tensor = allocateEmptyHWCTensor(height, width, torch::kCPU);
       }
       rawOutput.data = tensor.data_ptr<uint8_t>();
       convertFrameToBufferUsingSwsScale(rawOutput);
@@ -1315,8 +1310,10 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  int outputWidth = activeStream.options.width.value_or(frame->width);
-  int outputHeight = activeStream.options.height.value_or(frame->height);
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, *frame);
+  int outputHeight = frameDims.height;
+  int outputWidth = frameDims.width;
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
@@ -1382,7 +1379,11 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  std::vector<int64_t> shape = {filteredFrame->height, filteredFrame->width, 3};
+  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
+      streams_[streamIndex].options, *filteredFrame.get());
+  int height = frameDims.height;
+  int width = frameDims.width;
+  std::vector<int64_t> shape = {height, width, 3};
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
   AVFrame* filteredFramePtr = filteredFrame.release();
   auto deleter = [filteredFramePtr](void*) {
@@ -1390,7 +1391,6 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   };
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
-  StreamInfo& activeStream = streams_[streamIndex];
   return tensor;
 }
 
@@ -1403,6 +1403,43 @@ VideoDecoder::~VideoDecoder() {
     } else {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
+  }
+}
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata) {
+  return FrameDims(
+      options.height.value_or(*metadata.height),
+      options.width.value_or(*metadata.width));
+}
+
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const AVFrame& avFrame) {
+  return FrameDims(
+      options.height.value_or(avFrame.height),
+      options.width.value_or(avFrame.width));
+}
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames) {
+  auto tensorOptions = torch::TensorOptions()
+                           .dtype(torch::kUInt8)
+                           .layout(torch::kStrided)
+                           .device(device);
+  TORCH_CHECK(height > 0, "height must be > 0, got: ", height);
+  TORCH_CHECK(width > 0, "width must be > 0, got: ", width);
+  if (numFrames.has_value()) {
+    auto numFramesValue = numFrames.value();
+    TORCH_CHECK(
+        numFramesValue >= 0, "numFrames must be >= 0, got: ", numFramesValue);
+    return torch::empty({numFramesValue, height, width, 3}, tensorOptions);
+  } else {
+    return torch::empty({height, width, 3}, tensorOptions);
   }
 }
 

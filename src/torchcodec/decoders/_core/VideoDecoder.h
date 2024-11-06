@@ -243,6 +243,7 @@ class VideoDecoder {
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
   };
+
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
   BatchDecodedOutput getFramesAtIndices(
@@ -412,6 +413,69 @@ class VideoDecoder {
   // Whether or not we have already scanned all streams to update the metadata.
   bool scanned_all_streams_ = false;
 };
+
+// --------------------------------------------------------------------------
+// FRAME TENSOR ALLOCATION APIs
+// --------------------------------------------------------------------------
+
+// Note [Frame Tensor allocation and height and width]
+//
+// We always allocate [N]HWC tensors. The low-level decoding functions all
+// assume HWC tensors, since this is what FFmpeg natively handles. It's up to
+// the high-level decoding entry-points to permute that back to CHW, by calling
+// MaybePermuteHWC2CHW().
+//
+// Also, importantly, the way we figure out the the height and width of the
+// output frame varies and depends on the decoding entry-point:
+// - In all cases, if the user requested specific height and width from the
+// options, we honor that. Otherwise we fall into one of the categories below.
+// - In Batch decoding APIs (e.g. getFramesAtIndices), we get height and width
+// from the stream metadata, which itself got its value from the CodecContext,
+// when the stream was added.
+// - In single frames APIs:
+//   - On CPU we get height and width from the AVFrame.
+//   - On GPU, we get height and width from the metadata (same as batch APIs)
+//
+// These 2 strategies are encapsulated within
+// getHeightAndWidthFromOptionsOrMetadata() and
+// getHeightAndWidthFromOptionsOrAVFrame(). The reason they exist is to make it
+// very obvious which logic is used in which place, and they allow for `git
+// grep`ing.
+//
+// The source of truth for height and width really is the AVFrame: it's the
+// decoded ouptut from FFmpeg. The info from the metadata (i.e. from the
+// CodecContext) may not be as accurate. However, the AVFrame is only available
+// late in the call stack, when the frame is decoded, while the CodecContext is
+// available early when a stream is added. This is why we use the CodecContext
+// for pre-allocating batched output tensors (we could pre-allocate those only
+// once we decode the first frame to get the info frame the AVFrame, but that's
+// a more complex logic).
+//
+// Because the sources for height and width may disagree, we may end up with
+// conflicts: e.g. if we pre-allocate a batch output tensor based on the
+// metadata info, but the decoded AVFrame has a different height and width.
+// it is very important to check the height and width assumptions where the
+// tensors memory is used/filled in order to avoid segfaults.
+
+struct FrameDims {
+  int height;
+  int width;
+  FrameDims(int h, int w) : height(h), width(w) {}
+};
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata);
+
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const AVFrame& avFrame);
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames = std::nullopt);
 
 // Prints the VideoDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(
