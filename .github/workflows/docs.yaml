@@ -30,7 +30,7 @@ jobs:
         run: |
           # TODO: torchvision and torchaudio shouldn't be needed. They were only added
           #  to silence an error as seen in https://github.com/pytorch/torchcodec/issues/203
-          conda install nvidia/label/cuda-12.4.1::cuda nvidia/label/cuda-12.4.1::cuda-toolkit nvidia/label/cuda-12.4.1::cuda-cudart conda install nvidia/label/cuda-12.4.1::cuda-nvtx nvidia/label/cuda-12.4.1::libnpp
+          conda install nvidia/label/cuda-12.4.1::cuda nvidia/label/cuda-12.4.1::cuda-toolkit nvidia/label/cuda-12.4.1::cuda-cudart nvidia/label/cuda-12.4.1::cuda-nvtx nvidia/label/cuda-12.4.1::libnpp
           conda install "ffmpeg=7.0.1" pkg-config cmake -c conda-forge
           python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
           ffmpeg -version
