@@ -383,7 +383,7 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  void convertFrameToBufferUsingSwsScale(
+  int convertFrameToBufferUsingSwsScale(
       int streamIndex,
       const AVFrame* frame,
       torch::Tensor& outputTensor);
