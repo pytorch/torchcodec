@@ -43,6 +43,14 @@ We achieve these capabilities through:
         A simple video decoding example
 
      .. grid-item-card:: :octicon:`file-code;1em`
+        GPU decoding using TorchCodec
+        :img-top: _static/img/card-background.svg
+        :link: generated_examples/basic_cuda_example.html
+        :link-type: url
+
+        A GPU decoding example
+
+     .. grid-item-card:: :octicon:`file-code;1em`
         API Reference
         :img-top: _static/img/card-background.svg
         :link: api_ref_torchcodec.html
