@@ -36,8 +36,8 @@ jobs:
           ffmpeg -version
       - name: Build and install torchcodec
         run: |
-          find $CONDA_PREFIX/lib
-          find $CONDA_PREFIX/lib64
+          find $CONDA_PREFIX/lib -type f -iname libnvtoolsext\*.so | xargs ldd || true
+          find $CONDA_PREFIX/lib64 -type f -iname libnvtoolsext\*.so | xargs ldd || true
           ENABLE_CUDA=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Install doc dependencies
         run: |
