@@ -77,7 +77,8 @@ _FRAMEBATCH_RETURN_DOCS = """
             The sampled :term:`clips`, as a 5D :class:`~torchcodec.FrameBatch`.
             The shape of the ``data`` field is (``num_clips``,
             ``num_frames_per_clips``, ...) where ... is (H, W, C) or (C, H, W)
-            depending on the decoder options. The shape of the ``pts_seconds``
-            and ``duration_seconds`` fields is (``num_clips``,
-            ``num_frames_per_clips``)
+            depending on the ``dimension_order`` parameter of
+            :class:`~torchcodec.decoders.VideoDecoder`. The shape of the
+            ``pts_seconds`` and ``duration_seconds`` fields is (``num_clips``,
+            ``num_frames_per_clips``).
 """
