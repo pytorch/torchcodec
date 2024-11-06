@@ -38,7 +38,7 @@ jobs:
         run: |
           find $CONDA_PREFIX/lib
           find $CONDA_PREFIX/lib64
-          python -m pip install -e ".[dev]" --no-build-isolation -vvv
+          ENABLE_CUDA=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Install doc dependencies
         run: |
           cd docs
