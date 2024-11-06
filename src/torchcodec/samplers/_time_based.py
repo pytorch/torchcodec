@@ -229,6 +229,7 @@ def clips_at_random_timestamps(
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
+    # See docstring below
     return _generic_time_based_sampler(
         kind="random",
         decoder=decoder,
@@ -253,6 +254,7 @@ def clips_at_regular_timestamps(
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
+    # See docstring below
     return _generic_time_based_sampler(
         kind="regular",
         decoder=decoder,

@@ -195,6 +195,7 @@ def clips_at_random_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
+    # See docstring below
     return _generic_index_based_sampler(
         kind="random",
         decoder=decoder,
@@ -217,6 +218,7 @@ def clips_at_regular_indices(
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
+    # See docstring below
     return _generic_index_based_sampler(
         kind="regular",
         decoder=decoder,
