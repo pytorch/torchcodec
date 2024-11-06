@@ -23,22 +23,15 @@ jobs:
           auto-update-conda: true
           miniconda-version: "latest"
           activate-environment: test
-          python-version: '3.9'
+          python-version: '3.12'
       - name: Update pip
         run: python -m pip install --upgrade pip
       - name: Install dependencies and FFmpeg
         run: |
-          # TODO: torchvision and torchaudio shouldn't be needed. They were only added
-          #  to silence an error as seen in https://github.com/pytorch/torchcodec/issues/203
-          conda install pytorch torchvision torchaudio pytorch-cuda=12.4 cuda-toolkit=12.4 -c pytorch-nightly -c nvidia
-          # conda install nvidia/label/cuda-12.4.0::cuda nvidia/label/cuda-12.4.0::cuda-toolkit nvidia/label/cuda-12.4.0::cuda-cudart nvidia/label/cuda-12.4.0::cuda-nvtx nvidia/label/cuda-12.4.0::libnpp
-          conda install "ffmpeg=7.0.1" pkg-config cmake compilers -c conda-forge
+          conda env update --file packaging/cuda12.4.yaml
           ffmpeg -version
       - name: Build and install torchcodec
         run: |
-          find $CONDA_PREFIX/lib -type f -iname libnvtoolsext\*.so | xargs ldd || true
-          find $CONDA_PREFIX/lib64 -type f -iname libnvtoolsext\*.so | xargs ldd || true
-          find $CONDA_PREFIX -name cuda_cmake_macros.h
           ENABLE_CUDA=1 python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Install doc dependencies
         run: |
