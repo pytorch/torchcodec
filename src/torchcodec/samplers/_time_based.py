@@ -4,6 +4,7 @@ import torch
 
 from torchcodec import FrameBatch
 from torchcodec.samplers._common import (
+    _FRAMEBATCH_RETURN_DOCS,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
     _reshape_4d_framebatch_into_5d,
@@ -313,14 +314,16 @@ _COMMON_DOCS = """
 
             Default is "repeat". Note that when ``sampling_range_end=None``
             (default), this policy parameter is unlikely to be relevant.
+
+    {return_docs}
 """
 
 
 _NUM_CLIPS_DOCS = """
         num_clips (int, optional): The number of clips to sample. Default: 1.
 """
-clips_at_random_timestamps.__doc__ = f"""Sample clips at random timestamps.
-{_COMMON_DOCS.format(maybe_note="", num_clips_or_seconds_between_clip_starts=_NUM_CLIPS_DOCS)}
+clips_at_random_timestamps.__doc__ = f"""Sample :term:`clips` at random timestamps.
+{_COMMON_DOCS.format(maybe_note="", num_clips_or_seconds_between_clip_starts=_NUM_CLIPS_DOCS, return_docs=_FRAMEBATCH_RETURN_DOCS)}
 """
 
 
@@ -337,6 +340,6 @@ _NOTE_DOCS = """
         useful, please let us know by `opening a feature request
         <https://github.com/pytorch/torchcodec/issues?q=is:open+is:issue>`_.
 """
-clips_at_regular_timestamps.__doc__ = f"""Sample clips at regular (equally-spaced) timestamps.
-{_COMMON_DOCS.format(maybe_note=_NOTE_DOCS, num_clips_or_seconds_between_clip_starts=_SECONDS_BETWEEN_CLIP_STARTS)}
+clips_at_regular_timestamps.__doc__ = f"""Sample :term:`clips` at regular (equally-spaced) timestamps.
+{_COMMON_DOCS.format(maybe_note=_NOTE_DOCS, num_clips_or_seconds_between_clip_starts=_SECONDS_BETWEEN_CLIP_STARTS, return_docs=_FRAMEBATCH_RETURN_DOCS)}
 """

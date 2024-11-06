@@ -74,8 +74,10 @@ def _reshape_4d_framebatch_into_5d(
 _FRAMEBATCH_RETURN_DOCS = """
     Returns:
         FrameBatch:
-            The sampled clips, as a 5D :class:`~torchcodec.FrameBatch`.
+            The sampled :term:`clips`, as a 5D :class:`~torchcodec.FrameBatch`.
             The shape of the ``data`` field is (``num_clips``,
             ``num_frames_per_clips``, ...) where ... is (H, W, C) or (C, H, W)
-            depending on the decoder options.
+            depending on the decoder options. The shape of the ``pts_seconds``
+            and ``duration_seconds`` fields is (``num_clips``,
+            ``num_frames_per_clips``)
 """

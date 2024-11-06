@@ -273,11 +273,11 @@ _COMMON_DOCS = f"""
     {_FRAMEBATCH_RETURN_DOCS}
 """
 
-clips_at_random_indices.__doc__ = f"""Sample clips at random indices.
+clips_at_random_indices.__doc__ = f"""Sample :term:`clips` at random indices.
 {_COMMON_DOCS}
 """
 
 
-clips_at_regular_indices.__doc__ = f"""Sample clips at regular (equally-spaced) indices.
+clips_at_regular_indices.__doc__ = f"""Sample :term:`clips` at regular (equally-spaced) indices.
 {_COMMON_DOCS}
 """
