@@ -157,7 +157,7 @@ def _generic_time_based_sampler(
     # None means "begining", which may not always be 0
     sampling_range_start: Optional[float],
     sampling_range_end: Optional[float],  # interval is [start, end).
-    policy: str = "repeat_last",
+    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     # Note: *everywhere*, sampling_range_end denotes the upper bound of where a
     # clip can start. This is an *open* upper bound, i.e. we will make sure no
@@ -227,7 +227,7 @@ def clips_at_random_timestamps(
     # None means "begining", which may not always be 0
     sampling_range_start: Optional[float] = None,
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
-    policy: str = "repeat_last",
+    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     return _generic_time_based_sampler(
         kind="random",
@@ -251,7 +251,7 @@ def clips_at_regular_timestamps(
     # None means "begining", which may not always be 0
     sampling_range_start: Optional[float] = None,
     sampling_range_end: Optional[float] = None,  # interval is [start, end).
-    policy: str = "repeat_last",
+    policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     return _generic_time_based_sampler(
         kind="regular",
@@ -306,13 +306,13 @@ _COMMON_DOCS = """
             timestamps, so the ``policy`` parameter defines how to replace those
             frames, with valid sampling timestamps:
 
-            - "repeat": repeats the last valid frame of the clip. We would get
-              frames sampled at timestamps [10.5, 10.7, 10.9, 10.9, 10.9].
+            - "repeat_last": repeats the last valid frame of the clip. We would
+              get frames sampled at timestamps [10.5, 10.7, 10.9, 10.9, 10.9].
             - "wrap": wraps around to the beginning of the clip. We would get
               frames sampled at timestamps [10.5, 10.7, 10.9, 10.5, 10.7].
             - "error": raises an error.
 
-            Default is "repeat". Note that when ``sampling_range_end=None``
+            Default is "repeat_last". Note that when ``sampling_range_end=None``
             (default), this policy parameter is unlikely to be relevant.
 
     {return_docs}

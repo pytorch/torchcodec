@@ -261,13 +261,13 @@ _COMMON_DOCS = f"""
             invalid indices, so the ``policy`` parameter defines how to replace
             those frames, with valid indices:
 
-            - "repeat": repeats the last valid frame of the clip. We would get
-              [95, 97, 99, 99, 99].
+            - "repeat_last": repeats the last valid frame of the clip. We would
+              get [95, 97, 99, 99, 99].
             - "wrap": wraps around to the beginning of the clip. We would get
               [95, 97, 99, 95, 97].
             - "error": raises an error.
 
-            Default is "repeat". Note that when ``sampling_range_end=None``
+            Default is "repeat_last". Note that when ``sampling_range_end=None``
             (default), this policy parameter is unlikely to be relevant.
 
     {_FRAMEBATCH_RETURN_DOCS}
