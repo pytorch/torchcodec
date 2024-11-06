@@ -31,13 +31,13 @@ from benchmark_decoders_library import (
 class DecoderKind:
     display_name: str
     kind: typing.Type[AbstractDecoder]
-    default_options: dict = field(default_factory=dict)
+    default_options: dict[str, str] = field(default_factory=dict)
 
 
 decoder_registry = {
     "decord": DecoderKind("DecordAccurate", DecordAccurate),
     "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
-    "torchcodec_core": DecoderKind("TorchCodecCore:", TorchCodecCore),
+    "torchcodec_core": DecoderKind("TorchCodecCore", TorchCodecCore),
     "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
     "torchcodec_core_nonbatch": DecoderKind(
         "TorchCodecCoreNonBatch", TorchCodecCoreNonBatch
@@ -47,7 +47,11 @@ decoder_registry = {
     ),
     "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
     "torchvision": DecoderKind(
-        "TorchVision[backend=video_reader]", TorchVision, {"backend": "video_reader"}
+        # We don't compare against TorchVision's "pyav" backend because it doesn't support
+        # accurate seeks.
+        "TorchVision[backend=video_reader]",
+        TorchVision,
+        {"backend": "video_reader"},
     ),
     "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
 }
@@ -64,6 +68,16 @@ def get_test_resource_path(filename: str) -> str:
             return os.fspath(path)
 
     return str(Path(__file__).parent / f"../../test/resources/{filename}")
+
+
+def parse_options_code(options_code: str) -> dict[str, str]:
+    options = {}
+    for item in options_code.split("+"):
+        if item.strip() == "":
+            continue
+        k, v = item.split("=")
+        options[k] = v
+    return options
 
 
 def main() -> None:
@@ -98,19 +112,17 @@ def main() -> None:
         "--decoders",
         help=(
             "Comma-separated list of decoders to benchmark. "
-            "Choices are: "
-            + ", ".join(decoder_registry.keys())
-            + ". "
-            + "To specify options, append a ':' and then value pairs seperated by a '+'. "
-            "For example, torchcodec:num_threads=1+color_conversion_library=filtergraph."
+            "Choices are: " + ", ".join(decoder_registry.keys()) + ". "
+            "To specify options, append a ':' and then value pairs seperated by a '+'. "
+            "For example, torchcodec_core:num_threads=1+color_conversion_library=filtergraph."
         ),
         type=str,
         default=(
             "decord,decord_batch,"
-            + "torchvision,"
-            + "torchaudio,"
-            + "torchcodec_core,torchcodec_core:num_threads=1,torchcodec_core_batch,torchcodec_core_nonbatch,"
-            + "torchcodec_public"
+            "torchvision,"
+            "torchaudio,"
+            "torchcodec_core,torchcodec_core:num_threads=1,torchcodec_core_batch,torchcodec_core_nonbatch,"
+            "torchcodec_public"
         ),
     )
     parser.add_argument(
@@ -135,26 +147,17 @@ def main() -> None:
     decoders_to_run = {}
     for decoder in specified_decoders:
         if ":" in decoder:
-            decoder_name, _, options = decoder.partition(":")
-            assert decoder_name in decoder_registry
-
-            kwargs_dict = {}
-            for item in options.split("+"):
-                if item.strip() == "":
-                    continue
-                k, v = item.split("=")
-                kwargs_dict[k] = v
-
-            display_name = decoder_registry[decoder_name].display_name
-            kind = decoder_registry[decoder_name].kind
-            decoders_to_run[display_name + options] = kind(**kwargs_dict)
-        elif decoder in decoder_registry:
-            display_name = decoder_registry[decoder].display_name
-            kind = decoder_registry[decoder].kind
-            default_options = decoder_registry[decoder].default_options
-            decoders_to_run[display_name] = kind(**default_options)
+            decoder, _, options_code = decoder.partition(":")
+            assert decoder in decoder_registry, f"Unknown decoder: {decoder}"
+            display = decoder_registry[decoder].display_name + ":" + options_code
+            options = parse_options_code(options_code)
         else:
-            raise ValueError(f"Unknown decoder: {decoder}")
+            assert decoder in decoder_registry, f"Unknown decoder: {decoder}"
+            display = decoder_registry[decoder].display_name
+            options = decoder_registry[decoder].default_options
+
+        kind = decoder_registry[decoder].kind
+        decoders_to_run[display] = kind(**options)
 
     video_paths = args.bm_video_paths.split(",")
     if args.bm_video_dir:

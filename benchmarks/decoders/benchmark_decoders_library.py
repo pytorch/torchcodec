@@ -580,7 +580,7 @@ def run_benchmarks(
                     "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
                 },
                 label=f"video={first_video_file_path} {metadata_label}",
-                sub_label="TorchCodecCore:",
+                sub_label="TorchCodecCore",
                 description="create()+next()",
             )
             results.append(
