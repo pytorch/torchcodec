@@ -17,9 +17,6 @@ with TorchCodec, and how it improves the performance of video decoding.
 #    This tutorial requires FFmpeg libraries compiled with HW
 #    acceleration enabled.
 #
-#    Please refer to
-#    :ref:`Enabling GPU video decoder/encoder <enabling_hw_decoder>`
-#    for how to build FFmpeg with HW acceleration.
 #
 
 import torch
