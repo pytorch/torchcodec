@@ -75,3 +75,4 @@ We achieve these capabilities through:
 
    api_ref_torchcodec
    api_ref_decoders
+   api_ref_samplers
