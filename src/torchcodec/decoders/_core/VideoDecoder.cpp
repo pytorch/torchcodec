@@ -973,8 +973,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double frameEndTime = ptsToSeconds(
         stream.currentPts + stream.currentDuration, stream.timeBase);
     if (seconds >= frameStartTime && seconds < frameEndTime) {
-      // We are in the same frame as the one we just returned. However, since
-      // we don't cache it locally, we have to rewind back.
+      // We are in the same frame as the one we just returned. However, since we
+      // don't cache it locally, we have to rewind back.
       seconds = frameStartTime;
       break;
     }
@@ -990,9 +990,9 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
           // FFMPEG seeked past the frame we are looking for even though we
           // set max_ts to be our needed timestamp in avformat_seek_file()
           // in maybeSeekToBeforeDesiredPts().
-          // This could be a bug in FFMPEG:
-          // https://trac.ffmpeg.org/ticket/11137 In this case we return the
-          // very next frame instead of throwing an exception.
+          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
+          // In this case we return the very next frame instead of throwing an
+          // exception.
           // TODO: Maybe log to stderr for Debug builds?
           return true;
         }
@@ -1069,8 +1069,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   std::vector<size_t> argsort;
   if (!indicesAreSorted) {
     // if frameIndices is [13, 10, 12, 11]
-    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we
-    // want
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
     //                                         to use to decode the frames
     // and argsort is     [ 1,  3,  2,  0]
     argsort.resize(frameIndices.size());
@@ -1233,29 +1232,28 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   //   interval B: [0.2, 0.15)
   //
   // Both intervals take place between the pts values for frame 0 and frame 1,
-  // which by our abstract player, means that both intervals map to frame 0.
-  // By the definition of a half open interval, interval A should return no
-  // frames. Interval B should return frame 0. However, for both A and B, the
-  // individual values of the intervals will map to the same frame indices
-  // below. Hence, we need this special case below.
+  // which by our abstract player, means that both intervals map to frame 0. By
+  // the definition of a half open interval, interval A should return no frames.
+  // Interval B should return frame 0. However, for both A and B, the individual
+  // values of the intervals will map to the same frame indices below. Hence, we
+  // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
     output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
   }
 
-  // Note that we look at nextPts for a frame, and not its pts or duration.
-  // Our abstract player displays frames starting at the pts for that frame
-  // until the pts for the next frame. There are two consequences:
+  // Note that we look at nextPts for a frame, and not its pts or duration. Our
+  // abstract player displays frames starting at the pts for that frame until
+  // the pts for the next frame. There are two consequences:
   //
   //   1. We ignore the duration for a frame. A frame is played until the
   //   next frame replaces it. This model is robust to durations being 0 or
   //   incorrect; our source of truth is the pts for frames. If duration is
-  //   accurate, the nextPts for a frame would be equivalent to pts +
-  //   duration.
-  //   2. In order to establish if the start of an interval maps to a
-  //   particular frame, we need to figure out if it is ordered after the
-  //   frame's pts, but before the next frames's pts.
+  //   accurate, the nextPts for a frame would be equivalent to pts + duration.
+  //   2. In order to establish if the start of an interval maps to a particular
+  //   frame, we need to figure out if it is ordered after the frame's pts, but
+  //   before the next frames's pts.
   auto startFrame = std::lower_bound(
       stream.allFrames.begin(),
       stream.allFrames.end(),
