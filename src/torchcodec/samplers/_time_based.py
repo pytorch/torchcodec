@@ -322,7 +322,7 @@ _COMMON_DOCS = """
 
 
 _NUM_CLIPS_DOCS = """
-        num_clips (int, optional): The number of clips to sample. Default: 1.
+        num_clips (int, optional): The number of clips to return. Default: 1.
 """
 clips_at_random_timestamps.__doc__ = f"""Sample :term:`clips` at random timestamps.
 {_COMMON_DOCS.format(maybe_note="", num_clips_or_seconds_between_clip_starts=_NUM_CLIPS_DOCS, return_docs=_FRAMEBATCH_RETURN_DOCS)}

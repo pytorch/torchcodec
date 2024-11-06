@@ -235,7 +235,7 @@ _COMMON_DOCS = f"""
     Args:
         decoder (VideoDecoder): The :class:`~torchcodec.decoders.VideoDecoder`
             instance to sample clips from.
-        num_clips (int, optional): The number of clips to sample. Default: 1.
+        num_clips (int, optional): The number of clips to return. Default: 1.
         num_frames_per_clip (int, optional): The number of frames per clips. Default: 1.
         num_indices_between_frames(int, optional): The number of indices between
             the frames *within* a clip. Default: 1, which means frames are
