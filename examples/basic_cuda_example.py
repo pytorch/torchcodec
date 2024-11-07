@@ -40,7 +40,7 @@ In order use CUDA Decoding will need the following installed in your environment
 
 #. CUDA-enabled pytorch
 #. FFMPEG binaries that support NVDEC-enabled codecs
-#. libnpp
+#. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
 
 
 FFMPEG versions 5, 6 and 7 from conda-forge are built with NVDEC support and
@@ -49,7 +49,7 @@ you can install them by running (for example to install ffmpeg version 7):
 .. code-block:: bash
 
    conda install ffmpeg=7 -c conda-forge
-   conda install libnpp -c nvidia
+   conda install libnpp cuda-nvrtc -c nvidia
 """
 
 # %%
