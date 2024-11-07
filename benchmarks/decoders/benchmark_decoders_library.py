@@ -494,7 +494,12 @@ def run_benchmarks(
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
 
         duration = metadata.duration_seconds
-        uniform_pts_list = [i * duration / num_samples for i in range(num_samples)]
+        # The epislon of 1e-6 is added to avoid floating point issues. Otherwise I see error messages like:
+        # RuntimeError: frame pts is 0.015999; must be in range [0.015999, 5.004316).
+        begin = metadata.begin_stream_seconds + 1e-6
+        uniform_pts_list = [
+            i * duration / num_samples + begin for i in range(num_samples)
+        ]
 
         # Note that we are using the same random pts values for all decoders for the same
         # video. However, because we use the duration as part of this calculation, we
