@@ -21,30 +21,30 @@ CUDA decoding also uses less PCI-e bandwidth.
 CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
 
 #. You are decoding a large resolution video
-#. You are decoding a large batch of videos that's saturting the CPU
+#. You are decoding a large batch of videos that's saturating the CPU
 #. You want to do whole-image transforms like scaling or convolutions on the decoded tensors
    after decoding
 #. Your CPU is saturated and you want to free it up for other work
 
-In some scenarios CUDA Decoding can be slower than CPU Decoding, example:
+Here are situations where CUDA Decoding may not make sense:
 
-#. If your GPU is already busy and CPU is not
-#. If you have small resolution videos and the PCI-e transfer latency is large
 #. You want bit-exact results compared to CPU Decoding
+#. If you have small resolution videos and the PCI-e transfer latency is large
+#. If your GPU is already busy and CPU is not
 
 It's best to experiment with CUDA Decoding to see if it improves your use-case. With
-TorchCodec you can simply pass in a device parameter to the VideoDecoder class to
-use CUDA Decoding.
+TorchCodec you can simply pass in a device parameter to the
+:class:`~torchcodec.decoders.VideoDecoder` class to use CUDA Decoding.
 
 In order use CUDA Decoding will need the following installed in your environment:
 
 #. CUDA-enabled pytorch
-#. FFMPEG binaries that support NVDEC-enabled codecs
+#. FFmpeg binaries that support NVDEC-enabled codecs
 #. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
 
 
-FFMPEG versions 5, 6 and 7 from conda-forge are built with NVDEC support and
-you can install them by running (for example to install ffmpeg version 7):
+FFmpeg versions 5, 6 and 7 from conda-forge are built with NVDEC support and you can
+install them with conda. For example, to install FFmpeg version 7:
 
 .. code-block:: bash
 
