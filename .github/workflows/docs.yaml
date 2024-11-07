@@ -29,8 +29,9 @@ jobs:
       - name: Install torchcodec from nightly
         run: |
           pip3 install --pre torch torchvision torchaudio torchcodec --index-url https://download.pytorch.org/whl/nightly/cu124
-      - name: Install FFMPEG
+      - name: Install FFMPEG and other deps
         run: |
+          conda install cuda-nvrtc=12.4 -c nvidia
           conda install ffmpeg=7 -c conda-forge
           ffmpeg -version
       - name: Install doc dependencies
