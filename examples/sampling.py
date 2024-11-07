@@ -128,7 +128,7 @@ every_other_clip
 #
 # .. note::
 #   A more natural and efficient way to get clips after a given timestamp is to
-#   rely on the sampling range parameters, which will cover later in :ref:`sampling_range`.
+#   rely on the sampling range parameters, which we'll cover later in :ref:`sampling_range`.
 #
 # Index-based and Time-based samplers
 # -----------------------------------
