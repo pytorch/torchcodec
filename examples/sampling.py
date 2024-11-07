@@ -78,7 +78,11 @@ decoder = VideoDecoder(raw_video_bytes)
 
 from torchcodec.samplers import clips_at_random_indices
 
-torch.manual_seed(0)  # The samplers RNG is controlled by pytorch's RNG
+# The samplers RNG is controlled by pytorch's RNG. We set a seed for this
+# tutorial to be reproducible across runs, but note that hard-coding a seed for
+# a training run is generally not recommended.
+torch.manual_seed(0)
+
 clips = clips_at_random_indices(
     decoder,
     num_clips=5,
@@ -95,8 +99,8 @@ clips
 # - ``data``: a 5D uint8 tensor representing the frame data. Its shape is
 #   (num_clips, num_frames_per_clip, ...) where ... is either (C, H, W) or (H,
 #   W, C), depending on the ``dimension_order`` parameter of the
-#   :class:`~torchcodec.VideoDecoder`. This is typically what would get passed
-#   to the model.
+#   :class:`~torchcodec.decoders.VideoDecoder`. This is typically what would get
+#   passed to the model.
 # - ``pts_seconds``: a 2D float tensor of shape (num_clips, num_frames_per_clip)
 #   giving the starting timestamps of each frame within each clip, in seconds.
 # - ``duration_seconds``: a 2D float tensor of shape (num_clips,
