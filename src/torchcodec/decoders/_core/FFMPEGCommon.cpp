@@ -69,6 +69,12 @@ AVIOContext* AVIOBytesContext::getAVIO() {
 int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
   struct AVIOBufferData* bufferData =
       static_cast<struct AVIOBufferData*>(opaque);
+  TORCH_CHECK(
+      bufferData->current <= bufferData->size,
+      "Tried to read outside of the buffer: current=",
+      bufferData->current,
+      ", size=",
+      bufferData->size);
   buf_size = FFMIN(buf_size, bufferData->size - bufferData->current);
   TORCH_CHECK(
       buf_size >= 0,

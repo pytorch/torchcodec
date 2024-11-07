@@ -56,14 +56,20 @@ class Frame(Iterable):
 
 @dataclass
 class FrameBatch(Iterable):
-    """Multiple video frames with associated metadata."""
+    """Multiple video frames with associated metadata.
+
+    The ``data`` tensor is typically 4D for sequences of frames (NHWC or NCHW),
+    or 5D for sequences of clips, as returned by the :ref:`samplers <samplers>`.
+    When ``data`` is 4D (resp. 5D) the ``pts_seconds`` and ``duration_seconds``
+    tensors are 1D (resp. 2D).
+    """
 
     data: Tensor
-    """The frames data as (4-D ``torch.Tensor``)."""
+    """The frames data (``torch.Tensor`` of uint8)."""
     pts_seconds: Tensor
-    """The :term:`pts` of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
+    """The :term:`pts` of the frame, in seconds (``torch.Tensor`` of floats)."""
     duration_seconds: Tensor
-    """The duration of the frame, in seconds (1-D ``torch.Tensor`` of floats)."""
+    """The duration of the frame, in seconds (``torch.Tensor`` of floats)."""
 
     def __post_init__(self):
         # This is called after __init__() when a FrameBatch is created. We can
