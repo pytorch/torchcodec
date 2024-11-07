@@ -32,7 +32,7 @@ jobs:
       - name: Install FFMPEG and other deps
         run: |
           conda install cuda-nvrtc=12.4 libnpp -c nvidia
-          conda install ffmpeg=7 -c conda-forge
+          conda install ffmpeg=7 cmake pkg-config -c conda-forge
           ffmpeg -version
       - name: Build torchcodec
         run: |
