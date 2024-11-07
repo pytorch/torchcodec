@@ -170,11 +170,11 @@ every_other_clip
 #
 # Sometimes, we may not want to sample clips from an entire video. We may only
 # be interested in clips that start within a smaller interval. In samplers, the
-# ``sampling_range_start`` and ``sampling_range_end`` parmeter allow to control
-# the sampling range: they define where we allow clips to *start*. There are two
+# ``sampling_range_start`` and ``sampling_range_end`` parmeters control the
+# sampling range: they define where we allow clips to *start*. There are two
 # important things to keep in mind:
 #
-# - ``sampling_range_end`` is an open upper-bound: clips may only start within
+# - ``sampling_range_end`` is an *open* upper-bound: clips may only start within
 #   [sampling_range_start, sampling_range_end).
 # - Because these parameter define where a clip can start, clips may contain
 #   frames *after*  ``sampling_range_end``!
@@ -238,4 +238,10 @@ clips = clips_at_random_timestamps(
     policy="wrap",
 )
 clips.pts_seconds
+
 # %%
+# By default, the value of ``sampling_range_end`` is automatically set such that
+# the sampler *doesn't* try to sample frames beyond the end of the video: the
+# default value ensures that clips start early enough before the end. This means
+# that by default, the policy parameter rarely comes into action, and most users
+# probably don't need to worry too much about it.
