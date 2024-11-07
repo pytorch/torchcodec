@@ -11,16 +11,20 @@ Accelerated video decoding with NVDEC
 
 **Author**: `Ahmad Sharif <ahmads@meta.com>`__
 
-TorchCodec can use Nvidia hardware to speed-up video decoding. An additional benefit
-of doing decoding on the GPU is that the decoded tensor is left on GPU memory to
-benefit from subsequent GPU transforms like scaling or cropping. In this tutorial this
-Nvidia-GPU-accelerated decoding is called "CUDA Decoding".
+TorchCodec can use Nvidia hardware to speed-up video decoding. This is called "CUDA Decoding".
+CUDA Decoding can be faster than CPU Decoding for the actual decoding step and for
+subsequent transform steps like scaling, cropping or rotating. This is because the decode step leaves
+the decoded tensor in GPU memory so the GPU doesn't have to fetch from main memory before
+running the transform steps. Encoded packets are often much smaller than decoded frames so
+CUDA decoding also uses less PCI-e bandwidth.
 
 CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
 
-#. You are deocding a batch of videos that is saturating the CPU
-#. You want to do heavy transforms on the decoded tensors after decoding
-#. You want to free up the CPU to do other work
+#. You are decoding a large resolution video
+#. You are decoding a large batch of videos that's saturting the CPU
+#. You want to do whole-image transforms like scaling or convolutions on the decoded tensors
+   after decoding
+#. Your CPU is saturated and you want to free it up for other work
 
 In some scenarios CUDA Decoding can be slower than CPU Decoding, example:
 
