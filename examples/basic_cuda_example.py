@@ -11,15 +11,33 @@ Accelerated video decoding with NVDEC
 
 **Author**: `Ahmad Sharif <ahmads@meta.com>`__
 
-This tutorial shows how to use NVIDIA’s hardware video decoder (NVDEC)
-with TorchCodec. This decoder is called CUDA decoder in the documentation
-and APIs.
+TorchCodec can use Nvidia hardware to speed-up video decoding. An additional benefit
+of doing decoding on the GPU is that the decoded tensor is left on GPU memory to
+benefit from subsequent GPU transforms like scaling or cropping. In this tutorial this
+Nvidia-GPU-accelerated decoding is called "CUDA Decoding".
 
-To use the CUDA decoder, you have to have the following installed in your
-environment:
-* NVDEC-enabled FFMPEG
-* libnpp
-* CUDA-enabled pytorch
+CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
+
+#. You are deocding a batch of videos that is saturating the CPU
+#. You want to do heavy transforms on the decoded tensors after decoding
+#. You want to free up the CPU to do other work
+
+In some scenarios CUDA Decoding can be slower than CPU Decoding, example:
+
+#. If your GPU is already busy and CPU is not
+#. If you have small resolution videos and the PCI-e transfer latency is large
+#. You want bit-exact results compared to CPU Decoding
+
+It's best to experiment with CUDA Decoding to see if it improves your use-case. With
+TorchCodec you can simply pass in a device parameter to the VideoDecoder class to
+use CUDA Decoding.
+
+In order use CUDA Decoding will need the following installed in your environment:
+
+#. CUDA-enabled pytorch
+#. FFMPEG binaries that support NVDEC-enabled codecs
+#. libnpp
+
 
 FFMPEG versions 5, 6 and 7 from conda-forge are built with NVDEC support and
 you can install them by running (for example to install ffmpeg version 7):
@@ -126,7 +144,7 @@ cpu_numpy_images = get_numpy_images(cpu_frames)
 cuda_numpy_images = get_numpy_images(cuda_frames)
 
 
-def plot_cpu_and_cuda():
+def plot_cpu_and_cuda_images():
     n_rows = len(timestamps)
     fig, axes = plt.subplots(n_rows, 2, figsize=[12.8, 16.0])
     for i in range(n_rows):
@@ -139,7 +157,7 @@ def plot_cpu_and_cuda():
     plt.tight_layout()
 
 
-plot_cpu_and_cuda()
+plot_cpu_and_cuda_images()
 
 # %%
 #
