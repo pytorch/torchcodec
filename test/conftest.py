@@ -63,3 +63,11 @@ def prevent_leaking_rng():
     random.setstate(builtin_rng_state)
     if torch.cuda.is_available():
         torch.cuda.set_rng_state(cuda_rng_state)
+
+
+@pytest.fixture(autouse=True)
+def check_no_stdout_or_stderr(capsys):
+    yield
+    captured = capsys.readouterr()
+    assert not captured.out, "stdout output detected"
+    assert not captured.err, "stderr output detected"
