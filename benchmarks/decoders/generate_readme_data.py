@@ -12,6 +12,7 @@ import shutil
 from pathlib import Path
 
 from benchmark_decoders_library import (
+    DecordAccurateBatch,
     generate_videos,
     run_benchmarks,
     TorchAudioDecoder,
@@ -50,6 +51,7 @@ def main() -> None:
     decoder_dict["TorchCodec[num_threads=1]"] = TorchCodecPublic(num_ffmpeg_threads=1)
     decoder_dict["TorchVision[backend=video_reader]"] = TorchVision("video_reader")
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
+    decoder_dict["Decord"] = DecordAccurateBatch()
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10

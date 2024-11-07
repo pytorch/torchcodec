@@ -43,12 +43,12 @@ We achieve these capabilities through:
         A simple video decoding example
 
      .. grid-item-card:: :octicon:`file-code;1em`
-        API Reference
+        Clip sampling
         :img-top: _static/img/card-background.svg
-        :link: api_ref_torchcodec.html
+        :link: generated_examples/sampling.html
         :link-type: url
 
-        The API reference for TorchCodec
+        How to sample video clips
 
 .. toctree::
    :maxdepth: 1
@@ -75,3 +75,4 @@ We achieve these capabilities through:
 
    api_ref_torchcodec
    api_ref_decoders
+   api_ref_samplers
