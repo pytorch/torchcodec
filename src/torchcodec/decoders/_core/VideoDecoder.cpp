@@ -833,10 +833,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo& activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
-  auto startToSeekDone =
-      std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
-  auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
-      decodeDone - seekDone);
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
@@ -1395,7 +1391,6 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   };
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
-  StreamInfo& activeStream = streams_[streamIndex];
   return tensor;
 }
 

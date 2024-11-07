@@ -17,3 +17,10 @@ Glossary
        A scan corresponds to an entire pass over a video file, with the purpose
        of retrieving metadata about the different streams and frames. **It does
        not involve decoding**, so it is a lot cheaper than decoding the file.
+
+    clips
+        A clip is a sequence of frames, usually in :term:`pts` order. The frames
+        may not necessarily be consecutive. A clip is represented as a 4D
+        :class:`~torchcodec.FrameBatch`. A group of clips, which is what the
+        :ref:`samplers <samplers>` return, is represented as 5D
+        :class:`~torchcodec.FrameBatch`.
