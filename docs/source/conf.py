@@ -60,7 +60,7 @@ extensions = [
 sphinx_gallery_conf = {
     "examples_dirs": "../../examples/",  # path to your example scripts
     "gallery_dirs": "generated_examples",  # path to where to save gallery generated output
-    "filename_pattern": "basic*",
+    "filename_pattern": ".py",
     "backreferences_dir": "gen_modules/backreferences",
     "doc_module": ("torchcodec",),
     "remove_config_comments": True,
