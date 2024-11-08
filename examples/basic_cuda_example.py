@@ -50,9 +50,13 @@ In order to use CUDA Decoding will need the following installed in your environm
 FFmpeg versions 5, 6 and 7 from conda-forge are built with NdecoderEC support and you can
 install them with conda. For example, to install FFmpeg version 7:
 
+
 .. code-block:: bash
-   conda install ffmpeg=7 -c conda-forge
-   conda install libnpp cuda-nvrtc -c nvidia
+
+    conda install ffmpeg=7 -c conda-forge
+    conda install libnpp cuda-nvrtc -c nvidia
+
+
 """
 
 # %%
@@ -146,6 +150,8 @@ def get_numpy_images(frames):
 timestamps = [12, 19, 45, 131, 180]
 cpu_frames = get_frames(timestamps, device="cpu")
 cuda_frames = get_frames(timestamps, device="cuda")
+cpu_tensors = [frame.data for frame in cpu_frames]
+cuda_tensors = [frame.data for frame in cuda_frames]
 cpu_numpy_images = get_numpy_images(cpu_frames)
 cuda_numpy_images = get_numpy_images(cuda_frames)
 
@@ -168,12 +174,12 @@ def plot(
 
     fig, ax = plt.subplots(1, 2)
 
-    ax[0].imshow(to_pil_image(make_grid(frames1)))
+    ax[0].imshow(to_pil_image(make_grid(frames1, nrow=1)))
     ax[0].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
     if title1 is not None:
         ax[0].set_title(title1)
 
-    ax[1].imshow(to_pil_image(make_grid(frames2)))
+    ax[1].imshow(to_pil_image(make_grid(frames2, nrow=1)))
     ax[1].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
     if title2 is not None:
         ax[1].set_title(title2)
@@ -181,7 +187,7 @@ def plot(
     plt.tight_layout()
 
 
-plot(cpu_frames, cuda_frames, "CPU decoder", "CUDA decoder")
+plot(cpu_tensors, cuda_tensors, "CPU decoder", "CUDA decoder")
 
 # %%
 #
