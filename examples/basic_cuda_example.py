@@ -4,14 +4,15 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 """
-CUDA Decoding on Nvidia GPUs
-=====================================
+Accelerated video decoding on GPUs with CUDA and NVDEC
+================================================================
 
 .. _ndecoderec_tutorial:
 
 TorchCodec can use supported Nvidia hardware (see support matrix here
 <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>) to speed-up
-video decoding. This is called "CUDA Decoding".
+video decoding. This is called "CUDA Decoding" and it uses Nvidia's NVDEC hardware
+decoder and CUDA kernels to respectively decompress and convert to RGB.
 CUDA Decoding can be faster than CPU Decoding for the actual decoding step and also for
 subsequent transform steps like scaling, cropping or rotating. This is because the decode step leaves
 the decoded tensor in GPU memory so the GPU doesn't have to fetch from main memory before
