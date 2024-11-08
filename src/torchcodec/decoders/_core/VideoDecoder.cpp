@@ -863,7 +863,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        containerMetadata_.streams[streamIndex],
         rawOutput,
         output,
         preAllocatedOutputTensor);
@@ -880,7 +879,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 // speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
 // decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
 // found a way to do that with filtegraph.
-// TODO: Figure out whether that's possilbe!
+// TODO: Figure out whether that's possible!
 // Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
@@ -890,41 +889,68 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
-  torch::Tensor tensor;
+
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
+  int expectedOutputHeight = frameDims.height;
+  int expectedOutputWidth = frameDims.width;
+
+  if (preAllocatedOutputTensor.has_value()) {
+    auto shape = preAllocatedOutputTensor.value().sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+            (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+        "Expected pre-allocated tensor of shape ",
+        expectedOutputHeight,
+        "x",
+        expectedOutputWidth,
+        "x3, got ",
+        shape);
+  }
+
+  torch::Tensor outputTensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      auto frameDims =
-          getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
-      int height = frameDims.height;
-      int width = frameDims.width;
-      if (preAllocatedOutputTensor.has_value()) {
-        tensor = preAllocatedOutputTensor.value();
-        auto shape = tensor.sizes();
-        TORCH_CHECK(
-            (shape.size() == 3) && (shape[0] == height) &&
-                (shape[1] == width) && (shape[2] == 3),
-            "Expected tensor of shape ",
-            height,
-            "x",
-            width,
-            "x3, got ",
-            shape);
-      } else {
-        tensor = allocateEmptyHWCTensor(height, width, torch::kCPU);
-      }
-      rawOutput.data = tensor.data_ptr<uint8_t>();
-      convertFrameToBufferUsingSwsScale(rawOutput);
+      outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
+          expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-      output.frame = tensor;
+      int resultHeight =
+          convertFrameToBufferUsingSwsScale(streamIndex, frame, outputTensor);
+      // If this check failed, it would mean that the frame wasn't reshaped to
+      // the expected height.
+      // TODO: Can we do the same check for width?
+      TORCH_CHECK(
+          resultHeight == expectedOutputHeight,
+          "resultHeight != expectedOutputHeight: ",
+          resultHeight,
+          " != ",
+          expectedOutputHeight);
+
+      output.frame = outputTensor;
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      tensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+
+      // Similarly to above, if this check fails it means the frame wasn't
+      // reshaped to its expected dimensions by filtergraph.
+      auto shape = outputTensor.sizes();
+      TORCH_CHECK(
+          (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+              (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+          "Expected output tensor of shape ",
+          expectedOutputHeight,
+          "x",
+          expectedOutputWidth,
+          "x3, got ",
+          shape);
       if (preAllocatedOutputTensor.has_value()) {
-        preAllocatedOutputTensor.value().copy_(tensor);
+        // We have already validated that preAllocatedOutputTensor and
+        // outputTensor have the same shape.
+        preAllocatedOutputTensor.value().copy_(outputTensor);
         output.frame = preAllocatedOutputTensor.value();
       } else {
-        output.frame = tensor;
+        output.frame = outputTensor;
       }
     } else {
       throw std::runtime_error(
@@ -1303,24 +1329,23 @@ double VideoDecoder::getPtsSecondsForFrame(
   return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
 }
 
-void VideoDecoder::convertFrameToBufferUsingSwsScale(
-    RawDecodedOutput& rawOutput) {
-  AVFrame* frame = rawOutput.frame.get();
-  int streamIndex = rawOutput.streamIndex;
+int VideoDecoder::convertFrameToBufferUsingSwsScale(
+    int streamIndex,
+    const AVFrame* frame,
+    torch::Tensor& outputTensor) {
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(activeStream.options, *frame);
-  int outputHeight = frameDims.height;
-  int outputWidth = frameDims.width;
+
+  int expectedOutputHeight = outputTensor.sizes()[0];
+  int expectedOutputWidth = outputTensor.sizes()[1];
   if (activeStream.swsContext.get() == nullptr) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
         frame->height,
         frameFormat,
-        outputWidth,
-        outputHeight,
+        expectedOutputWidth,
+        expectedOutputHeight,
         AV_PIX_FMT_RGB24,
         SWS_BILINEAR,
         nullptr,
@@ -1352,8 +1377,8 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
   }
   SwsContext* swsContext = activeStream.swsContext.get();
   uint8_t* pointers[4] = {
-      static_cast<uint8_t*>(rawOutput.data), nullptr, nullptr, nullptr};
-  int linesizes[4] = {outputWidth * 3, 0, 0, 0};
+      outputTensor.data_ptr<uint8_t>(), nullptr, nullptr, nullptr};
+  int linesizes[4] = {expectedOutputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(
       swsContext,
       frame->data,
@@ -1362,9 +1387,7 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
       frame->height,
       pointers,
       linesizes);
-  TORCH_CHECK(
-      outputHeight == resultHeight,
-      "outputHeight(" + std::to_string(resultHeight) + ") != resultHeight");
+  return resultHeight;
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
@@ -1379,8 +1402,7 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
-      streams_[streamIndex].options, *filteredFrame.get());
+  auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredFrame.get());
   int height = frameDims.height;
   int width = frameDims.width;
   std::vector<int64_t> shape = {height, width, 3};
@@ -1404,6 +1426,10 @@ VideoDecoder::~VideoDecoder() {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
   }
+}
+
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
+  return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
 }
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(

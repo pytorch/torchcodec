@@ -383,7 +383,10 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
+  int convertFrameToBufferUsingSwsScale(
+      int streamIndex,
+      const AVFrame* frame,
+      torch::Tensor& outputTensor);
   DecodedOutput convertAVFrameToDecodedOutput(
       RawDecodedOutput& rawOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -426,30 +429,32 @@ class VideoDecoder {
 // MaybePermuteHWC2CHW().
 //
 // Also, importantly, the way we figure out the the height and width of the
-// output frame varies and depends on the decoding entry-point:
-// - In all cases, if the user requested specific height and width from the
-// options, we honor that. Otherwise we fall into one of the categories below.
-// - In Batch decoding APIs (e.g. getFramesAtIndices), we get height and width
-// from the stream metadata, which itself got its value from the CodecContext,
-// when the stream was added.
-// - In single frames APIs:
-//   - On CPU we get height and width from the AVFrame.
-//   - On GPU, we get height and width from the metadata (same as batch APIs)
+// output frame tensor varies, and depends on the decoding entry-point. In
+// *decreasing order of accuracy*, we use the following sources for determining
+// height and width:
+// - getHeightAndWidthFromResizedAVFrame(). This is the height and width of the
+//   AVframe, *post*-resizing. This is only used for single-frame decoding APIs,
+//   on CPU, with filtergraph.
+// - getHeightAndWidthFromOptionsOrAVFrame(). This is the height and width from
+//   the user-specified options if they exist, or the height and width of the
+//   AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
+//   our code or within FFmpeg code, this should be exactly the same as
+//   getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
+//   decoding APIs, on CPU with swscale, and on GPU.
+// - getHeightAndWidthFromOptionsOrMetadata(). This is the height and width from
+//   the user-specified options if they exist, or the height and width form the
+//   stream metadata, which itself got its value from the CodecContext, when the
+//   stream was added. This is used by batch decoding APIs, for both GPU and
+//   CPU.
 //
-// These 2 strategies are encapsulated within
-// getHeightAndWidthFromOptionsOrMetadata() and
-// getHeightAndWidthFromOptionsOrAVFrame(). The reason they exist is to make it
-// very obvious which logic is used in which place, and they allow for `git
-// grep`ing.
-//
-// The source of truth for height and width really is the AVFrame: it's the
-// decoded ouptut from FFmpeg. The info from the metadata (i.e. from the
-// CodecContext) may not be as accurate. However, the AVFrame is only available
-// late in the call stack, when the frame is decoded, while the CodecContext is
-// available early when a stream is added. This is why we use the CodecContext
-// for pre-allocating batched output tensors (we could pre-allocate those only
-// once we decode the first frame to get the info frame the AVFrame, but that's
-// a more complex logic).
+// The source of truth for height and width really is the (resized) AVFrame: it
+// comes from the decoded ouptut of FFmpeg. The info from the metadata (i.e.
+// from the CodecContext) may not be as accurate. However, the AVFrame is only
+// available late in the call stack, when the frame is decoded, while the
+// CodecContext is available early when a stream is added. This is why we use
+// the CodecContext for pre-allocating batched output tensors (we could
+// pre-allocate those only once we decode the first frame to get the info frame
+// the AVFrame, but that's a more complex logic).
 //
 // Because the sources for height and width may disagree, we may end up with
 // conflicts: e.g. if we pre-allocate a batch output tensor based on the
@@ -462,6 +467,10 @@ struct FrameDims {
   int width;
   FrameDims(int h, int w) : height(h), width(w) {}
 };
+
+// There's nothing preventing you from calling this on a non-resized frame, but
+// please don't.
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
