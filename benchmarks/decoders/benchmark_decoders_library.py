@@ -436,8 +436,8 @@ def plot_data(df_data, plot_path):
             # Plot bars with error bars
             ax.barh(
                 group["decoder"],
-                group["fps_mean"],
-                xerr=group["fps_std"],
+                group["fps_median"],
+                xerr=[group["fps_median"] - group["fps_p75"], group["fps_p25"] - group["fps_median"]],
                 color=[colors(i) for i in range(len(group))],
                 align="center",
                 capsize=5,
@@ -526,10 +526,6 @@ def run_benchmarks(
                 df_item["median"] = results[-1].median
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = f"{kind}:seek()+next()"
-                df_item["fps_mean"] = num_samples / results[-1].mean
-                df_item["fps_std"] = np.std(
-                    [num_samples / t for t in results[-1].times]
-                )
                 df_item["fps_median"] = num_samples / results[-1].median
                 df_item["fps_p75"] = num_samples / results[-1]._p75
                 df_item["fps_p25"] = num_samples / results[-1]._p25
@@ -560,10 +556,6 @@ def run_benchmarks(
                 df_item["median"] = results[-1].median
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = "next()"
-                df_item["fps_mean"] = num_samples / results[-1].mean
-                df_item["fps_std"] = np.std(
-                    [num_samples / t for t in results[-1].times]
-                )
                 df_item["fps_median"] = num_consecutive_nexts / results[-1].median
                 df_item["fps_p75"] = num_consecutive_nexts / results[-1]._p75
                 df_item["fps_p25"] = num_consecutive_nexts / results[-1]._p25
