@@ -2,7 +2,7 @@ name: Docs
 
 on:
   workflow_run:
-    workflows: ["Build and test Linux CUDA wheels"]
+    workflows: [Build and test Linux CUDA wheels]
     types:
       - completed
 
