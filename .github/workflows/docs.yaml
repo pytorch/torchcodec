@@ -24,9 +24,14 @@ jobs:
           auto-update-conda: true
           miniconda-version: "latest"
           activate-environment: test
-          python-version: '3.12'
+          python-version: '3.9'
       - name: Update pip
         run: python -m pip install --upgrade pip
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: pytorch_torchcodec__3.9_cu124_x86_64
+          path: pytorch/torchcodec/dist/
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
