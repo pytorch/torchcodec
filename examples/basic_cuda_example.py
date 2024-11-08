@@ -130,7 +130,7 @@ print(frame.data.device)
 #
 # Let's look at the frames decoded by CUDA decoder and compare them
 # against equivalent results from the CPU decoders.
-from typing import List, Optional
+import matplotlib.pyplot as plt
 
 
 def get_frames(timestamps: list[float], device: str):
@@ -149,45 +149,25 @@ def get_numpy_images(frames):
 
 timestamps = [12, 19, 45, 131, 180]
 cpu_frames = get_frames(timestamps, device="cpu")
-cuda_frames = get_frames(timestamps, device="cuda")
-cpu_tensors = [frame.data for frame in cpu_frames]
-cuda_tensors = [frame.data for frame in cuda_frames]
+cuda_frames = get_frames(timestamps, device="cuda:0")
 cpu_numpy_images = get_numpy_images(cpu_frames)
 cuda_numpy_images = get_numpy_images(cuda_frames)
 
 
-def plot(
-    frames1: List[torch.Tensor],
-    frames2: List[torch.Tensor],
-    title1: Optional[str] = None,
-    title2: Optional[str] = None,
-):
-    try:
-        import matplotlib.pyplot as plt
-        from torchvision.transforms.v2.functional import to_pil_image
-        from torchvision.utils import make_grid
-    except ImportError:
-        print("Cannot plot, please run `pip install torchvision matplotlib`")
-        return
+def plot_cpu_and_cuda_images():
+    n_rows = len(timestamps)
+    fig, axes = plt.subplots(n_rows, 2, figsize=[12.8, 16.0])
+    for i in range(n_rows):
+        axes[i][0].imshow(cpu_numpy_images[i])
+        axes[i][1].imshow(cuda_numpy_images[i])
 
-    plt.rcParams["savefig.bbox"] = "tight"
-
-    fig, ax = plt.subplots(1, 2)
-
-    ax[0].imshow(to_pil_image(make_grid(frames1, nrow=1)))
-    ax[0].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
-    if title1 is not None:
-        ax[0].set_title(title1)
-
-    ax[1].imshow(to_pil_image(make_grid(frames2, nrow=1)))
-    ax[1].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
-    if title2 is not None:
-        ax[1].set_title(title2)
-
+    axes[0][0].set_title("CPU decoder")
+    axes[0][1].set_title("CUDA decoder")
+    plt.setp(axes, xticks=[], yticks=[])
     plt.tight_layout()
 
 
-plot(cpu_tensors, cuda_tensors, "CPU decoder", "CUDA decoder")
+plot_cpu_and_cuda_images()
 
 # %%
 #
