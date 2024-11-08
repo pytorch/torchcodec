@@ -123,6 +123,7 @@ class TorchCodecCore(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
@@ -137,6 +138,7 @@ class TorchCodecCore(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
 
         frames = []
@@ -176,6 +178,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
 
         frames = []
@@ -187,10 +190,11 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
 
 class TorchCodecCoreBatch(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None):
+    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
+        self._device = device
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
@@ -199,6 +203,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
@@ -214,6 +219,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
             decoder,
             num_threads=self._num_threads,
             color_conversion_library=self._color_conversion_library,
+            device=self._device,
         )
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
@@ -225,17 +231,22 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 
 class TorchCodecPublic(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None):
+    def __init__(self, num_ffmpeg_threads=None, device="cpu"):
         self._num_ffmpeg_threads = (
             int(num_ffmpeg_threads) if num_ffmpeg_threads else None
         )
+        self._device = device
 
     def get_frames_from_video(self, video_file, pts_list):
-        decoder = VideoDecoder(video_file, num_ffmpeg_threads=self._num_ffmpeg_threads)
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=self._num_ffmpeg_threads, device=self._device
+        )
         return decoder.get_frames_played_at(pts_list)
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
-        decoder = VideoDecoder(video_file, num_ffmpeg_threads=self._num_ffmpeg_threads)
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=self._num_ffmpeg_threads, device=self._device
+        )
         frames = []
         count = 0
         for frame in decoder:
