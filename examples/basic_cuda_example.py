@@ -126,6 +126,7 @@ print(frame.data.device)
 #
 # Let's look at the frames decoded by CUDA decoder and compare them
 # against equivalent results from the CPU decoders.
+from typing import List, Optional
 
 
 def get_frames(timestamps: list[float], device: str):
