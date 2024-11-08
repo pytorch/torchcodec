@@ -863,7 +863,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        containerMetadata_.streams[streamIndex],
         rawOutput,
         output,
         preAllocatedOutputTensor);
