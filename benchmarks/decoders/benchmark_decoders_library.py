@@ -380,6 +380,7 @@ def retrieve_videos(urls_and_dest_paths):
     for url, path in urls_and_dest_paths:
         urllib.request.urlretrieve(url, path)
 
+
 def plot_data(df_data, plot_path):
     # Creating the DataFrame
     df = pd.DataFrame(df_data)
@@ -526,7 +527,9 @@ def run_benchmarks(
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = f"{kind}:seek()+next()"
                 df_item["fps_mean"] = num_samples / results[-1].mean
-                df_item["fps_std"] = np.std([num_samples / t for t in results[-1].times])
+                df_item["fps_std"] = np.std(
+                    [num_samples / t for t in results[-1].times]
+                )
                 df_item["fps_median"] = num_samples / results[-1].median
                 df_item["fps_p75"] = num_samples / results[-1]._p75
                 df_item["fps_p25"] = num_samples / results[-1]._p25
@@ -558,7 +561,9 @@ def run_benchmarks(
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = "next()"
                 df_item["fps_mean"] = num_samples / results[-1].mean
-                df_item["fps_std"] = np.std([num_samples / t for t in results[-1].times])
+                df_item["fps_std"] = np.std(
+                    [num_samples / t for t in results[-1].times]
+                )
                 df_item["fps_median"] = num_consecutive_nexts / results[-1].median
                 df_item["fps_p75"] = num_consecutive_nexts / results[-1]._p75
                 df_item["fps_p25"] = num_consecutive_nexts / results[-1]._p25

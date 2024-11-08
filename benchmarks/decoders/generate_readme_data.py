@@ -14,14 +14,15 @@ from pathlib import Path
 from benchmark_decoders_library import (
     DecordAccurateBatch,
     generate_videos,
+    retrieve_videos,
     run_benchmarks,
     TorchAudioDecoder,
     TorchCodecPublic,
     TorchVision,
-    retrieve_videos,
 )
 
 NASA_URL = "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4_small.mp4"
+
 
 def main() -> None:
     """Benchmarks the performance of a few video decoders on synthetic videos"""
@@ -50,10 +51,10 @@ def main() -> None:
         videos_dir_path,
     )
 
-    urls_and_dest_paths = [(NASA_URL, f"{videos_dir_path}/nasa_960x540_206s_30fps_yuv420p.mp4")]
+    urls_and_dest_paths = [
+        (NASA_URL, f"{videos_dir_path}/nasa_960x540_206s_30fps_yuv420p.mp4")
+    ]
     retrieve_videos(urls_and_dest_paths)
-
-    video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
 
     decoder_dict = {}
     decoder_dict["TorchCodec"] = TorchCodecPublic()
@@ -63,6 +64,7 @@ def main() -> None:
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
+    video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
     df_data = run_benchmarks(
         decoder_dict,
         video_files_paths,
