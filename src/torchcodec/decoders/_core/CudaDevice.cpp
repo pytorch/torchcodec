@@ -187,7 +187,6 @@ void initializeContextOnCuda(
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    const VideoDecoder::StreamMetadata& metadata,
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -197,11 +196,9 @@ void convertAVFrameToDecodedOutputOnCuda(
       src->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
-  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(options, *src);
   int height = frameDims.height;
   int width = frameDims.width;
-  NppiSize oSizeROI = {width, height};
-  Npp8u* input[2] = {src->data[0], src->data[1]};
   torch::Tensor& dst = output.frame;
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
@@ -222,8 +219,10 @@ void convertAVFrameToDecodedOutputOnCuda(
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device);
 
-  auto start = std::chrono::high_resolution_clock::now();
+  NppiSize oSizeROI = {width, height};
+  Npp8u* input[2] = {src->data[0], src->data[1]};
 
+  auto start = std::chrono::high_resolution_clock::now();
   NppStatus status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],

@@ -4,7 +4,6 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import glob
 import json
 import os
 import platform
@@ -14,29 +13,35 @@ from pathlib import Path
 from benchmark_decoders_library import (
     DecordAccurateBatch,
     generate_videos,
+    retrieve_videos,
     run_benchmarks,
     TorchAudioDecoder,
     TorchCodecPublic,
     TorchVision,
 )
 
+NASA_URL = "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4_small.mp4"
+
 
 def main() -> None:
     """Benchmarks the performance of a few video decoders on synthetic videos"""
 
-    resolutions = ["640x480"]
-    encodings = ["libx264"]
-    fpses = [30]
-    gop_sizes = [600]
-    durations = [10]
-    pix_fmts = ["yuv420p"]
-    ffmpeg_path = "ffmpeg"
     videos_dir_path = "/tmp/torchcodec_benchmarking_videos"
     shutil.rmtree(videos_dir_path, ignore_errors=True)
     os.makedirs(videos_dir_path)
+
+    resolutions = ["1280x720"]
+    encodings = ["libx264"]
+    patterns = ["mandelbrot"]
+    fpses = [60]
+    gop_sizes = [600]
+    durations = [120]
+    pix_fmts = ["yuv420p"]
+    ffmpeg_path = "ffmpeg"
     generate_videos(
         resolutions,
         encodings,
+        patterns,
         fpses,
         gop_sizes,
         durations,
@@ -44,17 +49,21 @@ def main() -> None:
         ffmpeg_path,
         videos_dir_path,
     )
-    video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
+
+    urls_and_dest_paths = [
+        (NASA_URL, f"{videos_dir_path}/nasa_960x540_206s_30fps_yuv420p.mp4")
+    ]
+    retrieve_videos(urls_and_dest_paths)
 
     decoder_dict = {}
     decoder_dict["TorchCodec"] = TorchCodecPublic()
-    decoder_dict["TorchCodec[num_threads=1]"] = TorchCodecPublic(num_ffmpeg_threads=1)
-    decoder_dict["TorchVision[backend=video_reader]"] = TorchVision("video_reader")
+    decoder_dict["TorchVision[video_reader]"] = TorchVision("video_reader")
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
     decoder_dict["Decord"] = DecordAccurateBatch()
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
+    video_files_paths = list(Path(videos_dir_path).glob("*.mp4"))
     df_data = run_benchmarks(
         decoder_dict,
         video_files_paths,
