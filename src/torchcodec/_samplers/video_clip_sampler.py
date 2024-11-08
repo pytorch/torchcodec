@@ -14,7 +14,7 @@ import torch
 from torch import nn, Tensor
 
 from torchcodec.decoders._core import (
-    add_video_stream,
+    _add_video_stream,
     create_from_tensor,
     get_frames_at_indices,
     get_json_metadata,
@@ -31,6 +31,7 @@ class VideoTooShortException(Exception):
 @dataclass
 class DecoderArgs:
     num_threads: int = 0
+    color_conversion_library: Union[None, str] = None
 
 
 @dataclass
@@ -150,7 +151,7 @@ class VideoClipSampler(nn.Module):
 
         video_decoder = create_from_tensor(video_data)
         scan_all_streams_to_update_metadata(video_decoder)
-        add_video_stream(video_decoder)
+        _add_video_stream(video_decoder)
         metadata_json = json.loads(get_json_metadata(video_decoder))
         target_width, target_height = self._compute_frame_width_height(
             metadata_json["width"], metadata_json["height"]
@@ -158,11 +159,12 @@ class VideoClipSampler(nn.Module):
 
         video_decoder = create_from_tensor(video_data)
         scan_all_streams_to_update_metadata(video_decoder)
-        add_video_stream(
+        _add_video_stream(
             video_decoder,
             width=target_width,
             height=target_height,
             num_threads=self.decoder_args.num_threads,
+            color_conversion_library=self.decoder_args.color_conversion_library,
         )
 
         clips: List[Any] = []
