@@ -97,7 +97,7 @@ urllib.request.urlretrieve(
 
 # %%
 ######################################################################
-# Decoding with CUDA
+# CUDA Decoding using VideoDecoder
 ######################################################################
 #
 # To use CUDA decoder, you need to pass in a cuda device to the decoder.
