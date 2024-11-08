@@ -1,9 +1,10 @@
 import abc
 import json
-import os
 import subprocess
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 from itertools import product
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -341,6 +342,7 @@ def generate_video(command):
 def generate_videos(
     resolutions,
     encodings,
+    patterns,
     fpses,
     gop_sizes,
     durations,
@@ -352,23 +354,25 @@ def generate_videos(
     video_count = 0
 
     futures = []
-    for resolution, duration, fps, gop_size, encoding, pix_fmt in product(
-        resolutions, durations, fpses, gop_sizes, encodings, pix_fmts
+    for resolution, duration, fps, gop_size, encoding, pattern, pix_fmt in product(
+        resolutions, durations, fpses, gop_sizes, encodings, patterns, pix_fmts
     ):
-        outfile = f"{output_dir}/{resolution}_{duration}s_{fps}fps_{gop_size}gop_{encoding}_{pix_fmt}.mp4"
+        outfile = f"{output_dir}/{pattern}_{resolution}_{duration}s_{fps}fps_{gop_size}gop_{encoding}_{pix_fmt}.mp4"
         command = [
             ffmpeg_cli,
             "-y",
             "-f",
             "lavfi",
             "-i",
-            f"color=c=blue:s={resolution}:d={duration}",
+            f"{pattern}=s={resolution}",
+            "-t",
+            str(duration),
             "-c:v",
             encoding,
             "-r",
-            f"{fps}",
+            str(fps),
             "-g",
-            f"{gop_size}",
+            str(gop_size),
             "-pix_fmt",
             pix_fmt,
             outfile,
@@ -381,6 +385,11 @@ def generate_videos(
         assert f.result()
     executor.shutdown(wait=True)
     print(f"Generated {video_count} videos")
+
+
+def retrieve_videos(urls_and_dest_paths):
+    for url, path in urls_and_dest_paths:
+        urllib.request.urlretrieve(url, path)
 
 
 def plot_data(df_data, plot_path):
@@ -411,7 +420,7 @@ def plot_data(df_data, plot_path):
         nrows=len(unique_videos),
         ncols=max_combinations,
         figsize=(max_combinations * 6, len(unique_videos) * 4),
-        sharex=True,
+        sharex=False,
         sharey=True,
     )
 
@@ -430,16 +439,19 @@ def plot_data(df_data, plot_path):
             ax = axes[row, col]  # Select the appropriate axis
 
             # Set the title for the subplot
-            base_video = os.path.basename(video)
+            base_video = Path(video).name.removesuffix(".mp4")
             ax.set_title(
-                f"video={base_video}\ndecode_pattern={vcount} x {vtype}", fontsize=12
+                f"video={base_video}\ndecode_pattern={vcount} x {vtype}", fontsize=10
             )
 
             # Plot bars with error bars
             ax.barh(
                 group["decoder"],
-                group["fps"],
-                xerr=[group["fps"] - group["fps_p75"], group["fps_p25"] - group["fps"]],
+                group["fps_median"],
+                xerr=[
+                    group["fps_median"] - group["fps_p75"],
+                    group["fps_p25"] - group["fps_median"],
+                ],
                 color=[colors(i) for i in range(len(group))],
                 align="center",
                 capsize=5,
@@ -449,27 +461,10 @@ def plot_data(df_data, plot_path):
             # Set the labels
             ax.set_xlabel("FPS")
 
-            # No need for y-axis label past the plot on the far left
-            if col == 0:
-                ax.set_ylabel("Decoder")
-
     # Remove any empty subplots for videos with fewer combinations
     for row in range(len(unique_videos)):
         for col in range(video_type_combinations[unique_videos[row]], max_combinations):
             fig.delaxes(axes[row, col])
-
-    # If we just call fig.legend, we'll get duplicate labels, as each label appears on
-    # each subplot. We take advantage of dicts having unique keys to de-dupe.
-    handles, labels = plt.gca().get_legend_handles_labels()
-    unique_labels = dict(zip(labels, handles))
-
-    # Reverse the order of the handles and labels to match the order of the bars
-    fig.legend(
-        handles=reversed(unique_labels.values()),
-        labels=reversed(unique_labels.keys()),
-        frameon=True,
-        loc="right",
-    )
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
@@ -486,7 +481,7 @@ def get_metadata(video_file_path: str) -> VideoStreamMetadata:
 
 def run_benchmarks(
     decoder_dict: dict[str, AbstractDecoder],
-    video_files_paths: list[str],
+    video_files_paths: list[Path],
     num_samples: int,
     num_sequential_frames_from_start: list[int],
     min_runtime_seconds: float,
@@ -526,7 +521,7 @@ def run_benchmarks(
                 seeked_result = benchmark.Timer(
                     stmt="decoder.get_frames_from_video(video_file, pts_list)",
                     globals={
-                        "video_file": video_file_path,
+                        "video_file": str(video_file_path),
                         "pts_list": pts_list,
                         "decoder": decoder,
                     },
@@ -539,22 +534,22 @@ def run_benchmarks(
                 )
                 df_item = {}
                 df_item["decoder"] = decoder_name
-                df_item["video"] = video_file_path
+                df_item["video"] = str(video_file_path)
                 df_item["description"] = results[-1].description
                 df_item["frame_count"] = num_samples
                 df_item["median"] = results[-1].median
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = f"{kind}:seek()+next()"
-                df_item["fps"] = 1.0 * num_samples / results[-1].median
-                df_item["fps_p75"] = 1.0 * num_samples / results[-1]._p75
-                df_item["fps_p25"] = 1.0 * num_samples / results[-1]._p25
+                df_item["fps_median"] = num_samples / results[-1].median
+                df_item["fps_p75"] = num_samples / results[-1]._p75
+                df_item["fps_p25"] = num_samples / results[-1]._p25
                 df_data.append(df_item)
 
             for num_consecutive_nexts in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.get_consecutive_frames_from_video(video_file, consecutive_frames_to_extract)",
                     globals={
-                        "video_file": video_file_path,
+                        "video_file": str(video_file_path),
                         "consecutive_frames_to_extract": num_consecutive_nexts,
                         "decoder": decoder,
                     },
@@ -569,15 +564,15 @@ def run_benchmarks(
                 )
                 df_item = {}
                 df_item["decoder"] = decoder_name
-                df_item["video"] = video_file_path
+                df_item["video"] = str(video_file_path)
                 df_item["description"] = results[-1].description
                 df_item["frame_count"] = num_consecutive_nexts
                 df_item["median"] = results[-1].median
                 df_item["iqr"] = results[-1].iqr
                 df_item["type"] = "next()"
-                df_item["fps"] = 1.0 * num_consecutive_nexts / results[-1].median
-                df_item["fps_p75"] = 1.0 * num_consecutive_nexts / results[-1]._p75
-                df_item["fps_p25"] = 1.0 * num_consecutive_nexts / results[-1]._p25
+                df_item["fps_median"] = num_consecutive_nexts / results[-1].median
+                df_item["fps_p75"] = num_consecutive_nexts / results[-1]._p75
+                df_item["fps_p25"] = num_consecutive_nexts / results[-1]._p25
                 df_data.append(df_item)
 
         first_video_file_path = video_files_paths[0]
@@ -587,7 +582,7 @@ def run_benchmarks(
             creation_result = benchmark.Timer(
                 stmt="create_torchcodec_decoder_from_file(video_file)",
                 globals={
-                    "video_file": first_video_file_path,
+                    "video_file": str(first_video_file_path),
                     "create_torchcodec_decoder_from_file": create_torchcodec_decoder_from_file,
                 },
                 label=f"video={first_video_file_path} {metadata_label}",
