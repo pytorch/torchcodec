@@ -4,7 +4,6 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import glob
 import json
 import os
 import platform
@@ -64,7 +63,7 @@ def main() -> None:
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
-    video_files_paths = glob.glob(f"{videos_dir_path}/*.mp4")
+    video_files_paths = list(Path(videos_dir_path).glob("*.mp4"))
     df_data = run_benchmarks(
         decoder_dict,
         video_files_paths,
