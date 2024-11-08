@@ -224,6 +224,9 @@ void convertAVFrameToDecodedOutputOnCuda(
 
   auto start = std::chrono::high_resolution_clock::now();
 
+  // TODO height and width info of output tensor comes from the metadata, which
+  // may not be accurate. How do we make sure we won't corrupt memory if the
+  // allocated tensor is too short/large?
   NppStatus status = nppiNV12ToRGB_8u_P2C3R(
       input,
       src->linesize[0],
