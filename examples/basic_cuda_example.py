@@ -10,9 +10,9 @@ Accelerated video decoding on GPUs with CUDA and NVDEC
 .. _ndecoderec_tutorial:
 
 TorchCodec can use supported Nvidia hardware (see support matrix
-`here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`) to speed-up
+`here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_) to speed-up
 video decoding. This is called "CUDA Decoding" and it uses Nvidia's
-`NVDEC hardware decoder <https://developer.nvidia.com/video-codec-sdk>`
+`NVDEC hardware decoder <https://developer.nvidia.com/video-codec-sdk>`_
 and CUDA kernels to respectively decompress and convert to RGB.
 CUDA Decoding can be faster than CPU Decoding for the actual decoding step and also for
 subsequent transform steps like scaling, cropping or rotating. This is because the decode step leaves
@@ -43,7 +43,7 @@ TorchCodec you can simply pass in a device parameter to the
 In order to use CUDA Decoding will need the following installed in your environment:
 
 #. An Nvidia GPU that supports decoding the video format you want to decode. See
-   the support matrix here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>
+   the support matrix `here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_
 #. `CUDA-enabled pytorch <https://pytorch.org/get-started/locally/>`_
 #. FFmpeg binaries that support NdecoderEC-enabled codecs
 #. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
