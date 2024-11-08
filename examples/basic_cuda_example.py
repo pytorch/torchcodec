@@ -53,6 +53,9 @@ install them with conda. For example, to install FFmpeg version 7:
 """
 
 # %%
+######################################################################
+# Checking if Pytorch has CUDA enabled
+######################################################################
 #
 # .. note::
 #
