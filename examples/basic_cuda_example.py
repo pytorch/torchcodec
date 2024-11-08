@@ -26,6 +26,7 @@ CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
    after decoding
 #. Your CPU is saturated and you want to free it up for other work
 
+
 Here are situations where CUDA Decoding may not make sense:
 
 #. You want bit-exact results compared to CPU Decoding
@@ -35,6 +36,7 @@ Here are situations where CUDA Decoding may not make sense:
 It's best to experiment with CUDA Decoding to see if it improves your use-case. With
 TorchCodec you can simply pass in a device parameter to the
 :class:`~torchcodec.decoders.VideoDecoder` class to use CUDA Decoding.
+
 
 In order use CUDA Decoding will need the following installed in your environment:
 
@@ -47,7 +49,7 @@ FFmpeg versions 5, 6 and 7 from conda-forge are built with NVDEC support and you
 install them with conda. For example, to install FFmpeg version 7:
 
 .. code-block:: bash
-
+   # These libraries are needed for CUDA decoding with TorchCodec
    conda install ffmpeg=7 -c conda-forge
    conda install libnpp cuda-nvrtc -c nvidia
 """
@@ -169,7 +171,7 @@ plot_cpu_and_cuda_images()
 # %%
 #
 # They look visually similar to the human eye but there may be subtle
-# differences because CUDA math is not bit-exact to CPU math.
+# differences because CUDA math is not bit-exact with respect to CPU math.
 #
 first_cpu_frame = cpu_frames[0].data.to("cpu")
 first_cuda_frame = cuda_frames[0].data.to("cpu")
