@@ -317,6 +317,15 @@ class VideoDecoder {
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
   };
+  struct SwsContextKey {
+    int decodedWidth;
+    int decodedHeight;
+    AVPixelFormat decodedFormat;
+    int outputWidth;
+    int outputHeight;
+    bool operator==(const SwsContextKey&) const = default;
+    bool operator!=(const SwsContextKey&) const = default;
+  };
   // Stores information for each stream.
   struct StreamInfo {
     int streamIndex = -1;
@@ -337,6 +346,7 @@ class VideoDecoder {
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    SwsContextKey swsContextKey;
     UniqueSwsContext swsContext;
   };
   VideoDecoder();
@@ -440,16 +450,16 @@ class VideoDecoder {
 //   AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
 //   our code or within FFmpeg code, this should be exactly the same as
 //   getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
-//   decoding APIs, on CPU, with swscale.
+//   decoding APIs, on CPU with swscale, and on GPU.
 // - getHeightAndWidthFromOptionsOrMetadata(). This is the height and width from
 //   the user-specified options if they exist, or the height and width form the
 //   stream metadata, which itself got its value from the CodecContext, when the
-//   stream was added. This is used by batch decoding APIs, or by GPU-APIs (both
-//   batch and single-frames).
+//   stream was added. This is used by batch decoding APIs, for both GPU and
+//   CPU.
 //
-// The source of truth for height and width really is the (resized) AVFrame:
-// it's the decoded ouptut from FFmpeg. The info from the metadata (i.e. from
-// the CodecContext) may not be as accurate. However, the AVFrame is only
+// The source of truth for height and width really is the (resized) AVFrame: it
+// comes from the decoded ouptut of FFmpeg. The info from the metadata (i.e.
+// from the CodecContext) may not be as accurate. However, the AVFrame is only
 // available late in the call stack, when the frame is decoded, while the
 // CodecContext is available early when a stream is added. This is why we use
 // the CodecContext for pre-allocating batched output tensors (we could

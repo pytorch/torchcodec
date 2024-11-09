@@ -863,7 +863,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        containerMetadata_.streams[streamIndex],
         rawOutput,
         output,
         preAllocatedOutputTensor);
@@ -1340,7 +1339,10 @@ int VideoDecoder::convertFrameToBufferUsingSwsScale(
 
   int expectedOutputHeight = outputTensor.sizes()[0];
   int expectedOutputWidth = outputTensor.sizes()[1];
-  if (activeStream.swsContext.get() == nullptr) {
+  auto curFrameSwsContextKey = SwsContextKey{
+      frame->width, frame->height, frameFormat, expectedOutputWidth, expectedOutputHeight};
+  if (activeStream.swsContext.get() == nullptr ||
+      activeStream.swsContextKey != curFrameSwsContextKey) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
         frame->height,
@@ -1374,6 +1376,7 @@ int VideoDecoder::convertFrameToBufferUsingSwsScale(
         brightness,
         contrast,
         saturation);
+    activeStream.swsContextKey = curFrameSwsContextKey;
     activeStream.swsContext.reset(swsContext);
   }
   SwsContext* swsContext = activeStream.swsContext.get();
