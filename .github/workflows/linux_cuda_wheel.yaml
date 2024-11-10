@@ -1,4 +1,4 @@
-name: linux_cuda_wheel
+name: Build and test Linux CUDA wheels
 
 on:
   pull_request:
