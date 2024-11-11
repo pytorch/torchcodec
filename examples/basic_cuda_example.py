@@ -81,7 +81,7 @@ print(f"{torch.cuda.get_device_properties(0)=}")
 # Downloading the video
 # -------------------------------------
 #
-# We will use the following video which has the following properties;
+# We will use the following video which has the following properties:
 #
 # - Codec: H.264
 # - Resolution: 960x540
