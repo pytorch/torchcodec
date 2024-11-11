@@ -393,6 +393,8 @@ def retrieve_videos(urls_and_dest_paths):
 
 
 def plot_data(df_data, plot_path):
+    plt.rcParams["font.size"] = 18
+
     # Creating the DataFrame
     df = pd.DataFrame(df_data)
 
@@ -440,9 +442,7 @@ def plot_data(df_data, plot_path):
 
             # Set the title for the subplot
             base_video = Path(video).name.removesuffix(".mp4")
-            ax.set_title(
-                f"video={base_video}\ndecode_pattern={vcount} x {vtype}", fontsize=10
-            )
+            ax.set_title(f"{base_video}\n{vcount} x {vtype}", fontsize=11)
 
             # Plot bars with error bars
             ax.barh(
