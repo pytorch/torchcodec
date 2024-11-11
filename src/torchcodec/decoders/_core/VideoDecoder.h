@@ -323,8 +323,8 @@ class VideoDecoder {
     AVPixelFormat decodedFormat;
     int outputWidth;
     int outputHeight;
-    bool operator==(const SwsContextKey&) const = default;
-    bool operator!=(const SwsContextKey&) const = default;
+    bool operator==(const SwsContextKey&);
+    bool operator!=(const SwsContextKey&);
   };
   // Stores information for each stream.
   struct StreamInfo {
