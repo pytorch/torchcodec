@@ -133,43 +133,35 @@ print(frame.data.device)
 # Let's look at the frames decoded by CUDA decoder and compare them
 # against equivalent results from the CPU decoders.
 import matplotlib.pyplot as plt
+from torchvision.transforms.v2.functional import to_pil_image
 
 
 def get_frames(timestamps: list[float], device: str):
     decoder = VideoDecoder(video_file, device=device)
-    return [decoder.get_frame_played_at(ts) for ts in timestamps]
-
-
-def get_numpy_images(frames):
-    numpy_images = []
-    for frame in frames:
-        # We transfer to the CPU so they can be visualized by matplotlib.
-        numpy_image = frame.data.to("cpu").permute(1, 2, 0).numpy()
-        numpy_images.append(numpy_image)
-    return numpy_images
+    return [decoder.get_frame_played_at(ts).data for ts in timestamps]
 
 
 timestamps = [12, 19, 45, 131, 180]
 cpu_frames = get_frames(timestamps, device="cpu")
 cuda_frames = get_frames(timestamps, device="cuda:0")
-cpu_numpy_images = get_numpy_images(cpu_frames)
-cuda_numpy_images = get_numpy_images(cuda_frames)
 
 
-def plot_cpu_and_cuda_images():
+def plot_cpu_and_cuda_frames(
+    cpu_frames: list[torch.Tensor], cuda_frames: list[torch.Tensor]
+):
     n_rows = len(timestamps)
     fig, axes = plt.subplots(n_rows, 2, figsize=[12.8, 16.0])
     for i in range(n_rows):
-        axes[i][0].imshow(cpu_numpy_images[i])
-        axes[i][1].imshow(cuda_numpy_images[i])
+        axes[i][0].imshow(to_pil_image(cpu_frames[i].to("cpu")))
+        axes[i][1].imshow(to_pil_image(cuda_frames[i].to("cpu")))
 
-    axes[0][0].set_title("CPU decoder")
-    axes[0][1].set_title("CUDA decoder")
+    axes[0][0].set_title("CPU decoder", fontsize=24)
+    axes[0][1].set_title("CUDA decoder", fontsize=24)
     plt.setp(axes, xticks=[], yticks=[])
     plt.tight_layout()
 
 
-plot_cpu_and_cuda_images()
+plot_cpu_and_cuda_frames(cpu_frames, cuda_frames)
 
 # %%
 #
