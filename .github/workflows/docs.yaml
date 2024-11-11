@@ -107,11 +107,11 @@ jobs:
       - name: Install doc dependencies
         run: |
           cd docs
-          python -m pip install -r requirements.txt
+          ${CONDA_RUN} python -m pip install -r requirements.txt
       - name: Build docs
         run: |
           cd docs
-          make html
+          ${CONDA_RUN} make html
       - uses: actions/upload-artifact@v3
         with:
           name: Built-Docs
