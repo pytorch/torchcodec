@@ -140,9 +140,7 @@ cpu_frames = cpu_decoder.get_frames_played_at(timestamps).data
 cuda_frames = cuda_decoder.get_frames_played_at(timestamps).data
 
 
-def plot_cpu_and_cuda_frames(
-    cpu_frames: list[torch.Tensor], cuda_frames: list[torch.Tensor]
-):
+def plot_cpu_and_cuda_frames(cpu_frames: torch.Tensor, cuda_frames: torch.Tensor):
     try:
         import matplotlib.pyplot as plt
         from torchvision.transforms.v2.functional import to_pil_image
