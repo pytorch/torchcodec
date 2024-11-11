@@ -317,6 +317,15 @@ class VideoDecoder {
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
   };
+  struct SwsContextKey {
+    int decodedWidth;
+    int decodedHeight;
+    AVPixelFormat decodedFormat;
+    int outputWidth;
+    int outputHeight;
+    bool operator==(const SwsContextKey&);
+    bool operator!=(const SwsContextKey&);
+  };
   // Stores information for each stream.
   struct StreamInfo {
     int streamIndex = -1;
@@ -337,6 +346,7 @@ class VideoDecoder {
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    SwsContextKey swsContextKey;
     UniqueSwsContext swsContext;
   };
   VideoDecoder();
