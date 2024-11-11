@@ -166,7 +166,11 @@ plot_cpu_and_cuda_frames(cpu_frames, cuda_frames)
 # They look visually similar to the human eye but there may be subtle
 # differences because CUDA math is not bit-exact with respect to CPU math.
 #
-first_cpu_frame = cpu_frames[0].data.to("cpu")
-first_cuda_frame = cuda_frames[0].data.to("cpu")
-frames_equal = torch.equal(first_cpu_frame, first_cuda_frame)
+frames_equal = torch.equal(cpu_frames.to("cuda"), cuda_frames)
+mean_abs_diff = torch.mean(
+    torch.abs(cpu_frames.float().to("cuda") - cuda_frames.float())
+)
+max_abs_diff = torch.max(torch.abs(cpu_frames.to("cuda").float() - cuda_frames.float()))
 print(f"{frames_equal=}")
+print(f"{mean_abs_diff=}")
+print(f"{max_abs_diff=}")
