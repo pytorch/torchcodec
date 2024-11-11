@@ -143,7 +143,7 @@ def get_frames(timestamps: list[float], device: str):
 
 timestamps = [12, 19, 45, 131, 180]
 cpu_frames = get_frames(timestamps, device="cpu")
-cuda_frames = get_frames(timestamps, device="cuda:0")
+cuda_frames = get_frames(timestamps, device="cuda")
 
 
 def plot_cpu_and_cuda_frames(
