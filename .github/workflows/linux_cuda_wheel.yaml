@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - src/torchcodec/*
+      - benchmarks/*
       - packaging/*
       - test/*
       - .github/workflows/linux_cuda_wheel.yaml # self reference
