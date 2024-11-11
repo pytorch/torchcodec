@@ -11,7 +11,7 @@ defaults:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: linux.g5.4xlarge.nvidia.gpu
     strategy:
       fail-fast: false
     steps:
@@ -26,14 +26,15 @@ jobs:
           python-version: '3.12'
       - name: Update pip
         run: python -m pip install --upgrade pip
-      - name: Install dependencies and FFmpeg
+      - name: Install torchcodec from nightly
         run: |
-          # TODO: torchvision and torchaudio shouldn't be needed. They were only added
-          #  to silence an error as seen in https://github.com/pytorch/torchcodec/issues/203
-          python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
-          conda install "ffmpeg=7.0.1" pkg-config -c conda-forge
+          pip3 install --pre torch torchvision torchaudio torchcodec --index-url https://download.pytorch.org/whl/nightly/cu124
+      - name: Install FFMPEG and other deps
+        run: |
+          conda install cuda-nvrtc=12.4 libnpp cuda-nvcc=12.4 cuda-cudart=12.4 -c nvidia
+          conda install ffmpeg=7 cmake pkg-config -c conda-forge
           ffmpeg -version
-      - name: Build and install torchcodec
+      - name: Build torchcodec
         run: |
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Install doc dependencies
