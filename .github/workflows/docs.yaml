@@ -53,8 +53,6 @@ jobs:
           # 3.9 corresponds to the minimum python version for which we build
           # the wheel unless the label cliflow/binaries/all is present in the
           # PR.
-          # For the actual release we should add that label and change this to
-          # include more python versions.
         python-version: ['3.9']
         cuda-version: ['12.4']
         ffmpeg-version-for-tests: ['7']

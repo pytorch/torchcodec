@@ -56,7 +56,7 @@ We achieve these capabilities through:
         :link: generated_examples/basic_cuda_example.html
         :link-type: url
 
-        A simple example demonstrating Nvidia GPU decoding
+        A simple example demonstrating CUDA GPU decoding
 
 .. toctree::
    :maxdepth: 1

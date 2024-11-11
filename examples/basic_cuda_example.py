@@ -7,8 +7,6 @@
 Accelerated video decoding on GPUs with CUDA and NVDEC
 ================================================================
 
-.. _ndecoderec_tutorial:
-
 TorchCodec can use supported Nvidia hardware (see support matrix
 `here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_) to speed-up
 video decoding. This is called "CUDA Decoding" and it uses Nvidia's
@@ -45,12 +43,15 @@ In order to use CUDA Decoding will need the following installed in your environm
 #. An Nvidia GPU that supports decoding the video format you want to decode. See
    the support matrix `here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_
 #. `CUDA-enabled pytorch <https://pytorch.org/get-started/locally/>`_
-#. FFmpeg binaries that support NdecoderEC-enabled codecs
+#. FFmpeg binaries that support
+   `NVDEC-enabled <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
+   codecs
 #. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
 
 
-FFmpeg versions 5, 6 and 7 from conda-forge are built with NdecoderEC support and you can
-install them with conda. For example, to install FFmpeg version 7:
+FFmpeg versions 5, 6 and 7 from conda-forge are built with
+`NVDEC support <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
+and you can install them with conda. For example, to install FFmpeg version 7:
 
 
 .. code-block:: bash
@@ -117,7 +118,7 @@ frame = decoder[0]
 #
 # The video frames are decoded and returned as tensor of NCHW format.
 
-print(frame.data.shape, frame.data.dtype)
+print(frame.shape, frame.dtype)
 
 # %%
 #
@@ -132,23 +133,22 @@ print(frame.data.device)
 #
 # Let's look at the frames decoded by CUDA decoder and compare them
 # against equivalent results from the CPU decoders.
-import matplotlib.pyplot as plt
-from torchvision.transforms.v2.functional import to_pil_image
-
-
-def get_frames(timestamps: list[float], device: str):
-    decoder = VideoDecoder(video_file, device=device)
-    return [decoder.get_frame_played_at(ts).data for ts in timestamps]
-
-
 timestamps = [12, 19, 45, 131, 180]
-cpu_frames = get_frames(timestamps, device="cpu")
-cuda_frames = get_frames(timestamps, device="cuda")
+cpu_decoder = VideoDecoder(video_file, device="cpu")
+cuda_decoder = VideoDecoder(video_file, device="cuda")
+cpu_frames = cpu_decoder.get_frames_played_at(timestamps).data
+cuda_frames = cuda_decoder.get_frames_played_at(timestamps).data
 
 
 def plot_cpu_and_cuda_frames(
     cpu_frames: list[torch.Tensor], cuda_frames: list[torch.Tensor]
 ):
+    try:
+        import matplotlib.pyplot as plt
+        from torchvision.transforms.v2.functional import to_pil_image
+    except ImportError:
+        print("Cannot plot, please run `pip install torchvision matplotlib`")
+        return
     n_rows = len(timestamps)
     fig, axes = plt.subplots(n_rows, 2, figsize=[12.8, 16.0])
     for i in range(n_rows):
