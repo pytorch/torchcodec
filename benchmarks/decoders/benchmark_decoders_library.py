@@ -5,6 +5,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 from itertools import product
 from pathlib import Path
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -479,10 +480,19 @@ def get_metadata(video_file_path: str) -> VideoStreamMetadata:
     return VideoDecoder(video_file_path).metadata
 
 
-def run_batch_using_threads(function, *args, num_threads=10, batch_size=40):
-    executor = ThreadPoolExecutor(max_workers=10)
+class BatchParameters(NamedTuple):
+    num_threads: int
+    batch_size: int
+
+
+def run_batch_using_threads(
+    function,
+    *args,
+    batch_parameters: BatchParameters = BatchParameters(num_threads=8, batch_size=40),
+):
+    executor = ThreadPoolExecutor(max_workers=batch_parameters.num_threads)
     futures = []
-    for _ in range(batch_size):
+    for _ in range(batch_parameters.batch_size):
         futures.append(executor.submit(function, *args))
     for f in futures:
         assert f.result()
@@ -513,7 +523,7 @@ def run_benchmarks(
     num_sequential_frames_from_start: list[int],
     min_runtime_seconds: float,
     benchmark_video_creation: bool,
-    batch_size: int = 0,
+    batch_parameters: BatchParameters = None,
 ) -> list[dict[str, str | float | int]]:
     # Ensure that we have the same seed across benchmark runs.
     torch.manual_seed(0)
@@ -570,15 +580,15 @@ def run_benchmarks(
                     )
                 )
 
-                if batch_size > 0:
+                if batch_parameters:
                     seeked_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.get_frames_from_video, video_file, pts_list, batch_size=batch_size)",
+                        stmt="run_batch_using_threads(decoder.get_frames_from_video, video_file, pts_list, batch_parameters=batch_parameters)",
                         globals={
                             "video_file": str(video_file_path),
                             "pts_list": pts_list,
                             "decoder": decoder,
                             "run_batch_using_threads": run_batch_using_threads,
-                            "batch_size": batch_size,
+                            "batch_parameters": batch_parameters,
                         },
                         label=f"video={video_file_path} {metadata_label}",
                         sub_label=decoder_name,
@@ -594,7 +604,7 @@ def run_benchmarks(
                             results[-1],
                             decoder_name,
                             video_file_path,
-                            num_samples * batch_size,
+                            num_samples * batch_parameters.batch_size,
                             f"batch {kind} seek()+next()",
                         )
                     )
@@ -626,15 +636,15 @@ def run_benchmarks(
                     )
                 )
 
-                if batch_size > 0:
+                if batch_parameters:
                     consecutive_frames_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.get_consecutive_frames_from_video, video_file, consecutive_frames_to_extract, batch_size=batch_size)",
+                        stmt="run_batch_using_threads(decoder.get_consecutive_frames_from_video, video_file, consecutive_frames_to_extract, batch_parameters=batch_parameters)",
                         globals={
                             "video_file": str(video_file_path),
                             "consecutive_frames_to_extract": num_consecutive_nexts,
                             "decoder": decoder,
                             "run_batch_using_threads": run_batch_using_threads,
-                            "batch_size": batch_size,
+                            "batch_parameters": batch_parameters,
                         },
                         label=f"video={video_file_path} {metadata_label}",
                         sub_label=decoder_name,
@@ -650,7 +660,7 @@ def run_benchmarks(
                             results[-1],
                             decoder_name,
                             video_file_path,
-                            num_consecutive_nexts * batch_size,
+                            num_consecutive_nexts * batch_parameters.batch_size,
                             f"batch {num_consecutive_nexts} next()",
                         )
                     )
