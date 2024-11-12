@@ -552,7 +552,7 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=f"batch {kind} {num_samples} seek()+next()",
+                    description=f"{kind} {num_samples} seek()+next()",
                 )
                 results.append(
                     seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
@@ -562,8 +562,8 @@ def run_benchmarks(
                         results[-1],
                         decoder_name,
                         video_file_path,
-                        num_samples * batch_size,
-                        f"{kind} {num_samples} seek()+next()",
+                        num_samples,
+                        f"{kind} seek()+next()",
                     )
                 )
 
@@ -589,7 +589,7 @@ def run_benchmarks(
                         decoder_name,
                         video_file_path,
                         num_samples * batch_size,
-                        f"batch {kind} {num_samples} seek()+next()",
+                        f"batch {kind} seek()+next()",
                     )
                 )
 
@@ -603,7 +603,7 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=f"batch {num_consecutive_nexts} next()",
+                    description=f"{num_consecutive_nexts} next()",
                 )
                 results.append(
                     consecutive_frames_result.blocked_autorange(
@@ -615,7 +615,7 @@ def run_benchmarks(
                         results[-1],
                         decoder_name,
                         video_file_path,
-                        num_consecutive_nexts * batch_size,
+                        num_consecutive_nexts,
                         f"{num_consecutive_nexts} next()",
                     )
                 )
