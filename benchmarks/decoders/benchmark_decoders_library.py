@@ -481,8 +481,11 @@ def get_metadata(video_file_path: str) -> VideoStreamMetadata:
 
 def run_batch_using_threads(function, *args, num_threads=10, batch_size=40):
     executor = ThreadPoolExecutor(max_workers=10)
+    futures = []
     for _ in range(batch_size):
-        executor.submit(function, *args)
+        futures.append(executor.submit(function, *args))
+    for f in futures:
+        assert f.result()
     executor.shutdown(wait=True)
 
 
@@ -510,6 +513,7 @@ def run_benchmarks(
     num_sequential_frames_from_start: list[int],
     min_runtime_seconds: float,
     benchmark_video_creation: bool,
+    batch_size: int = 0,
 ) -> list[dict[str, str | float | int]]:
     # Ensure that we have the same seed across benchmark runs.
     torch.manual_seed(0)
@@ -530,7 +534,6 @@ def run_benchmarks(
         # video. However, because we use the duration as part of this calculation, we
         # are using different random pts values across videos.
         random_pts_list = (torch.rand(num_samples) * duration).tolist()
-        batch_size = 40
 
         for decoder_name, decoder in decoder_dict.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
@@ -567,31 +570,34 @@ def run_benchmarks(
                     )
                 )
 
-                seeked_result = benchmark.Timer(
-                    stmt="run_batch_using_threads(decoder.get_frames_from_video, video_file, pts_list, batch_size=batch_size)",
-                    globals={
-                        "video_file": str(video_file_path),
-                        "pts_list": pts_list,
-                        "decoder": decoder,
-                        "run_batch_using_threads": run_batch_using_threads,
-                        "batch_size": batch_size,
-                    },
-                    label=f"video={video_file_path} {metadata_label}",
-                    sub_label=decoder_name,
-                    description=f"batch {kind} {num_samples} seek()+next()",
-                )
-                results.append(
-                    seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
-                )
-                df_data.append(
-                    convert_result_to_df_item(
-                        results[-1],
-                        decoder_name,
-                        video_file_path,
-                        num_samples * batch_size,
-                        f"batch {kind} seek()+next()",
+                if batch_size > 0:
+                    seeked_result = benchmark.Timer(
+                        stmt="run_batch_using_threads(decoder.get_frames_from_video, video_file, pts_list, batch_size=batch_size)",
+                        globals={
+                            "video_file": str(video_file_path),
+                            "pts_list": pts_list,
+                            "decoder": decoder,
+                            "run_batch_using_threads": run_batch_using_threads,
+                            "batch_size": batch_size,
+                        },
+                        label=f"video={video_file_path} {metadata_label}",
+                        sub_label=decoder_name,
+                        description=f"batch {kind} {num_samples} seek()+next()",
                     )
-                )
+                    results.append(
+                        seeked_result.blocked_autorange(
+                            min_run_time=min_runtime_seconds
+                        )
+                    )
+                    df_data.append(
+                        convert_result_to_df_item(
+                            results[-1],
+                            decoder_name,
+                            video_file_path,
+                            num_samples * batch_size,
+                            f"batch {kind} seek()+next()",
+                        )
+                    )
 
             for num_consecutive_nexts in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
@@ -620,33 +626,34 @@ def run_benchmarks(
                     )
                 )
 
-                consecutive_frames_result = benchmark.Timer(
-                    stmt="run_batch_using_threads(decoder.get_consecutive_frames_from_video, video_file, consecutive_frames_to_extract, batch_size=batch_size)",
-                    globals={
-                        "video_file": str(video_file_path),
-                        "consecutive_frames_to_extract": num_consecutive_nexts,
-                        "decoder": decoder,
-                        "run_batch_using_threads": run_batch_using_threads,
-                        "batch_size": batch_size,
-                    },
-                    label=f"video={video_file_path} {metadata_label}",
-                    sub_label=decoder_name,
-                    description=f"batch {num_consecutive_nexts} next()",
-                )
-                results.append(
-                    consecutive_frames_result.blocked_autorange(
-                        min_run_time=min_runtime_seconds
+                if batch_size > 0:
+                    consecutive_frames_result = benchmark.Timer(
+                        stmt="run_batch_using_threads(decoder.get_consecutive_frames_from_video, video_file, consecutive_frames_to_extract, batch_size=batch_size)",
+                        globals={
+                            "video_file": str(video_file_path),
+                            "consecutive_frames_to_extract": num_consecutive_nexts,
+                            "decoder": decoder,
+                            "run_batch_using_threads": run_batch_using_threads,
+                            "batch_size": batch_size,
+                        },
+                        label=f"video={video_file_path} {metadata_label}",
+                        sub_label=decoder_name,
+                        description=f"batch {num_consecutive_nexts} next()",
                     )
-                )
-                df_data.append(
-                    convert_result_to_df_item(
-                        results[-1],
-                        decoder_name,
-                        video_file_path,
-                        num_consecutive_nexts * batch_size,
-                        f"batch {num_consecutive_nexts} next()",
+                    results.append(
+                        consecutive_frames_result.blocked_autorange(
+                            min_run_time=min_runtime_seconds
+                        )
                     )
-                )
+                    df_data.append(
+                        convert_result_to_df_item(
+                            results[-1],
+                            decoder_name,
+                            video_file_path,
+                            num_consecutive_nexts * batch_size,
+                            f"batch {num_consecutive_nexts} next()",
+                        )
+                    )
 
         first_video_file_path = video_files_paths[0]
         if benchmark_video_creation:

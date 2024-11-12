@@ -72,6 +72,7 @@ def main() -> None:
         num_sequential_frames_from_start=[100],
         min_runtime_seconds=30,
         benchmark_video_creation=False,
+        batch_size=0,
     )
     df_data.append(
         {

@@ -173,6 +173,7 @@ def main() -> None:
         num_sequential_frames_from_start=[1, 10, 100],
         min_runtime_seconds=args.bm_video_speed_min_run_seconds,
         benchmark_video_creation=args.bm_video_creation,
+        batch_size=40,
     )
     plot_data(df_data, args.plot_path)
 
