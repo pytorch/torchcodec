@@ -42,10 +42,13 @@ def load_torchcodec_extension():
         + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
-        """Could not load libtorchcodec. Likely causes:
+        f"""Could not load libtorchcodec. Likely causes:
           1. FFmpeg is not properly installed in your environment. We support
-             verisons 4, 5, 6 and 7.
-          2. PyTorch 2.4 is not properly installed in your environment.
+             versions 4, 5, 6 and 7.
+          2. The PyTorch version ({torch.__version__}) is not compatible with
+             this version of TorchCodec. Refer to the version compatibility
+             table:
+             https://github.com/pytorch/torchcodec?tab=readme-ov-file#installing-torchcodec.
           3. Another runtime dependency; see exceptions below.
         The following exceptions were raised as we tried to load libtorchcodec:
         """
