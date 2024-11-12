@@ -3,9 +3,9 @@ import json
 import subprocess
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
-from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -480,7 +480,8 @@ def get_metadata(video_file_path: str) -> VideoStreamMetadata:
     return VideoDecoder(video_file_path).metadata
 
 
-class BatchParameters(NamedTuple):
+@dataclass
+class BatchParameters:
     num_threads: int
     batch_size: int
 
