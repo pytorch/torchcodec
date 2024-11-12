@@ -57,7 +57,6 @@ def main() -> None:
 
     decoder_dict = {}
     decoder_dict["TorchCodec"] = TorchCodecPublic()
-    decoder_dict["TorchCodec[cuda]"] = TorchCodecPublic(device="cuda")
     decoder_dict["TorchVision[video_reader]"] = TorchVision("video_reader")
     decoder_dict["TorchAudio"] = TorchAudioDecoder()
     decoder_dict["Decord"] = DecordAccurateBatch()
