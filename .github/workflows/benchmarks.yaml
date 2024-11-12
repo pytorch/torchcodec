@@ -41,7 +41,7 @@ jobs:
           python -m pip install -e ".[dev]" --no-build-isolation -vvv
       - name: Test generic decoder benchmark
         run: |
-          python benchmarks/decoders/benchmark_decoders.py --decoders torchcodec_core,torchcodec_public,torchvision,torchaudio --bm_video_speed_min_run_seconds 1
+          python benchmarks/decoders/benchmark_decoders.py --bm_video_speed_min_run_seconds 1
       - name: TEST README data geeneration benchmark
         run: |
           python benchmarks/decoders/generate_readme_data.py --test_run
