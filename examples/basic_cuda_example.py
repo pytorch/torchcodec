@@ -18,6 +18,9 @@ the decoded tensor in GPU memory so the GPU doesn't have to fetch from main memo
 running the transform steps. Encoded packets are often much smaller than decoded frames so
 CUDA decoding also uses less PCI-e bandwidth.
 
+When to and when not to use CUDA Decoding
+-----------------------------------------
+
 CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
 
 #. You are decoding a large resolution video
@@ -37,6 +40,8 @@ It's best to experiment with CUDA Decoding to see if it improves your use-case. 
 TorchCodec you can simply pass in a device parameter to the
 :class:`~torchcodec.decoders.VideoDecoder` class to use CUDA Decoding.
 
+Installing TorchCodec with CUDA Enabled
+---------------------------------------
 
 In order to use CUDA Decoding will need the following installed in your environment:
 
@@ -47,6 +52,18 @@ In order to use CUDA Decoding will need the following installed in your environm
    `NVDEC-enabled <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
    codecs
 #. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
+#. TorchCodec built with CUDA enabled. Note that the TorchCodec binaries on PyPi do not have CUDA enabled.
+   For installing CUDA-enabled TorchCodec binaries you have two options:
+
+   #. Install TorchCodec's CUDA-enable prebuilts using one of Pytorch's package URLs. These are specified
+      to ``pip`` by passing in the ``--index-url`` argument, example:
+
+      .. code-block:: bash
+
+         # If you have CUDA toolkit version 12.4 and have the nightly pytorch version installed:
+         pip3 install --pre torchcodec --index-url https://download.pytorch.org/whl/nightly/cu124
+
+   #. Build TorchCodec from source using the environment variable ENABLE_CUDA=1
 
 
 FFmpeg versions 5, 6 and 7 from conda-forge are built with
