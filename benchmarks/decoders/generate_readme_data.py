@@ -58,7 +58,7 @@ def main() -> None:
         patterns = ["mandelbrot"]
         fpses = [30]
         gop_sizes = [20]
-        durations = [10] # if this goes too low, we hit EOF errors in some decoders
+        durations = [10]  # if this goes too low, we hit EOF errors in some decoders
         pix_fmts = ["yuv420p"]
         ffmpeg_path = "ffmpeg"
         min_runtime_seconds = 1
