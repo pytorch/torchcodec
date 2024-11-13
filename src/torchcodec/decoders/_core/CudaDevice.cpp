@@ -223,13 +223,24 @@ void convertAVFrameToDecodedOutputOnCuda(
   Npp8u* input[2] = {src->data[0], src->data[1]};
 
   auto start = std::chrono::high_resolution_clock::now();
-  NppStatus status = nppiNV12ToRGB_8u_P2C3R(
-      input,
-      src->linesize[0],
-      static_cast<Npp8u*>(dst.data_ptr()),
-      dst.stride(0),
-      oSizeROI);
+  NppStatus status;
+  if (src->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+    status = nppiNV12ToRGB_709HDTV_8u_P2C3R(
+        input,
+        src->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI);
+  } else {
+    status = nppiNV12ToRGB_8u_P2C3R(
+        input,
+        src->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI);
+  }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+
   // Make the pytorch stream wait for the npp kernel to finish before using the
   // output.
   at::cuda::CUDAEvent nppDoneEvent;
