@@ -2,11 +2,6 @@ name: Build and test Linux wheel
 
 on:
   pull_request:
-    paths:
-      - src/torchcodec/*
-      - packaging/*
-      - test/*
-      - .github/workflows/linux_wheel.yaml # self reference
   push:
     branches:
       - nightly
