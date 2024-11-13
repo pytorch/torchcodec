@@ -15,6 +15,7 @@ on:
     paths:
       - packaging/build_ffmpeg.sh
       - .github/workflows/build_ffmpeg.yaml # self reference
+    types: [created, edited]
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 

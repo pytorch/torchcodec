@@ -8,6 +8,7 @@ on:
       - packaging/*
       - test/*
       - .github/workflows/linux_cuda_wheel.yaml # self reference
+    types: [created, edited]
   push:
     branches:
       - nightly

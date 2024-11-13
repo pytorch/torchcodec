@@ -6,6 +6,7 @@ on:
     paths:
       - test/generate_reference_resources.sh
       - .github/workflows/reference_resources.yaml # self reference
+    types: [created, edited]
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 
