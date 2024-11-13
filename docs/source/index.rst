@@ -29,7 +29,7 @@ We achieve these capabilities through:
      .. grid-item-card:: :octicon:`file-code;1em`
         Installation instructions
         :img-top: _static/img/card-background.svg
-        :link: install_instructions.html
+        :link: https://github.com/pytorch/torchcodec?tab=readme-ov-file#installing-torchcodec
         :link-type: url
 
         How to install TorchCodec
@@ -71,7 +71,7 @@ We achieve these capabilities through:
    :caption: Examples and tutorials
    :hidden:
 
-   install_instructions
+   Installation instructions <https://github.com/pytorch/torchcodec?tab=readme-ov-file#installing-torchcodec>
    generated_examples/index
 
 
