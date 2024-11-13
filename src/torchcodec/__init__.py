@@ -11,4 +11,7 @@ from . import decoders, samplers  # noqa
 
 from .version import _get_version
 
-__version__ = _get_version()
+try:
+    __version__ = _get_version()
+except Exception:
+    __version__ = "0.0.0"
