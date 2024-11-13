@@ -9,9 +9,4 @@
 from ._frame import Frame, FrameBatch  # usort:skip # noqa
 from . import decoders, samplers  # noqa
 
-from .version import _get_version
-
-try:
-    __version__ = _get_version()
-except Exception:
-    pass
+from .version import __version__

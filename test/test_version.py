@@ -2,4 +2,5 @@ import torchcodec
 
 
 def test_version():
-    assert torchcodec.__version__ != "0.0.0"
+    assert "+cpu" not in torchcodec.__version__
+    assert "+cu" not in torchcodec.__version__
