@@ -9,7 +9,7 @@
 from ._frame import Frame, FrameBatch  # usort:skip # noqa
 from . import decoders, samplers  # noqa
 
-__version__ = "1.2.2"
-# try:
-#     from .version import __version__  # noqa: F401
-
+try:
+    from .version import __version__  # noqa: F401
+except ImportError:
+    pass
