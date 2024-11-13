@@ -172,14 +172,13 @@ if "bdist_wheel" in sys.argv and not (
 fake_extension = Extension(name="FAKE_NAME", sources=[])
 
 
-def get_and_write_version():
-    if os.getenv("BUILD_VERSION"):
-        # BUILD_VERSION is set by the `test-infra` build jobs. It typically is
-        # the content of `version.txt` plus some suffix like "+cpu" or "+cu112".
-        # See
-        # https://github.com/pytorch/test-infra/blob/61e6da7a6557152eb9879e461a26ad667c15f0fd/tools/pkg-helpers/pytorch_pkg_helpers/version.py#L113
-        version = os.getenv("BUILD_VERSION")
-    else:
+def get_version():
+    # BUILD_VERSION is set by the `test-infra` build jobs. It typically is
+    # the content of `version.txt` plus some suffix like "+cpu" or "+cu112".
+    # See
+    # https://github.com/pytorch/test-infra/blob/61e6da7a6557152eb9879e461a26ad667c15f0fd/tools/pkg-helpers/pytorch_pkg_helpers/version.py#L113
+    version = os.getenv("BUILD_VERSION")
+    if not version:
         with open(_ROOT_DIR / "version.txt") as f:
             version = f.readline().strip()
 
@@ -195,14 +194,19 @@ def get_and_write_version():
         except Exception:
             print("INFO: Didn't find sha. Is this a git repo?")
 
-    with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
-        f.write(f"__version__ = '{version}'\n")
-
     return version
 
 
+def write_version_file(version):
+    with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
+        f.write(f"__version__ = '{version}'\n")
+
+
+version = get_version()
+write_version_file(version)
+
 setup(
-    version=get_and_write_version(),
+    version=version,
     ext_modules=[fake_extension],
     cmdclass={"build_ext": CMakeBuild},
 )
