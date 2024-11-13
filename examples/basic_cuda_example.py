@@ -43,7 +43,7 @@ TorchCodec you can simply pass in a device parameter to the
 Installing TorchCodec with CUDA Enabled
 ---------------------------------------
 
-Refer to the installation guide in the `README <https://github.com/pytorch/torchcodec#installing-torchcodec>`_.
+Refer to the installation guide in the `README <https://github.com/pytorch/torchcodec#installing-cuda-enabled-torchcodec>`_.
 
 """
 
