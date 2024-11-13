@@ -43,39 +43,7 @@ TorchCodec you can simply pass in a device parameter to the
 Installing TorchCodec with CUDA Enabled
 ---------------------------------------
 
-In order to use CUDA Decoding will need the following installed in your environment:
-
-#. An Nvidia GPU that supports decoding the video format you want to decode. See
-   the support matrix `here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_
-#. `CUDA-enabled pytorch <https://pytorch.org/get-started/locally/>`_
-#. FFmpeg binaries that support
-   `NVDEC-enabled <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
-   codecs
-#. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
-#. TorchCodec built with CUDA enabled. Note that the TorchCodec binaries on PyPi do not have CUDA enabled.
-   For installing CUDA-enabled TorchCodec binaries you have two options:
-
-   #. Install TorchCodec's CUDA-enable prebuilts using one of Pytorch's package URLs. These are specified
-      to ``pip`` by passing in the ``--index-url`` argument, example:
-
-      .. code-block:: bash
-
-         # If you have CUDA toolkit version 12.4 and have the nightly pytorch version installed:
-         pip3 install --pre torchcodec --index-url https://download.pytorch.org/whl/nightly/cu124
-
-   #. Build TorchCodec from source using the environment variable ENABLE_CUDA=1
-
-
-FFmpeg versions 5, 6 and 7 from conda-forge are built with
-`NVDEC support <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
-and you can install them with conda. For example, to install FFmpeg version 7:
-
-
-.. code-block:: bash
-
-    conda install ffmpeg=7 -c conda-forge
-    conda install libnpp cuda-nvrtc -c nvidia
-
+Refer to the installation guide in the `README <https://github.com/pytorch/torchcodec#installing-torchcodec>`_.
 
 """
 

@@ -93,6 +93,7 @@ ffmpeg -f lavfi -i \
 ```
 
 ## Installing TorchCodec
+### Installing CPU-only TorchCodec
 
 1. Install the latest stable version of PyTorch following the
    [official instructions](https://pytorch.org/get-started/locally/). For other
@@ -126,6 +127,46 @@ The following table indicates the compatibility between versions of
 | `main` / `nightly` | `main` / `nightly` | `>=3.9`, `<=3.12`   |
 | not yet supported  | `2.5`              | `>=3.9`, `<=3.12`   |
 | `0.0.3`            | `2.4`              | `>=3.8`, `<=3.12`   |
+
+### Installing CUDA-enabled TorchCodec
+
+First, make sure you have a GPU that has NVDEC hardware that can decode the
+format you want. Refer to Nvidia's GPU support matrix for more details
+[here](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new).
+
+1. Install CUDA Toolkit. Pytorch and TorchCodec supports CUDA Toolkit
+   versions 11.8, 12.1 or 12.4. In particular TorchCodec depends on
+   CUDA libraries libnpp and libnvrtc.
+
+2. Install Pytorch that corresponds to your CUDA Toolkit version using the
+   [official instructions](https://pytorch.org/get-started/locally/).
+
+3. Install or compile FFmpeg with NVDEC support.
+   TorchCodec with CUDA should work with FFmpeg versions in [4, 7].
+
+   If FFmpeg is not already installed, or you need a more recent version, an
+   easy way to install it is to use `conda`:
+
+   ```bash
+   conda install ffmpeg
+   # or
+   conda install ffmpeg -c conda-forge
+   ```
+
+   If you are building FFmpeg from source you can follow Nvidia's guide to
+   configuring and installing FFmpeg with NVDEC support
+   [here](https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html).
+
+4. Install TorchCodec by passing in an `--index-url` parameter that corresponds to your CUDA
+   Toolkit version, example:
+
+   ```bash
+   # This corresponds to CUDA Toolkit version 12.4
+   pip install torchcodec --index-url=https://download.pytorch.org/whl/nightly/cu124
+   ```
+
+   Note that without passing in the `--index-url` parameter, `pip` installs TorchCodec
+   binaries from PyPi which are CPU-only and do not have CUDA support.
 
 ## Benchmark Results
 
