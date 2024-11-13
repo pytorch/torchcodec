@@ -15,7 +15,7 @@ defaults:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.5
     with:
       package-type: wheel
       os: linux
@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload wheel
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@release/2.5
     with:
       repository: pytorch/torchcodec
       ref: ""
@@ -70,7 +70,7 @@ jobs:
           name: pytorch_torchcodec__3.9_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup miniconda using test-infra
-        uses: pytorch/test-infra/.github/actions/setup-miniconda@main
+        uses: pytorch/test-infra/.github/actions/setup-miniconda@release/2.5
         with:
           python-version: ${{ matrix.python-version }}
           #
