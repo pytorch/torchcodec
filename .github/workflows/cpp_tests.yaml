@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    paths:
+      - src/torchcodec/*
+      - test/*
+      - .github/workflows/cpp_tests.yaml # self reference
 
 concurrency:
   group: unit-test${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_number || github.ref }}

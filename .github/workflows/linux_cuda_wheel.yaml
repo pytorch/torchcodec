@@ -2,6 +2,12 @@ name: Build and test Linux CUDA wheels
 
 on:
   pull_request:
+    paths:
+      - src/torchcodec/*
+      - benchmarks/*
+      - packaging/*
+      - test/*
+      - .github/workflows/linux_cuda_wheel.yaml # self reference
   push:
     branches:
       - nightly

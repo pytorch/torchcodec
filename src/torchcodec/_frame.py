@@ -62,6 +62,10 @@ class FrameBatch(Iterable):
     or 5D for sequences of clips, as returned by the :ref:`samplers
     <sphx_glr_generated_examples_sampling.py>`. When ``data`` is 4D (resp.  5D)
     the ``pts_seconds`` and ``duration_seconds`` tensors are 1D (resp. 2D).
+
+    .. note::
+        The ``pts_seconds`` and ``duration_seconds`` Tensors are always returned
+        on CPU, even if ``data`` is on GPU.
     """
 
     data: Tensor
