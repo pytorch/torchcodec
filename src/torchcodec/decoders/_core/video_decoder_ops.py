@@ -31,6 +31,7 @@ def load_torchcodec_extension():
         try:
             torch.ops.load_library(_get_extension_path(library_name))
             return
+
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
             # but we should probably handle that via a proper logging mechanism.
