@@ -9,4 +9,10 @@
 from ._frame import Frame, FrameBatch  # usort:skip # noqa
 from . import decoders, samplers  # noqa
 
-__version__ = "0.0.1"
+
+__version__ = "0.0.0"  # Fake version, just makes sure wheel building works
+
+try:
+    from .version import __version__  # noqa: F401
+except ImportError:
+    pass
