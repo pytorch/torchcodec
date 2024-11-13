@@ -36,14 +36,14 @@ jobs:
       - name: Install FFmpeg, PyTorch and TorchAudio
         run: |
           conda install "ffmpeg=6" pkg-config -c conda-forge
-          python -m pip install --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+          python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
           ffmpeg -version
 
-      - name: Download, build and install TorchVision
-        run: |
-          git clone https://github.com/pytorch/vision.git
-          cd vision
-          python setup.py install
+          #- name: Download, build and install TorchVision
+          #  run: |
+          #    git clone https://github.com/pytorch/vision.git
+          #    cd vision
+          #    python setup.py install
 
       - name: Install all other dependencies
         run: |
