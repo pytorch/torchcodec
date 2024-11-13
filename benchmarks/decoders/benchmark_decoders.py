@@ -13,7 +13,7 @@ from pathlib import Path
 
 from benchmark_decoders_library import (
     AbstractDecoder,
-    BatchParameters,
+    # BatchParameters,
     DecordAccurate,
     DecordAccurateBatch,
     plot_data,
@@ -174,7 +174,7 @@ def main() -> None:
         num_sequential_frames_from_start=[1, 10, 100],
         min_runtime_seconds=args.bm_video_speed_min_run_seconds,
         benchmark_video_creation=args.bm_video_creation,
-        batch_parameters=None, #BatchParameters(num_threads=8, batch_size=40),
+        batch_parameters=None,  # BatchParameters(num_threads=8, batch_size=40),
     )
     plot_data(df_data, args.plot_path)
 

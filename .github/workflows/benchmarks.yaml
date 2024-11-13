@@ -35,7 +35,7 @@ jobs:
 
       - name: Install FFmpeg, PyTorch and TorchAudio
         run: |
-          conda install "ffmpeg=5" pkg-config -c conda-forge
+          conda install "ffmpeg=4" pkg-config -c conda-forge
           conda install pytorch torchvision torchaudio cpuonly -c pytorch-nightly
           #python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
           ffmpeg -version
