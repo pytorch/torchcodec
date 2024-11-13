@@ -195,7 +195,7 @@ def get_version():
         except Exception:
             print("INFO: Didn't find sha. Is this a git repo?")
 
-        with open(_ROOT_DIR / "src/torchcodec/version.py") as f:
+        with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
             f.write(f"__version__ = '{version}'\n")
 
     return version
