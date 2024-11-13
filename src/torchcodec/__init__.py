@@ -9,4 +9,4 @@
 from ._frame import Frame, FrameBatch  # usort:skip # noqa
 from . import decoders, samplers  # noqa
 
-__version__ = "0.0.4.dev"
+from .version import __version__  # noqa: F401
