@@ -199,7 +199,7 @@ def get_version():
 
 def write_version_file(version):
     with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
-        f.write(f"__version__ = '{version}'\n")
+        f.write(f"def _get_version(): return '{version}'\n")
 
 
 version = get_version()
