@@ -496,7 +496,7 @@ def run_batch_using_threads(
     for _ in range(batch_parameters.batch_size):
         futures.append(executor.submit(function, *args))
     for f in futures:
-        assert f.result()
+        assert len(f.result()) > 0
     executor.shutdown(wait=True)
 
 
