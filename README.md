@@ -157,6 +157,21 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    configuring and installing FFmpeg with NVDEC support
    [here](https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html).
 
+   After installing FFmpeg make sure it has NVDEC support when you list the supported
+   decoders:
+
+   ```bash
+   ffmpeg -decoders | grep -i nvidia
+   # This should show a line like this:
+   # V..... h264_cuvid           Nvidia CUVID H264 decoder (codec h264)
+   ```
+
+   To check that FFmpeg libraries work with NVDEC correctly you can decode a sample video:
+
+   ```bash
+   ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i test/resources/nasa_13013.mp4 -f null -
+   ```
+
 4. Install TorchCodec by passing in an `--index-url` parameter that corresponds to your CUDA
    Toolkit version, example:
 
