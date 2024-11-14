@@ -157,10 +157,12 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
 
+  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextDecodedOutputNoDemux() will return the first frame at or
-  // after this position.
+  // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
+  // or after this position.
   void setCursorPtsInSeconds(double seconds);
   // This is an internal structure that is used to store the decoded output
   // from decoding a frame through color conversion. Example usage is:
@@ -214,15 +216,23 @@ class VideoDecoder {
   };
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  DecodedOutput getNextDecodedOutputNoDemux();
+  DecodedOutput getNextFrameNoDemux();
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
   // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
-  DecodedOutput getFrameDisplayedAtTimestampNoDemux(double seconds);
+  DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
+
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  // This is morally private but needs to be exposed for C++ tests. Once
+  // getFrameAtIndex supports the preAllocatedOutputTensor parameter, we can
+  // move it back to private.
+  DecodedOutput getFrameAtIndexInternal(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   struct BatchDecodedOutput {
     torch::Tensor frames;
     torch::Tensor ptsSeconds;
@@ -233,11 +243,17 @@ class VideoDecoder {
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
   };
+
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
   BatchDecodedOutput getFramesAtIndices(
       int streamIndex,
       const std::vector<int64_t>& frameIndices);
+
+  BatchDecodedOutput getFramesPlayedByTimestamps(
+      int streamIndex,
+      const std::vector<double>& timestamps);
+
   // Returns frames within a given range for a given stream as a single stacked
   // Tensor. The range is defined by [start, stop). The values retrieved from
   // the range are:
@@ -255,7 +271,7 @@ class VideoDecoder {
   // frame. Otherwise, the moment in time immediately before stopSeconds is in
   // the range, and that time maps to the same frame as stopSeconds.
   //
-  // The frames returned are the frames that would be displayed by our abstract
+  // The frames returned are the frames that would be played by our abstract
   // player. Our abstract player displays frames based on pts only. It displays
   // frame i starting at the pts for frame i, and stops at the pts for frame
   // i+1. This model ignores a frame's reported duration.
@@ -263,7 +279,7 @@ class VideoDecoder {
   // Valid values for startSeconds and stopSeconds are:
   //
   //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
-  BatchDecodedOutput getFramesDisplayedByTimestampInRange(
+  BatchDecodedOutput getFramesPlayedByTimestampInRange(
       int streamIndex,
       double startSeconds,
       double stopSeconds);
@@ -289,12 +305,26 @@ class VideoDecoder {
  private:
   struct FrameInfo {
     int64_t pts = 0;
-    int64_t nextPts = 0;
+    // The value of this default is important: the last frame's nextPts will be
+    // INT64_MAX, which ensures that the allFrames vec contains FrameInfo
+    // structs with *increasing* nextPts values. That's a necessary condition
+    // for the binary searches on those values to work properly (as typically
+    // done during pts -> index conversions.)
+    int64_t nextPts = INT64_MAX;
   };
   struct FilterState {
     UniqueAVFilterGraph filterGraph;
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
+  };
+  struct SwsContextKey {
+    int decodedWidth;
+    int decodedHeight;
+    AVPixelFormat decodedFormat;
+    int outputWidth;
+    int outputHeight;
+    bool operator==(const SwsContextKey&);
+    bool operator!=(const SwsContextKey&);
   };
   // Stores information for each stream.
   struct StreamInfo {
@@ -307,8 +337,8 @@ class VideoDecoder {
     int64_t currentDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
-    // We set this field if the user requested a seek.
-    std::optional<int64_t> discardFramesBeforePts = 0;
+    // We update this field if the user requested a seek.
+    int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamDecoderOptions options;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
@@ -316,6 +346,7 @@ class VideoDecoder {
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
+    SwsContextKey swsContextKey;
     UniqueSwsContext swsContext;
   };
   VideoDecoder();
@@ -362,11 +393,20 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  void convertFrameToBufferUsingSwsScale(RawDecodedOutput& rawOutput);
-  DecodedOutput convertAVFrameToDecodedOutput(RawDecodedOutput& rawOutput);
+  int convertFrameToBufferUsingSwsScale(
+      int streamIndex,
+      const AVFrame* frame,
+      torch::Tensor& outputTensor);
+  DecodedOutput convertAVFrameToDecodedOutput(
+      RawDecodedOutput& rawOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   void convertAVFrameToDecodedOutputOnCPU(
       RawDecodedOutput& rawOutput,
-      DecodedOutput& output);
+      DecodedOutput& output,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  DecodedOutput getNextFrameOutputNoDemuxInternal(
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   DecoderOptions options_;
   ContainerMetadata containerMetadata_;
@@ -386,6 +426,75 @@ class VideoDecoder {
   // Whether or not we have already scanned all streams to update the metadata.
   bool scanned_all_streams_ = false;
 };
+
+// --------------------------------------------------------------------------
+// FRAME TENSOR ALLOCATION APIs
+// --------------------------------------------------------------------------
+
+// Note [Frame Tensor allocation and height and width]
+//
+// We always allocate [N]HWC tensors. The low-level decoding functions all
+// assume HWC tensors, since this is what FFmpeg natively handles. It's up to
+// the high-level decoding entry-points to permute that back to CHW, by calling
+// MaybePermuteHWC2CHW().
+//
+// Also, importantly, the way we figure out the the height and width of the
+// output frame tensor varies, and depends on the decoding entry-point. In
+// *decreasing order of accuracy*, we use the following sources for determining
+// height and width:
+// - getHeightAndWidthFromResizedAVFrame(). This is the height and width of the
+//   AVframe, *post*-resizing. This is only used for single-frame decoding APIs,
+//   on CPU, with filtergraph.
+// - getHeightAndWidthFromOptionsOrAVFrame(). This is the height and width from
+//   the user-specified options if they exist, or the height and width of the
+//   AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
+//   our code or within FFmpeg code, this should be exactly the same as
+//   getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
+//   decoding APIs, on CPU with swscale, and on GPU.
+// - getHeightAndWidthFromOptionsOrMetadata(). This is the height and width from
+//   the user-specified options if they exist, or the height and width form the
+//   stream metadata, which itself got its value from the CodecContext, when the
+//   stream was added. This is used by batch decoding APIs, for both GPU and
+//   CPU.
+//
+// The source of truth for height and width really is the (resized) AVFrame: it
+// comes from the decoded ouptut of FFmpeg. The info from the metadata (i.e.
+// from the CodecContext) may not be as accurate. However, the AVFrame is only
+// available late in the call stack, when the frame is decoded, while the
+// CodecContext is available early when a stream is added. This is why we use
+// the CodecContext for pre-allocating batched output tensors (we could
+// pre-allocate those only once we decode the first frame to get the info frame
+// the AVFrame, but that's a more complex logic).
+//
+// Because the sources for height and width may disagree, we may end up with
+// conflicts: e.g. if we pre-allocate a batch output tensor based on the
+// metadata info, but the decoded AVFrame has a different height and width.
+// it is very important to check the height and width assumptions where the
+// tensors memory is used/filled in order to avoid segfaults.
+
+struct FrameDims {
+  int height;
+  int width;
+  FrameDims(int h, int w) : height(h), width(w) {}
+};
+
+// There's nothing preventing you from calling this on a non-resized frame, but
+// please don't.
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata);
+
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const AVFrame& avFrame);
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames = std::nullopt);
 
 // Prints the VideoDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(

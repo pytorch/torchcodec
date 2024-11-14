@@ -38,14 +38,17 @@ if len(sys.argv) != 2:
 
 MAX_ALLOWED = (3, 4, 19)
 
+symbol_matches = sys.argv[1].split("\n")
 all_symbols = set()
-for line in sys.argv[1].split("\n"):
+for line in symbol_matches:
     # We search for GLIBCXX_major.minor.micro
     if match := re.search(r"GLIBCXX_\d+\.\d+\.\d+", line):
         all_symbols.add(match.group(0))
 
 if not all_symbols:
-    raise ValueError("No GLIBCXX symbols found. Something is wrong.")
+    raise ValueError(
+        f"No GLIBCXX symbols found in {symbol_matches}. Something is wrong."
+    )
 
 all_versions = (symbol.split("_")[1].split(".") for symbol in all_symbols)
 all_versions = (tuple(int(v) for v in version) for version in all_versions)

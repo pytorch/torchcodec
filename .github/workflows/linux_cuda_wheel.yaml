@@ -1,4 +1,4 @@
-name: Build and test Linux wheel
+name: Build and test Linux CUDA wheels
 
 on:
   pull_request:
@@ -24,7 +24,6 @@ defaults:
     shell: bash -l -eo pipefail {0}
 
 jobs:
-
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
@@ -32,16 +31,16 @@ jobs:
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      with-cpu: disable
       with-xpu: disable
       with-rocm: disable
-      with-cuda: disable
+      with-cuda: enable
       build-python-only: "disable"
-
   build:
     needs: generate-matrix
     strategy:
       fail-fast: false
-    name: Build and Upload Linux wheel
+    name: Build and Upload wheel
     uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: pytorch/torchcodec
@@ -54,58 +53,71 @@ jobs:
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
-      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
+      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ENABLE_CUDA=1 python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
-    runs-on: ubuntu-latest
+    runs-on: linux.4xlarge.nvidia.gpu
     strategy:
       fail-fast: false
       matrix:
+          # 3.9 corresponds to the minimum python version for which we build
+          # the wheel unless the label cliflow/binaries/all is present in the
+          # PR.
+          # For the actual release we should add that label and change this to
+          # include more python versions.
         python-version: ['3.9']
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        cuda-version: ['11.8', '12.1', '12.4']
+        ffmpeg-version-for-tests: ['5', '6', '7']
+    container:
+      image: "pytorch/manylinux-builder:cuda${{ matrix.cuda-version }}"
+      options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
     needs: build
     steps:
+      - name: Setup env vars
+        run: |
+          cuda_version_without_periods=$(echo "${{ matrix.cuda-version }}" | sed 's/\.//g')
+          echo cuda_version_without_periods=${cuda_version_without_periods} >> $GITHUB_ENV
       - uses: actions/download-artifact@v3
         with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_x86_64
+          name: pytorch_torchcodec__3.9_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
-      - name: Setup conda env
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup miniconda using test-infra
+        uses: pytorch/test-infra/.github/actions/setup-miniconda@main
         with:
-          auto-update-conda: true
-          miniconda-version: "latest"
-          activate-environment: test
           python-version: ${{ matrix.python-version }}
+          #
+          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
+          # So we use the latter convention for libnpp.
+          # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
+          default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
+      - name: Check env
+        run: |
+          ${CONDA_RUN} env
+          ${CONDA_RUN} conda info
+          ${CONDA_RUN} nvidia-smi
+          ${CONDA_RUN} conda list
+      - name: Assert ffmpeg exists
+        run: |
+          ${CONDA_RUN} ffmpeg -buildconf
       - name: Update pip
-        run: python -m pip install --upgrade pip
+        run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+          ${CONDA_RUN} python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
           wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
           echo Installing $wheel_path
-          python -m pip install $wheel_path -vvv
+          ${CONDA_RUN} python -m pip install $wheel_path -vvv
 
       - name: Check out repo
         uses: actions/checkout@v3
-      - name: Install ffmpeg, post build
-        run: |
-          # Ideally we would have checked for that before installing the wheel,
-          # but we need to checkout the repo to access this file, and we don't
-          # want to checkout the repo before installing the wheel to avoid any
-          # side-effect. It's OK.
-          source packaging/helpers.sh
-          assert_ffmpeg_not_installed
-
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-          ffmpeg -version
 
       - name: Install test dependencies
         run: |
-          python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           # Ideally we would find a way to get those dependencies from pyproject.toml
-          python -m pip install numpy pytest pillow
+          ${CONDA_RUN} python -m pip install numpy pytest pillow
 
       - name: Delete the src/ folder just for fun
         run: |
@@ -123,7 +135,10 @@ jobs:
           ls
       - name: Smoke test
         run: |
-          python -X faulthandler test/decoders/manual_smoke_test.py
+          ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          pytest test -vvv
+          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -vvv
+      - name: Run Python benchmark
+        run: |
+          ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none

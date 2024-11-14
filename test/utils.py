@@ -12,11 +12,22 @@ import pytest
 import torch
 
 
-# Decorator for skipping CUDA tests when CUDA isn't available
+# Decorator for skipping CUDA tests when CUDA isn't available. The tests are
+# effectively marked to be skipped in pytest_collection_modifyitems() of
+# conftest.py
 def needs_cuda(test_item):
-    if not torch.cuda.is_available():
-        return pytest.mark.skip(reason="CUDA not available")(test_item)
-    return test_item
+    return pytest.mark.needs_cuda(test_item)
+
+
+def cpu_and_cuda():
+    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
+
+
+def get_frame_compare_function(device):
+    if device == "cpu":
+        return assert_tensor_equal
+    else:
+        return assert_tensor_close_on_at_least
 
 
 # For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On
@@ -29,6 +40,23 @@ def assert_tensor_equal(*args, **kwargs):
     else:
         absolute_tolerance = 3
     torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
+
+
+# Asserts that at least `percentage`% of the values are within the absolute tolerance.
+def assert_tensor_close_on_at_least(
+    actual_tensor, ref_tensor, percentage=90, abs_tolerance=19
+):
+    assert (
+        actual_tensor.device == ref_tensor.device
+    ), f"Devices don't match: {actual_tensor.device} vs {ref_tensor.device}"
+    diff = (ref_tensor.float() - actual_tensor.float()).abs()
+    max_diff_percentage = 100.0 - percentage
+    if diff.sum() == 0:
+        return
+    diff_percentage = (diff > abs_tolerance).float().mean() * 100.0
+    assert (
+        diff_percentage <= max_diff_percentage
+    ), f"Diff too high: {diff_percentage} > {max_diff_percentage}"
 
 
 # For use with floating point metadata, or in other instances where we are not confident
@@ -150,9 +178,6 @@ class TestContainerFile:
 
         return self.frames[stream_index][idx]
 
-    def get_frame_by_name(self, name: str) -> torch.Tensor:
-        return _load_tensor_from_file(f"{self.filename}.{name}.pt")
-
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
         return torch.empty([0], dtype=torch.float64)
@@ -263,6 +288,8 @@ NASA_VIDEO = TestVideo(
             8: TestFrameInfo(pts_seconds=0.266933, duration_seconds=0.033367),
             9: TestFrameInfo(pts_seconds=0.300300, duration_seconds=0.033367),
             10: TestFrameInfo(pts_seconds=0.333667, duration_seconds=0.033367),
+            25: TestFrameInfo(pts_seconds=0.8342, duration_seconds=0.033367),
+            35: TestFrameInfo(pts_seconds=1.1678, duration_seconds=0.033367),
         },
     },
 )

@@ -34,6 +34,10 @@ double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
   return ptsToSeconds(pts, timeBase.den);
 }
 
+int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
+  return static_cast<int64_t>(std::round(seconds * timeBase.den));
+}
+
 struct AVInput {
   UniqueAVFormatContext formatContext;
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
@@ -111,6 +115,31 @@ VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibraryForWidth(
 
 } // namespace
 
+// Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
+// The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
+// or 4D.
+// Calling permute() is guaranteed to return a view as per the docs:
+// https://pytorch.org/docs/stable/generated/torch.permute.html
+torch::Tensor VideoDecoder::MaybePermuteHWC2CHW(
+    int streamIndex,
+    torch::Tensor& hwcTensor) {
+  if (streams_[streamIndex].options.dimensionOrder == "NHWC") {
+    return hwcTensor;
+  }
+  auto numDimensions = hwcTensor.dim();
+  auto shape = hwcTensor.sizes();
+  if (numDimensions == 3) {
+    TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
+    return hwcTensor.permute({2, 0, 1});
+  } else if (numDimensions == 4) {
+    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
+    return hwcTensor.permute({0, 3, 1, 2});
+  } else {
+    TORCH_CHECK(
+        false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
+  }
+}
+
 VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
     const std::string& optionsString) {
   std::vector<std::string> tokens =
@@ -168,26 +197,22 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     const StreamMetadata& metadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  if (options.dimensionOrder == "NHWC") {
-    frames = torch::empty(
-        {numFrames,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width),
-         3},
-        {torch::kUInt8});
-  } else if (options.dimensionOrder == "NCHW") {
-    frames = torch::empty(
-        {numFrames,
-         3,
-         options.height.value_or(*metadata.height),
-         options.width.value_or(*metadata.width)},
-        torch::TensorOptions()
-            .memory_format(torch::MemoryFormat::ChannelsLast)
-            .dtype({torch::kUInt8}));
-  } else {
-    TORCH_CHECK(
-        false, "Unsupported frame dimensionOrder =" + options.dimensionOrder)
-  }
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, metadata);
+  int height = frameDims.height;
+  int width = frameDims.width;
+  frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
+}
+
+bool VideoDecoder::SwsContextKey::operator==(
+    const VideoDecoder::SwsContextKey& other) {
+  return decodedWidth == other.decodedWidth && decodedHeight == decodedHeight &&
+      decodedFormat == other.decodedFormat &&
+      outputWidth == other.outputWidth && outputHeight == other.outputHeight;
+}
+
+bool VideoDecoder::SwsContextKey::operator!=(
+    const VideoDecoder::SwsContextKey& other) {
+  return !(*this == other);
 }
 
 VideoDecoder::VideoDecoder() {}
@@ -350,12 +375,11 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
   char description[512];
-  int width = activeStream.codecContext->width;
-  int height = activeStream.codecContext->height;
-  if (options.height.has_value() && options.width.has_value()) {
-    width = *options.width;
-    height = *options.height;
-  }
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
+      options, containerMetadata_.streams[streamIndex]);
+  int height = frameDims.height;
+  int width = frameDims.width;
+
   std::snprintf(
       description,
       sizeof(description),
@@ -652,8 +676,9 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streams_[streamIndex];
-    streamInfo.discardFramesBeforePts =
-        *maybeDesiredPts_ * streamInfo.timeBase.den;
+    // clang-format off: clang format clashes
+    streamInfo.discardFramesBeforePts = secondsToClosestPts(*maybeDesiredPts_, streamInfo.timeBase);
+    // clang-format on
   }
 
   decodeStats_.numSeeksAttempted++;
@@ -665,9 +690,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     int64_t desiredPtsForStream = *maybeDesiredPts_ * streamInfo.timeBase.den;
     if (!canWeAvoidSeekingForStream(
             streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
-      VLOG(5) << "Seeking is needed for streamIndex=" << streamIndex
-              << " desiredPts=" << desiredPtsForStream
-              << " currentPts=" << streamInfo.currentPts;
       mustSeek = true;
       break;
     }
@@ -678,7 +700,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streams_[firstActiveStreamIndex];
-  int64_t desiredPts = *maybeDesiredPts_ * firstStreamInfo.timeBase.den;
+  int64_t desiredPts =
+      secondsToClosestPts(*maybeDesiredPts_, firstStreamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -686,8 +709,9 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   // See https://github.com/pytorch/torchcodec/issues/179 for more details.
   // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
   if (!firstStreamInfo.keyFrames.empty()) {
-    int desiredKeyFrameIndex =
-        getKeyFrameIndexForPts(firstStreamInfo, desiredPts);
+    int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
+        firstStreamInfo.keyFrames, desiredPts);
+    desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = firstStreamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
@@ -716,13 +740,10 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
-  VLOG(9) << "Starting getDecodedOutputWithFilter()";
   resetDecodeStats();
   if (maybeDesiredPts_.has_value()) {
-    VLOG(9) << "maybeDesiredPts_=" << *maybeDesiredPts_;
     maybeSeekToBeforeDesiredPts();
     maybeDesiredPts_ = std::nullopt;
-    VLOG(9) << "seeking done";
   }
   auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
@@ -737,13 +758,9 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       StreamInfo& streamInfo = streams_[streamIndex];
       ffmpegStatus =
           avcodec_receive_frame(streamInfo.codecContext.get(), frame.get());
-      VLOG(9) << "received frame" << " status=" << ffmpegStatus
-              << " streamIndex=" << streamInfo.stream->index;
       bool gotNonRetriableError =
           ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN);
       if (gotNonRetriableError) {
-        VLOG(9) << "Got non-retriable error from decoder: "
-                << getFFMPEGErrorStringFromErrorCode(ffmpegStatus);
         gotPermanentErrorOnAnyActiveStream = true;
         break;
       }
@@ -773,7 +790,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     UniqueAVPacket packet(av_packet_alloc());
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
-    VLOG(9) << "av_read_frame returned status: " << ffmpegStatus;
     if (ffmpegStatus == AVERROR_EOF) {
       // End of file reached. We must drain all codecs by sending a nullptr
       // packet.
@@ -796,8 +812,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
           "Could not read frame from input file: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
     }
-    VLOG(9) << "Got packet: stream_index=" << packet->stream_index
-            << " pts=" << packet->pts << " size=" << packet->size;
     if (activeStreamIndices_.count(packet->stream_index) == 0) {
       // This packet is not for any of the active streams.
       continue;
@@ -831,14 +845,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   StreamInfo& activeStream = streams_[frameStreamIndex];
   activeStream.currentPts = frame->pts;
   activeStream.currentDuration = getDuration(frame);
-  auto startToSeekDone =
-      std::chrono::duration_cast<std::chrono::milliseconds>(seekDone - start);
-  auto seekToDecodeDone = std::chrono::duration_cast<std::chrono::milliseconds>(
-      decodeDone - seekDone);
-  VLOG(3) << "Got frame: stream_index=" << activeStream.stream->index
-          << " pts=" << frame->pts << " stats=" << decodeStats_
-          << " startToSeekDone=" << startToSeekDone.count() << "ms"
-          << " seekToDecodeDone=" << seekToDecodeDone.count() << "ms";
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
   rawOutput.frame = std::move(frame);
@@ -846,7 +852,8 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
-    VideoDecoder::RawDecodedOutput& rawOutput) {
+    VideoDecoder::RawDecodedOutput& rawOutput,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
@@ -860,15 +867,17 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+  // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
   if (streamInfo.options.device.type() == torch::kCPU) {
-    convertAVFrameToDecodedOutputOnCPU(rawOutput, output);
+    convertAVFrameToDecodedOutputOnCPU(
+        rawOutput, output, preAllocatedOutputTensor);
   } else if (streamInfo.options.device.type() == torch::kCUDA) {
     convertAVFrameToDecodedOutputOnCuda(
         streamInfo.options.device,
         streamInfo.options,
-        streamInfo.codecContext.get(),
         rawOutput,
-        output);
+        output,
+        preAllocatedOutputTensor);
   } else {
     TORCH_CHECK(
         false, "Invalid device type: " + streamInfo.options.device.str());
@@ -876,29 +885,85 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   return output;
 }
 
+// Note [preAllocatedOutputTensor with swscale and filtergraph]:
+// Callers may pass a pre-allocated tensor, where the output frame tensor will
+// be stored. This parameter is honored in any case, but it only leads to a
+// speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
+// decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
+// found a way to do that with filtegraph.
+// TODO: Figure out whether that's possible!
+// Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
+// `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     VideoDecoder::RawDecodedOutput& rawOutput,
-    DecodedOutput& output) {
+    DecodedOutput& output,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
   AVFrame* frame = rawOutput.frame.get();
   auto& streamInfo = streams_[streamIndex];
+
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
+  int expectedOutputHeight = frameDims.height;
+  int expectedOutputWidth = frameDims.width;
+
+  if (preAllocatedOutputTensor.has_value()) {
+    auto shape = preAllocatedOutputTensor.value().sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+            (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+        "Expected pre-allocated tensor of shape ",
+        expectedOutputHeight,
+        "x",
+        expectedOutputWidth,
+        "x3, got ",
+        shape);
+  }
+
+  torch::Tensor outputTensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      int width = streamInfo.options.width.value_or(frame->width);
-      int height = streamInfo.options.height.value_or(frame->height);
-      torch::Tensor tensor = torch::empty(
-          {height, width, 3}, torch::TensorOptions().dtype({torch::kUInt8}));
-      rawOutput.data = tensor.data_ptr<uint8_t>();
-      convertFrameToBufferUsingSwsScale(rawOutput);
+      outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
+          expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-      if (streamInfo.options.dimensionOrder == "NCHW") {
-        tensor = tensor.permute({2, 0, 1});
-      }
-      output.frame = tensor;
+      int resultHeight =
+          convertFrameToBufferUsingSwsScale(streamIndex, frame, outputTensor);
+      // If this check failed, it would mean that the frame wasn't reshaped to
+      // the expected height.
+      // TODO: Can we do the same check for width?
+      TORCH_CHECK(
+          resultHeight == expectedOutputHeight,
+          "resultHeight != expectedOutputHeight: ",
+          resultHeight,
+          " != ",
+          expectedOutputHeight);
+
+      output.frame = outputTensor;
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      output.frame = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+      outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+
+      // Similarly to above, if this check fails it means the frame wasn't
+      // reshaped to its expected dimensions by filtergraph.
+      auto shape = outputTensor.sizes();
+      TORCH_CHECK(
+          (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+              (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+          "Expected output tensor of shape ",
+          expectedOutputHeight,
+          "x",
+          expectedOutputWidth,
+          "x3, got ",
+          shape);
+      if (preAllocatedOutputTensor.has_value()) {
+        // We have already validated that preAllocatedOutputTensor and
+        // outputTensor have the same shape.
+        preAllocatedOutputTensor.value().copy_(outputTensor);
+        output.frame = preAllocatedOutputTensor.value();
+      } else {
+        output.frame = outputTensor;
+      }
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
@@ -912,7 +977,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
+VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
@@ -945,7 +1010,9 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameDisplayedAtTimestampNoDemux(
         return seconds >= frameStartTime && seconds < frameEndTime;
       });
   // Convert the frame to tensor.
-  return convertAVFrameToDecodedOutput(rawOutput);
+  auto output = convertAVFrameToDecodedOutput(rawOutput);
+  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  return output;
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
@@ -981,6 +1048,15 @@ void VideoDecoder::validateFrameIndex(
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
+  auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
+  output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
+  return output;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
+    int streamIndex,
+    int64_t frameIndex,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
@@ -989,7 +1065,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
 
   int64_t pts = stream.allFrames[frameIndex].pts;
   setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-  return getNextDecodedOutputNoDemux();
+  return getNextFrameOutputNoDemuxInternal(preAllocatedOutputTensor);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
@@ -998,42 +1074,97 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFramesAtIndices");
 
+  auto indicesAreSorted =
+      std::is_sorted(frameIndices.begin(), frameIndices.end());
+
+  std::vector<size_t> argsort;
+  if (!indicesAreSorted) {
+    // if frameIndices is [13, 10, 12, 11]
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+    //                                         to use to decode the frames
+    // and argsort is     [ 1,  3,  2,  0]
+    argsort.resize(frameIndices.size());
+    for (size_t i = 0; i < argsort.size(); ++i) {
+      argsort[i] = i;
+    }
+    std::sort(
+        argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
+          return frameIndices[a] < frameIndices[b];
+        });
+  }
+
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
-  const auto& options = streams_[streamIndex].options;
+  const auto& stream = streams_[streamIndex];
+  const auto& options = stream.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
-  int i = 0;
-  const auto& stream = streams_[streamIndex];
-  for (int64_t frameIndex : frameIndices) {
-    if (frameIndex < 0 || frameIndex >= stream.allFrames.size()) {
+  auto previousIndexInVideo = -1;
+  for (auto f = 0; f < frameIndices.size(); ++f) {
+    auto indexInOutput = indicesAreSorted ? f : argsort[f];
+    auto indexInVideo = frameIndices[indexInOutput];
+    if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
       throw std::runtime_error(
-          "Invalid frame index=" + std::to_string(frameIndex));
+          "Invalid frame index=" + std::to_string(indexInVideo));
     }
-    int64_t pts = stream.allFrames[frameIndex].pts;
-    setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
-    auto rawSingleOutput = getNextRawDecodedOutputNoDemux();
-    if (stream.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      // We are using sws_scale to convert the frame to tensor. sws_scale can
-      // convert to a pre-allocated buffer so we can do the color-conversion
-      // in-place on the output tensor's data_ptr.
-      rawSingleOutput.data = output.frames[i].data_ptr<uint8_t>();
-      convertFrameToBufferUsingSwsScale(rawSingleOutput);
-    } else if (
-        stream.colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-      // We are using a filter graph to convert the frame to tensor. The
-      // filter graph returns us an AVFrame allocated by FFMPEG. So we need to
-      // copy the AVFrame to the output tensor.
-      torch::Tensor frame = convertFrameToTensorUsingFilterGraph(
-          rawSingleOutput.streamIndex, rawSingleOutput.frame.get());
-      output.frames[i] = frame;
+    if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
+      // Avoid decoding the same frame twice
+      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
+      output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
+      output.ptsSeconds[indexInOutput] =
+          output.ptsSeconds[previousIndexInOutput];
+      output.durationSeconds[indexInOutput] =
+          output.durationSeconds[previousIndexInOutput];
     } else {
-      throw std::runtime_error(
-          "Invalid color conversion library: " +
-          std::to_string(static_cast<int>(stream.colorConversionLibrary)));
+      DecodedOutput singleOut = getFrameAtIndexInternal(
+          streamIndex, indexInVideo, output.frames[indexInOutput]);
+      output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
+      output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
-    i++;
+    previousIndexInVideo = indexInVideo;
   }
+  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
   return output;
+}
+
+VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
+    int streamIndex,
+    const std::vector<double>& timestamps) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getFramesPlayedByTimestamps");
+
+  // The frame played at timestamp t and the one played at timestamp `t +
+  // eps` are probably the same frame, with the same index. The easiest way to
+  // avoid decoding that unique frame twice is to convert the input timestamps
+  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+  // This means this function requires a scan.
+  // TODO: longer term, we should implement this without requiring a scan
+
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& stream = streams_[streamIndex];
+  double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
+  double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
+
+  std::vector<int64_t> frameIndices(timestamps.size());
+  for (auto i = 0; i < timestamps.size(); ++i) {
+    auto framePts = timestamps[i];
+    TORCH_CHECK(
+        framePts >= minSeconds && framePts < maxSeconds,
+        "frame pts is " + std::to_string(framePts) + "; must be in range [" +
+            std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
+            ").");
+
+    auto it = std::lower_bound(
+        stream.allFrames.begin(),
+        stream.allFrames.end(),
+        framePts,
+        [&stream](const FrameInfo& info, double framePts) {
+          return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
+        });
+    int64_t frameIndex = it - stream.allFrames.begin();
+    frameIndices[i] = frameIndex;
+  }
+
+  return getFramesAtIndices(streamIndex, frameIndices);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
@@ -1061,22 +1192,22 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
-    output.frames[f] = singleOut.frame;
+    DecodedOutput singleOut =
+        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-
+  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
   return output;
 }
 
 VideoDecoder::BatchDecodedOutput
-VideoDecoder::getFramesDisplayedByTimestampInRange(
+VideoDecoder::getFramesPlayedByTimestampInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFramesDisplayedByTimestampInRange");
+  validateScannedAllStreams("getFramesPlayedByTimestampInRange");
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   double minSeconds = streamMetadata.minPtsSecondsFromScan.value();
@@ -1119,6 +1250,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
+    output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
   }
 
@@ -1126,7 +1258,7 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   // abstract player displays frames starting at the pts for that frame until
   // the pts for the next frame. There are two consequences:
   //
-  //   1. We ignore the duration for a frame. A frame is displayed until the
+  //   1. We ignore the duration for a frame. A frame is played until the
   //   next frame replaces it. This model is robust to durations being 0 or
   //   incorrect; our source of truth is the pts for frames. If duration is
   //   accurate, the nextPts for a frame would be equivalent to pts + duration.
@@ -1154,11 +1286,12 @@ VideoDecoder::getFramesDisplayedByTimestampInRange(
   int64_t numFrames = stopFrameIndex - startFrameIndex;
   BatchDecodedOutput output(numFrames, options, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    DecodedOutput singleOut = getFrameAtIndex(streamIndex, i);
-    output.frames[f] = singleOut.frame;
+    DecodedOutput singleOut =
+        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
+  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
 
   return output;
 }
@@ -1167,15 +1300,21 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   auto rawOutput =
       getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
         StreamInfo& activeStream = streams_[frameStreamIndex];
-        return frame->pts >=
-            activeStream.discardFramesBeforePts.value_or(INT64_MIN);
+        return frame->pts >= activeStream.discardFramesBeforePts;
       });
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextDecodedOutputNoDemux() {
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
+  auto output = getNextFrameOutputNoDemuxInternal();
+  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  return output;
+}
+
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrameOutputNoDemuxInternal(
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
-  return convertAVFrameToDecodedOutput(rawOutput);
+  return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
@@ -1194,7 +1333,7 @@ double VideoDecoder::getPtsSecondsForFrame(
     int streamIndex,
     int64_t frameIndex) {
   validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getFrameAtIndex");
+  validateScannedAllStreams("getPtsSecondsForFrame");
 
   const auto& stream = streams_[streamIndex];
   validateFrameIndex(stream, frameIndex);
@@ -1202,22 +1341,30 @@ double VideoDecoder::getPtsSecondsForFrame(
   return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
 }
 
-void VideoDecoder::convertFrameToBufferUsingSwsScale(
-    RawDecodedOutput& rawOutput) {
-  AVFrame* frame = rawOutput.frame.get();
-  int streamIndex = rawOutput.streamIndex;
+int VideoDecoder::convertFrameToBufferUsingSwsScale(
+    int streamIndex,
+    const AVFrame* frame,
+    torch::Tensor& outputTensor) {
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-  int outputWidth = activeStream.options.width.value_or(frame->width);
-  int outputHeight = activeStream.options.height.value_or(frame->height);
-  if (activeStream.swsContext.get() == nullptr) {
+
+  int expectedOutputHeight = outputTensor.sizes()[0];
+  int expectedOutputWidth = outputTensor.sizes()[1];
+  auto curFrameSwsContextKey = SwsContextKey{
+      frame->width,
+      frame->height,
+      frameFormat,
+      expectedOutputWidth,
+      expectedOutputHeight};
+  if (activeStream.swsContext.get() == nullptr ||
+      activeStream.swsContextKey != curFrameSwsContextKey) {
     SwsContext* swsContext = sws_getContext(
         frame->width,
         frame->height,
         frameFormat,
-        outputWidth,
-        outputHeight,
+        expectedOutputWidth,
+        expectedOutputHeight,
         AV_PIX_FMT_RGB24,
         SWS_BILINEAR,
         nullptr,
@@ -1245,12 +1392,13 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
         brightness,
         contrast,
         saturation);
+    activeStream.swsContextKey = curFrameSwsContextKey;
     activeStream.swsContext.reset(swsContext);
   }
   SwsContext* swsContext = activeStream.swsContext.get();
   uint8_t* pointers[4] = {
-      static_cast<uint8_t*>(rawOutput.data), nullptr, nullptr, nullptr};
-  int linesizes[4] = {outputWidth * 3, 0, 0, 0};
+      outputTensor.data_ptr<uint8_t>(), nullptr, nullptr, nullptr};
+  int linesizes[4] = {expectedOutputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(
       swsContext,
       frame->data,
@@ -1259,9 +1407,7 @@ void VideoDecoder::convertFrameToBufferUsingSwsScale(
       frame->height,
       pointers,
       linesizes);
-  TORCH_CHECK(
-      outputHeight == resultHeight,
-      "outputHeight(" + std::to_string(resultHeight) + ") != resultHeight");
+  return resultHeight;
 }
 
 torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
@@ -1276,7 +1422,10 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
-  std::vector<int64_t> shape = {filteredFrame->height, filteredFrame->width, 3};
+  auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredFrame.get());
+  int height = frameDims.height;
+  int width = frameDims.width;
+  std::vector<int64_t> shape = {height, width, 3};
   std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
   AVFrame* filteredFramePtr = filteredFrame.release();
   auto deleter = [filteredFramePtr](void*) {
@@ -1284,12 +1433,6 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   };
   torch::Tensor tensor = torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
-  StreamInfo& activeStream = streams_[streamIndex];
-  if (activeStream.options.dimensionOrder == "NCHW") {
-    // The docs guaranty this to return a view:
-    // https://pytorch.org/docs/stable/generated/torch.permute.html
-    tensor = tensor.permute({2, 0, 1});
-  }
   return tensor;
 }
 
@@ -1302,6 +1445,47 @@ VideoDecoder::~VideoDecoder() {
     } else {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
+  }
+}
+
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
+  return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
+}
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::StreamMetadata& metadata) {
+  return FrameDims(
+      options.height.value_or(*metadata.height),
+      options.width.value_or(*metadata.width));
+}
+
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const AVFrame& avFrame) {
+  return FrameDims(
+      options.height.value_or(avFrame.height),
+      options.width.value_or(avFrame.width));
+}
+
+torch::Tensor allocateEmptyHWCTensor(
+    int height,
+    int width,
+    torch::Device device,
+    std::optional<int> numFrames) {
+  auto tensorOptions = torch::TensorOptions()
+                           .dtype(torch::kUInt8)
+                           .layout(torch::kStrided)
+                           .device(device);
+  TORCH_CHECK(height > 0, "height must be > 0, got: ", height);
+  TORCH_CHECK(width > 0, "width must be > 0, got: ", width);
+  if (numFrames.has_value()) {
+    auto numFramesValue = numFrames.value();
+    TORCH_CHECK(
+        numFramesValue >= 0, "numFrames must be >= 0, got: ", numFramesValue);
+    return torch::empty({numFramesValue, height, width, 3}, tensorOptions);
+  } else {
+    return torch::empty({height, width, 3}, tensorOptions);
   }
 }
 

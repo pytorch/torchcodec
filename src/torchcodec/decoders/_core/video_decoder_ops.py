@@ -42,10 +42,13 @@ def load_torchcodec_extension():
         + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
-        """Could not load libtorchcodec. Likely causes:
+        f"""Could not load libtorchcodec. Likely causes:
           1. FFmpeg is not properly installed in your environment. We support
-             verisons 4, 5, 6 and 7.
-          2. PyTorch 2.4 is not properly installed in your environment.
+             versions 4, 5, 6 and 7.
+          2. The PyTorch version ({torch.__version__}) is not compatible with
+             this version of TorchCodec. Refer to the version compatibility
+             table:
+             https://github.com/pytorch/torchcodec?tab=readme-ov-file#installing-torchcodec.
           3. Another runtime dependency; see exceptions below.
         The following exceptions were raised as we tried to load libtorchcodec:
         """
@@ -71,6 +74,7 @@ get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
 get_frame_at_index = torch.ops.torchcodec_ns.get_frame_at_index.default
 get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
+get_frames_by_pts = torch.ops.torchcodec_ns.get_frames_by_pts.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
@@ -172,6 +176,21 @@ def get_frame_at_pts_abstract(
     )
 
 
+@register_fake("torchcodec_ns::get_frames_by_pts")
+def get_frames_by_pts_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: int,
+    timestamps: List[float],
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
+
+
 @register_fake("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
     decoder: torch.Tensor, *, stream_index: int, frame_index: int
@@ -190,9 +209,13 @@ def get_frames_at_indices_abstract(
     *,
     stream_index: int,
     frame_indices: List[int],
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
-    return torch.empty(image_size)
+    return (
+        torch.empty(image_size),
+        torch.empty([], dtype=torch.float),
+        torch.empty([], dtype=torch.float),
+    )
 
 
 @register_fake("torchcodec_ns::get_frames_in_range")

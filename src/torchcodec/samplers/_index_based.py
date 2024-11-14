@@ -1,14 +1,14 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 import torch
 
-from torchcodec import Frame, FrameBatch
+from torchcodec import FrameBatch
 from torchcodec.decoders import VideoDecoder
 from torchcodec.samplers._common import (
-    _chunk_list,
+    _FRAMEBATCH_RETURN_DOCS,
     _POLICY_FUNCTION_TYPE,
     _POLICY_FUNCTIONS,
-    _to_framebatch,
+    _reshape_4d_framebatch_into_5d,
     _validate_common_params,
 )
 
@@ -117,51 +117,6 @@ def _build_all_clips_indices(
     return all_clips_indices
 
 
-def _decode_all_clips_indices(
-    decoder: VideoDecoder, all_clips_indices: list[int], num_frames_per_clip: int
-) -> list[FrameBatch]:
-    # This takes the list of all the frames to decode (in arbitrary order),
-    # decode all the frames, and then packs them into clips of length
-    # num_frames_per_clip.
-    #
-    # To avoid backwards seeks (which are slow), we:
-    # - sort all the frame indices to be decoded
-    # - dedup them
-    # - decode all unique frames in sorted order
-    # - re-assemble the decoded frames back to their original order
-    #
-    # TODO: Write this in C++ so we can avoid the copies that happen in `_to_framebatch`
-
-    all_clips_indices_sorted, argsort = zip(
-        *sorted((frame_index, i) for (i, frame_index) in enumerate(all_clips_indices))
-    )
-    previous_decoded_frame = None
-    all_decoded_frames = [None] * len(all_clips_indices)
-    for i, j in enumerate(argsort):
-        frame_index = all_clips_indices_sorted[i]
-        if (
-            previous_decoded_frame is not None  # then we know i > 0
-            and frame_index == all_clips_indices_sorted[i - 1]
-        ):
-            # Avoid decoding the same frame twice.
-            # IMPORTANT: this is only correct because a copy of the frame will
-            # happen within `_to_framebatch` when we call torch.stack.
-            # If a copy isn't made, the same underlying memory will be used for
-            # the 2 consecutive frames. When we re-write this, we should make
-            # sure to explicitly copy the data.
-            decoded_frame = previous_decoded_frame
-        else:
-            decoded_frame = decoder.get_frame_at(index=frame_index)
-        previous_decoded_frame = decoded_frame
-        all_decoded_frames[j] = decoded_frame
-
-    all_clips: list[list[Frame]] = _chunk_list(
-        all_decoded_frames, chunk_size=num_frames_per_clip
-    )
-
-    return [_to_framebatch(clip) for clip in all_clips]
-
-
 def _generic_index_based_sampler(
     kind: Literal["random", "regular"],
     decoder: VideoDecoder,
@@ -174,7 +129,7 @@ def _generic_index_based_sampler(
     # Important note: sampling_range_end defines the upper bound of where a clip
     # can *start*, not where a clip can end.
     policy: Literal["repeat_last", "wrap", "error"],
-) -> List[FrameBatch]:
+) -> FrameBatch:
 
     _validate_common_params(
         decoder=decoder,
@@ -221,9 +176,11 @@ def _generic_index_based_sampler(
         num_frames_in_video=len(decoder),
         policy_fun=_POLICY_FUNCTIONS[policy],
     )
-    return _decode_all_clips_indices(
-        decoder,
-        all_clips_indices=all_clips_indices,
+
+    frames = decoder.get_frames_at(indices=all_clips_indices)
+    return _reshape_4d_framebatch_into_5d(
+        frames=frames,
+        num_clips=num_clips,
         num_frames_per_clip=num_frames_per_clip,
     )
 
@@ -237,7 +194,8 @@ def clips_at_random_indices(
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
-) -> List[FrameBatch]:
+) -> FrameBatch:
+    # See docstring below
     return _generic_index_based_sampler(
         kind="random",
         decoder=decoder,
@@ -259,8 +217,8 @@ def clips_at_regular_indices(
     sampling_range_start: int = 0,
     sampling_range_end: Optional[int] = None,  # interval is [start, end).
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
-) -> List[FrameBatch]:
-
+) -> FrameBatch:
+    # See docstring below
     return _generic_index_based_sampler(
         kind="regular",
         decoder=decoder,
@@ -271,3 +229,57 @@ def clips_at_regular_indices(
         sampling_range_end=sampling_range_end,
         policy=policy,
     )
+
+
+_COMMON_DOCS = f"""
+    Args:
+        decoder (VideoDecoder): The :class:`~torchcodec.decoders.VideoDecoder`
+            instance to sample clips from.
+        num_clips (int, optional): The number of clips to return. Default: 1.
+        num_frames_per_clip (int, optional): The number of frames per clips. Default: 1.
+        num_indices_between_frames(int, optional): The number of indices between
+            the frames *within* a clip. Default: 1, which means frames are
+            consecutive. This is sometimes refered-to as "dilation".
+        sampling_range_start (int, optional): The start of the sampling range,
+            which defines the first index that a clip may *start* at. Default:
+            0, i.e. the start of the video.
+        sampling_range_end (int or None, optional): The end of the sampling
+            range, which defines the last index that a clip may *start* at. This
+            value is exclusive, i.e. a clip may only start within
+            [``sampling_range_start``, ``sampling_range_end``). If None
+            (default), the value is set automatically such that the clips never
+            span beyond the end of the video. For example if the last valid
+            index in a video is 99 and the clips span 10 frames, this value is
+            set to 99 - 10 + 1 = 90. Negative values are accepted and are
+            equivalent to ``len(video) - val``. When a clip spans beyond the end
+            of the video, the ``policy`` parameter defines how to construct such
+            clip.
+        policy (str, optional): Defines how to construct clips that span beyond
+            the end of the video. This is best described with an example:
+            assuming the last valid index in a video is 99, and a clip was
+            sampled to start at index 95, with ``num_frames_per_clip=5`` and
+            ``num_indices_between_frames=2``, the indices of the frames in the
+            clip are supposed to be [95, 97, 99, 101, 103]. But 101 and 103 are
+            invalid indices, so the ``policy`` parameter defines how to replace
+            those frames, with valid indices:
+
+            - "repeat_last": repeats the last valid frame of the clip. We would
+              get [95, 97, 99, 99, 99].
+            - "wrap": wraps around to the beginning of the clip. We would get
+              [95, 97, 99, 95, 97].
+            - "error": raises an error.
+
+            Default is "repeat_last". Note that when ``sampling_range_end=None``
+            (default), this policy parameter is unlikely to be relevant.
+
+    {_FRAMEBATCH_RETURN_DOCS}
+"""
+
+clips_at_random_indices.__doc__ = f"""Sample :term:`clips` at random indices.
+{_COMMON_DOCS}
+"""
+
+
+clips_at_regular_indices.__doc__ = f"""Sample :term:`clips` at regular (equally-spaced) indices.
+{_COMMON_DOCS}
+"""

@@ -40,11 +40,13 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> Tensor");
+      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] timestamps) -> (Tensor, Tensor, Tensor)");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -191,7 +193,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::DecodedOutput result;
   try {
-    result = videoDecoder->getNextDecodedOutputNoDemux();
+    result = videoDecoder->getNextFrameNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
@@ -205,7 +207,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
 
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFrameDisplayedAtTimestampNoDemux(seconds);
+  auto result = videoDecoder->getFramePlayedAtTimestampNoDemux(seconds);
   return makeOpsDecodedOutput(result);
 }
 
@@ -218,7 +220,7 @@ OpsDecodedOutput get_frame_at_index(
   return makeOpsDecodedOutput(result);
 }
 
-at::Tensor get_frames_at_indices(
+OpsBatchDecodedOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices) {
@@ -226,7 +228,7 @@ at::Tensor get_frames_at_indices(
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
   auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
-  return result.frames;
+  return makeOpsBatchDecodedOutput(result);
 }
 
 OpsBatchDecodedOutput get_frames_in_range(
@@ -240,6 +242,16 @@ OpsBatchDecodedOutput get_frames_in_range(
       stream_index, start, stop, step.value_or(1));
   return makeOpsBatchDecodedOutput(result);
 }
+OpsBatchDecodedOutput get_frames_by_pts(
+    at::Tensor& decoder,
+    int64_t stream_index,
+    at::ArrayRef<double> timestamps) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
+  auto result =
+      videoDecoder->getFramesPlayedByTimestamps(stream_index, timestampsVec);
+  return makeOpsBatchDecodedOutput(result);
+}
 
 OpsBatchDecodedOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
@@ -247,7 +259,7 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFramesDisplayedByTimestampInRange(
+  auto result = videoDecoder->getFramesPlayedByTimestampInRange(
       stream_index, start_seconds, stop_seconds);
   return makeOpsBatchDecodedOutput(result);
 }
@@ -280,12 +292,6 @@ bool _test_frame_pts_equality(
     int64_t frame_index,
     double pts_seconds_to_test) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  LOG(INFO) << "pts_seconds_to_test: " << std::setprecision(15)
-            << pts_seconds_to_test << std::endl;
-  LOG(INFO) << "frame pts  : " << std::setprecision(15)
-            << videoDecoder->getPtsSecondsForFrame(stream_index, frame_index)
-            << std::endl
-            << std::endl;
   return pts_seconds_to_test ==
       videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }
@@ -485,6 +491,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
+  m.impl("get_frames_by_pts", &get_frames_by_pts);
   m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);
   m.impl(
       "scan_all_streams_to_update_metadata",
