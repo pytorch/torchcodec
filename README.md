@@ -136,7 +136,7 @@ format you want. Refer to Nvidia's GPU support matrix for more details
 
 1. Install CUDA Toolkit. Pytorch and TorchCodec supports CUDA Toolkit
    versions 11.8, 12.1 or 12.4. In particular TorchCodec depends on
-   CUDA libraries libnpp and libnvrtc.
+   CUDA libraries libnpp and libnvrtc (which are part of CUDA Toolkit).
 
 2. Install Pytorch that corresponds to your CUDA Toolkit version using the
    [official instructions](https://pytorch.org/get-started/locally/).
