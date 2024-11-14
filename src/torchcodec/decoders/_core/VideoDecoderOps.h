@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <string_view>
 #include <torch/types.h>
 #include <optional>
 
@@ -20,7 +21,7 @@ namespace facebook::torchcodec {
 // auto decoderTensor = createDecoderOp.call(videoPath);
 
 // Create a VideoDecoder from file and wrap the pointer in a tensor.
-at::Tensor create_from_file(c10::string_view filename);
+at::Tensor create_from_file(std::string_view filename);
 
 at::Tensor create_from_tensor(at::Tensor video_tensor);
 
@@ -34,19 +35,19 @@ void add_video_stream(
     std::optional<int64_t> width = std::nullopt,
     std::optional<int64_t> height = std::nullopt,
     std::optional<int64_t> num_threads = std::nullopt,
-    std::optional<c10::string_view> dimension_order = std::nullopt,
+    std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<c10::string_view> device = std::nullopt);
+    std::optional<std::string_view> device = std::nullopt);
 
 void _add_video_stream(
     at::Tensor& decoder,
     std::optional<int64_t> width = std::nullopt,
     std::optional<int64_t> height = std::nullopt,
     std::optional<int64_t> num_threads = std::nullopt,
-    std::optional<c10::string_view> dimension_order = std::nullopt,
+    std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<c10::string_view> device = std::nullopt,
-    std::optional<c10::string_view> color_conversion_library = std::nullopt);
+    std::optional<std::string_view> device = std::nullopt,
+    std::optional<std::string_view> color_conversion_library = std::nullopt);
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
