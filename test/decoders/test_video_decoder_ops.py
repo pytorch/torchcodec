@@ -118,8 +118,10 @@ class TestOps:
         # return the next frame since the right boundary of the interval is
         # open.
         next_frame, _, _ = get_frame_at_pts(decoder, 6.039367)
-        with pytest.raises(AssertionError):
-            frame_compare_function(next_frame, reference_frame6.to(device))
+        if device == "cpu":
+            # We can only compare exact equality on CPU.
+            with pytest.raises(AssertionError):
+                frame_compare_function(next_frame, reference_frame6.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_index(self, device):
