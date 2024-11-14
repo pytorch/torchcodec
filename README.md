@@ -176,7 +176,7 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    Toolkit version, example:
 
    ```bash
-   # This corresponds to CUDA Toolkit version 12.4
+   # This corresponds to CUDA Toolkit version 12.4 and nightly Pytorch.
    pip install torchcodec --index-url=https://download.pytorch.org/whl/nightly/cu124
    ```
 
