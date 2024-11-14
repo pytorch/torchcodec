@@ -56,10 +56,9 @@ def main() -> None:
     retrieve_videos(urls_and_dest_paths)
 
     decoder_dict = {}
-    decoder_dict["TorchCodec"] = TorchCodecPublic()
-    decoder_dict["TorchVision[video_reader]"] = TorchVision("video_reader")
-    decoder_dict["TorchAudio"] = TorchAudioDecoder()
-    decoder_dict["Decord"] = DecordAccurateBatch()
+    decoder_dict["torchcodec"] = TorchCodecPublic()
+    decoder_dict["torchvision[video_reader]"] = TorchVision("video_reader")
+    decoder_dict["torchaudio"] = TorchAudioDecoder()
 
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
