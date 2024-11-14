@@ -11,7 +11,6 @@ import shutil
 from pathlib import Path
 
 from benchmark_decoders_library import (
-    DecordAccurateBatch,
     generate_videos,
     retrieve_videos,
     run_benchmarks,
