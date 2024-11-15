@@ -11,6 +11,8 @@ import shutil
 from pathlib import Path
 
 from benchmark_decoders_library import (
+    BatchParameters,
+    DataLoaderInspiredWorkloadParameters,
     generate_videos,
     retrieve_videos,
     run_benchmarks,
@@ -26,36 +28,38 @@ def main() -> None:
     """Benchmarks the performance of a few video decoders on synthetic videos"""
 
     videos_dir_path = "/tmp/torchcodec_benchmarking_videos"
-    shutil.rmtree(videos_dir_path, ignore_errors=True)
-    os.makedirs(videos_dir_path)
+    if not os.path.exists(videos_dir_path):
+        shutil.rmtree(videos_dir_path, ignore_errors=True)
+        os.makedirs(videos_dir_path)
 
-    resolutions = ["1280x720"]
-    encodings = ["libx264"]
-    patterns = ["mandelbrot"]
-    fpses = [60]
-    gop_sizes = [600]
-    durations = [120]
-    pix_fmts = ["yuv420p"]
-    ffmpeg_path = "ffmpeg"
-    generate_videos(
-        resolutions,
-        encodings,
-        patterns,
-        fpses,
-        gop_sizes,
-        durations,
-        pix_fmts,
-        ffmpeg_path,
-        videos_dir_path,
-    )
+        resolutions = ["1280x720"]
+        encodings = ["libx264"]
+        patterns = ["mandelbrot"]
+        fpses = [60]
+        gop_sizes = [600]
+        durations = [120]
+        pix_fmts = ["yuv420p"]
+        ffmpeg_path = "ffmpeg"
+        generate_videos(
+            resolutions,
+            encodings,
+            patterns,
+            fpses,
+            gop_sizes,
+            durations,
+            pix_fmts,
+            ffmpeg_path,
+            videos_dir_path,
+        )
 
-    urls_and_dest_paths = [
-        (NASA_URL, f"{videos_dir_path}/nasa_960x540_206s_30fps_yuv420p.mp4")
-    ]
-    retrieve_videos(urls_and_dest_paths)
+        urls_and_dest_paths = [
+            (NASA_URL, f"{videos_dir_path}/nasa_960x540_206s_30fps_yuv420p.mp4")
+        ]
+        retrieve_videos(urls_and_dest_paths)
 
     decoder_dict = {}
     decoder_dict["torchcodec"] = TorchCodecPublic()
+    decoder_dict["torchcodec[cuda]"] = TorchCodecPublic(device="cuda")
     decoder_dict["torchvision[video_reader]"] = TorchVision("video_reader")
     decoder_dict["torchaudio"] = TorchAudioDecoder()
 
@@ -69,6 +73,12 @@ def main() -> None:
         num_sequential_frames_from_start=[100],
         min_runtime_seconds=30,
         benchmark_video_creation=False,
+        dataloader_parameters=DataLoaderInspiredWorkloadParameters(
+            batch_parameters=BatchParameters(batch_size=64, num_threads=8),
+            resize_height=256,
+            resize_width=256,
+            resize_device="cuda",
+        ),
     )
     df_data.append(
         {

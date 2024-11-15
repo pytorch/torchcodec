@@ -38,6 +38,14 @@ class AbstractDecoder:
     def get_frames_from_video(self, video_file, pts_list):
         pass
 
+    @abc.abstractmethod
+    def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        pass
+
+    @abc.abstractmethod
+    def decode_and_transform(self, video_file, pts_list, height, width, device):
+        pass
+
 
 class DecordAccurate(AbstractDecoder):
     def __init__(self):
@@ -109,6 +117,18 @@ class TorchVision(AbstractDecoder):
         for _ in range(numFramesToDecode):
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
+        return frames
+
+    def decode_and_transform(self, video_file, pts_list, height, width, device):
+        self.torchvision.set_video_backend(self._backend)
+        reader = self.torchvision.io.VideoReader(video_file, "video")
+        frames = []
+        for pts in pts_list:
+            reader.seek(pts)
+            frame = next(reader)
+            frames.append(frame["data"].permute(1, 2, 0))
+        frames = [frame.to(device) for frame in frames]
+        frames = self.torchvision.transforms.v2.function.resize(frames, (height, width))
         return frames
 
 
@@ -239,6 +259,12 @@ class TorchCodecPublic(AbstractDecoder):
         )
         self._device = device
 
+        import torchvision  # noqa: F401
+        from torchvision.transforms import v2 as transforms_v2
+
+        self.torchvision = torchvision
+        self.transforms_v2 = transforms_v2
+
     def get_frames_from_video(self, video_file, pts_list):
         decoder = VideoDecoder(
             video_file, num_ffmpeg_threads=self._num_ffmpeg_threads, device=self._device
@@ -256,6 +282,14 @@ class TorchCodecPublic(AbstractDecoder):
             count += 1
             if count == numFramesToDecode:
                 break
+        return frames
+
+    def decode_and_transform(self, video_file, pts_list, height, width, device):
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=self._num_ffmpeg_threads, device=self._device
+        )
+        frames = decoder.get_frames_played_at(pts_list)
+        frames = self.transforms_v2.functional.resize(frames.data, (height, width))
         return frames
 
 
@@ -299,7 +333,9 @@ class TorchAudioDecoder(AbstractDecoder):
 
         self.torchaudio = torchaudio
 
-        pass
+        from torchvision.transforms import v2 as transforms_v2
+
+        self.transforms_v2 = transforms_v2
 
     def get_frames_from_video(self, video_file, pts_list):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
@@ -323,6 +359,19 @@ class TorchAudioDecoder(AbstractDecoder):
             frames.append(vframe[0][0])
             frame_cnt += 1
 
+        return frames
+
+    def decode_and_transform(self, video_file, pts_list, height, width, device):
+        stream_reader = self.torchaudio.io.StreamReader(src=video_file)
+        stream_reader.add_basic_video_stream(frames_per_chunk=1)
+        frames = []
+        for pts in pts_list:
+            stream_reader.seek(pts)
+            stream_reader.fill_buffer()
+            clip = stream_reader.pop_chunks()
+            frames.append(clip[0][0])
+        frames = [frame.to(device) for frame in frames]
+        frames = self.transforms.v2.function.resize(frames, (height, width))
         return frames
 
 
@@ -486,6 +535,14 @@ class BatchParameters:
     batch_size: int
 
 
+@dataclass
+class DataLoaderInspiredWorkloadParameters:
+    batch_parameters: BatchParameters
+    resize_height: int
+    resize_width: int
+    resize_device: str
+
+
 def run_batch_using_threads(
     function,
     *args,
@@ -525,6 +582,7 @@ def run_benchmarks(
     num_sequential_frames_from_start: list[int],
     min_runtime_seconds: float,
     benchmark_video_creation: bool,
+    dataloader_parameters: DataLoaderInspiredWorkloadParameters = None,
     batch_parameters: BatchParameters = None,
 ) -> list[dict[str, str | float | int]]:
     # Ensure that we have the same seed across benchmark runs.
@@ -535,6 +593,7 @@ def run_benchmarks(
     results = []
     df_data = []
     verbose = False
+    min_runtime_seconds = 0.1
     for video_file_path in video_files_paths:
         metadata = get_metadata(video_file_path)
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
@@ -549,6 +608,39 @@ def run_benchmarks(
 
         for decoder_name, decoder in decoder_dict.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
+
+            if dataloader_parameters:
+                bp = dataloader_parameters.batch_parameters
+                dataloader_result = benchmark.Timer(
+                    stmt="run_batch_using_threads(decoder.decode_and_transform, video_file, pts_list, height, width, device, batch_parameters=batch_parameters)",
+                    globals={
+                        "video_file": str(video_file_path),
+                        "pts_list": uniform_pts_list,
+                        "decoder": decoder,
+                        "run_batch_using_threads": run_batch_using_threads,
+                        "batch_parameters": dataloader_parameters.batch_parameters,
+                        "height": dataloader_parameters.resize_height,
+                        "width": dataloader_parameters.resize_width,
+                        "device": dataloader_parameters.resize_device,
+                    },
+                    label=f"video={video_file_path} {metadata_label}",
+                    sub_label=decoder_name,
+                    description=f"dataloader[threads={bp.num_threads} batch_size={bp.batch_size}] {num_samples} decode_and_transform()",
+                )
+                results.append(
+                    dataloader_result.blocked_autorange(
+                        min_run_time=min_runtime_seconds
+                    )
+                )
+                df_data.append(
+                    convert_result_to_df_item(
+                        results[-1],
+                        decoder_name,
+                        video_file_path,
+                        num_samples * dataloader_parameters.batch_parameters.batch_size,
+                        f"dataloader[threads={bp.num_threads} batch_size={bp.batch_size}] {num_samples} x decode_and_transform()",
+                    )
+                )
 
             for kind, pts_list in [
                 ("uniform", uniform_pts_list),
