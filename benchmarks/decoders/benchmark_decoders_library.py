@@ -97,8 +97,10 @@ class TorchVision(AbstractDecoder):
         self._backend = backend
         self._print_each_iteration_time = False
         import torchvision  # noqa: F401
+        from torchvision.transforms import v2 as transforms_v2
 
         self.torchvision = torchvision
+        self.transforms_v2 = transforms_v2
 
     def get_frames_from_video(self, video_file, pts_list):
         self.torchvision.set_video_backend(self._backend)
@@ -128,7 +130,7 @@ class TorchVision(AbstractDecoder):
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
         frames = [frame.to(device) for frame in frames]
-        frames = self.torchvision.transforms.v2.function.resize(frames, (height, width))
+        frames = self.transforms_v2.functional.resize(frames, (height, width))
         return frames
 
 
@@ -371,7 +373,7 @@ class TorchAudioDecoder(AbstractDecoder):
             clip = stream_reader.pop_chunks()
             frames.append(clip[0][0])
         frames = [frame.to(device) for frame in frames]
-        frames = self.transforms.v2.function.resize(frames, (height, width))
+        frames = self.transforms_v2.functional.resize(frames, (height, width))
         return frames
 
 
@@ -593,6 +595,7 @@ def run_benchmarks(
     results = []
     df_data = []
     verbose = False
+    # TODO: change this back before landing.
     min_runtime_seconds = 0.1
     for video_file_path in video_files_paths:
         metadata = get_metadata(video_file_path)
