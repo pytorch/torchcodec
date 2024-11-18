@@ -172,7 +172,7 @@ if "bdist_wheel" in sys.argv and not (
 fake_extension = Extension(name="FAKE_NAME", sources=[])
 
 
-def get_version():
+def set_version():
     if version := os.getenv("BUILD_VERSION"):
         # BUILD_VERSION is set by the `test-infra` build jobs. It typically is
         # the content of `version.txt` plus some suffix like "+cpu" or "+cu112".
@@ -195,16 +195,13 @@ def get_version():
         except Exception:
             print("INFO: Didn't find sha. Is this a git repo?")
 
-        with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
-            f.write(f"__version__ = '{version}'\n")
-
-    return version
+    with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
+        f.write(f"__version__ = '{version}'\n")
 
 
-version = get_version()
+set_version()
 
 setup(
-    version=version,
     ext_modules=[fake_extension],
     cmdclass={"build_ext": CMakeBuild},
 )
