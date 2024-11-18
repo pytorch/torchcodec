@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     needs: build
     steps:
