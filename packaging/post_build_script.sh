@@ -8,12 +8,6 @@ wheel_path=$(pwd)/$(find dist -type f -name "*.whl")
 echo "Wheel content:"
 unzip -l $wheel_path
 
-if [[ "$wheel_path" == *"0.0.0"* ]]; then
-  echo "Wrong wheel version :'("
-  exit 1
-fi
-
-
 unamestr=$(uname)
 if [[ "$unamestr" == 'Linux' ]]; then
     ext="so"

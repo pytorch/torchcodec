@@ -172,7 +172,7 @@ if "bdist_wheel" in sys.argv and not (
 fake_extension = Extension(name="FAKE_NAME", sources=[])
 
 
-def set_version():
+def _write_version_files():
     if version := os.getenv("BUILD_VERSION"):
         # BUILD_VERSION is set by the `test-infra` build jobs. It typically is
         # the content of `version.txt` plus some suffix like "+cpu" or "+cu112".
@@ -199,7 +199,7 @@ def set_version():
         f.write(f"__version__ = '{version}'\n")
 
 
-set_version()
+_write_version_files()
 
 setup(
     ext_modules=[fake_extension],
