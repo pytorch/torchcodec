@@ -10,6 +10,8 @@ src/TorchCodec.egg-info/
 *~
 frame180.* # output from smoke test
 
+src/torchcodec/version.py
+
 docs/build
 # sphinx-gallery
 docs/source/generated_examples/
