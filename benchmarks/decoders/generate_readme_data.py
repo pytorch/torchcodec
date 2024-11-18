@@ -10,6 +10,8 @@ import platform
 import shutil
 from pathlib import Path
 
+import torch
+
 from benchmark_decoders_library import (
     BatchParameters,
     DataLoaderInspiredWorkloadParameters,
@@ -87,6 +89,7 @@ def main() -> None:
             "machine": platform.machine(),
             "processor": platform.processor(),
             "python_version": str(platform.python_version()),
+            "is_cuda_available": str(torch.cuda.is_available()),
         }
     )
 

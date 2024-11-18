@@ -129,8 +129,10 @@ class TorchVision(AbstractDecoder):
             reader.seek(pts)
             frame = next(reader)
             frames.append(frame["data"].permute(1, 2, 0))
-        frames = [frame.to(device) for frame in frames]
-        frames = self.transforms_v2.functional.resize(frames, (height, width))
+        frames = [
+            self.transforms_v2.functional.resize(frame.to(device), (height, width))
+            for frame in frames
+        ]
         return frames
 
 
@@ -261,10 +263,8 @@ class TorchCodecPublic(AbstractDecoder):
         )
         self._device = device
 
-        import torchvision  # noqa: F401
         from torchvision.transforms import v2 as transforms_v2
 
-        self.torchvision = torchvision
         self.transforms_v2 = transforms_v2
 
     def get_frames_from_video(self, video_file, pts_list):
@@ -372,8 +372,10 @@ class TorchAudioDecoder(AbstractDecoder):
             stream_reader.fill_buffer()
             clip = stream_reader.pop_chunks()
             frames.append(clip[0][0])
-        frames = [frame.to(device) for frame in frames]
-        frames = self.transforms_v2.functional.resize(frames, (height, width))
+        frames = [
+            self.transforms_v2.functional.resize(frame.to(device), (height, width))
+            for frame in frames
+        ]
         return frames
 
 
@@ -595,8 +597,6 @@ def run_benchmarks(
     results = []
     df_data = []
     verbose = False
-    # TODO: change this back before landing.
-    min_runtime_seconds = 0.1
     for video_file_path in video_files_paths:
         metadata = get_metadata(video_file_path)
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
