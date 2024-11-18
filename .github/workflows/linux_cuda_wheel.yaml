@@ -107,7 +107,7 @@ jobs:
           ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
-          wheel_path=`find pytorch/torchcodec/dist -type f -name "*.whl"`
+          wheel_path=`find pytorch/torchcodec/dist -type f -name "*cu${{ matrix.cuda-version }}*.whl"`
           echo Installing $wheel_path
           ${CONDA_RUN} python -m pip install $wheel_path -vvv
 
