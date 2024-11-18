@@ -34,7 +34,7 @@ def main() -> None:
         shutil.rmtree(videos_dir_path, ignore_errors=True)
         os.makedirs(videos_dir_path)
 
-        resolutions = ["1280x720"]
+        resolutions = ["1920x1080"]
         encodings = ["libx264"]
         patterns = ["mandelbrot"]
         fpses = [60]
@@ -68,6 +68,7 @@ def main() -> None:
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
     video_files_paths = list(Path(videos_dir_path).glob("*.mp4"))
+    assert len(video_files_paths) == 2, "Expected exactly 2 videos"
     df_data = run_benchmarks(
         decoder_dict,
         video_files_paths,
