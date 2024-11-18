@@ -9,6 +9,8 @@ from pathlib import Path
 import torchcodec
 from torchvision.io.image import write_png
 
+print(f"{torchcodec.__version__ = }")
+
 decoder = torchcodec.decoders._core.create_from_file(
     str(Path(__file__).parent / "../resources/nasa_13013.mp4")
 )
