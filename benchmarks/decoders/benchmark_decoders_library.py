@@ -496,7 +496,7 @@ def plot_data(df_data, plot_path):
 
             # Set the title for the subplot
             base_video = Path(video).name.removesuffix(".mp4")
-            ax.set_title(f"{base_video}\n{vcount} x {vtype}", fontsize=11)
+            ax.set_title(f"{base_video}\n{vtype}", fontsize=11)
 
             # Plot bars with error bars
             ax.barh(
