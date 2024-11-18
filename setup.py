@@ -196,6 +196,7 @@ def _write_version_files():
             print("INFO: Didn't find sha. Is this a git repo?")
 
     with open(_ROOT_DIR / "src/torchcodec/version.py", "w") as f:
+        f.write("# Note that this file is generated during install.\n")
         f.write(f"__version__ = '{version}'\n")
 
 
