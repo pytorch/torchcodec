@@ -1,0 +1,63 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - src/torchcodec/*
+      - benchmarks/*
+      - .github/workflows/benchmarks.yaml
+
+defaults:
+  run:
+    shell: bash -l -eo pipefail {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+
+      - name: Setup conda env
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          activate-environment: test
+          python-version: '3.12'
+
+      - name: Update pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install FFmpeg, PyTorch and TorchAudio
+        run: |
+          conda install "ffmpeg=4" pkg-config -c conda-forge
+          conda install pytorch torchvision torchaudio cpuonly -c pytorch-nightly
+          #python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+          ffmpeg -version
+
+          #- name: Download, build and install TorchVision
+          #  run: |
+          #    git clone https://github.com/pytorch/vision.git
+          #    cd vision
+          #    python setup.py install
+
+      - name: Install all other dependencies
+        run: |
+          python -m pip install decord matplotlib pandas numpy
+
+      - name: Build and install torchcodec
+        run: |
+          python -m pip install -e ".[dev]" --no-build-isolation -vvv
+
+      - name: Test generic decoder benchmark
+        run: |
+          python benchmarks/decoders/benchmark_decoders.py --bm_video_speed_min_run_seconds 1
+
+      - name: TEST README data geeneration benchmark
+        run: |
+          python benchmarks/decoders/generate_readme_data.py --test_run
