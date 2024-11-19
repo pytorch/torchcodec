@@ -77,7 +77,7 @@ def main() -> None:
         min_runtime_seconds=30,
         benchmark_video_creation=False,
         dataloader_parameters=DataLoaderInspiredWorkloadParameters(
-            batch_parameters=BatchParameters(batch_size=64, num_threads=8),
+            batch_parameters=BatchParameters(batch_size=50, num_threads=5),
             resize_height=256,
             resize_width=256,
             resize_device="cuda",

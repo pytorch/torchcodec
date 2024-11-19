@@ -258,9 +258,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 class TorchCodecPublic(AbstractDecoder):
     def __init__(self, num_ffmpeg_threads=None, device="cpu"):
-        self._num_ffmpeg_threads = (
-            int(num_ffmpeg_threads) if num_ffmpeg_threads else None
-        )
+        self._num_ffmpeg_threads = int(num_ffmpeg_threads) if num_ffmpeg_threads else 1
         self._device = device
 
         from torchvision.transforms import v2 as transforms_v2
@@ -628,7 +626,7 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=f"dataloader[threads={bp.num_threads} batch_size={bp.batch_size}] {num_samples} decode_and_transform()",
+                    description=f"dataloader[threads={bp.num_threads},batch_size={bp.batch_size}] {num_samples} decode_and_transform()",
                 )
                 results.append(
                     dataloader_result.blocked_autorange(
@@ -673,7 +671,7 @@ def run_benchmarks(
                         decoder_name,
                         video_file_path,
                         num_samples,
-                        f"{kind} seek()+next()",
+                        f"{num_samples} x {kind} seek()+next()",
                     )
                 )
 
