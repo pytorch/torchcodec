@@ -79,7 +79,7 @@ jobs:
           echo cuda_version_without_periods=${cuda_version_without_periods} >> $GITHUB_ENV
       - uses: actions/download-artifact@v3
         with:
-          name: pytorch_torchcodec__3.9_cu${{ env.cuda_version_without_periods }}_x86_64
+          name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
           path: pytorch/torchcodec/dist/
       - name: Setup miniconda using test-infra
         uses: pytorch/test-infra/.github/actions/setup-miniconda@release/2.5
