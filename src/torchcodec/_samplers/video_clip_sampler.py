@@ -212,7 +212,7 @@ class VideoClipSampler(nn.Module):
         sample_start_index = max(0, index_based_sampler_args.sample_start_index)
         sample_end_index = (
             min(
-                index_based_sampler_args.sample_end_index,
+                index_based_sampler_args.sample_end_index + 1,
                 metadata_json["numFrames"],
             )
             - index_based_sampler_args.video_frame_dilation
