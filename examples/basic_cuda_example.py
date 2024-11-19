@@ -18,6 +18,9 @@ the decoded tensor in GPU memory so the GPU doesn't have to fetch from main memo
 running the transform steps. Encoded packets are often much smaller than decoded frames so
 CUDA decoding also uses less PCI-e bandwidth.
 
+When to and when not to use CUDA Decoding
+-----------------------------------------
+
 CUDA Decoding can offer speed-up over CPU Decoding in a few scenarios:
 
 #. You are decoding a large resolution video
@@ -37,28 +40,10 @@ It's best to experiment with CUDA Decoding to see if it improves your use-case. 
 TorchCodec you can simply pass in a device parameter to the
 :class:`~torchcodec.decoders.VideoDecoder` class to use CUDA Decoding.
 
+Installing TorchCodec with CUDA Enabled
+---------------------------------------
 
-In order to use CUDA Decoding will need the following installed in your environment:
-
-#. An Nvidia GPU that supports decoding the video format you want to decode. See
-   the support matrix `here <https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new>`_
-#. `CUDA-enabled pytorch <https://pytorch.org/get-started/locally/>`_
-#. FFmpeg binaries that support
-   `NVDEC-enabled <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
-   codecs
-#. libnpp and nvrtc (these are usually installed when you install the full cuda-toolkit)
-
-
-FFmpeg versions 5, 6 and 7 from conda-forge are built with
-`NVDEC support <https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html>`_
-and you can install them with conda. For example, to install FFmpeg version 7:
-
-
-.. code-block:: bash
-
-    conda install ffmpeg=7 -c conda-forge
-    conda install libnpp cuda-nvrtc -c nvidia
-
+Refer to the installation guide in the `README <https://github.com/pytorch/torchcodec#installing-cuda-enabled-torchcodec>`_.
 
 """
 
