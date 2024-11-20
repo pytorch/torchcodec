@@ -2,10 +2,10 @@
 
 # TorchCodec
 
-TorchCodec is a Python library for decoding videos into PyTorch tensors. It aims
-to be fast, easy to use, and well integrated into the PyTorch ecosystem. If you
-want to use PyTorch to train ML models on videos, TorchCodec is how you turn
-those videos into data.
+TorchCodec is a Python library for decoding videos into PyTorch tensors, on CPU
+and CUDA GPU. It aims to be fast, easy to use, and well integrated into the
+PyTorch ecosystem. If you want to use PyTorch to train ML models on videos,
+TorchCodec is how you turn those videos into data.
 
 We achieve these capabilities through:
 
