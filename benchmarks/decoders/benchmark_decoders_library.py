@@ -519,8 +519,8 @@ def plot_data(json_data, plot_path):
             fig.delaxes(axes[row, col])
 
     plt.gcf().text(
-        0.01,
-        0.02,
+        0.006,
+        0.87,
         "\n".join([f"{k}: {v}" for k, v in json_data["system_metadata"].items()]),
         fontsize=11,
         bbox=dict(facecolor="white"),
