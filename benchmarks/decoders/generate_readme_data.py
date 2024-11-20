@@ -91,7 +91,7 @@ def main() -> None:
             "machine": platform.machine(),
             "python_version": str(platform.python_version()),
             "cuda": (
-                str(torch.cuda.get_device_properties(0))
+                torch.cuda.get_device_properties(0).name
                 if torch.cuda.is_available()
                 else "not available"
             ),

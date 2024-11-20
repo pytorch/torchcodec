@@ -389,10 +389,9 @@
   "system_metadata":
   {
       "cpu_count": 22,
-      "is_cuda_available": "True",
       "machine": "x86_64",
       "python_version": "3.12.5",
       "system": "Linux",
-      "cuda": "bogus"
+      "cuda": "NVIDIA PG509-210"
   }
 }
