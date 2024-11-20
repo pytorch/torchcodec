@@ -69,7 +69,7 @@ def main() -> None:
     num_samples = 10
     video_files_paths = list(Path(videos_dir_path).glob("*.mp4"))
     assert len(video_files_paths) == 2, "Expected exactly 2 videos"
-    df_data = run_benchmarks(
+    results = run_benchmarks(
         decoder_dict,
         video_files_paths,
         num_samples,
@@ -83,21 +83,20 @@ def main() -> None:
             resize_device="cuda",
         ),
     )
-    df_data.append(
-        {
-            "system_metadata": {
-                "cpu_count": os.cpu_count(),
-                "system": platform.system(),
-                "machine": platform.machine(),
-                "python_version": str(platform.python_version()),
-                "is_cuda_available": str(torch.cuda.is_available()),
-            }
-        }
-    )
+    data_for_writing = {
+        "experiments": results,
+        "system_metadata": {
+            "cpu_count": os.cpu_count(),
+            "system": platform.system(),
+            "machine": platform.machine(),
+            "python_version": str(platform.python_version()),
+            "is_cuda_available": str(torch.cuda.is_available()),
+        },
+    }
 
     data_json = Path(__file__).parent / "benchmark_readme_data.json"
     with open(data_json, "w") as write_file:
-        json.dump(df_data, write_file, sort_keys=True, indent=4)
+        json.dump(data_for_writing, write_file, sort_keys=True, indent=4)
 
 
 if __name__ == "__main__":
