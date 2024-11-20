@@ -85,12 +85,14 @@ def main() -> None:
     )
     df_data.append(
         {
-            "cpu_count": os.cpu_count(),
-            "system": platform.system(),
-            "machine": platform.machine(),
-            "processor": platform.processor(),
-            "python_version": str(platform.python_version()),
-            "is_cuda_available": str(torch.cuda.is_available()),
+            "system_metadata":
+                {
+                    "cpu_count": os.cpu_count(),
+                    "system": platform.system(),
+                    "machine": platform.machine(),
+                    "python_version": str(platform.python_version()),
+                    "is_cuda_available": str(torch.cuda.is_available()),
+                }
         }
     )
 
