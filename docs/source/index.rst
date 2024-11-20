@@ -1,10 +1,10 @@
 Welcome to the TorchCodec documentation!
 ========================================
 
-TorchCodec is a Python library for decoding videos into PyTorch tensors. It aims
-to be fast, easy to use, and well integrated into the PyTorch ecosystem. If you
-want to use PyTorch to train ML models on videos, TorchCodec is how you turn
-those videos into data.
+TorchCodec is a Python library for decoding videos into PyTorch tensors, on CPU
+and CUDA GPU. It aims to be fast, easy to use, and well integrated into the
+PyTorch ecosystem. If you want to use PyTorch to train ML models on videos,
+TorchCodec is how you turn those videos into data.
 
 We achieve these capabilities through:
 
@@ -16,13 +16,6 @@ We achieve these capabilities through:
   correctly and efficiently.
 * Returning data as PyTorch tensors, ready to be fed into PyTorch transforms
   or used directly to train models.
-
-.. note::
-
-   TorchCodec is still in early development stage and we are actively seeking
-   feedback. If you have any suggestions or issues, please let us know by
-   `opening an issue <https://github.com/pytorch/torchcodec/issues/new/choose>`_
-   on our `GitHub repository <https://github.com/pytorch/torchcodec/>`_.
 
 .. grid:: 3
 
@@ -48,15 +41,22 @@ We achieve these capabilities through:
         :link: generated_examples/sampling.html
         :link-type: url
 
-        How to sample video clips
+        How to sample regular and random clips from a video
 
      .. grid-item-card:: :octicon:`file-code;1em`
-        GPU decoding using TorchCodec
+        GPU decoding
         :img-top: _static/img/card-background.svg
         :link: generated_examples/basic_cuda_example.html
         :link-type: url
 
         A simple example demonstrating CUDA GPU decoding
+
+.. note::
+
+   TorchCodec is still in development stage and we are actively seeking
+   feedback. If you have any suggestions or issues, please let us know by
+   `opening an issue <https://github.com/pytorch/torchcodec/issues/new/choose>`_
+   on our `GitHub repository <https://github.com/pytorch/torchcodec/>`_.
 
 .. toctree::
    :maxdepth: 1

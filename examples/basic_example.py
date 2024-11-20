@@ -120,22 +120,22 @@ for frame in decoder:
 # their :term:`pts` (Presentation Time Stamp), and their duration.
 # This can be achieved using the
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at` and
-# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`  methods, which
-# will return a :class:`~torchcodec.Frame` and
-# :class:`~torchcodec.FrameBatch` objects respectively.
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`  methods, which will
+# return a :class:`~torchcodec.Frame` and :class:`~torchcodec.FrameBatch`
+# objects respectively.
 
 last_frame = decoder.get_frame_at(len(decoder) - 1)
 print(f"{type(last_frame) = }")
 print(last_frame)
 
 # %%
-middle_frames = decoder.get_frames_in_range(start=10, stop=20, step=2)
-print(f"{type(middle_frames) = }")
-print(middle_frames)
+other_frames = decoder.get_frames_at([10, 0, 50])
+print(f"{type(other_frames) = }")
+print(other_frames)
 
 # %%
 plot(last_frame.data, "Last frame")
-plot(middle_frames.data, "Middle frames")
+plot(other_frames.data, "Other frames")
 
 # %%
 # Both :class:`~torchcodec.Frame` and
@@ -152,7 +152,7 @@ plot(middle_frames.data, "Middle frames")
 # So far, we have retrieved frames based on their index. We can also retrieve
 # frames based on *when* they are played with
 # :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at` and
-# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`, which
+# :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`, which
 # also returns :class:`~torchcodec.Frame` and :class:`~torchcodec.FrameBatch`
 # respectively.
 
@@ -161,13 +161,10 @@ print(f"{type(frame_at_2_seconds) = }")
 print(frame_at_2_seconds)
 
 # %%
-first_two_seconds = decoder.get_frames_played_in_range(
-    start_seconds=0,
-    stop_seconds=2,
-)
-print(f"{type(first_two_seconds) = }")
-print(first_two_seconds)
+other_frames = decoder.get_frames_played_at(seconds=[10.1, 0.3, 5])
+print(f"{type(other_frames) = }")
+print(other_frames)
 
 # %%
 plot(frame_at_2_seconds.data, "Frame played at 2 seconds")
-plot(first_two_seconds.data, "Frames played during [0, 2) seconds")
+plot(other_frames.data, "Other frames")
