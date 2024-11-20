@@ -74,7 +74,7 @@ def main() -> None:
         video_files_paths,
         num_samples,
         num_sequential_frames_from_start=[100],
-        min_runtime_seconds=30,
+        min_runtime_seconds=1,
         benchmark_video_creation=False,
         dataloader_parameters=DataLoaderInspiredWorkloadParameters(
             batch_parameters=BatchParameters(batch_size=50, num_threads=10),
