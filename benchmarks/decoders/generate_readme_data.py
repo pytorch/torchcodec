@@ -90,7 +90,11 @@ def main() -> None:
             "system": platform.system(),
             "machine": platform.machine(),
             "python_version": str(platform.python_version()),
-            "is_cuda_available": str(torch.cuda.is_available()),
+            "cuda": (
+                str(torch.cuda.get_device_properties(0))
+                if torch.cuda.is_available()
+                else "not available"
+            ),
         },
     }
 

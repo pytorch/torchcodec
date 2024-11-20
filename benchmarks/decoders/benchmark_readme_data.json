@@ -392,6 +392,7 @@
       "is_cuda_available": "True",
       "machine": "x86_64",
       "python_version": "3.12.5",
-      "system": "Linux"
+      "system": "Linux",
+      "cuda": "bogus"
   }
 }
