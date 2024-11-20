@@ -40,7 +40,7 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::string_view fileName,
+    std::string_view fileName)
     : wf_(wf) {
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
