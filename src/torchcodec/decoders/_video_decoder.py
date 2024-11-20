@@ -47,6 +47,7 @@ class VideoDecoder:
             Use 1 for single-threaded decoding which may be best if you are running multiple
             instances of ``VideoDecoder`` in parallel. Use a higher number for multi-threaded
             decoding which is best if you are running a single instance of ``VideoDecoder``.
+            Passing 0 lets FFmpeg decide on the number of threads.
             Default: 1.
         device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
 
@@ -87,6 +88,9 @@ class VideoDecoder:
                 f"Invalid dimension order ({dimension_order}). "
                 f"Supported values are {', '.join(allowed_dimension_orders)}."
             )
+
+        if num_ffmpeg_threads is None:
+            raise ValueError(f"{num_ffmpeg_threads = } should be an int.")
 
         core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(
