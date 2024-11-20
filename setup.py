@@ -178,11 +178,13 @@ def _write_version_files():
         # the content of `version.txt` plus some suffix like "+cpu" or "+cu112".
         # See
         # https://github.com/pytorch/test-infra/blob/61e6da7a6557152eb9879e461a26ad667c15f0fd/tools/pkg-helpers/pytorch_pkg_helpers/version.py#L113
+        version = version.replace("+cpu", "")
         with open(_ROOT_DIR / "version.txt", "w") as f:
             f.write(f"{version}")
     else:
         with open(_ROOT_DIR / "version.txt") as f:
             version = f.readline().strip()
+        version = version.replace("+cpu", "")
         try:
             sha = (
                 subprocess.check_output(
