@@ -8,7 +8,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 228.2064311997965,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/mandelbrot_1920x1080_120s_60fps_600gop_libx264_yuv420p.mp4"
     },
     {
@@ -56,7 +56,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 68.26139582134783,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/mandelbrot_1920x1080_120s_60fps_600gop_libx264_yuv420p.mp4"
     },
     {
@@ -104,7 +104,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 256.265970476903,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/mandelbrot_1920x1080_120s_60fps_600gop_libx264_yuv420p.mp4"
     },
     {
@@ -152,7 +152,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 2163.0256813913584,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/mandelbrot_1920x1080_120s_60fps_600gop_libx264_yuv420p.mp4"
     },
     {
@@ -200,7 +200,7 @@
         "frame_count": 500,
         "iqr": 0.04515926633030176,
         "median": 6.3376939836889505,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/nasa_960x540_206s_30fps_yuv420p.mp4"
     },
     {
@@ -248,7 +248,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 34.34407581947744,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/nasa_960x540_206s_30fps_yuv420p.mp4"
     },
     {
@@ -296,7 +296,7 @@
         "frame_count": 500,
         "iqr": 0.20602534664794803,
         "median": 12.078899261541665,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/nasa_960x540_206s_30fps_yuv420p.mp4"
     },
     {
@@ -344,7 +344,7 @@
         "frame_count": 500,
         "iqr": 0.0,
         "median": 54.1696757460013,
-        "type": "dataloader[threads=10 batch_size=50] 10 x decode_and_transform()",
+        "type": "dataloader[threads=10,batch_size=50] 10 x decode_and_transform()",
         "video": "/tmp/torchcodec_benchmarking_videos/nasa_960x540_206s_30fps_yuv420p.mp4"
     },
     {
