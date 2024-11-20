@@ -459,11 +459,11 @@ def retrieve_videos(urls_and_dest_paths):
         urllib.request.urlretrieve(url, path)
 
 
-def plot_data(df_data, plot_path):
+def plot_data(json_data, plot_path):
     plt.rcParams["font.size"] = 18
 
     # Creating the DataFrame
-    df = pd.DataFrame(df_data)
+    df = pd.DataFrame(json_data["experiments"])
 
     # Sorting by video, type, and frame_count
     df_sorted = df.sort_values(by=["video", "type", "frame_count"])
@@ -532,6 +532,14 @@ def plot_data(df_data, plot_path):
     for row in range(len(unique_videos)):
         for col in range(video_type_combinations[unique_videos[row]], max_combinations):
             fig.delaxes(axes[row, col])
+
+    plt.gcf().text(
+        0.005,
+        0.87,
+        "\n".join([f"{k}: {v}" for k, v in json_data["system_metadata"].items()]),
+        fontsize=11,
+        bbox=dict(facecolor="white"),
+    )
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
