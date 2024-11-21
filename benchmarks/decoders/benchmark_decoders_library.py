@@ -177,15 +177,20 @@ class TorchCodecCore(AbstractDecoder):
 
 class TorchCodecCoreNonBatch(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
-        self._num_threads = int(num_threads) if num_threads else None
+        self._num_threads = num_threads
         self._color_conversion_library = color_conversion_library
         self._device = device
 
+        from torchvision.transforms import v2 as transforms_v2
+
+        self.transforms_v2 = transforms_v2
+
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
+        num_threads = int(self._num_threads) if self._num_threads else 0
         _add_video_stream(
             decoder,
-            num_threads=self._num_threads,
+            num_threads=num_threads,
             color_conversion_library=self._color_conversion_library,
             device=self._device,
         )
@@ -199,10 +204,11 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
+        num_threads = int(self._num_threads) if self._num_threads else 0
         decoder = create_from_file(video_file)
         _add_video_stream(
             decoder,
-            num_threads=self._num_threads,
+            num_threads=num_threads,
             color_conversion_library=self._color_conversion_library,
             device=self._device,
         )
@@ -211,6 +217,29 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
         for _ in range(numFramesToDecode):
             frame = get_next_frame(decoder)
             frames.append(frame)
+
+        return frames
+
+    def decode_and_transform(self, video_file, pts_list, height, width, device):
+        num_threads = int(self._num_threads) if self._num_threads else 1
+        decoder = create_from_file(video_file)
+        _add_video_stream(
+            decoder,
+            num_threads=num_threads,
+            color_conversion_library=self._color_conversion_library,
+            device=self._device,
+        )
+
+        frames = []
+        for pts in pts_list:
+            seek_to_pts(decoder, pts)
+            frame, *_ = get_next_frame(decoder)
+            frames.append(frame)
+
+        frames = [
+            self.transforms_v2.functional.resize(frame.to(device), (height, width))
+            for frame in frames
+        ]
 
         return frames
 
