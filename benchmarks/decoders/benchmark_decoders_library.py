@@ -258,9 +258,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 class TorchCodecPublic(AbstractDecoder):
     def __init__(self, num_ffmpeg_threads=None, device="cpu"):
-        self._num_ffmpeg_threads = (
-            int(num_ffmpeg_threads) if num_ffmpeg_threads else None
-        )
+        self._num_ffmpeg_threads = int(num_ffmpeg_threads) if num_ffmpeg_threads else 1
         self._device = device
 
         from torchvision.transforms import v2 as transforms_v2
@@ -446,11 +444,11 @@ def retrieve_videos(urls_and_dest_paths):
         urllib.request.urlretrieve(url, path)
 
 
-def plot_data(df_data, plot_path):
+def plot_data(json_data, plot_path):
     plt.rcParams["font.size"] = 18
 
     # Creating the DataFrame
-    df = pd.DataFrame(df_data)
+    df = pd.DataFrame(json_data["experiments"])
 
     # Sorting by video, type, and frame_count
     df_sorted = df.sort_values(by=["video", "type", "frame_count"])
@@ -519,6 +517,14 @@ def plot_data(df_data, plot_path):
     for row in range(len(unique_videos)):
         for col in range(video_type_combinations[unique_videos[row]], max_combinations):
             fig.delaxes(axes[row, col])
+
+    plt.gcf().text(
+        0.005,
+        0.87,
+        "\n".join([f"{k}: {v}" for k, v in json_data["system_metadata"].items()]),
+        fontsize=11,
+        bbox=dict(facecolor="white"),
+    )
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
@@ -628,7 +634,7 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=f"dataloader[threads={bp.num_threads} batch_size={bp.batch_size}] {num_samples} decode_and_transform()",
+                    description=f"dataloader[threads={bp.num_threads},batch_size={bp.batch_size}] {num_samples} decode_and_transform()",
                 )
                 results.append(
                     dataloader_result.blocked_autorange(
@@ -673,7 +679,7 @@ def run_benchmarks(
                         decoder_name,
                         video_file_path,
                         num_samples,
-                        f"{kind} seek()+next()",
+                        f"{num_samples} x {kind} seek()+next()",
                     )
                 )
 
