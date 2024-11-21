@@ -39,7 +39,7 @@ def main() -> None:
         patterns = ["mandelbrot"]
         fpses = [60]
         gop_sizes = [600]
-        durations = [120]
+        durations = [10, 120]
         pix_fmts = ["yuv420p"]
         ffmpeg_path = "ffmpeg"
         generate_videos(
@@ -68,12 +68,12 @@ def main() -> None:
     # These are the number of uniform seeks we do in the seek+decode benchmark.
     num_samples = 10
     video_files_paths = list(Path(videos_dir_path).glob("*.mp4"))
-    assert len(video_files_paths) == 2, "Expected exactly 2 videos"
+    assert len(video_files_paths) == 3, "Expected exactly 3 videos"
     results = run_benchmarks(
         decoder_dict,
         video_files_paths,
         num_samples,
-        num_sequential_frames_from_start=[100],
+        num_sequential_frames_from_start=[1, 10, 100],
         min_runtime_seconds=30,
         benchmark_video_creation=False,
         dataloader_parameters=DataLoaderInspiredWorkloadParameters(
