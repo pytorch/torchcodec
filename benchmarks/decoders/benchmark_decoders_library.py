@@ -187,7 +187,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
     def get_frames_from_video(self, video_file, pts_list):
         decoder = create_from_file(video_file)
-        num_threads = int(self._num_threads) if self._num_threads else None
+        num_threads = int(self._num_threads) if self._num_threads else 0
         _add_video_stream(
             decoder,
             num_threads=num_threads,
@@ -204,7 +204,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
         return frames
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
-        num_threads = int(self._num_threads) if self._num_threads else None
+        num_threads = int(self._num_threads) if self._num_threads else 0
         decoder = create_from_file(video_file)
         _add_video_stream(
             decoder,
