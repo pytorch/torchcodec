@@ -104,7 +104,7 @@ class TorchVision(AbstractDecoder):
 
     def get_frames_from_video(self, video_file, pts_list):
         self.torchvision.set_video_backend(self._backend)
-        reader = self.torchvision.io.VideoReader(video_file, "video")
+        reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=0)
         frames = []
         for pts in pts_list:
             reader.seek(pts)
@@ -114,7 +114,7 @@ class TorchVision(AbstractDecoder):
 
     def get_consecutive_frames_from_video(self, video_file, numFramesToDecode):
         self.torchvision.set_video_backend(self._backend)
-        reader = self.torchvision.io.VideoReader(video_file, "video")
+        reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=0)
         frames = []
         for _ in range(numFramesToDecode):
             frame = next(reader)
