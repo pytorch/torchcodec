@@ -7,9 +7,12 @@
 import argparse
 import importlib.resources
 import os
+import platform
 import typing
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import torch
 
 from benchmark_decoders_library import (
     AbstractDecoder,
@@ -167,7 +170,7 @@ def main() -> None:
             if entry.is_file() and entry.name.endswith(".mp4"):
                 video_paths.append(entry.path)
 
-    df_data = run_benchmarks(
+    results = run_benchmarks(
         decoders_to_run,
         video_paths,
         num_uniform_samples,
@@ -176,7 +179,21 @@ def main() -> None:
         benchmark_video_creation=args.bm_video_creation,
         batch_parameters=BatchParameters(num_threads=8, batch_size=40),
     )
-    plot_data(df_data, args.plot_path)
+    data = {
+        "experiments": results,
+        "system_metadata": {
+            "cpu_count": os.cpu_count(),
+            "system": platform.system(),
+            "machine": platform.machine(),
+            "python_version": str(platform.python_version()),
+            "cuda": (
+                torch.cuda.get_device_properties(0).name
+                if torch.cuda.is_available()
+                else "not available"
+            ),
+        },
+    }
+    plot_data(data, args.plot_path)
 
 
 if __name__ == "__main__":
