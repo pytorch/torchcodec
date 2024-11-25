@@ -35,27 +35,27 @@ class AbstractDecoder:
         pass
 
     @abc.abstractmethod
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         pass
 
-    def sample_frames_description(self, num_frames: int, kind: str) -> str:
-        return f"sample {num_frames} {kind} frames"
+    def decode_frames_description(self, num_frames: int, kind: str) -> str:
+        return f"decode {num_frames} {kind} frames"
 
     @abc.abstractmethod
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         pass
 
-    def get_first_n_frames_description(self, n) -> str:
+    def decode_first_n_frames_description(self, n) -> str:
         return f"first {n} frames"
 
     @abc.abstractmethod
-    def sample_and_resize(self, video_file, pts_list, height, width, device):
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
         pass
 
-    def sample_and_resize_description(
+    def decode_and_resize_description(
         self, num_frames: int, height: int, width: int
     ) -> str:
-        return f"sample {num_frames} -> {height}x{width}"
+        return f"decode {num_frames} -> {height}x{width}"
 
 
 class DecordAccurate(AbstractDecoder):
@@ -65,7 +65,7 @@ class DecordAccurate(AbstractDecoder):
         self.decord = decord
         self.decord.bridge.set_bridge("torch")
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         frames = []
         fps = decord_vr.get_avg_fps()
@@ -75,7 +75,7 @@ class DecordAccurate(AbstractDecoder):
             frames.append(frame)
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         frames = []
         for _ in range(n):
@@ -91,13 +91,13 @@ class DecordAccurateBatch(AbstractDecoder):
         self.decord = decord
         self.decord.bridge.set_bridge("torch")
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         average_fps = decord_vr.get_avg_fps()
         indices_list = [int(pts * average_fps) for pts in pts_list]
         return decord_vr.get_batch(indices_list)
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         decord_vr = self.decord.VideoReader(video_file, ctx=self.decord.cpu())
         indices_list = list(range(n))
         return decord_vr.get_batch(indices_list)
@@ -113,7 +113,7 @@ class TorchVision(AbstractDecoder):
         self.torchvision = torchvision
         self.transforms_v2 = transforms_v2
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=0)
         frames = []
@@ -123,7 +123,7 @@ class TorchVision(AbstractDecoder):
             frames.append(frame["data"].permute(1, 2, 0))
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=0)
         frames = []
@@ -132,7 +132,7 @@ class TorchVision(AbstractDecoder):
             frames.append(frame["data"].permute(1, 2, 0))
         return frames
 
-    def sample_and_resize(self, video_file, pts_list, height, width, device):
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
         self.torchvision.set_video_backend(self._backend)
         reader = self.torchvision.io.VideoReader(video_file, "video", num_threads=1)
         frames = []
@@ -153,7 +153,7 @@ class TorchCodecCore(AbstractDecoder):
         self._color_conversion_library = color_conversion_library
         self._device = device
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
         _add_video_stream(
@@ -169,7 +169,7 @@ class TorchCodecCore(AbstractDecoder):
         )
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         decoder = create_from_file(video_file)
         _add_video_stream(
             decoder,
@@ -196,7 +196,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
         self.transforms_v2 = transforms_v2
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         num_threads = int(self._num_threads) if self._num_threads else 0
         _add_video_stream(
@@ -214,7 +214,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         num_threads = int(self._num_threads) if self._num_threads else 0
         decoder = create_from_file(video_file)
         _add_video_stream(
@@ -231,7 +231,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
         return frames
 
-    def sample_and_resize(self, video_file, pts_list, height, width, device):
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
         num_threads = int(self._num_threads) if self._num_threads else 1
         decoder = create_from_file(video_file)
         _add_video_stream(
@@ -262,7 +262,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         self._color_conversion_library = color_conversion_library
         self._device = device
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
         _add_video_stream(
@@ -278,7 +278,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         )
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         decoder = create_from_file(video_file)
         scan_all_streams_to_update_metadata(decoder)
         _add_video_stream(
@@ -305,7 +305,7 @@ class TorchCodecPublic(AbstractDecoder):
 
         self.transforms_v2 = transforms_v2
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         num_ffmpeg_threads = (
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
@@ -314,7 +314,7 @@ class TorchCodecPublic(AbstractDecoder):
         )
         return decoder.get_frames_played_at(pts_list)
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         num_ffmpeg_threads = (
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
@@ -330,7 +330,7 @@ class TorchCodecPublic(AbstractDecoder):
                 break
         return frames
 
-    def sample_and_resize(self, video_file, pts_list, height, width, device):
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
         num_ffmpeg_threads = (
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
         )
@@ -357,7 +357,7 @@ class TorchCodecCoreCompiled(AbstractDecoder):
     def __init__(self):
         pass
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         decoder = create_from_file(video_file)
         _add_video_stream(decoder)
         frames = []
@@ -366,7 +366,7 @@ class TorchCodecCoreCompiled(AbstractDecoder):
             frames.append(frame)
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         decoder = create_from_file(video_file)
         _add_video_stream(decoder)
         frames = []
@@ -386,7 +386,7 @@ class TorchAudioDecoder(AbstractDecoder):
 
         self.transforms_v2 = transforms_v2
 
-    def sample_frames(self, video_file, pts_list):
+    def decode_frames(self, video_file, pts_list):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
             frames_per_chunk=1, decoder_option={"threads": "0"}
@@ -399,7 +399,7 @@ class TorchAudioDecoder(AbstractDecoder):
             frames.append(clip[0][0])
         return frames
 
-    def get_first_n_frames(self, video_file, n):
+    def decode_first_n_frames(self, video_file, n):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
             frames_per_chunk=1, decoder_option={"threads": "0"}
@@ -414,7 +414,7 @@ class TorchAudioDecoder(AbstractDecoder):
 
         return frames
 
-    def sample_and_resize(self, video_file, pts_list, height, width, device):
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
             frames_per_chunk=1, decoder_option={"threads": "1"}
@@ -679,14 +679,14 @@ def run_benchmarks(
                 description = (
                     f"concurrency {bp.num_threads}"
                     f"batch {bp.batch_size}"
-                    + decoder.sample_and_resize_description(
+                    + decoder.decode_and_resize_description(
                         num_samples,
                         dataloader_parameters.resize_height,
                         dataloader_parameters.resize_width,
                     )
                 )
                 dataloader_result = benchmark.Timer(
-                    stmt="run_batch_using_threads(decoder.sample_and_resize, video_file, pts_list, height, width, device, batch_parameters=batch_parameters)",
+                    stmt="run_batch_using_threads(decoder.decode_and_resize, video_file, pts_list, height, width, device, batch_parameters=batch_parameters)",
                     globals={
                         "video_file": str(video_file_path),
                         "pts_list": uniform_pts_list,
@@ -726,7 +726,7 @@ def run_benchmarks(
                         f"video={video_file_path}, decoder={decoder_name}, pts_list={pts_list}"
                     )
                 seeked_result = benchmark.Timer(
-                    stmt="decoder.sample_frames(video_file, pts_list)",
+                    stmt="decoder.decode_frames(video_file, pts_list)",
                     globals={
                         "video_file": str(video_file_path),
                         "pts_list": pts_list,
@@ -734,10 +734,10 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=decoder.sample_frames_description(num_samples, kind),
+                    description=decoder.decode_frames_description(num_samples, kind),
                 )
                 print(
-                    f"{decoder_name} {decoder.sample_frames_description(num_samples, kind)}"
+                    f"{decoder_name} {decoder.decode_frames_description(num_samples, kind)}"
                 )
                 results.append(
                     seeked_result.blocked_autorange(min_run_time=min_runtime_seconds)
@@ -748,13 +748,13 @@ def run_benchmarks(
                         decoder_name,
                         video_file_path,
                         num_samples,
-                        decoder.sample_frames_description(num_samples, kind),
+                        decoder.decode_frames_description(num_samples, kind),
                     )
                 )
 
                 if batch_parameters:
                     seeked_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.sample_frames, video_file, pts_list, batch_parameters=batch_parameters)",
+                        stmt="run_batch_using_threads(decoder.decode_frames, video_file, pts_list, batch_parameters=batch_parameters)",
                         globals={
                             "video_file": str(video_file_path),
                             "pts_list": pts_list,
@@ -764,12 +764,12 @@ def run_benchmarks(
                         },
                         label=f"video={video_file_path} {metadata_label}",
                         sub_label=decoder_name,
-                        description=decoder.sample_frames_description(
+                        description=decoder.decode_frames_description(
                             num_samples, kind
                         ),
                     )
                     print(
-                        f"{decoder_name} batch {decoder.sample_frames_description(num_samples, kind)}"
+                        f"{decoder_name} batch {decoder.decode_frames_description(num_samples, kind)}"
                     )
                     results.append(
                         seeked_result.blocked_autorange(
@@ -782,13 +782,13 @@ def run_benchmarks(
                             decoder_name,
                             video_file_path,
                             num_samples * batch_parameters.batch_size,
-                            decoder.sample_frames_description(num_samples, kind),
+                            decoder.decode_frames_description(num_samples, kind),
                         )
                     )
 
             for num_frames in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
-                    stmt="decoder.get_first_n_frames(video_file, n)",
+                    stmt="decoder.decode_first_n_frames(video_file, n)",
                     globals={
                         "video_file": str(video_file_path),
                         "n": num_frames,
@@ -796,10 +796,10 @@ def run_benchmarks(
                     },
                     label=f"video={video_file_path} {metadata_label}",
                     sub_label=decoder_name,
-                    description=decoder.get_first_n_frames_description(num_frames),
+                    description=decoder.decode_first_n_frames_description(num_frames),
                 )
                 print(
-                    f"{decoder_name} {decoder.get_first_n_frames_description(num_frames)}"
+                    f"{decoder_name} {decoder.decode_first_n_frames_description(num_frames)}"
                 )
                 results.append(
                     consecutive_frames_result.blocked_autorange(
@@ -812,13 +812,13 @@ def run_benchmarks(
                         decoder_name,
                         video_file_path,
                         num_frames,
-                        decoder.get_first_n_frames_description(num_frames),
+                        decoder.decode_first_n_frames_description(num_frames),
                     )
                 )
 
                 if batch_parameters:
                     consecutive_frames_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.get_first_n_frames, video_file, n, batch_parameters=batch_parameters)",
+                        stmt="run_batch_using_threads(decoder.decode_first_n_frames, video_file, n, batch_parameters=batch_parameters)",
                         globals={
                             "video_file": str(video_file_path),
                             "n": num_frames,
@@ -828,10 +828,12 @@ def run_benchmarks(
                         },
                         label=f"video={video_file_path} {metadata_label}",
                         sub_label=decoder_name,
-                        description=decoder.get_first_n_frames_description(num_frames),
+                        description=decoder.decode_first_n_frames_description(
+                            num_frames
+                        ),
                     )
                     print(
-                        f"{decoder_name} batch {decoder.get_first_n_frames_description(num_frames)}"
+                        f"{decoder_name} batch {decoder.decode_first_n_frames_description(num_frames)}"
                     )
                     results.append(
                         consecutive_frames_result.blocked_autorange(
@@ -844,7 +846,7 @@ def run_benchmarks(
                             decoder_name,
                             video_file_path,
                             num_frames * batch_parameters.batch_size,
-                            decoder.get_first_n_frames_description(num_frames),
+                            decoder.decode_first_n_frames_description(num_frames),
                         )
                     )
 
