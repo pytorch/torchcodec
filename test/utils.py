@@ -44,7 +44,7 @@ def assert_tensor_equal(*args, **kwargs):
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
 def assert_tensor_close_on_at_least(
-    actual_tensor, ref_tensor, percentage=90, abs_tolerance=19
+    actual_tensor, ref_tensor, percentage=90, abs_tolerance=5
 ):
     assert (
         actual_tensor.device == ref_tensor.device
