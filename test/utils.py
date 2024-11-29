@@ -23,40 +23,22 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
-def get_frame_compare_function(device):
-    if device == "cpu":
-        return assert_tensor_equal
-    else:
-        return assert_tensor_close_on_at_least
-
-
-# For use with decoded data frames. On Linux, we expect exact, bit-for-bit equality. On
-# all other platforms, we allow a small tolerance. FFmpeg does not guarantee bit-for-bit
-# equality across systems and architectures, so we also cannot. We currently use Linux
-# on x86_64 as our reference system.
+# For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
+# equality. On CUDA Linux, we expect a small tolerance.
+# On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
+# not guarantee bit-for-bit equality across systems and architectures, so we
+# also cannot. We currently use Linux on x86_64 as our reference system.
 def assert_tensor_equal(*args, **kwargs):
     if sys.platform == "linux":
-        absolute_tolerance = 0
+        if args[0].device.type == "cuda":
+            # CUDA tensors are not exactly equal on Linux, so we need to use a
+            # higher tolerance.
+            absolute_tolerance = 2
+        else:
+            absolute_tolerance = 0
     else:
         absolute_tolerance = 3
     torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
-
-
-# Asserts that at least `percentage`% of the values are within the absolute tolerance.
-def assert_tensor_close_on_at_least(
-    actual_tensor, ref_tensor, percentage=90, abs_tolerance=5
-):
-    assert (
-        actual_tensor.device == ref_tensor.device
-    ), f"Devices don't match: {actual_tensor.device} vs {ref_tensor.device}"
-    diff = (ref_tensor.float() - actual_tensor.float()).abs()
-    max_diff_percentage = 100.0 - percentage
-    if diff.sum() == 0:
-        return
-    diff_percentage = (diff > abs_tolerance).float().mean() * 100.0
-    assert (
-        diff_percentage <= max_diff_percentage
-    ), f"Diff too high: {diff_percentage} > {max_diff_percentage}"
 
 
 # For use with floating point metadata, or in other instances where we are not confident
