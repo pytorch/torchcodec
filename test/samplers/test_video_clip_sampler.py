@@ -36,7 +36,7 @@ def test_sampler(sampler_args):
     video_args = VideoArgs(desired_width=desired_width, desired_height=desired_height)
     sampler = VideoClipSampler(video_args, sampler_args)
     clips = sampler(NASA_VIDEO.to_tensor())
-    assert_tensor_equal(len(clips), sampler_args.clips_per_video)
+    assert len(clips) == sampler_args.clips_per_video
     clip = clips[0]
     if isinstance(sampler_args, TimeBasedSamplerArgs):
         # Note: Looks like we have an API inconsistency.
