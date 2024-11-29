@@ -54,10 +54,10 @@ jobs:
           # the wheel unless the label cliflow/binaries/all is present in the
           # PR.
         python-version: ['3.9']
-        cuda-version: ['12.4']
+        cuda-version: ['12.6']
         ffmpeg-version-for-tests: ['7']
     container:
-      image: "pytorch/manylinux-builder:cuda${{ matrix.cuda-version }}"
+      image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
       options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
     needs: build
     steps:
