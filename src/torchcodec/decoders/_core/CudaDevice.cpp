@@ -225,7 +225,7 @@ void convertAVFrameToDecodedOutputOnCuda(
   auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
   if (src->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-    status = nppiNV12ToRGB_709HDTV_8u_P2C3R(
+    status = nppiNV12ToRGB_709CSC_8u_P2C3R(
         input,
         src->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
