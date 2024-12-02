@@ -15,7 +15,6 @@ from ..utils import (
     assert_tensor_close,
     assert_tensor_equal,
     cpu_and_cuda,
-    get_frame_compare_function,
     H265_VIDEO,
     NASA_VIDEO,
 )
@@ -74,11 +73,10 @@ class TestVideoDecoder:
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289).to(device)
 
-        frame_compare_function = get_frame_compare_function(device)
-        frame_compare_function(ref_frame0, decoder[0])
-        frame_compare_function(ref_frame1, decoder[1])
-        frame_compare_function(ref_frame180, decoder[180])
-        frame_compare_function(ref_frame_last, decoder[-1])
+        assert_tensor_equal(ref_frame0, decoder[0])
+        assert_tensor_equal(ref_frame1, decoder[1])
+        assert_tensor_equal(ref_frame180, decoder[180])
+        assert_tensor_equal(ref_frame_last, decoder[-1])
 
     def test_getitem_numpy_int(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
@@ -113,7 +111,6 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_getitem_slice(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
-        frame_compare_function = get_frame_compare_function(device)
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -127,7 +124,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref0, slice0)
+        assert_tensor_equal(ref0, slice0)
 
         ref4 = NASA_VIDEO.get_frame_data_by_range(4, 5).to(device)
         slice4 = decoder[4:5]
@@ -139,7 +136,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref4, slice4)
+        assert_tensor_equal(ref4, slice4)
 
         ref8 = NASA_VIDEO.get_frame_data_by_range(8, 9).to(device)
         slice8 = decoder[8:9]
@@ -151,7 +148,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref8, slice8)
+        assert_tensor_equal(ref8, slice8)
 
         ref180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
         slice180 = decoder[180:181]
@@ -163,7 +160,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref180, slice180[0])
+        assert_tensor_equal(ref180, slice180[0])
 
         # contiguous ranges
         ref0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9).to(device)
@@ -176,7 +173,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref0_9, slice0_9)
+        assert_tensor_equal(ref0_9, slice0_9)
 
         ref4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8).to(device)
         slice4_8 = decoder[4:8]
@@ -188,7 +185,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref4_8, slice4_8)
+        assert_tensor_equal(ref4_8, slice4_8)
 
         # ranges with a stride
         ref15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5).to(device)
@@ -201,7 +198,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref15_35, slice15_35)
+        assert_tensor_equal(ref15_35, slice15_35)
 
         ref0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2).to(device)
         slice0_9_2 = decoder[0:9:2]
@@ -213,7 +210,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref0_9_2, slice0_9_2)
+        assert_tensor_equal(ref0_9_2, slice0_9_2)
 
         # negative numbers in the slice
         ref386_389 = NASA_VIDEO.get_frame_data_by_range(386, 390).to(device)
@@ -226,15 +223,15 @@ class TestVideoDecoder:
                 NASA_VIDEO.width,
             ]
         )
-        frame_compare_function(ref386_389, slice386_389)
+        assert_tensor_equal(ref386_389, slice386_389)
 
         # an empty range is valid!
         empty_frame = decoder[5:5]
-        frame_compare_function(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
+        assert_tensor_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
         # slices that are out-of-range are also valid - they return an empty tensor
         also_empty = decoder[10000:]
-        frame_compare_function(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
+        assert_tensor_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
 
         # should be just a copy
         all_frames = decoder[:].to(device)
@@ -247,7 +244,7 @@ class TestVideoDecoder:
             ]
         )
         for sliced, ref in zip(all_frames, decoder):
-            frame_compare_function(sliced, ref)
+            assert_tensor_equal(sliced, ref)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_getitem_fails(self, device):
@@ -275,27 +272,26 @@ class TestVideoDecoder:
         ref_frame35 = NASA_VIDEO.get_frame_data_by_index(35).to(device)
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289).to(device)
-        frame_compare_function = get_frame_compare_function(device)
 
         # Access an arbitrary frame to make sure that the later iteration
         # still works as expected. The underlying C++ decoder object is
         # actually stateful, and accessing a frame will move its internal
         # cursor.
-        frame_compare_function(ref_frame35, decoder[35])
+        assert_tensor_equal(ref_frame35, decoder[35])
 
         for i, frame in enumerate(decoder):
             if i == 0:
-                frame_compare_function(ref_frame0, frame)
+                assert_tensor_equal(ref_frame0, frame)
             elif i == 1:
-                frame_compare_function(ref_frame1, frame)
+                assert_tensor_equal(ref_frame1, frame)
             elif i == 9:
-                frame_compare_function(ref_frame9, frame)
+                assert_tensor_equal(ref_frame9, frame)
             elif i == 35:
-                frame_compare_function(ref_frame35, frame)
+                assert_tensor_equal(ref_frame35, frame)
             elif i == 180:
-                frame_compare_function(ref_frame180, frame)
+                assert_tensor_equal(ref_frame180, frame)
             elif i == 389:
-                frame_compare_function(ref_frame_last, frame)
+                assert_tensor_equal(ref_frame_last, frame)
 
     def test_iteration_slow(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
@@ -314,12 +310,11 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
-        frame_compare_function = get_frame_compare_function(device)
 
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9).to(device)
         frame9 = decoder.get_frame_at(9)
 
-        frame_compare_function(ref_frame9, frame9.data)
+        assert_tensor_equal(ref_frame9, frame9.data)
         assert isinstance(frame9.pts_seconds, float)
         expected_frame_info = NASA_VIDEO.get_frame_info(9)
         assert frame9.pts_seconds == pytest.approx(expected_frame_info.pts_seconds)
@@ -330,19 +325,19 @@ class TestVideoDecoder:
 
         # test numpy.int64
         frame9 = decoder.get_frame_at(numpy.int64(9))
-        frame_compare_function(ref_frame9, frame9.data)
+        assert_tensor_equal(ref_frame9, frame9.data)
 
         # test numpy.int32
         frame9 = decoder.get_frame_at(numpy.int32(9))
-        frame_compare_function(ref_frame9, frame9.data)
+        assert_tensor_equal(ref_frame9, frame9.data)
 
         # test numpy.uint64
         frame9 = decoder.get_frame_at(numpy.uint64(9))
-        frame_compare_function(ref_frame9, frame9.data)
+        assert_tensor_equal(ref_frame9, frame9.data)
 
         # test numpy.uint32
         frame9 = decoder.get_frame_at(numpy.uint32(9))
-        frame_compare_function(ref_frame9, frame9.data)
+        assert_tensor_equal(ref_frame9, frame9.data)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_tuple_unpacking(self, device):
@@ -368,16 +363,15 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
-        frame_compare_function = get_frame_compare_function(device)
 
         frames = decoder.get_frames_at([35, 25])
 
         assert isinstance(frames, FrameBatch)
 
-        frame_compare_function(
+        assert_tensor_equal(
             frames[0].data, NASA_VIDEO.get_frame_data_by_index(35).to(device)
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frames[1].data, NASA_VIDEO.get_frame_data_by_index(25).to(device)
         )
 
@@ -421,16 +415,15 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_played_at(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
-        frame_compare_function = get_frame_compare_function(device)
 
         ref_frame_played_at_6 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
-        frame_compare_function(
+        assert_tensor_equal(
             ref_frame_played_at_6, decoder.get_frame_played_at(6.006).data
         )
-        frame_compare_function(
+        assert_tensor_equal(
             ref_frame_played_at_6, decoder.get_frame_played_at(6.02).data
         )
-        frame_compare_function(
+        assert_tensor_equal(
             ref_frame_played_at_6, decoder.get_frame_played_at(6.039366).data
         )
         assert isinstance(decoder.get_frame_played_at(6.02).pts_seconds, float)
@@ -459,7 +452,6 @@ class TestVideoDecoder:
     def test_get_frames_played_at(self, device):
 
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
-        frame_compare_function = get_frame_compare_function(device)
 
         # Note: We know the frame at ~0.84s has index 25, the one at 1.16s has
         # index 35. We use those indices as reference to test against.
@@ -470,7 +462,7 @@ class TestVideoDecoder:
         assert isinstance(frames, FrameBatch)
 
         for i in range(len(reference_indices)):
-            frame_compare_function(
+            assert_tensor_equal(
                 frames.data[i],
                 NASA_VIDEO.get_frame_data_by_index(reference_indices[i]).to(device),
             )
@@ -512,7 +504,6 @@ class TestVideoDecoder:
         decoder = VideoDecoder(
             NASA_VIDEO.path, stream_index=stream_index, device=device
         )
-        frame_compare_function = get_frame_compare_function(device)
 
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
@@ -520,7 +511,7 @@ class TestVideoDecoder:
         ).to(device)
         frames9 = decoder.get_frames_in_range(start=9, stop=10)
 
-        frame_compare_function(ref_frames9, frames9.data)
+        assert_tensor_equal(ref_frames9, frames9.data)
 
         assert frames9.pts_seconds.device.type == "cpu"
         assert frames9.pts_seconds[0].item() == pytest.approx(
@@ -546,7 +537,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.get_width(stream_index=stream_index),
             ]
         )
-        frame_compare_function(ref_frames0_9, frames0_9.data)
+        assert_tensor_equal(ref_frames0_9, frames0_9.data)
         assert_tensor_close(
             NASA_VIDEO.get_pts_seconds_by_range(0, 10, stream_index=stream_index),
             frames0_9.pts_seconds,
@@ -569,7 +560,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.get_width(stream_index=stream_index),
             ]
         )
-        frame_compare_function(ref_frames0_8_2, frames0_8_2.data)
+        assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
         assert_tensor_close(
             NASA_VIDEO.get_pts_seconds_by_range(0, 10, 2, stream_index=stream_index),
             frames0_8_2.pts_seconds,
@@ -585,7 +576,7 @@ class TestVideoDecoder:
         frames0_8_2 = decoder.get_frames_in_range(
             start=numpy.int64(0), stop=numpy.int64(10), step=numpy.int64(2)
         )
-        frame_compare_function(ref_frames0_8_2, frames0_8_2.data)
+        assert_tensor_equal(ref_frames0_8_2, frames0_8_2.data)
 
         # an empty range is valid!
         empty_frames = decoder.get_frames_in_range(5, 5)
@@ -640,7 +631,6 @@ class TestVideoDecoder:
         decoder = VideoDecoder(
             NASA_VIDEO.path, stream_index=stream_index, device=device
         )
-        frame_compare_function = get_frame_compare_function(device)
 
         # Note that we are comparing the results of VideoDecoder's method:
         #   get_frames_played_in_range()
@@ -663,7 +653,7 @@ class TestVideoDecoder:
         frames0_4 = decoder.get_frames_played_in_range(
             decoder.get_frame_at(0).pts_seconds, decoder.get_frame_at(5).pts_seconds
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frames0_4.data,
             NASA_VIDEO.get_frame_data_by_range(0, 5, stream_index=stream_index).to(
                 device
@@ -675,7 +665,7 @@ class TestVideoDecoder:
             decoder.get_frame_at(0).pts_seconds,
             decoder.get_frame_at(4).pts_seconds + HALF_DURATION,
         )
-        frame_compare_function(also_frames0_4.data, frames0_4.data)
+        assert_tensor_equal(also_frames0_4.data, frames0_4.data)
 
         # Again, the intention here is to provide the exact values we care about. In practice, our
         # pts values are slightly smaller, so we nudge the start upwards.
@@ -683,7 +673,7 @@ class TestVideoDecoder:
             decoder.get_frame_at(5).pts_seconds,
             decoder.get_frame_at(10).pts_seconds,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frames5_9.data,
             NASA_VIDEO.get_frame_data_by_range(5, 10, stream_index=stream_index).to(
                 device
@@ -697,7 +687,7 @@ class TestVideoDecoder:
             decoder.get_frame_at(6).pts_seconds,
             decoder.get_frame_at(6).pts_seconds + HALF_DURATION,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frame6.data,
             NASA_VIDEO.get_frame_data_by_range(6, 7, stream_index=stream_index).to(
                 device
@@ -709,7 +699,7 @@ class TestVideoDecoder:
             decoder.get_frame_at(35).pts_seconds,
             decoder.get_frame_at(35).pts_seconds + 1e-10,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frame35.data,
             NASA_VIDEO.get_frame_data_by_range(35, 36, stream_index=stream_index).to(
                 device
@@ -725,7 +715,7 @@ class TestVideoDecoder:
             NASA_VIDEO.get_frame_info(8, stream_index=stream_index).pts_seconds
             + HALF_DURATION,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frames7_8.data,
             NASA_VIDEO.get_frame_data_by_range(7, 9, stream_index=stream_index).to(
                 device
@@ -737,7 +727,7 @@ class TestVideoDecoder:
             NASA_VIDEO.get_frame_info(4, stream_index=stream_index).pts_seconds,
             NASA_VIDEO.get_frame_info(4, stream_index=stream_index).pts_seconds,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             empty_frame.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
         )
@@ -755,7 +745,7 @@ class TestVideoDecoder:
             NASA_VIDEO.get_frame_info(0, stream_index=stream_index).pts_seconds
             + HALF_DURATION,
         )
-        frame_compare_function(
+        assert_tensor_equal(
             frame0.data,
             NASA_VIDEO.get_frame_data_by_range(0, 1, stream_index=stream_index).to(
                 device
@@ -767,7 +757,7 @@ class TestVideoDecoder:
         all_frames = decoder.get_frames_played_in_range(
             decoder.metadata.begin_stream_seconds, decoder.metadata.end_stream_seconds
         )
-        frame_compare_function(all_frames.data, decoder[:])
+        assert_tensor_equal(all_frames.data, decoder[:])
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_by_pts_in_range_fails(self, device):
