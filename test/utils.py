@@ -28,7 +28,7 @@ def cpu_and_cuda():
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_tensor_equal(*args, **kwargs):
+def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             # CUDA tensors are not exactly equal on Linux, so we need to use a
@@ -39,15 +39,6 @@ def assert_tensor_equal(*args, **kwargs):
     else:
         absolute_tolerance = 3
     torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
-
-
-# For use with floating point metadata, or in other instances where we are not confident
-# that reference and test tensors can be exactly equal. This is true for pts and duration
-# in seconds, as the reference values are from ffprobe's JSON output. In that case, it is
-# limiting the floating point precision when printing the value as a string. The value from
-# JSON and the value we retrieve during decoding are not exactly the same.
-def assert_tensor_close(*args, **kwargs):
-    torch.testing.assert_close(*args, **kwargs, atol=1e-6, rtol=1e-6)
 
 
 def in_fbcode() -> bool:
