@@ -736,7 +736,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
-  auto start = std::chrono::high_resolution_clock::now();
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
@@ -745,7 +744,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     maybeSeekToBeforeDesiredPts();
     maybeDesiredPts_ = std::nullopt;
   }
-  auto seekDone = std::chrono::high_resolution_clock::now();
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame frame(av_frame_alloc());
   int ffmpegStatus = AVSUCCESS;
@@ -835,7 +833,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
         "Could not receive frame from decoder: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
-  auto decodeDone = std::chrono::high_resolution_clock::now();
   // Note that we don't flush the decoder when we reach EOF (even though that's
   // mentioned in https://ffmpeg.org/doxygen/trunk/group__lavc__encdec.html).
   // This is because we may have packets internally in the decoder that we
