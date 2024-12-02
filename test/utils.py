@@ -28,7 +28,7 @@ def cpu_and_cuda():
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_tensor_equal(*args, **kwargs):
+def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             # CUDA tensors are not exactly equal on Linux, so we need to use a

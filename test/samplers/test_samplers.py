@@ -19,7 +19,7 @@ from torchcodec.samplers._common import _POLICY_FUNCTIONS
 from torchcodec.samplers._index_based import _build_all_clips_indices
 from torchcodec.samplers._time_based import _build_all_clips_timestamps
 
-from ..utils import assert_tensor_equal, NASA_VIDEO
+from ..utils import assert_frames_equal, NASA_VIDEO
 
 
 def _assert_output_type_and_shapes(
@@ -190,7 +190,7 @@ def test_against_ref(sampler):
     )
 
     clip = sampler(decoder, num_frames_per_clip=num_frames_per_clip)[0]
-    assert_tensor_equal(clip.data, expected_clip_data)
+    assert_frames_equal(clip.data, expected_clip_data)
 
 
 @pytest.mark.parametrize(
@@ -245,7 +245,7 @@ def test_sampling_range(
     )
 
     # This context manager is used to ensure that the call to
-    # assert_tensor_equal() below either passes (nullcontext) or fails
+    # assert_frames_equal() below either passes (nullcontext) or fails
     # (pytest.raises)
     cm = (
         contextlib.nullcontext()
@@ -254,7 +254,7 @@ def test_sampling_range(
     )
     with cm:
         for clip in clips:
-            assert_tensor_equal(clip.data, clips[0].data)
+            assert_frames_equal(clip.data, clips[0].data)
 
 
 @pytest.mark.parametrize("sampler", (clips_at_random_indices, clips_at_regular_indices))
@@ -282,10 +282,10 @@ def test_sampling_range_negative(sampler):
 
     # There is only one unique clip in clips_1...
     for clip in clips_1:
-        assert_tensor_equal(clip.data, clips_1[0].data)
+        assert_frames_equal(clip.data, clips_1[0].data)
     # ... and it's the same that's in clips_2
     for clip in clips_2:
-        assert_tensor_equal(clip.data, clips_1[0].data)
+        assert_frames_equal(clip.data, clips_1[0].data)
 
 
 @pytest.mark.parametrize(
@@ -436,15 +436,15 @@ def test_random_sampler_randomness(sampler):
     clips_2 = sampler(decoder, num_clips=num_clips)
 
     for clip_1, clip_2 in zip(clips_1, clips_2):
-        assert_tensor_equal(clip_1.data, clip_2.data)
-        assert_tensor_equal(clip_1.pts_seconds, clip_2.pts_seconds)
-        assert_tensor_equal(clip_1.duration_seconds, clip_2.duration_seconds)
+        assert_frames_equal(clip_1.data, clip_2.data)
+        assert_frames_equal(clip_1.pts_seconds, clip_2.pts_seconds)
+        assert_frames_equal(clip_1.duration_seconds, clip_2.duration_seconds)
 
     # Call with a different seed, expect different results
     torch.manual_seed(1)
     clips_3 = sampler(decoder, num_clips=num_clips)
     with pytest.raises(AssertionError, match="Tensor-likes are not"):
-        assert_tensor_equal(clips_1[0].data, clips_3[0].data)
+        assert_frames_equal(clips_1[0].data, clips_3[0].data)
 
     # Make sure we didn't alter the builtin Python RNG
     builtin_random_state_end = random.getstate()
