@@ -11,13 +11,7 @@ from torchcodec import FrameBatch
 
 from torchcodec.decoders import _core, VideoDecoder
 
-from ..utils import (
-    assert_frames_equal,
-    assert_tensor_close,
-    cpu_and_cuda,
-    H265_VIDEO,
-    NASA_VIDEO,
-)
+from ..utils import assert_frames_equal, cpu_and_cuda, H265_VIDEO, NASA_VIDEO
 
 
 class TestVideoDecoder:
@@ -538,13 +532,17 @@ class TestVideoDecoder:
             ]
         )
         assert_frames_equal(ref_frames0_9, frames0_9.data)
-        assert_tensor_close(
+        torch.testing.assert_close(
             NASA_VIDEO.get_pts_seconds_by_range(0, 10, stream_index=stream_index),
             frames0_9.pts_seconds,
+            atol=1e-6,
+            rtol=1e-6,
         )
-        assert_tensor_close(
+        torch.testing.assert_close(
             NASA_VIDEO.get_duration_seconds_by_range(0, 10, stream_index=stream_index),
             frames0_9.duration_seconds,
+            atol=1e-6,
+            rtol=1e-6,
         )
 
         # test steps
@@ -561,15 +559,19 @@ class TestVideoDecoder:
             ]
         )
         assert_frames_equal(ref_frames0_8_2, frames0_8_2.data)
-        assert_tensor_close(
+        torch.testing.assert_close(
             NASA_VIDEO.get_pts_seconds_by_range(0, 10, 2, stream_index=stream_index),
             frames0_8_2.pts_seconds,
+            atol=1e-6,
+            rtol=1e-6,
         )
-        assert_tensor_close(
+        torch.testing.assert_close(
             NASA_VIDEO.get_duration_seconds_by_range(
                 0, 10, 2, stream_index=stream_index
             ),
             frames0_8_2.duration_seconds,
+            atol=1e-6,
+            rtol=1e-6,
         )
 
         # test numpy.int64 for indices
@@ -584,8 +586,10 @@ class TestVideoDecoder:
             empty_frames.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
         )
-        assert_tensor_close(empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds)
-        assert_tensor_close(
+        torch.testing.assert_close(
+            empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds
+        )
+        torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
 

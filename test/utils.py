@@ -41,15 +41,6 @@ def assert_frames_equal(*args, **kwargs):
     torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
 
 
-# For use with floating point metadata, or in other instances where we are not confident
-# that reference and test tensors can be exactly equal. This is true for pts and duration
-# in seconds, as the reference values are from ffprobe's JSON output. In that case, it is
-# limiting the floating point precision when printing the value as a string. The value from
-# JSON and the value we retrieve during decoding are not exactly the same.
-def assert_tensor_close(*args, **kwargs):
-    torch.testing.assert_close(*args, **kwargs, atol=1e-6, rtol=1e-6)
-
-
 def in_fbcode() -> bool:
     return os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
 
