@@ -258,7 +258,7 @@ class TestOps:
             *[get_frame_at_pts(decoder, seconds=pts) for pts in all_pts_seconds_ref]
         )
         pts_seconds = torch.tensor(pts_seconds)
-        assert_frames_equal(pts_seconds, all_pts_seconds_ref)
+        torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
         _, pts_seconds, _ = get_frames_by_pts_in_range(
             decoder,
@@ -266,7 +266,7 @@ class TestOps:
             start_seconds=0,
             stop_seconds=all_pts_seconds_ref[-1] + 1e-4,
         )
-        assert_frames_equal(pts_seconds, all_pts_seconds_ref)
+        torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
         _, pts_seconds, _ = zip(
             *[
@@ -280,12 +280,12 @@ class TestOps:
             ]
         )
         pts_seconds = torch.tensor(pts_seconds)
-        assert_frames_equal(pts_seconds, all_pts_seconds_ref)
+        torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
         _, pts_seconds, _ = get_frames_by_pts(
             decoder, stream_index=stream_index, timestamps=all_pts_seconds_ref.tolist()
         )
-        assert_frames_equal(pts_seconds, all_pts_seconds_ref)
+        torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_in_range(self, device):

@@ -12,8 +12,8 @@ from torchcodec import FrameBatch
 from torchcodec.decoders import _core, VideoDecoder
 
 from ..utils import (
-    assert_tensor_close,
     assert_frames_equal,
+    assert_tensor_close,
     cpu_and_cuda,
     H265_VIDEO,
     NASA_VIDEO,
@@ -584,8 +584,8 @@ class TestVideoDecoder:
             empty_frames.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
         )
-        assert_frames_equal(empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds)
-        assert_frames_equal(
+        assert_tensor_close(empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds)
+        assert_tensor_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
 
@@ -731,12 +731,14 @@ class TestVideoDecoder:
             empty_frame.data,
             NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
         )
-        assert_frames_equal(
-            empty_frame.pts_seconds,
-            NASA_VIDEO.empty_pts_seconds,
+        torch.testing.assert_close(
+            empty_frame.pts_seconds, NASA_VIDEO.empty_pts_seconds, atol=0, rtol=0
         )
-        assert_frames_equal(
-            empty_frame.duration_seconds, NASA_VIDEO.empty_duration_seconds
+        torch.testing.assert_close(
+            empty_frame.duration_seconds,
+            NASA_VIDEO.empty_duration_seconds,
+            atol=0,
+            rtol=0,
         )
 
         # Start and stop seconds land within the first frame.

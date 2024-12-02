@@ -437,8 +437,12 @@ def test_random_sampler_randomness(sampler):
 
     for clip_1, clip_2 in zip(clips_1, clips_2):
         assert_frames_equal(clip_1.data, clip_2.data)
-        assert_frames_equal(clip_1.pts_seconds, clip_2.pts_seconds)
-        assert_frames_equal(clip_1.duration_seconds, clip_2.duration_seconds)
+        torch.testing.assert_close(
+            clip_1.pts_seconds, clip_2.pts_seconds, rtol=0, atol=0
+        )
+        torch.testing.assert_close(
+            clip_1.duration_seconds, clip_2.duration_seconds, rtol=0, atol=0
+        )
 
     # Call with a different seed, expect different results
     torch.manual_seed(1)
