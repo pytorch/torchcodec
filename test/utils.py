@@ -31,14 +31,39 @@ def cpu_and_cuda():
 def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
-            # CUDA tensors are not exactly equal on Linux, so we need to use a
-            # higher tolerance.
-            absolute_tolerance = 2
+            atol = 2
+            if in_fbcode():
+                assert_tensor_close_on_at_least(args[0], args[1], percentage=95, atol=atol)
+            else:
+                torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
         else:
-            absolute_tolerance = 0
+            torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:
-        absolute_tolerance = 3
-    torch.testing.assert_close(*args, **kwargs, atol=absolute_tolerance, rtol=0)
+        torch.testing.assert_close(*args, **kwargs, atol=3, rtol=0)
+
+
+# Asserts that at least `percentage`% of the values are within the absolute tolerance.
+# Percentage is expected in [0, 100] (actually, [60, 100])
+def assert_tensor_close_on_at_least(
+    actual_tensor, ref_tensor, *, percentage, atol
+):
+    # In theory lower bound should be 0, but we want to make sure we don't
+    # mistakenly pass percentage in [0, 1]
+    assert 60 < percentage <= 100, (
+        f"Percentage must be in [60, 100], got {percentage}. "
+        "Are you sure setting such a low tolerance is desired?"
+    )
+    assert (
+        actual_tensor.device == ref_tensor.device
+    ), f"Devices don't match: {actual_tensor.device} vs {ref_tensor.device}"
+
+    abs_diff = (ref_tensor.float() - actual_tensor.float()).abs()
+    valid_percentage = (abs_diff <= atol).float().mean() * 100
+    if valid_percentage < percentage:
+        raise AssertionError(
+            f"Expected at least {percentage}% of values to be within atol={atol}, "
+            f"but only {valid_percentage}% were."
+        )
 
 
 def in_fbcode() -> bool:
