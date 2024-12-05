@@ -33,7 +33,9 @@ def assert_frames_equal(*args, **kwargs):
         if args[0].device.type == "cuda":
             atol = 2
             if in_fbcode():
-                assert_tensor_close_on_at_least(args[0], args[1], percentage=95, atol=atol)
+                assert_tensor_close_on_at_least(
+                    args[0], args[1], percentage=95, atol=atol
+                )
             else:
                 torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
         else:
@@ -44,9 +46,7 @@ def assert_frames_equal(*args, **kwargs):
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
 # Percentage is expected in [0, 100] (actually, [60, 100])
-def assert_tensor_close_on_at_least(
-    actual_tensor, ref_tensor, *, percentage, atol
-):
+def assert_tensor_close_on_at_least(actual_tensor, ref_tensor, *, percentage, atol):
     # In theory lower bound should be 0, but we want to make sure we don't
     # mistakenly pass percentage in [0, 1]
     assert 60 < percentage <= 100, (
