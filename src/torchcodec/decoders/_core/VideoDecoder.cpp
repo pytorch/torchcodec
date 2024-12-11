@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include "src/torchcodec/decoders/_core/DeviceInterface.h"
@@ -305,42 +306,40 @@ void VideoDecoder::initializeFilterGraphForStream(
   if (filterState.filterGraph) {
     return;
   }
+
   filterState.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterState.filterGraph.get() != nullptr);
   if (options.ffmpegThreadCount.has_value()) {
     filterState.filterGraph->nb_threads = options.ffmpegThreadCount.value();
   }
+
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
   const AVFilter* buffersink = avfilter_get_by_name("buffersink");
-  enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
   const StreamInfo& activeStream = streams_[streamIndex];
-
   AVCodecContext* codecContext = activeStream.codecContext.get();
-  char args[512];
-  snprintf(
-      args,
-      sizeof(args),
-      "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-      codecContext->width,
-      codecContext->height,
-      codecContext->pix_fmt,
-      activeStream.stream->time_base.num,
-      activeStream.stream->time_base.den,
-      codecContext->sample_aspect_ratio.num,
-      codecContext->sample_aspect_ratio.den);
+
+  std::stringstream filterArgs;
+  filterArgs << "video_size=" << codecContext->width << "x"
+             << codecContext->height;
+  filterArgs << ":pix_fmt=" << codecContext->pix_fmt;
+  filterArgs << ":time_base=" << activeStream.stream->time_base.num << "/"
+             << activeStream.stream->time_base.den;
+  filterArgs << ":pixel_aspect=" << codecContext->sample_aspect_ratio.num << "/"
+             << codecContext->sample_aspect_ratio.den;
 
   int ffmpegStatus = avfilter_graph_create_filter(
       &filterState.sourceContext,
       buffersrc,
       "in",
-      args,
+      filterArgs.str().c_str(),
       nullptr,
       filterState.filterGraph.get());
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
-        std::string("Failed to create filter graph: ") + args + ": " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        std::string("Failed to create filter graph: ") + filterArgs.str() +
+        ": " + getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+
   ffmpegStatus = avfilter_graph_create_filter(
       &filterState.sinkContext,
       buffersink,
@@ -353,6 +352,8 @@ void VideoDecoder::initializeFilterGraphForStream(
         "Failed to create filter graph: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+
+  enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
   ffmpegStatus = av_opt_set_int_list(
       filterState.sinkContext,
       "pix_fmts",
@@ -364,8 +365,10 @@ void VideoDecoder::initializeFilterGraphForStream(
         "Failed to set output pixel formats: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+
   UniqueAVFilterInOut outputs(avfilter_inout_alloc());
   UniqueAVFilterInOut inputs(avfilter_inout_alloc());
+
   outputs->name = av_strdup("in");
   outputs->filter_ctx = filterState.sourceContext;
   outputs->pad_idx = 0;
@@ -374,23 +377,18 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->filter_ctx = filterState.sinkContext;
   inputs->pad_idx = 0;
   inputs->next = nullptr;
-  char description[512];
+
   auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
       options, containerMetadata_.streams[streamIndex]);
-  int height = frameDims.height;
-  int width = frameDims.width;
+  std::stringstream description;
+  description << "scale=" << frameDims.width << ":" << frameDims.height;
+  description << ":sws_flags=bilinear";
 
-  std::snprintf(
-      description,
-      sizeof(description),
-      "scale=%d:%d:sws_flags=bilinear",
-      width,
-      height);
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
   ffmpegStatus = avfilter_graph_parse_ptr(
       filterState.filterGraph.get(),
-      description,
+      description.str().c_str(),
       &inputsTmp,
       &outputsTmp,
       nullptr);
@@ -401,6 +399,7 @@ void VideoDecoder::initializeFilterGraphForStream(
         "Failed to parse filter description: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+
   ffmpegStatus = avfilter_graph_config(filterState.filterGraph.get(), nullptr);
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
