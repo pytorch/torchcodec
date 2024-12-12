@@ -88,7 +88,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--bm_video_creation",
+        "--bm-video-creation",
         help="Benchmark large video creation memory",
         default=False,
         action=argparse.BooleanOptionalAction,
@@ -100,13 +100,13 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
-        "--min_run_seconds",
+        "--min-run-seconds",
         help="Benchmark minimum run time, in seconds, to wait per datapoint",
         type=float,
         default=2.0,
     )
     parser.add_argument(
-        "--video_paths",
+        "--video-paths",
         help="Comma-separated paths to videos that you want to benchmark.",
         type=str,
         default=get_test_resource_path("nasa_13013.mp4"),
@@ -129,13 +129,13 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--video_dir",
+        "--video-dir",
         help="Directory where video files reside. We will run benchmarks on all .mp4 files in this directory.",
         type=str,
         default="",
     )
     parser.add_argument(
-        "--plot_path",
+        "--plot-path",
         help="Path where the generated plot is stored, if non-empty",
         type=str,
         default="benchmarks.png",
