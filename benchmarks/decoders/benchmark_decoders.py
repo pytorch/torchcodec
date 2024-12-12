@@ -16,7 +16,6 @@ import torch
 
 from benchmark_decoders_library import (
     AbstractDecoder,
-    BatchParameters,
     DecordAccurate,
     DecordAccurateBatch,
     plot_data,
