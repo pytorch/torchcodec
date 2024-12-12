@@ -16,7 +16,6 @@ import torch
 
 from benchmark_decoders_library import (
     AbstractDecoder,
-    BatchParameters,
     DecordAccurate,
     DecordAccurateBatch,
     plot_data,
@@ -89,9 +88,9 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--bm_video_creation",
+        "--bm-video-creation",
         help="Benchmark large video creation memory",
-        default=True,
+        default=False,
         action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
@@ -101,13 +100,13 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
     )
     parser.add_argument(
-        "--bm_video_speed_min_run_seconds",
+        "--min-run-seconds",
         help="Benchmark minimum run time, in seconds, to wait per datapoint",
         type=float,
         default=2.0,
     )
     parser.add_argument(
-        "--bm_video_paths",
+        "--video-paths",
         help="Comma-separated paths to videos that you want to benchmark.",
         type=str,
         default=get_test_resource_path("nasa_13013.mp4"),
@@ -130,16 +129,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--bm_video_dir",
+        "--video-dir",
         help="Directory where video files reside. We will run benchmarks on all .mp4 files in this directory.",
         type=str,
         default="",
     )
     parser.add_argument(
-        "--plot_path",
+        "--plot-path",
         help="Path where the generated plot is stored, if non-empty",
         type=str,
-        default="",
+        default="benchmarks.png",
     )
 
     args = parser.parse_args()
@@ -163,10 +162,10 @@ def main() -> None:
         kind = decoder_registry[decoder].kind
         decoders_to_run[display] = kind(**options)
 
-    video_paths = args.bm_video_paths.split(",")
-    if args.bm_video_dir:
+    video_paths = args.video_paths.split(",")
+    if args.video_dir:
         video_paths = []
-        for entry in os.scandir(args.bm_video_dir):
+        for entry in os.scandir(args.video_dir):
             if entry.is_file() and entry.name.endswith(".mp4"):
                 video_paths.append(entry.path)
 
@@ -175,9 +174,8 @@ def main() -> None:
         video_paths,
         num_uniform_samples,
         num_sequential_frames_from_start=[1, 10, 100],
-        min_runtime_seconds=args.bm_video_speed_min_run_seconds,
+        min_runtime_seconds=args.min_run_seconds,
         benchmark_video_creation=args.bm_video_creation,
-        batch_parameters=BatchParameters(num_threads=8, batch_size=40),
     )
     data = {
         "experiments": results,

@@ -649,7 +649,6 @@ def run_benchmarks(
     min_runtime_seconds: float,
     benchmark_video_creation: bool,
     dataloader_parameters: DataLoaderInspiredWorkloadParameters = None,
-    batch_parameters: BatchParameters = None,
 ) -> list[dict[str, str | float | int]]:
     # Ensure that we have the same seed across benchmark runs.
     torch.manual_seed(0)
@@ -752,40 +751,6 @@ def run_benchmarks(
                     )
                 )
 
-                if batch_parameters:
-                    seeked_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.decode_frames, video_file, pts_list, batch_parameters=batch_parameters)",
-                        globals={
-                            "video_file": str(video_file_path),
-                            "pts_list": pts_list,
-                            "decoder": decoder,
-                            "run_batch_using_threads": run_batch_using_threads,
-                            "batch_parameters": batch_parameters,
-                        },
-                        label=f"video={video_file_path} {metadata_label}",
-                        sub_label=decoder_name,
-                        description=decoder.decode_frames_description(
-                            num_samples, kind
-                        ),
-                    )
-                    print(
-                        f"{decoder_name} batch {decoder.decode_frames_description(num_samples, kind)}"
-                    )
-                    results.append(
-                        seeked_result.blocked_autorange(
-                            min_run_time=min_runtime_seconds
-                        )
-                    )
-                    df_data.append(
-                        convert_result_to_df_item(
-                            results[-1],
-                            decoder_name,
-                            video_file_path,
-                            num_samples * batch_parameters.batch_size,
-                            decoder.decode_frames_description(num_samples, kind),
-                        )
-                    )
-
             for num_frames in num_sequential_frames_from_start:
                 consecutive_frames_result = benchmark.Timer(
                     stmt="decoder.decode_first_n_frames(video_file, n)",
@@ -816,51 +781,16 @@ def run_benchmarks(
                     )
                 )
 
-                if batch_parameters:
-                    consecutive_frames_result = benchmark.Timer(
-                        stmt="run_batch_using_threads(decoder.decode_first_n_frames, video_file, n, batch_parameters=batch_parameters)",
-                        globals={
-                            "video_file": str(video_file_path),
-                            "n": num_frames,
-                            "decoder": decoder,
-                            "run_batch_using_threads": run_batch_using_threads,
-                            "batch_parameters": batch_parameters,
-                        },
-                        label=f"video={video_file_path} {metadata_label}",
-                        sub_label=decoder_name,
-                        description=decoder.decode_first_n_frames_description(
-                            num_frames
-                        ),
-                    )
-                    print(
-                        f"{decoder_name} batch {decoder.decode_first_n_frames_description(num_frames)}"
-                    )
-                    results.append(
-                        consecutive_frames_result.blocked_autorange(
-                            min_run_time=min_runtime_seconds
-                        )
-                    )
-                    df_data.append(
-                        convert_result_to_df_item(
-                            results[-1],
-                            decoder_name,
-                            video_file_path,
-                            num_frames * batch_parameters.batch_size,
-                            decoder.decode_first_n_frames_description(num_frames),
-                        )
-                    )
-
-        first_video_file_path = video_files_paths[0]
         if benchmark_video_creation:
             metadata = get_metadata(video_file_path)
             metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
             creation_result = benchmark.Timer(
                 stmt="create_torchcodec_core_decode_first_frame(video_file)",
                 globals={
-                    "video_file": str(first_video_file_path),
+                    "video_file": str(video_file_path),
                     "create_torchcodec_core_decode_first_frame": create_torchcodec_core_decode_first_frame,
                 },
-                label=f"video={first_video_file_path} {metadata_label}",
+                label=f"video={video_file_path} {metadata_label}",
                 sub_label="TorchCodecCore",
                 description="create decode first",
             )
