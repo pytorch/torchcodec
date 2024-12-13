@@ -101,7 +101,7 @@ std::vector<std::string> splitStringWithDelimiters(
   return result;
 }
 
-VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibraryForWidth(
+VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
     int width) {
   VideoDecoder::ColorConversionLibrary library =
       VideoDecoder::ColorConversionLibrary::SWSCALE;
@@ -299,9 +299,10 @@ std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
   return decoder;
 }
 
-void VideoDecoder::initializeFilterGraphForStream(
+void VideoDecoder::initializeFilterGraph(
     StreamInfo& streamInfo,
-    const AVFrame& frame) {
+    int expectedOutputHeight,
+    int expectedOutputWidth) {
   FilterState& filterState = streamInfo.filterState;
   if (filterState.filterGraph) {
     return;
@@ -378,10 +379,8 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
 
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
   std::stringstream description;
-  description << "scale=" << frameDims.width << ":" << frameDims.height;
+  description << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
   description << ":sws_flags=bilinear";
 
   AVFilterInOut* outputsTmp = outputs.release();
@@ -469,25 +468,16 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.options = options;
   int width = options.width.value_or(codecContext->width);
 
-  // Use swscale for color conversion by default because it is faster.
-  VideoDecoder::ColorConversionLibrary defaultColorConversionLibrary =
-      getDefaultColorConversionLibraryForWidth(width);
-  // If the user specifies the color conversion library (example in
-  // benchmarks), we use that instead.
-  auto colorConversionLibrary =
-      options.colorConversionLibrary.value_or(defaultColorConversionLibrary);
-
-  if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-    streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-  } else if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-    streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
-  } else {
-    throw std::invalid_argument(
-        "Invalid colorConversionLibrary=" +
-        std::to_string(static_cast<int>(colorConversionLibrary)) +
-        ". colorConversionLibrary must be either "
-        "filtergraph or swscale.");
-  }
+  // By default, we want to use swscale for color conversion because it is
+  // faster. However, it has width requirements, so we may need to fall back
+  // to filtergraph. We also need to respect what was requested from the
+  // options; we respect the options unconditionally, so it's possible for
+  // swscale's width requirements to be violated. We don't expose the ability to
+  // choose color conversion library publicly; we only use this ability
+  // internally.
+  auto defaultLibrary = getDefaultColorConversionLibrary(width);
+  streamInfo.colorConversionLibrary =
+      options.colorConversionLibrary.value_or(defaultLibrary);
 }
 
 void VideoDecoder::updateMetadataWithCodecContext(
@@ -937,7 +927,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      // Note that is is a lazy init; we initialize filtergraph the first time
+      // Note that is a lazy init; we initialize filtergraph the first time
       // we have a raw decoded frame. We do this lazily because up until this
       // point, we really don't know what the resolution of the frames are
       // without modification. In theory, we should be able to get that from the
@@ -945,7 +935,8 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       // stream metadata had a different resolution from the actual resolution
       // of the raw decoded frames.
       if (!streamInfo.filterState.filterGraph) {
-        initializeFilterGraphForStream(streamInfo, *frame);
+        initializeFilterGraph(
+            streamInfo, expectedOutputHeight, expectedOutputWidth);
       }
       outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
 
@@ -970,13 +961,11 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       } else {
         output.frame = outputTensor;
       }
-
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
           std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
     }
-
   } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
     // audio decoding.

@@ -376,9 +376,10 @@ class VideoDecoder {
   void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
-  void initializeFilterGraphForStream(
+  void initializeFilterGraph(
       StreamInfo& streamInfo,
-      const AVFrame& frame);
+      int expectedOutputHeight,
+      int expectedOutputWidth);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
