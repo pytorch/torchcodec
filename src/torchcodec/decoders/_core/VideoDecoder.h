@@ -157,7 +157,7 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
 
-  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
@@ -377,8 +377,8 @@ class VideoDecoder {
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraphForStream(
-      int streamIndex,
-      const VideoStreamDecoderOptions& options);
+      StreamInfo& streamInfo,
+      const AVFrame& frame);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
@@ -436,7 +436,7 @@ class VideoDecoder {
 // We always allocate [N]HWC tensors. The low-level decoding functions all
 // assume HWC tensors, since this is what FFmpeg natively handles. It's up to
 // the high-level decoding entry-points to permute that back to CHW, by calling
-// MaybePermuteHWC2CHW().
+// maybePermuteHWC2CHW().
 //
 // Also, importantly, the way we figure out the the height and width of the
 // output frame tensor varies, and depends on the decoding entry-point. In

@@ -121,7 +121,7 @@ VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibraryForWidth(
 // or 4D.
 // Calling permute() is guaranteed to return a view as per the docs:
 // https://pytorch.org/docs/stable/generated/torch.permute.html
-torch::Tensor VideoDecoder::MaybePermuteHWC2CHW(
+torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
     int streamIndex,
     torch::Tensor& hwcTensor) {
   if (streams_[streamIndex].options.dimensionOrder == "NHWC") {
@@ -300,30 +300,30 @@ std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
 }
 
 void VideoDecoder::initializeFilterGraphForStream(
-    int streamIndex,
-    const VideoStreamDecoderOptions& options) {
-  FilterState& filterState = streams_[streamIndex].filterState;
+    StreamInfo& streamInfo,
+    const AVFrame& frame) {
+  FilterState& filterState = streamInfo.filterState;
   if (filterState.filterGraph) {
     return;
   }
 
   filterState.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterState.filterGraph.get() != nullptr);
-  if (options.ffmpegThreadCount.has_value()) {
-    filterState.filterGraph->nb_threads = options.ffmpegThreadCount.value();
+  if (streamInfo.options.ffmpegThreadCount.has_value()) {
+    filterState.filterGraph->nb_threads =
+        streamInfo.options.ffmpegThreadCount.value();
   }
 
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
   const AVFilter* buffersink = avfilter_get_by_name("buffersink");
-  const StreamInfo& activeStream = streams_[streamIndex];
-  AVCodecContext* codecContext = activeStream.codecContext.get();
+  AVCodecContext* codecContext = streamInfo.codecContext.get();
 
   std::stringstream filterArgs;
   filterArgs << "video_size=" << codecContext->width << "x"
              << codecContext->height;
   filterArgs << ":pix_fmt=" << codecContext->pix_fmt;
-  filterArgs << ":time_base=" << activeStream.stream->time_base.num << "/"
-             << activeStream.stream->time_base.den;
+  filterArgs << ":time_base=" << streamInfo.stream->time_base.num << "/"
+             << streamInfo.stream->time_base.den;
   filterArgs << ":pixel_aspect=" << codecContext->sample_aspect_ratio.num << "/"
              << codecContext->sample_aspect_ratio.den;
 
@@ -378,8 +378,8 @@ void VideoDecoder::initializeFilterGraphForStream(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
 
-  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
-      options, containerMetadata_.streams[streamIndex]);
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, frame);
   std::stringstream description;
   description << "scale=" << frameDims.width << ":" << frameDims.height;
   description << ":sws_flags=bilinear";
@@ -478,7 +478,6 @@ void VideoDecoder::addVideoStreamDecoder(
       options.colorConversionLibrary.value_or(defaultColorConversionLibrary);
 
   if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
-    initializeFilterGraphForStream(streamNumber, options);
     streamInfo.colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
   } else if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
     streamInfo.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
@@ -938,6 +937,16 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
+      // Note that is is a lazy init; we initialize filtergraph the first time
+      // we have a raw decoded frame. We do this lazily because up until this
+      // point, we really don't know what the resolution of the frames are
+      // without modification. In theory, we should be able to get that from the
+      // stream metadata, but in practice, we have encountered videos where the
+      // stream metadata had a different resolution from the actual resolution
+      // of the raw decoded frames.
+      if (!streamInfo.filterState.filterGraph) {
+        initializeFilterGraphForStream(streamInfo, *frame);
+      }
       outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
 
       // Similarly to above, if this check fails it means the frame wasn't
@@ -952,6 +961,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
           expectedOutputWidth,
           "x3, got ",
           shape);
+
       if (preAllocatedOutputTensor.has_value()) {
         // We have already validated that preAllocatedOutputTensor and
         // outputTensor have the same shape.
@@ -960,6 +970,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       } else {
         output.frame = outputTensor;
       }
+
     } else {
       throw std::runtime_error(
           "Invalid color conversion library: " +
@@ -1007,7 +1018,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
       });
   // Convert the frame to tensor.
   auto output = convertAVFrameToDecodedOutput(rawOutput);
-  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
@@ -1045,7 +1056,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
   auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
-  output.frame = MaybePermuteHWC2CHW(streamIndex, output.frame);
+  output.frame = maybePermuteHWC2CHW(streamIndex, output.frame);
   return output;
 }
 
@@ -1118,7 +1129,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     }
     previousIndexInVideo = indexInVideo;
   }
-  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
+  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
   return output;
 }
 
@@ -1193,7 +1204,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
+  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
   return output;
 }
 
@@ -1246,7 +1257,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     BatchDecodedOutput output(0, options, streamMetadata);
-    output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
+    output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
   }
 
@@ -1287,7 +1298,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = MaybePermuteHWC2CHW(streamIndex, output.frames);
+  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
 
   return output;
 }
@@ -1303,7 +1314,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextFrameOutputNoDemuxInternal();
-  output.frame = MaybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
