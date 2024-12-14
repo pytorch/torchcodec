@@ -46,27 +46,23 @@ class VideoDecoder {
  public:
   ~VideoDecoder();
 
-  struct DecoderOptions {
-    DecoderOptions() {}
-    // TODO: Add options for the entire decoder here, or remove if not needed.
-  };
-
   // --------------------------------------------------------------------------
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
-  // Creates a VideoDecoder with the given options for the video in file
-  // `videoFilePath`. If it fails, returns an error status.
-  static std::unique_ptr<VideoDecoder> createFromFilePath(
-      const std::string& videoFilePath,
-      const DecoderOptions& options = DecoderOptions());
+  // Creates a VideoDecoder from the video at videoFilePath.
+  explicit VideoDecoder(const std::string& videoFilePath);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
+  explicit VideoDecoder(const void* buffer, size_t length);
+
+  static std::unique_ptr<VideoDecoder> createFromFilePath(
+      const std::string& videoFilePath);
+
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
-      size_t length,
-      const DecoderOptions& options = DecoderOptions());
+      size_t length);
 
   // --------------------------------------------------------------------------
   // VIDEO METADATA QUERY API
@@ -157,7 +153,7 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
 
-  torch::Tensor MaybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
@@ -349,7 +345,6 @@ class VideoDecoder {
     SwsContextKey swsContextKey;
     UniqueSwsContext swsContext;
   };
-  VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
   // index. Note that this index may be truncated for some files.
   int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
@@ -376,9 +371,10 @@ class VideoDecoder {
   void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
-  void initializeFilterGraphForStream(
-      int streamIndex,
-      const VideoStreamDecoderOptions& options);
+  void initializeFilterGraph(
+      StreamInfo& streamInfo,
+      int expectedOutputHeight,
+      int expectedOutputWidth);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
@@ -408,7 +404,6 @@ class VideoDecoder {
   DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecoderOptions options_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streams_;
@@ -436,7 +431,7 @@ class VideoDecoder {
 // We always allocate [N]HWC tensors. The low-level decoding functions all
 // assume HWC tensors, since this is what FFmpeg natively handles. It's up to
 // the high-level decoding entry-points to permute that back to CHW, by calling
-// MaybePermuteHWC2CHW().
+// maybePermuteHWC2CHW().
 //
 // Also, importantly, the way we figure out the the height and width of the
 // output frame tensor varies, and depends on the decoding entry-point. In
