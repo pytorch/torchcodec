@@ -50,16 +50,16 @@ class VideoDecoder {
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
+  // Creates a VideoDecoder from the video at videoFilePath.
   explicit VideoDecoder(const std::string& videoFilePath);
-  explicit VideoDecoder(const void* buffer, size_t length);
-
-  // Creates a VideoDecoder with the given options for the video in file
-  // `videoFilePath`. If it fails, returns an error status.
-  static std::unique_ptr<VideoDecoder> createFromFilePath(
-      const std::string& videoFilePath);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
+  explicit VideoDecoder(const void* buffer, size_t length);
+
+  static std::unique_ptr<VideoDecoder> createFromFilePath(
+      const std::string& videoFilePath);
+
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
       size_t length);
