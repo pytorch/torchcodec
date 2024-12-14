@@ -46,27 +46,23 @@ class VideoDecoder {
  public:
   ~VideoDecoder();
 
-  struct DecoderOptions {
-    DecoderOptions() {}
-    // TODO: Add options for the entire decoder here, or remove if not needed.
-  };
-
   // --------------------------------------------------------------------------
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
+  explicit VideoDecoder(const std::string& videoFilePath);
+  explicit VideoDecoder(const void* buffer, size_t length);
+
   // Creates a VideoDecoder with the given options for the video in file
   // `videoFilePath`. If it fails, returns an error status.
   static std::unique_ptr<VideoDecoder> createFromFilePath(
-      const std::string& videoFilePath,
-      const DecoderOptions& options = DecoderOptions());
+      const std::string& videoFilePath);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
-      size_t length,
-      const DecoderOptions& options = DecoderOptions());
+      size_t length);
 
   // --------------------------------------------------------------------------
   // VIDEO METADATA QUERY API
@@ -349,7 +345,6 @@ class VideoDecoder {
     SwsContextKey swsContextKey;
     UniqueSwsContext swsContext;
   };
-  VideoDecoder();
   // Returns the key frame index of the presentation timestamp using FFMPEG's
   // index. Note that this index may be truncated for some files.
   int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
@@ -409,7 +404,6 @@ class VideoDecoder {
   DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecoderOptions options_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streams_;
