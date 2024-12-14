@@ -219,14 +219,17 @@ bool VideoDecoder::SwsContextKey::operator!=(
 VideoDecoder::VideoDecoder(const std::string& videoFilePath) {
   AVInput input = createAVFormatContextFromFilePath(videoFilePath);
   formatContext_ = std::move(input.formatContext);
+
   initializeDecoder();
 }
 
 VideoDecoder::VideoDecoder(const void* buffer, size_t length) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+
   AVInput input = createAVFormatContextFromBuffer(buffer, length);
   formatContext_ = std::move(input.formatContext);
   ioBytesContext_ = std::move(input.ioBytesContext);
+
   initializeDecoder();
 }
 
