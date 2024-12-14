@@ -216,7 +216,22 @@ bool VideoDecoder::SwsContextKey::operator!=(
   return !(*this == other);
 }
 
-VideoDecoder::VideoDecoder() {}
+VideoDecoder::VideoDecoder(const std::string& videoFilePath) {
+  AVInput input = createAVFormatContextFromFilePath(videoFilePath);
+  formatContext_ = std::move(input.formatContext);
+
+  initializeDecoder();
+}
+
+VideoDecoder::VideoDecoder(const void* buffer, size_t length) {
+  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+
+  AVInput input = createAVFormatContextFromBuffer(buffer, length);
+  formatContext_ = std::move(input.formatContext);
+  ioBytesContext_ = std::move(input.ioBytesContext);
+
+  initializeDecoder();
+}
 
 void VideoDecoder::initializeDecoder() {
   // Some formats don't store enough info in the header so we read/decode a few
@@ -275,28 +290,14 @@ void VideoDecoder::initializeDecoder() {
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::createFromFilePath(
-    const std::string& videoFilePath,
-    const VideoDecoder::DecoderOptions& options) {
-  AVInput input = createAVFormatContextFromFilePath(videoFilePath);
-  std::unique_ptr<VideoDecoder> decoder(new VideoDecoder());
-  decoder->formatContext_ = std::move(input.formatContext);
-  decoder->options_ = options;
-  decoder->initializeDecoder();
-  return decoder;
+    const std::string& videoFilePath) {
+  return std::unique_ptr<VideoDecoder>(new VideoDecoder(videoFilePath));
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
     const void* buffer,
-    size_t length,
-    const VideoDecoder::DecoderOptions& options) {
-  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
-  AVInput input = createAVFormatContextFromBuffer(buffer, length);
-  std::unique_ptr<VideoDecoder> decoder(new VideoDecoder());
-  decoder->formatContext_ = std::move(input.formatContext);
-  decoder->ioBytesContext_ = std::move(input.ioBytesContext);
-  decoder->options_ = options;
-  decoder->initializeDecoder();
-  return decoder;
+    size_t length) {
+  return std::unique_ptr<VideoDecoder>(new VideoDecoder(buffer, length));
 }
 
 void VideoDecoder::initializeFilterGraph(
