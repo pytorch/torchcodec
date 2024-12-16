@@ -50,12 +50,19 @@ class VideoDecoder {
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
+  enum class SeekMode { EXACT, APPROXIMATE };
+
   // Creates a VideoDecoder from the video at videoFilePath.
-  explicit VideoDecoder(const std::string& videoFilePath);
+  explicit VideoDecoder(
+      const std::string& videoFilePath,
+      SeekMode seek = SeekMode::EXACT);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
-  explicit VideoDecoder(const void* buffer, size_t length);
+  explicit VideoDecoder(
+      const void* buffer,
+      size_t length,
+      SeekMode seek = SeekMode::EXACT);
 
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath);
@@ -368,13 +375,19 @@ class VideoDecoder {
   void initializeDecoder();
   void validateUserProvidedStreamIndex(uint64_t streamIndex);
   void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
+  void validateFrameIndex(const StreamInfo& streamInfo, const StreamMetadata& streamMetadata, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void initializeFilterGraph(
       StreamInfo& streamInfo,
       int expectedOutputHeight,
       int expectedOutputWidth);
+
+  int64_t getFramesSize(const StreamInfo& streamInfo, const StreamMetadata& streamMetadata);
+  int64_t getPts(
+      const StreamInfo& stream,
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
@@ -404,6 +417,7 @@ class VideoDecoder {
   DecodedOutput getNextFrameOutputNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streams_;

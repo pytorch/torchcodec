@@ -216,14 +216,16 @@ bool VideoDecoder::SwsContextKey::operator!=(
   return !(*this == other);
 }
 
-VideoDecoder::VideoDecoder(const std::string& videoFilePath) {
+VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seek)
+    : seekMode_(seek) {
   AVInput input = createAVFormatContextFromFilePath(videoFilePath);
   formatContext_ = std::move(input.formatContext);
 
   initializeDecoder();
 }
 
-VideoDecoder::VideoDecoder(const void* buffer, size_t length) {
+VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seek)
+    : seekMode_(seek) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
 
   AVInput input = createAVFormatContextFromBuffer(buffer, length);
@@ -1033,13 +1035,15 @@ void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
 }
 
 void VideoDecoder::validateFrameIndex(
-    const StreamInfo& stream,
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata,
     int64_t frameIndex) {
+  int64_t framesSize = getFramesSize(streamInfo, streamMetadata);
   TORCH_CHECK(
-      frameIndex >= 0 && frameIndex < stream.allFrames.size(),
+      frameIndex >= 0 && frameIndex < framesSize,
       "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(stream.streamIndex) +
-          " numFrames=" + std::to_string(stream.allFrames.size()));
+          " for streamIndex=" + std::to_string(streamInfo.streamIndex) +
+          " numFrames=" + std::to_string(framesSize));
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
@@ -1050,6 +1054,32 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
   return output;
 }
 
+int64_t VideoDecoder::getPts(
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata,
+    int64_t frameIndex) {
+  switch (seekMode_) {
+    case SeekMode::EXACT:
+      return streamInfo.allFrames[frameIndex].pts;
+    case SeekMode::APPROXIMATE:
+      return secondsToClosestPts(
+          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+int64_t VideoDecoder::getFramesSize(const StreamInfo& streamInfo, const StreamMetadata& streamMetadata) {
+  switch(seekMode_) {
+    case SeekMode::EXACT:
+      return streamInfo.allFrames.size();
+    case SeekMode::APPROXIMATE:
+      return streamMetadata.numFrames.value();
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
     int streamIndex,
     int64_t frameIndex,
@@ -1057,11 +1087,12 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getFrameAtIndex");
 
-  const auto& stream = streams_[streamIndex];
-  validateFrameIndex(stream, frameIndex);
+  const auto& streamInfo = streams_[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  validateFrameIndex(streamInfo, streamMetadata, frameIndex);
 
-  int64_t pts = stream.allFrames[frameIndex].pts;
-  setCursorPtsInSeconds(ptsToSeconds(pts, stream.timeBase));
+  int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
+  setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
   return getNextFrameOutputNoDemuxInternal(preAllocatedOutputTensor);
 }
 
@@ -1332,10 +1363,11 @@ double VideoDecoder::getPtsSecondsForFrame(
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getPtsSecondsForFrame");
 
-  const auto& stream = streams_[streamIndex];
-  validateFrameIndex(stream, frameIndex);
+  const auto& streamInfo = streams_[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  validateFrameIndex(streamInfo, streamMetadata, frameIndex);
 
-  return ptsToSeconds(stream.allFrames[frameIndex].pts, stream.timeBase);
+  return ptsToSeconds(streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
 }
 
 int VideoDecoder::convertFrameToBufferUsingSwsScale(
