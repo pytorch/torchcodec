@@ -420,6 +420,8 @@ class VideoDecoder {
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
   // Whether or not we have already scanned all streams to update the metadata.
   bool scanned_all_streams_ = false;
+  // Tracks that we've already been initialized.
+  bool initialized_ = false;
 };
 
 // --------------------------------------------------------------------------
