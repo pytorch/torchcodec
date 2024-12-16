@@ -313,14 +313,14 @@ class VideoDecoder {
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
   };
-  struct SwsContextKey {
+  struct DecodedFrameContext {
     int decodedWidth;
     int decodedHeight;
     AVPixelFormat decodedFormat;
-    int outputWidth;
-    int outputHeight;
-    bool operator==(const SwsContextKey&);
-    bool operator!=(const SwsContextKey&);
+    int expectedWidth;
+    int expectedHeight;
+    bool operator==(const DecodedFrameContext&);
+    bool operator!=(const DecodedFrameContext&);
   };
   // Stores information for each stream.
   struct StreamInfo {
@@ -342,7 +342,7 @@ class VideoDecoder {
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
-    SwsContextKey swsContextKey;
+    DecodedFrameContext prevFrame;
     UniqueSwsContext swsContext;
   };
   // Returns the key frame index of the presentation timestamp using FFMPEG's
@@ -371,10 +371,14 @@ class VideoDecoder {
   void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
-  void initializeFilterGraph(
+  void createFilterGraph(
       StreamInfo& streamInfo,
       int expectedOutputHeight,
       int expectedOutputWidth);
+  void createSwsContext(
+      StreamInfo& streamInfo,
+      const DecodedFrameContext& frameContext,
+      const enum AVColorSpace colorspace);
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
@@ -389,7 +393,7 @@ class VideoDecoder {
   torch::Tensor convertFrameToTensorUsingFilterGraph(
       int streamIndex,
       const AVFrame* frame);
-  int convertFrameToBufferUsingSwsScale(
+  int convertFrameToTensorUsingSwsScale(
       int streamIndex,
       const AVFrame* frame,
       torch::Tensor& outputTensor);
