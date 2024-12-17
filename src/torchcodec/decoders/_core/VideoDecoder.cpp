@@ -1414,15 +1414,11 @@ int VideoDecoder::convertFrameToTensorUsingSwsScale(
     int streamIndex,
     const AVFrame* frame,
     torch::Tensor& outputTensor) {
-  enum AVPixelFormat frameFormat =
-      static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-
-  int expectedOutputHeight = outputTensor.sizes()[0];
-  int expectedOutputWidth = outputTensor.sizes()[1];
   SwsContext* swsContext = activeStream.swsContext.get();
   uint8_t* pointers[4] = {
       outputTensor.data_ptr<uint8_t>(), nullptr, nullptr, nullptr};
+  int expectedOutputWidth = outputTensor.sizes()[1];
   int linesizes[4] = {expectedOutputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(
       swsContext,
