@@ -204,15 +204,16 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
   frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
 }
 
-bool VideoDecoder::SwsContextKey::operator==(
-    const VideoDecoder::SwsContextKey& other) {
+bool VideoDecoder::DecodedFrameContext::operator==(
+    const VideoDecoder::DecodedFrameContext& other) {
   return decodedWidth == other.decodedWidth && decodedHeight == decodedHeight &&
       decodedFormat == other.decodedFormat &&
-      outputWidth == other.outputWidth && outputHeight == other.outputHeight;
+      expectedWidth == other.expectedWidth &&
+      expectedHeight == other.expectedHeight;
 }
 
-bool VideoDecoder::SwsContextKey::operator!=(
-    const VideoDecoder::SwsContextKey& other) {
+bool VideoDecoder::DecodedFrameContext::operator!=(
+    const VideoDecoder::DecodedFrameContext& other) {
   return !(*this == other);
 }
 
@@ -236,36 +237,41 @@ VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seek)
 }
 
 void VideoDecoder::initializeDecoder() {
-  // Some formats don't store enough info in the header so we read/decode a few
-  // frames to grab that. This is needed for the filter graph. Note: If this
-  // takes a long time, consider initializing the filter graph after the first
-  // frame decode.
+  TORCH_CHECK(!initialized_, "Attempted double initialization.");
+
   int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
         "Failed to find stream info: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
-  containerMetadata_.streams.resize(0);
+
   for (int i = 0; i < formatContext_->nb_streams; i++) {
     AVStream* stream = formatContext_->streams[i];
-    containerMetadata_.streams.resize(containerMetadata_.streams.size() + 1);
-    auto& curr = containerMetadata_.streams.back();
-    curr.streamIndex = i;
-    curr.mediaType = stream->codecpar->codec_type;
-    curr.codecName = avcodec_get_name(stream->codecpar->codec_id);
-    curr.bitRate = stream->codecpar->bit_rate;
+    StreamMetadata meta;
+
+    TORCH_CHECK(
+        i == stream->index,
+        "Our stream index, " + std::to_string(i) +
+            ", does not match AVStream's index, " +
+            std::to_string(stream->index) + ".");
+    meta.streamIndex = i;
+    meta.mediaType = stream->codecpar->codec_type;
+    meta.codecName = avcodec_get_name(stream->codecpar->codec_id);
+    meta.bitRate = stream->codecpar->bit_rate;
 
     int64_t frameCount = stream->nb_frames;
     if (frameCount > 0) {
-      curr.numFrames = frameCount;
+      meta.numFrames = frameCount;
     }
+
     if (stream->duration > 0 && stream->time_base.den > 0) {
-      curr.durationSeconds = av_q2d(stream->time_base) * stream->duration;
+      meta.durationSeconds = av_q2d(stream->time_base) * stream->duration;
     }
+
     double fps = av_q2d(stream->r_frame_rate);
     if (fps > 0) {
-      curr.averageFps = fps;
+      meta.averageFps = fps;
     }
 
     if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -273,22 +279,30 @@ void VideoDecoder::initializeDecoder() {
     } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       containerMetadata_.numAudioStreams++;
     }
+
+    containerMetadata_.streams.push_back(meta);
   }
+
   if (formatContext_->duration > 0) {
     containerMetadata_.durationSeconds =
         ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
   }
+
   if (formatContext_->bit_rate > 0) {
     containerMetadata_.bitRate = formatContext_->bit_rate;
   }
+
   int bestVideoStream = getBestStreamIndex(AVMEDIA_TYPE_VIDEO);
   if (bestVideoStream >= 0) {
     containerMetadata_.bestVideoStreamIndex = bestVideoStream;
   }
+
   int bestAudioStream = getBestStreamIndex(AVMEDIA_TYPE_AUDIO);
   if (bestAudioStream >= 0) {
     containerMetadata_.bestAudioStreamIndex = bestAudioStream;
   }
+
+  initialized_ = true;
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::createFromFilePath(
@@ -302,17 +316,14 @@ std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
   return std::unique_ptr<VideoDecoder>(new VideoDecoder(buffer, length));
 }
 
-void VideoDecoder::initializeFilterGraph(
+void VideoDecoder::createFilterGraph(
     StreamInfo& streamInfo,
     int expectedOutputHeight,
     int expectedOutputWidth) {
   FilterState& filterState = streamInfo.filterState;
-  if (filterState.filterGraph) {
-    return;
-  }
-
   filterState.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterState.filterGraph.get() != nullptr);
+
   if (streamInfo.options.ffmpegThreadCount.has_value()) {
     filterState.filterGraph->nb_threads =
         streamInfo.options.ffmpegThreadCount.value();
@@ -910,12 +921,32 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
 
   torch::Tensor outputTensor;
   if (output.streamType == AVMEDIA_TYPE_VIDEO) {
+    // We need to compare the current frame context with our previous frame
+    // context. If they are different, then we need to re-create our colorspace
+    // conversion objects. We create our colorspace conversion objects late so
+    // that we don't have to depend on the unreliable metadata in the header.
+    // And we sometimes re-create them because it's possible for frame
+    // resolution to change mid-stream. Finally, we want to reuse the colorspace
+    // conversion objects as much as possible for performance reasons.
+    enum AVPixelFormat frameFormat =
+        static_cast<enum AVPixelFormat>(frame->format);
+    auto frameContext = DecodedFrameContext{
+        frame->width,
+        frame->height,
+        frameFormat,
+        expectedOutputWidth,
+        expectedOutputHeight};
+
     if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
       outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
           expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
+      if (!streamInfo.swsContext || streamInfo.prevFrame != frameContext) {
+        createSwsContext(streamInfo, frameContext, frame->colorspace);
+        streamInfo.prevFrame = frameContext;
+      }
       int resultHeight =
-          convertFrameToBufferUsingSwsScale(streamIndex, frame, outputTensor);
+          convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
       // If this check failed, it would mean that the frame wasn't reshaped to
       // the expected height.
       // TODO: Can we do the same check for width?
@@ -930,16 +961,11 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     } else if (
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
-      // Note that is a lazy init; we initialize filtergraph the first time
-      // we have a raw decoded frame. We do this lazily because up until this
-      // point, we really don't know what the resolution of the frames are
-      // without modification. In theory, we should be able to get that from the
-      // stream metadata, but in practice, we have encountered videos where the
-      // stream metadata had a different resolution from the actual resolution
-      // of the raw decoded frames.
-      if (!streamInfo.filterState.filterGraph) {
-        initializeFilterGraph(
+      if (!streamInfo.filterState.filterGraph ||
+          streamInfo.prevFrame != frameContext) {
+        createFilterGraph(
             streamInfo, expectedOutputHeight, expectedOutputWidth);
+        streamInfo.prevFrame = frameContext;
       }
       outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
 
@@ -1370,63 +1396,61 @@ double VideoDecoder::getPtsSecondsForFrame(
   return ptsToSeconds(streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
 }
 
-int VideoDecoder::convertFrameToBufferUsingSwsScale(
+void VideoDecoder::createSwsContext(
+    StreamInfo& streamInfo,
+    const DecodedFrameContext& frameContext,
+    const enum AVColorSpace colorspace) {
+  SwsContext* swsContext = sws_getContext(
+      frameContext.decodedWidth,
+      frameContext.decodedHeight,
+      frameContext.decodedFormat,
+      frameContext.expectedWidth,
+      frameContext.expectedHeight,
+      AV_PIX_FMT_RGB24,
+      SWS_BILINEAR,
+      nullptr,
+      nullptr,
+      nullptr);
+  TORCH_CHECK(swsContext, "sws_getContext() returned nullptr");
+
+  int* invTable = nullptr;
+  int* table = nullptr;
+  int srcRange, dstRange, brightness, contrast, saturation;
+  int ret = sws_getColorspaceDetails(
+      swsContext,
+      &invTable,
+      &srcRange,
+      &table,
+      &dstRange,
+      &brightness,
+      &contrast,
+      &saturation);
+  TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
+
+  const int* colorspaceTable = sws_getCoefficients(colorspace);
+  ret = sws_setColorspaceDetails(
+      swsContext,
+      colorspaceTable,
+      srcRange,
+      colorspaceTable,
+      dstRange,
+      brightness,
+      contrast,
+      saturation);
+  TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
+
+  streamInfo.swsContext.reset(swsContext);
+}
+
+int VideoDecoder::convertFrameToTensorUsingSwsScale(
     int streamIndex,
     const AVFrame* frame,
     torch::Tensor& outputTensor) {
-  enum AVPixelFormat frameFormat =
-      static_cast<enum AVPixelFormat>(frame->format);
   StreamInfo& activeStream = streams_[streamIndex];
-
-  int expectedOutputHeight = outputTensor.sizes()[0];
-  int expectedOutputWidth = outputTensor.sizes()[1];
-  auto curFrameSwsContextKey = SwsContextKey{
-      frame->width,
-      frame->height,
-      frameFormat,
-      expectedOutputWidth,
-      expectedOutputHeight};
-  if (activeStream.swsContext.get() == nullptr ||
-      activeStream.swsContextKey != curFrameSwsContextKey) {
-    SwsContext* swsContext = sws_getContext(
-        frame->width,
-        frame->height,
-        frameFormat,
-        expectedOutputWidth,
-        expectedOutputHeight,
-        AV_PIX_FMT_RGB24,
-        SWS_BILINEAR,
-        nullptr,
-        nullptr,
-        nullptr);
-    int* invTable = nullptr;
-    int* table = nullptr;
-    int srcRange, dstRange, brightness, contrast, saturation;
-    sws_getColorspaceDetails(
-        swsContext,
-        &invTable,
-        &srcRange,
-        &table,
-        &dstRange,
-        &brightness,
-        &contrast,
-        &saturation);
-    const int* colorspaceTable = sws_getCoefficients(frame->colorspace);
-    sws_setColorspaceDetails(
-        swsContext,
-        colorspaceTable,
-        srcRange,
-        colorspaceTable,
-        dstRange,
-        brightness,
-        contrast,
-        saturation);
-    activeStream.swsContextKey = curFrameSwsContextKey;
-    activeStream.swsContext.reset(swsContext);
-  }
   SwsContext* swsContext = activeStream.swsContext.get();
   uint8_t* pointers[4] = {
       outputTensor.data_ptr<uint8_t>(), nullptr, nullptr, nullptr};
+  int expectedOutputWidth = outputTensor.sizes()[1];
   int linesizes[4] = {expectedOutputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(
       swsContext,
@@ -1447,10 +1471,12 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   if (ffmpegStatus < AVSUCCESS) {
     throw std::runtime_error("Failed to add frame to buffer source context");
   }
+
   UniqueAVFrame filteredFrame(av_frame_alloc());
   ffmpegStatus =
       av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
   TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
+
   auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredFrame.get());
   int height = frameDims.height;
   int width = frameDims.width;
@@ -1460,9 +1486,8 @@ torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
   auto deleter = [filteredFramePtr](void*) {
     UniqueAVFrame frameToDelete(filteredFramePtr);
   };
-  torch::Tensor tensor = torch::from_blob(
+  return torch::from_blob(
       filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
-  return tensor;
 }
 
 VideoDecoder::~VideoDecoder() {
