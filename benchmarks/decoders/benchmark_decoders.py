@@ -26,6 +26,7 @@ from benchmark_decoders_library import (
     TorchCodecCoreCompiled,
     TorchCodecCoreNonBatch,
     TorchCodecPublic,
+    TorchCodecPublicNonBatch,
     TorchVision,
 )
 
@@ -49,6 +50,9 @@ decoder_registry = {
         "TorchCodecCoreCompiled", TorchCodecCoreCompiled
     ),
     "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
+    "torchcodec_public_nonbatch": DecoderKind(
+        "TorchCodecPublicNonBatch", TorchCodecPublicNonBatch
+    ),
     "torchvision": DecoderKind(
         # We don't compare against TorchVision's "pyav" backend because it doesn't support
         # accurate seeks.
