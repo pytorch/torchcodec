@@ -94,7 +94,7 @@ OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
 // Implementations for the operators
 // ==============================
 
-at::Tensor create_from_file(c10::string_view filename) {
+at::Tensor create_from_file(std::string_view filename) {
   std::string filenameStr(filename);
   std::unique_ptr<VideoDecoder> uniqueDecoder =
       VideoDecoder::createFromFilePath(filenameStr);
@@ -121,9 +121,9 @@ void add_video_stream(
     std::optional<int64_t> width,
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
-    std::optional<c10::string_view> dimension_order,
+    std::optional<std::string_view> dimension_order,
     std::optional<int64_t> stream_index,
-    std::optional<c10::string_view> device) {
+    std::optional<std::string_view> device) {
   _add_video_stream(
       decoder,
       width,
@@ -139,10 +139,10 @@ void _add_video_stream(
     std::optional<int64_t> width,
     std::optional<int64_t> height,
     std::optional<int64_t> num_threads,
-    std::optional<c10::string_view> dimension_order,
+    std::optional<std::string_view> dimension_order,
     std::optional<int64_t> stream_index,
-    std::optional<c10::string_view> device,
-    std::optional<c10::string_view> color_conversion_library) {
+    std::optional<std::string_view> device,
+    std::optional<std::string_view> color_conversion_library) {
   VideoDecoder::VideoStreamDecoderOptions options;
   options.width = width;
   options.height = height;
