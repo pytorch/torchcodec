@@ -342,6 +342,65 @@ class TorchCodecPublic(AbstractDecoder):
         return frames
 
 
+class TorchCodecPublicNonBatch(AbstractDecoder):
+    def __init__(self, num_ffmpeg_threads=None, device="cpu"):
+        self._num_ffmpeg_threads = num_ffmpeg_threads
+        self._device = device
+
+        from torchvision.transforms import v2 as transforms_v2
+
+        self.transforms_v2 = transforms_v2
+
+    def decode_frames(self, video_file, pts_list):
+        num_ffmpeg_threads = (
+            int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
+        )
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+        )
+
+        frames = []
+        for pts in pts_list:
+            frame = decoder.get_frame_played_at(pts)
+            frames.append(frame)
+        return frames
+
+    def decode_first_n_frames(self, video_file, n):
+        num_ffmpeg_threads = (
+            int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
+        )
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+        )
+        frames = []
+        count = 0
+        for frame in decoder:
+            frames.append(frame)
+            count += 1
+            if count == n:
+                break
+        return frames
+
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
+        num_ffmpeg_threads = (
+            int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
+        )
+        decoder = VideoDecoder(
+            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+        )
+
+        frames = []
+        for pts in pts_list:
+            frame = decoder.get_frame_played_at(pts)
+            frames.append(frame)
+
+        frames = [
+            self.transforms_v2.functional.resize(frame.to(device), (height, width))
+            for frame in frames
+        ]
+        return frames
+
+
 @torch.compile(fullgraph=True, backend="eager")
 def compiled_seek_and_next(decoder, pts):
     seek_to_pts(decoder, pts)
