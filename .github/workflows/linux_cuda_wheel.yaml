@@ -66,7 +66,7 @@ jobs:
           # For the actual release we should add that label and change this to
           # include more python versions.
         python-version: ['3.9']
-        cuda-version: ['12.6']
+        cuda-version: ['11.8', '12.4', '12.6']
         ffmpeg-version-for-tests: ['5', '6', '7']
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
