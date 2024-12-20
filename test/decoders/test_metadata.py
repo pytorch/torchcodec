@@ -21,9 +21,10 @@ from ..utils import NASA_VIDEO
 
 
 def _get_video_metadata(path, with_scan: bool):
-    decoder = create_from_file(str(path))
     if with_scan:
-        scan_all_streams_to_update_metadata(decoder)
+        decoder = create_from_file(str(path), seek_mode="exact")
+    else:
+        decoder = create_from_file(str(path), seek_mode="approximate")
     return get_video_metadata(decoder)
 
 

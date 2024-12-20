@@ -53,19 +53,15 @@ class VideoDecoder {
   enum class SeekMode { exact, approximate };
 
   // Creates a VideoDecoder from the video at videoFilePath.
-  explicit VideoDecoder(
-      const std::string& videoFilePath,
-      SeekMode);
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
-  explicit VideoDecoder(
-      const void* buffer,
-      size_t length,
-      SeekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode);
 
   static std::unique_ptr<VideoDecoder> createFromFilePath(
-      const std::string& videoFilePath, SeekMode seekMode = SeekMode::exact);
+      const std::string& videoFilePath,
+      SeekMode seekMode = SeekMode::exact);
 
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
@@ -243,14 +239,14 @@ class VideoDecoder {
     torch::Tensor durationSeconds;
 
     explicit BatchDecodedOutput(
-      int64_t numFrames,
-      const VideoStreamDecoderOptions& options,
-      const StreamMetadata& metadata);
+        int64_t numFrames,
+        const VideoStreamDecoderOptions& options,
+        const StreamMetadata& metadata);
 
     explicit BatchDecodedOutput(
-      const std::vector<torch::Tensor>& inFrames,
-      std::vector<double>& inPtsSeconds,
-      std::vector<double>& inDurationSeconds);
+        const std::vector<torch::Tensor>& inFrames,
+        std::vector<double>& inPtsSeconds,
+        std::vector<double>& inDurationSeconds);
   };
 
   // Returns frames at the given indices for a given stream as a single stacked
@@ -381,7 +377,10 @@ class VideoDecoder {
   void initializeDecoder();
   void validateUserProvidedStreamIndex(uint64_t streamIndex);
   void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(const StreamInfo& streamInfo, const StreamMetadata& streamMetadata, int64_t frameIndex);
+  void validateFrameIndex(
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
 
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
@@ -390,7 +389,9 @@ class VideoDecoder {
       int expectedOutputHeight,
       int expectedOutputWidth);
 
-  int64_t getFramesSize(const StreamInfo& streamInfo, const StreamMetadata& streamMetadata);
+  int64_t getFramesSize(
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata);
 
   int64_t getPts(
       const StreamInfo& stream,
@@ -401,6 +402,10 @@ class VideoDecoder {
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
+
+  DecodedOutput getFramePlayedAtTimestampNoDemuxInternal(
+      double seconds,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
@@ -447,7 +452,7 @@ class VideoDecoder {
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
   // Whether or not we have already scanned all streams to update the metadata.
-  bool scanned_all_streams_ = false;
+  bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
 };

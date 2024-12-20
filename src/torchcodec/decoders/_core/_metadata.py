@@ -172,4 +172,4 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
 
 
 def get_video_metadata_from_header(filename: Union[str, pathlib.Path]) -> VideoMetadata:
-    return get_video_metadata(create_from_file(str(filename)))
+    return get_video_metadata(create_from_file(str(filename), seek_mode="approximate"))
