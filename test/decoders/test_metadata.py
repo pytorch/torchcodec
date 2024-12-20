@@ -13,7 +13,6 @@ from torchcodec.decoders._core import (
     get_ffmpeg_library_versions,
     get_video_metadata,
     get_video_metadata_from_header,
-    scan_all_streams_to_update_metadata,
     VideoStreamMetadata,
 )
 

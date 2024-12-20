@@ -116,7 +116,7 @@ class VideoDecoder:
             self._decoder, stream_index
         )
 
-        if seek_mode is "exact":
+        if seek_mode == "exact":
             if self.metadata.num_frames_from_content is None:
                 raise ValueError(
                     "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
@@ -136,7 +136,7 @@ class VideoDecoder:
                     + _ERROR_REPORTING_INSTRUCTIONS
                 )
             self._end_stream_seconds = self.metadata.end_stream_seconds
-        elif seek_mode is "approximate":
+        elif seek_mode == "approximate":
             if self.metadata.num_frames_from_header is None:
                 raise ValueError(
                     "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS

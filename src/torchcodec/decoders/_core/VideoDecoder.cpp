@@ -1162,7 +1162,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateUserProvidedStreamIndex(streamIndex);
-  //validateScannedAllStreams("getFrameAtIndex"); // converted
+  // validateScannedAllStreams("getFrameAtIndex"); // converted
 
   const auto& streamInfo = streams_[streamIndex];
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
@@ -1177,7 +1177,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
     const std::vector<int64_t>& frameIndices) {
   validateUserProvidedStreamIndex(streamIndex);
-  //validateScannedAllStreams("getFramesAtIndices"); // converted
+  // validateScannedAllStreams("getFramesAtIndices"); // converted
 
   auto indicesAreSorted =
       std::is_sorted(frameIndices.begin(), frameIndices.end());
@@ -1236,7 +1236,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
     int streamIndex,
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
-  //validateScannedAllStreams("getFramesPlayedByTimestamps"); // converted
+  // validateScannedAllStreams("getFramesPlayedByTimestamps"); // converted
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
@@ -1291,8 +1291,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
               std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
               ").");
 
-      DecodedOutput singleOut = getFramePlayedAtTimestampNoDemuxInternal(
-          framePts, output.frames[i]);
+      DecodedOutput singleOut =
+          getFramePlayedAtTimestampNoDemuxInternal(framePts, output.frames[i]);
       output.ptsSeconds[i] = singleOut.ptsSeconds;
       output.durationSeconds[i] = singleOut.durationSeconds;
     }
@@ -1311,7 +1311,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int64_t stop,
     int64_t step) {
   validateUserProvidedStreamIndex(streamIndex);
-  //validateScannedAllStreams("getFramesInRange"); // converted
+  // validateScannedAllStreams("getFramesInRange"); // converted
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
@@ -1345,7 +1345,8 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
     double startSeconds,
     double stopSeconds) {
   validateUserProvidedStreamIndex(streamIndex);
-  //validateScannedAllStreams("getFramesPlayedByTimestampInRange"); // converted
+  // validateScannedAllStreams("getFramesPlayedByTimestampInRange"); //
+  // converted
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   TORCH_CHECK(

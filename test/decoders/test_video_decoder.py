@@ -33,11 +33,7 @@ class TestVideoDecoder:
 
         decoder = VideoDecoder(source, seek_mode=seek_mode)
         assert isinstance(decoder.metadata, _core.VideoStreamMetadata)
-        assert (
-            len(decoder)
-            == decoder._num_frames
-            == 390
-        )
+        assert len(decoder) == decoder._num_frames == 390
         assert decoder.stream_index == decoder.metadata.stream_index == 3
         assert decoder.metadata.duration_seconds == pytest.approx(13.013)
         assert decoder.metadata.average_fps == pytest.approx(29.970029)
@@ -521,7 +517,10 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_get_frames_in_range(self, stream_index, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, stream_index=stream_index, device=device, seek_mode=seek_mode
+            NASA_VIDEO.path,
+            stream_index=stream_index,
+            device=device,
+            seek_mode=seek_mode,
         )
 
         # test degenerate case where we only actually get 1 frame
@@ -635,7 +634,10 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_dimension_order(self, dimension_order, frame_getter, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, dimension_order=dimension_order, device=device, seek_mode=seek_mode
+            NASA_VIDEO.path,
+            dimension_order=dimension_order,
+            device=device,
+            seek_mode=seek_mode,
         )
         frame = frame_getter(decoder)
 
@@ -660,7 +662,10 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_get_frames_by_pts_in_range(self, stream_index, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, stream_index=stream_index, device=device, seek_mode=seek_mode
+            NASA_VIDEO.path,
+            stream_index=stream_index,
+            device=device,
+            seek_mode=seek_mode,
         )
 
         # Note that we are comparing the results of VideoDecoder's method:

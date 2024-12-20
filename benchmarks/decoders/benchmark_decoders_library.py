@@ -307,7 +307,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         return decoder.get_frames_played_at(pts_list)
 
@@ -316,7 +319,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = []
         count = 0
@@ -332,7 +338,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = decoder.get_frames_played_at(pts_list)
         frames = self.transforms_v2.functional.resize(frames.data, (height, width))
@@ -354,7 +363,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
 
         frames = []
@@ -368,7 +380,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = []
         count = 0
@@ -384,7 +399,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device, seek_mode=self._seek_mode
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
 
         frames = []
