@@ -37,12 +37,12 @@ class VideoStreamMetadata:
     content (the scan doesn't involve decoding). This is more accurate
     than ``num_frames_from_header``. We recommend using the
     ``num_frames`` attribute instead. (int or None)."""
-    begin_stream_seconds: Optional[float]
+    begin_stream_seconds_from_content: Optional[float]
     """Beginning of the stream, in seconds (float or None).
     Conceptually, this corresponds to the first frame's :term:`pts`. It is
     computed as min(frame.pts) across all frames in the stream. Usually, this is
     equal to 0."""
-    end_stream_seconds: Optional[float]
+    end_stream_seconds_from_content: Optional[float]
     """End of the stream, in seconds (float or None).
     Conceptually, this corresponds to last_frame.pts + last_frame.duration. It
     is computed as max(frame.pts + frame.duration) across all frames in the
@@ -81,9 +81,15 @@ class VideoStreamMetadata:
         from the actual frames if a :term:`scan` was performed. Otherwise we
         fall back to ``duration_seconds_from_header``.
         """
-        if self.end_stream_seconds is None or self.begin_stream_seconds is None:
+        if (
+            self.end_stream_seconds_from_content is None
+            or self.begin_stream_seconds_from_content is None
+        ):
             return self.duration_seconds_from_header
-        return self.end_stream_seconds - self.begin_stream_seconds
+        return (
+            self.end_stream_seconds_from_content
+            - self.begin_stream_seconds_from_content
+        )
 
     @property
     def average_fps(self) -> Optional[float]:
@@ -92,12 +98,29 @@ class VideoStreamMetadata:
         Otherwise we fall back to ``average_fps_from_header``.
         """
         if (
-            self.end_stream_seconds is None
-            or self.begin_stream_seconds is None
+            self.end_stream_seconds_from_content is None
+            or self.begin_stream_seconds_from_content is None
             or self.num_frames is None
         ):
             return self.average_fps_from_header
-        return self.num_frames / (self.end_stream_seconds - self.begin_stream_seconds)
+        return self.num_frames / (
+            self.end_stream_seconds_from_content
+            - self.begin_stream_seconds_from_content
+        )
+
+    @property
+    def begin_stream_seconds(self) -> float:
+        """TODO."""
+        if self.begin_stream_seconds_from_content is None:
+            return 0
+        return self.begin_stream_seconds_from_content
+
+    @property
+    def end_stream_seconds(self) -> Optional[float]:
+        """TODO."""
+        if self.end_stream_seconds_from_content is None:
+            return self.duration_seconds
+        return self.end_stream_seconds_from_content
 
     def __repr__(self):
         # Overridden because properites are not printed by default.
@@ -152,8 +175,12 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
                 bit_rate=stream_dict.get("bitRate"),
                 num_frames_from_header=stream_dict.get("numFrames"),
                 num_frames_from_content=stream_dict.get("numFramesFromScan"),
-                begin_stream_seconds=stream_dict.get("minPtsSecondsFromScan"),
-                end_stream_seconds=stream_dict.get("maxPtsSecondsFromScan"),
+                begin_stream_seconds_from_content=stream_dict.get(
+                    "minPtsSecondsFromScan"
+                ),
+                end_stream_seconds_from_content=stream_dict.get(
+                    "maxPtsSecondsFromScan"
+                ),
                 codec=stream_dict.get("codec"),
                 width=stream_dict.get("width"),
                 height=stream_dict.get("height"),

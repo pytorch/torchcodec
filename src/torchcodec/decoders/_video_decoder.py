@@ -116,44 +116,25 @@ class VideoDecoder:
             self._decoder, stream_index
         )
 
-        if seek_mode == "exact":
-            if self.metadata.num_frames_from_content is None:
-                raise ValueError(
-                    "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
-                )
-            self._num_frames = self.metadata.num_frames_from_content
+        if self.metadata.num_frames is None:
+            raise ValueError(
+                "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._num_frames = self.metadata.num_frames
 
-            if self.metadata.begin_stream_seconds is None:
-                raise ValueError(
-                    "The minimum pts value in seconds is unknown. "
-                    + _ERROR_REPORTING_INSTRUCTIONS
-                )
-            self._begin_stream_seconds = self.metadata.begin_stream_seconds
+        if self.metadata.begin_stream_seconds is None:
+            raise ValueError(
+                "The minimum pts value in seconds is unknown. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._begin_stream_seconds = self.metadata.begin_stream_seconds
 
-            if self.metadata.end_stream_seconds is None:
-                raise ValueError(
-                    "The maximum pts value in seconds is unknown. "
-                    + _ERROR_REPORTING_INSTRUCTIONS
-                )
-            self._end_stream_seconds = self.metadata.end_stream_seconds
-        elif seek_mode == "approximate":
-            if self.metadata.num_frames_from_header is None:
-                raise ValueError(
-                    "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
-                )
-            self._num_frames = self.metadata.num_frames_from_header
-
-            self._begin_stream_seconds = 0
-
-            if self.metadata.duration_seconds_from_header is None:
-                raise ValueError(
-                    "The maximum pts value in seconds is unknown. "
-                    + _ERROR_REPORTING_INSTRUCTIONS
-                )
-            self._end_stream_seconds = self.metadata.duration_seconds_from_header
-
-        else:
-            raise ValueError(f"Invalid seek mode: {seek_mode}.")
+        if self.metadata.end_stream_seconds is None:
+            raise ValueError(
+                "The maximum pts value in seconds is unknown. "
+                + _ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._end_stream_seconds = self.metadata.end_stream_seconds
 
     def __len__(self) -> int:
         return self._num_frames

@@ -161,7 +161,7 @@ class VideoDecoder {
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
+  // Calling getNextFrameNoDemuxInternal() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
   // This is an internal structure that is used to store the decoded output
@@ -433,7 +433,7 @@ class VideoDecoder {
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecodedOutput getNextFrameOutputNoDemuxInternal(
+  DecodedOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   SeekMode seekMode_;

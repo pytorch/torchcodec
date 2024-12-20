@@ -1170,7 +1170,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
 
   int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
   setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
-  return getNextFrameOutputNoDemuxInternal(preAllocatedOutputTensor);
+  return getNextFrameNoDemuxInternal(preAllocatedOutputTensor);
 }
 
 VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
@@ -1252,19 +1252,19 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
 
     std::vector<int64_t> frameIndices(timestamps.size());
     for (auto i = 0; i < timestamps.size(); ++i) {
-      auto framePts = timestamps[i];
+      auto frameSeconds = timestamps[i];
       TORCH_CHECK(
-          framePts >= minSeconds && framePts < maxSeconds,
-          "frame pts is " + std::to_string(framePts) + "; must be in range [" +
-              std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
-              ").");
+          frameSeconds >= minSeconds && frameSeconds < maxSeconds,
+          "frame pts is " + std::to_string(frameSeconds) +
+              "; must be in range [" + std::to_string(minSeconds) + ", " +
+              std::to_string(maxSeconds) + ").");
 
       auto it = std::lower_bound(
           stream.allFrames.begin(),
           stream.allFrames.end(),
-          framePts,
-          [&stream](const FrameInfo& info, double framePts) {
-            return ptsToSeconds(info.nextPts, stream.timeBase) <= framePts;
+          frameSeconds,
+          [&stream](const FrameInfo& info, double frameSeconds) {
+            return ptsToSeconds(info.nextPts, stream.timeBase) <= frameSeconds;
           });
       int64_t frameIndex = it - stream.allFrames.begin();
       frameIndices[i] = frameIndex;
@@ -1284,15 +1284,15 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
     BatchDecodedOutput output(timestamps.size(), options, streamMetadata);
 
     for (auto i = 0; i < timestamps.size(); ++i) {
-      auto framePts = timestamps[i];
+      auto frameSeconds = timestamps[i];
       TORCH_CHECK(
-          framePts >= minSeconds && framePts < maxSeconds,
-          "frame pts is " + std::to_string(framePts) + "; must be in range [" +
-              std::to_string(minSeconds) + ", " + std::to_string(maxSeconds) +
-              ").");
+          frameSeconds >= minSeconds && frameSeconds < maxSeconds,
+          "frame pts is " + std::to_string(frameSeconds) +
+              "; must be in range [" + std::to_string(minSeconds) + ", " +
+              std::to_string(maxSeconds) + ").");
 
-      DecodedOutput singleOut =
-          getFramePlayedAtTimestampNoDemuxInternal(framePts, output.frames[i]);
+      DecodedOutput singleOut = getFramePlayedAtTimestampNoDemuxInternal(
+          frameSeconds, output.frames[i]);
       output.ptsSeconds[i] = singleOut.ptsSeconds;
       output.durationSeconds[i] = singleOut.durationSeconds;
     }
@@ -1462,21 +1462,43 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
     // after the fact. We can't preallocate the final tensor because we don't
     // know how many frames we're going to decode up front.
 
-    setCursorPtsInSeconds(startSeconds);
-    DecodedOutput singleOut = getNextFrameNoDemux();
+    DecodedOutput singleOut =
+        getFramePlayedAtTimestampNoDemuxInternal(startSeconds);
 
-    std::vector<torch::Tensor> frames = {singleOut.frame};
-    std::vector<double> ptsSeconds = {singleOut.ptsSeconds};
-    std::vector<double> durationSeconds = {singleOut.durationSeconds};
+    std::vector<torch::Tensor> frames;
+    std::vector<double> ptsSeconds;
+    std::vector<double> durationSeconds;
 
-    while (singleOut.ptsSeconds < stopSeconds) {
-      singleOut = getNextFrameNoDemux();
+    // Note that we only know we've decoded all frames in the range when we have
+    // decoded the first frame outside of the range. That is, we have to decode
+    // one frame past where we want to stop, and conclude from its pts that all
+    // of the prior frames comprises our range. That means we decode one extra
+    // frame; we don't return it, but we decode it.
+    //
+    // This algorithm works fine except when stopSeconds is the duration of the
+    // video. In that case, we're going to hit the end-of-file exception.
+    //
+    // We could avoid decoding an extra frame, and the end-of-file exception, by
+    // using the currently decoded frame's duration to know that the next frame
+    // is outside of our range. This would be more efficient. However, up until
+    // now we have avoided relying on a frame's duration to determine if a frame
+    // is played during a time window. So there is a potential TODO here where
+    // we relax that principle and just do the math to avoid the extra decode.
+    bool eof = false;
+    while (singleOut.ptsSeconds < stopSeconds && !eof) {
       frames.push_back(singleOut.frame);
       ptsSeconds.push_back(singleOut.ptsSeconds);
       durationSeconds.push_back(singleOut.durationSeconds);
+
+      try {
+        singleOut = getNextFrameNoDemuxInternal();
+      } catch (EndOfFileException e) {
+        eof = true;
+      }
     }
 
     BatchDecodedOutput output(frames, ptsSeconds, durationSeconds);
+    output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
 
   } else {
@@ -1494,12 +1516,12 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
-  auto output = getNextFrameOutputNoDemuxInternal();
+  auto output = getNextFrameNoDemuxInternal();
   output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextFrameOutputNoDemuxInternal(
+VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextRawDecodedOutputNoDemux();
   return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
