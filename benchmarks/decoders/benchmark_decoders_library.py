@@ -349,7 +349,7 @@ class TorchCodecPublic(AbstractDecoder):
 
 
 class TorchCodecPublicNonBatch(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="exact"):
+    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="approximate"):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
         self._seek_mode = seek_mode
