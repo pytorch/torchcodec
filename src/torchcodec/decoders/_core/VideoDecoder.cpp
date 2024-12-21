@@ -204,22 +204,6 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
   frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
 }
 
-VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
-    const std::vector<torch::Tensor>& inFrames,
-    std::vector<double>& inPtsSeconds,
-    std::vector<double>& inDurationSeconds)
-    : frames(torch::stack(inFrames)),
-      ptsSeconds(torch::from_blob(
-                     inPtsSeconds.data(),
-                     inPtsSeconds.size(),
-                     {torch::kFloat64})
-                     .clone()),
-      durationSeconds(torch::from_blob(
-                          inDurationSeconds.data(),
-                          inDurationSeconds.size(),
-                          {torch::kFloat64})
-                          .clone()) {}
-
 bool VideoDecoder::DecodedFrameContext::operator==(
     const VideoDecoder::DecodedFrameContext& other) {
   return decodedWidth == other.decodedWidth && decodedHeight == decodedHeight &&
@@ -1323,23 +1307,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
             "; must be in range [" + std::to_string(minSeconds) + ", " +
             std::to_string(maxSeconds) + ").");
 
-    int64_t frameIndex = -1;
-    if (seekMode_ == SeekMode::exact) {
-      auto it = std::lower_bound(
-          stream.allFrames.begin(),
-          stream.allFrames.end(),
-          frameSeconds,
-          [&stream](const FrameInfo& info, double frameSeconds) {
-            return ptsToSeconds(info.nextPts, stream.timeBase) <= frameSeconds;
-          });
-      frameIndex = it - stream.allFrames.begin();
-    } else if (seekMode_ == SeekMode::approximate) {
-      frameIndex = std::floor(frameSeconds * streamMetadata.averageFps.value());
-    } else {
-      throw std::runtime_error("Unknown SeekMode");
-    }
-
-    frameIndices[i] = frameIndex;
+    frameIndices[i] =
+        secondsToIndexLowerBound(frameSeconds, stream, streamMetadata);
   }
 
   return getFramesAtIndices(streamIndex, frameIndices);

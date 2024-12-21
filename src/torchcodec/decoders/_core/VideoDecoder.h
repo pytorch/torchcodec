@@ -242,11 +242,6 @@ class VideoDecoder {
         int64_t numFrames,
         const VideoStreamDecoderOptions& options,
         const StreamMetadata& metadata);
-
-    explicit BatchDecodedOutput(
-        const std::vector<torch::Tensor>& inFrames,
-        std::vector<double>& inPtsSeconds,
-        std::vector<double>& inDurationSeconds);
   };
 
   // Returns frames at the given indices for a given stream as a single stacked
