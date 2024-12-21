@@ -401,6 +401,16 @@ class VideoDecoder {
   double getMinSeconds(const StreamMetadata& streamMetadata);
   double getMaxSeconds(const StreamMetadata& streamMetadata);
 
+  int64_t secondsToIndexLowerBound(
+      double seconds,
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata);
+
+  int64_t secondsToIndexUpperBound(
+      double seconds,
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata);
+
   void createSwsContext(
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
