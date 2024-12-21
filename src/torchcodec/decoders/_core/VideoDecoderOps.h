@@ -20,13 +20,20 @@ namespace facebook::torchcodec {
 // auto decoderTensor = createDecoderOp.call(videoPath);
 
 // Create a VideoDecoder from file and wrap the pointer in a tensor.
-at::Tensor create_from_file(std::string_view filename);
+at::Tensor create_from_file(
+    std::string_view filename,
+    std::optional<std::string_view> seek_mode = std::nullopt);
 
-at::Tensor create_from_tensor(at::Tensor video_tensor);
+at::Tensor create_from_tensor(
+    at::Tensor video_tensor,
+    std::optional<std::string_view> seek_mode = std::nullopt);
 
 // This API is C++ only and will not be exposed via custom ops, use
 // videodecoder_create_from_bytes in Python
-at::Tensor create_from_buffer(const void* buffer, size_t length);
+at::Tensor create_from_buffer(
+    const void* buffer,
+    size_t length,
+    std::optional<std::string_view> seek_mode = std::nullopt);
 
 // Add a new video stream at `stream_index` using the provided options.
 void add_video_stream(

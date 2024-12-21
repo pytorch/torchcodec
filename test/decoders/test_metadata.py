@@ -13,7 +13,6 @@ from torchcodec.decoders._core import (
     get_ffmpeg_library_versions,
     get_video_metadata,
     get_video_metadata_from_header,
-    scan_all_streams_to_update_metadata,
     VideoStreamMetadata,
 )
 
@@ -21,9 +20,10 @@ from ..utils import NASA_VIDEO
 
 
 def _get_video_metadata(path, with_scan: bool):
-    decoder = create_from_file(str(path))
     if with_scan:
-        scan_all_streams_to_update_metadata(decoder)
+        decoder = create_from_file(str(path), seek_mode="exact")
+    else:
+        decoder = create_from_file(str(path), seek_mode="approximate")
     return get_video_metadata(decoder)
 
 
@@ -92,8 +92,8 @@ def test_num_frames_fallback(
         bit_rate=123,
         num_frames_from_header=num_frames_from_header,
         num_frames_from_content=num_frames_from_content,
-        begin_stream_seconds=0,
-        end_stream_seconds=4,
+        begin_stream_seconds_from_content=0,
+        end_stream_seconds_from_content=4,
         codec="whatever",
         width=123,
         height=321,
