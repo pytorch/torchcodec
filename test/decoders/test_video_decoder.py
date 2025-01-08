@@ -11,7 +11,14 @@ from torchcodec import FrameBatch
 
 from torchcodec.decoders import _core, VideoDecoder
 
-from ..utils import assert_frames_equal, cpu_and_cuda, H265_VIDEO, in_fbcode, NASA_VIDEO
+from ..utils import (
+    assert_frames_equal,
+    AV1_VIDEO,
+    cpu_and_cuda,
+    H265_VIDEO,
+    in_fbcode,
+    NASA_VIDEO,
+)
 
 
 class TestVideoDecoder:
@@ -408,6 +415,16 @@ class TestVideoDecoder:
 
         with pytest.raises(RuntimeError, match="Expected a value of type"):
             decoder.get_frames_at([0.3])
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frame_at_av1(self, device):
+        decoder = VideoDecoder(AV1_VIDEO.path, device=device)
+        ref_frame11 = AV1_VIDEO.get_frame_data_by_index(10)
+        ref_frame_info11 = AV1_VIDEO.get_frame_info(10)
+        decoded_frame11 = decoder.get_frame_at(10)
+        assert decoded_frame11.duration_seconds == ref_frame_info11.duration_seconds
+        assert decoded_frame11.pts_seconds == ref_frame_info11.pts_seconds
+        assert_frames_equal(decoded_frame11.data, ref_frame11.to(device=device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_played_at(self, device):

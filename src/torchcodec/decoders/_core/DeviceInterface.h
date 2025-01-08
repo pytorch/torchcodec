@@ -43,4 +43,9 @@ void releaseContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext);
 
+void forceCudaCodec(
+    const torch::Device& device,
+    const AVCodec** codec,
+    const AVCodecID& codecId);
+
 } // namespace facebook::torchcodec

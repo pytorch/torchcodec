@@ -42,11 +42,12 @@ git clone git@github.com:pytorch/torchcodec.git
 cd torchcodec
 
 pip install -e ".[dev]" --no-build-isolation -vv
+# Or, for cuda support: ENABLE_CUDA=1 pip install -e ".[dev]" --no-build-isolation -vv
 ```
 
 ### Running unit tests
 
-To run python tests run:
+To run python tests run (please make sure `torchvision` is installed):
 
 ```bash
 pytest test -vvv

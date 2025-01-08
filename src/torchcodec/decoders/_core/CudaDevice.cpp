@@ -256,4 +256,36 @@ void convertAVFrameToDecodedOutputOnCuda(
           << " took: " << duration.count() << "us" << std::endl;
 }
 
+// inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9
+void forceCudaCodec(
+    const torch::Device& device,
+    const AVCodec** codec,
+    const AVCodecID& codecId) {
+  if (device.type() != torch::kCUDA) {
+    return;
+  }
+
+  const AVCodec* c;
+  void* i = NULL;
+  bool found = false;
+
+  while (!found && (c = av_codec_iterate(&i))) {
+    const AVCodecHWConfig* config;
+
+    if (c->id != codecId || !av_codec_is_decoder(c)) {
+      continue;
+    }
+
+    for (int j = 0; config = avcodec_get_hw_config(c, j); j++) {
+      if (config->device_type == AV_HWDEVICE_TYPE_CUDA) {
+        found = true;
+      }
+    }
+  }
+
+  if (found) {
+    *codec = c;
+  }
+}
+
 } // namespace facebook::torchcodec

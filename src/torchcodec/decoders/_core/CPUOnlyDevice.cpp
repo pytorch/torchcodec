@@ -35,4 +35,11 @@ void releaseContextOnCuda(
   throwUnsupportedDeviceError(device);
 }
 
+void forceCudaCodec(
+    const torch::Device& device,
+    const AVCodec** codec,
+    const AVCodecID& codecId) {
+  throwUnsupportedDeviceError(device);
+}
+
 } // namespace facebook::torchcodec
