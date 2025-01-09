@@ -37,7 +37,7 @@ void releaseContextOnCuda(
 
 void forceCudaCodec(
     const torch::Device& device,
-    const AVCodec** codec,
+    AVCodecPtr* codec,
     const AVCodecID& codecId) {
   throwUnsupportedDeviceError(device);
 }

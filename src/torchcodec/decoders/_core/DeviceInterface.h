@@ -10,6 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include "FFMPEGCommon.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 extern "C" {
@@ -45,7 +46,7 @@ void releaseContextOnCuda(
 
 void forceCudaCodec(
     const torch::Device& device,
-    const AVCodec** codec,
+    AVCodecPtr* codec,
     const AVCodecID& codecId);
 
 } // namespace facebook::torchcodec

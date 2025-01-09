@@ -259,7 +259,7 @@ void convertAVFrameToDecodedOutputOnCuda(
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9
 void forceCudaCodec(
     const torch::Device& device,
-    const AVCodec** codec,
+    AVCodecPtr* codec,
     const AVCodecID& codecId) {
   if (device.type() != torch::kCUDA) {
     return;
