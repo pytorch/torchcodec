@@ -939,9 +939,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
           expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-      if (!streamInfo.swsContext || streamInfo.prevFrame != frameContext) {
+      if (!streamInfo.swsContext ||
+          streamInfo.prevFrameContext != frameContext) {
         createSwsContext(streamInfo, frameContext, frame->colorspace);
-        streamInfo.prevFrame = frameContext;
+        streamInfo.prevFrameContext = frameContext;
       }
       int resultHeight =
           convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
@@ -960,10 +961,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
         streamInfo.colorConversionLibrary ==
         ColorConversionLibrary::FILTERGRAPH) {
       if (!streamInfo.filterState.filterGraph ||
-          streamInfo.prevFrame != frameContext) {
+          streamInfo.prevFrameContext != frameContext) {
         createFilterGraph(
             streamInfo, expectedOutputHeight, expectedOutputWidth);
-        streamInfo.prevFrame = frameContext;
+        streamInfo.prevFrameContext = frameContext;
       }
       outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
 
