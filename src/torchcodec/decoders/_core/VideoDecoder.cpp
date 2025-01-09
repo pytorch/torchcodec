@@ -237,6 +237,11 @@ VideoDecoder::VideoDecoder(const void* buffer, size_t length) {
 void VideoDecoder::initializeDecoder() {
   TORCH_CHECK(!initialized_, "Attempted double initialization.");
 
+  // In principle, the AVFormatContext should be filled in by the call to
+  // avformat_open_input() which reads the header. However, some formats do not
+  // store enough info in the header, so we call avformat_find_stream_info()
+  // which decodes a few frames to get missing info. For more, see:
+  //   https://ffmpeg.org/doxygen/7.0/group__lavf__decoding.html
   int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
   if (ffmpegStatus < 0) {
     throw std::runtime_error(
