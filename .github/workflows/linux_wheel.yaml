@@ -65,7 +65,7 @@ jobs:
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     needs: build
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: pytorch_torchcodec__${{ matrix.python-version }}_cpu_x86_64
           path: pytorch/torchcodec/dist/
