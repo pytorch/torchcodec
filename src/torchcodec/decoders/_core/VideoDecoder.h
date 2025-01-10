@@ -342,7 +342,7 @@ class VideoDecoder {
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
-    DecodedFrameContext prevFrame;
+    DecodedFrameContext prevFrameContext;
     UniqueSwsContext swsContext;
   };
   // Returns the key frame index of the presentation timestamp using FFMPEG's
