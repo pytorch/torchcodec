@@ -426,6 +426,7 @@ class TestVideoDecoder:
         assert isinstance(decoder.get_frame_played_at(6.02).pts_seconds, float)
         assert isinstance(decoder.get_frame_played_at(6.02).duration_seconds, float)
 
+    @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_played_at_h265(self):
         # Non-regression test for https://github.com/pytorch/torchcodec/issues/179
         # We don't parametrize with CUDA because the current GPUs on CI do not
