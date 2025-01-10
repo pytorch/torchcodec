@@ -420,12 +420,12 @@ class TestVideoDecoder:
         # We don't parametrize with CUDA because the current GPUs on CI do not
         # support AV1:
         decoder = VideoDecoder(AV1_VIDEO.path, device="cpu")
-        ref_frame11 = AV1_VIDEO.get_frame_data_by_index(10)
-        ref_frame_info11 = AV1_VIDEO.get_frame_info(10)
-        decoded_frame11 = decoder.get_frame_at(10)
-        assert decoded_frame11.duration_seconds == ref_frame_info11.duration_seconds
-        assert decoded_frame11.pts_seconds == ref_frame_info11.pts_seconds
-        assert_frames_equal(decoded_frame11.data, ref_frame11.to(device="cpu"))
+        ref_frame10 = AV1_VIDEO.get_frame_data_by_index(10)
+        ref_frame_info10 = AV1_VIDEO.get_frame_info(10)
+        decoded_frame10 = decoder.get_frame_at(10)
+        assert decoded_frame10.duration_seconds == ref_frame_info10.duration_seconds
+        assert decoded_frame10.pts_seconds == ref_frame_info10.pts_seconds
+        assert_frames_equal(decoded_frame10.data, ref_frame10.to(device="cpu"))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_played_at(self, device):
