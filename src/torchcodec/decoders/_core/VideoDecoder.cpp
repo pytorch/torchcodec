@@ -458,8 +458,9 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   if (options.device.type() == torch::kCUDA) {
-    forceCudaCodec(
-        options.device, &codec, streamInfo.stream->codecpar->codec_id);
+    codec =
+        forceCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
+            .value_or(codec);
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(codec);
