@@ -416,10 +416,9 @@ class TestVideoDecoder:
         with pytest.raises(RuntimeError, match="Expected a value of type"):
             decoder.get_frames_at([0.3])
 
-    def test_get_frame_at_av1(self):
-        # We don't parametrize with CUDA because the current GPUs on CI do not
-        # support AV1:
-        decoder = VideoDecoder(AV1_VIDEO.path, device="cpu")
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frame_at_av1(self, device):
+        decoder = VideoDecoder(AV1_VIDEO.path, device=device)
         ref_frame10 = AV1_VIDEO.get_frame_data_by_index(10)
         ref_frame_info10 = AV1_VIDEO.get_frame_info(10)
         decoded_frame10 = decoder.get_frame_at(10)
