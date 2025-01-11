@@ -19,11 +19,8 @@ from torchcodec.decoders._core import (
 from ..utils import NASA_VIDEO
 
 
-def _get_video_metadata(path, with_scan: bool):
-    if with_scan:
-        decoder = create_from_file(str(path), seek_mode="exact")
-    else:
-        decoder = create_from_file(str(path), seek_mode="approximate")
+def _get_video_metadata(path, seek_mode):
+    decoder = create_from_file(str(path), seek_mode=seek_mode)
     return get_video_metadata(decoder)
 
 
@@ -31,13 +28,13 @@ def _get_video_metadata(path, with_scan: bool):
     "metadata_getter",
     (
         get_video_metadata_from_header,
-        functools.partial(_get_video_metadata, with_scan=False),
-        functools.partial(_get_video_metadata, with_scan=True),
+        functools.partial(_get_video_metadata, seek_mode="approximate"),
+        functools.partial(_get_video_metadata, seek_mode="exact"),
     ),
 )
 def test_get_metadata(metadata_getter):
     with_scan = (
-        metadata_getter.keywords["with_scan"]
+        metadata_getter.keywords["seek_mode"] == "exact"
         if isinstance(metadata_getter, functools.partial)
         else False
     )
