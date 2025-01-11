@@ -217,16 +217,16 @@ bool VideoDecoder::DecodedFrameContext::operator!=(
   return !(*this == other);
 }
 
-VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seek)
-    : seekMode_(seek) {
+VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
+    : seekMode_(seekMode) {
   AVInput input = createAVFormatContextFromFilePath(videoFilePath);
   formatContext_ = std::move(input.formatContext);
 
   initializeDecoder();
 }
 
-VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seek)
-    : seekMode_(seek) {
+VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
+    : seekMode_(seekMode) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
 
   AVInput input = createAVFormatContextFromBuffer(buffer, length);
