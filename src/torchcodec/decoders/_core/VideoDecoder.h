@@ -411,10 +411,6 @@ class VideoDecoder {
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
 
-  DecodedOutput getFramePlayedAtTimestampNoDemuxInternal(
-      double seconds,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
-
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);

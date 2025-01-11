@@ -1034,15 +1034,6 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
 
 VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double seconds) {
-  auto output = getFramePlayedAtTimestampNoDemuxInternal(seconds);
-  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
-  return output;
-}
-
-VideoDecoder::DecodedOutput
-VideoDecoder::getFramePlayedAtTimestampNoDemuxInternal(
-    double seconds,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   for (auto& [streamIndex, stream] : streams_) {
     double frameStartTime = ptsToSeconds(stream.currentPts, stream.timeBase);
     double frameEndTime = ptsToSeconds(
@@ -1076,7 +1067,9 @@ VideoDecoder::getFramePlayedAtTimestampNoDemuxInternal(
       });
 
   // Convert the frame to tensor.
-  return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
+  DecodedOutput output = convertAVFrameToDecodedOutput(rawOutput);
+  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
+  return output;
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
