@@ -1103,12 +1103,12 @@ void VideoDecoder::validateFrameIndex(
     const StreamInfo& streamInfo,
     const StreamMetadata& streamMetadata,
     int64_t frameIndex) {
-  int64_t framesSize = getFramesSize(streamInfo, streamMetadata);
+  int64_t numFrames = getNumFrames(streamInfo, streamMetadata);
   TORCH_CHECK(
-      frameIndex >= 0 && frameIndex < framesSize,
+      frameIndex >= 0 && frameIndex < numFrames,
       "Invalid frame index=" + std::to_string(frameIndex) +
           " for streamIndex=" + std::to_string(streamInfo.streamIndex) +
-          " numFrames=" + std::to_string(framesSize));
+          " numFrames=" + std::to_string(numFrames));
 }
 
 VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
@@ -1134,7 +1134,7 @@ int64_t VideoDecoder::getPts(
   }
 }
 
-int64_t VideoDecoder::getFramesSize(
+int64_t VideoDecoder::getNumFrames(
     const StreamInfo& streamInfo,
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
@@ -1264,7 +1264,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
     if (indexInVideo < 0 ||
-        indexInVideo >= getFramesSize(stream, streamMetadata)) {
+        indexInVideo >= getNumFrames(stream, streamMetadata)) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(indexInVideo));
     }
@@ -1329,13 +1329,13 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
 
   const auto& streamMetadata = containerMetadata_.streams[streamIndex];
   const auto& stream = streams_[streamIndex];
-  int64_t framesSize = getFramesSize(stream, streamMetadata);
+  int64_t numFrames = getNumFrames(stream, streamMetadata);
   TORCH_CHECK(
       start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
   TORCH_CHECK(
-      stop <= framesSize,
+      stop <= numFrames,
       "Range stop, " + std::to_string(stop) +
-          ", is more than the number of frames, " + std::to_string(framesSize));
+          ", is more than the number of frames, " + std::to_string(numFrames));
   TORCH_CHECK(
       step > 0, "Step must be greater than 0; is " + std::to_string(step));
 

@@ -384,7 +384,7 @@ class VideoDecoder {
       int expectedOutputHeight,
       int expectedOutputWidth);
 
-  int64_t getFramesSize(
+  int64_t getNumFrames(
       const StreamInfo& streamInfo,
       const StreamMetadata& streamMetadata);
 
