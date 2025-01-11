@@ -53,11 +53,11 @@ class VideoDecoder {
   enum class SeekMode { exact, approximate };
 
   // Creates a VideoDecoder from the video at videoFilePath.
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode);
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seek);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seek);
 
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath,
