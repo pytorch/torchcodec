@@ -389,7 +389,7 @@ class VideoDecoder {
       const StreamMetadata& streamMetadata);
 
   int64_t getPts(
-      const StreamInfo& stream,
+      const StreamInfo& streamInfo,
       const StreamMetadata& streamMetadata,
       int64_t frameIndex);
 
