@@ -260,7 +260,7 @@ void convertAVFrameToDecodedOutputOnCuda(
 // we have to do this because of an FFmpeg bug where hardware decoding is not
 // appropriately set, so we just go off and find the matching codec for the CUDA
 // device
-std::optional<AVCodecPtr> forceCudaCodec(
+std::optional<AVCodecPtr> findCudaCodec(
     const torch::Device& device,
     const AVCodecID& codecId) {
   throwErrorIfNonCudaDevice(device);

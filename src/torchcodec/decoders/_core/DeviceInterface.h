@@ -44,7 +44,7 @@ void releaseContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext);
 
-std::optional<AVCodecPtr> forceCudaCodec(
+std::optional<AVCodecPtr> findCudaCodec(
     const torch::Device& device,
     const AVCodecID& codecId);
 
