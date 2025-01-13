@@ -265,10 +265,9 @@ std::optional<AVCodecPtr> forceCudaCodec(
     const AVCodecID& codecId) {
   throwErrorIfNonCudaDevice(device);
 
-  AVCodecPtr c;
   void* i = NULL;
 
-  while ((c = av_codec_iterate(&i))) {
+  while ((AVCodecPtr c = av_codec_iterate(&i))) {
     const AVCodecHWConfig* config;
 
     if (c->id != codecId || !av_codec_is_decoder(c)) {
