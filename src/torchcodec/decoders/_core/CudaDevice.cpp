@@ -267,7 +267,8 @@ std::optional<AVCodecPtr> findCudaCodec(
 
   void* i = NULL;
 
-  while ((AVCodecPtr c = av_codec_iterate(&i))) {
+  AVCodecPtr c;
+  while (c = av_codec_iterate(&i)) {
     const AVCodecHWConfig* config;
 
     if (c->id != codecId || !av_codec_is_decoder(c)) {
