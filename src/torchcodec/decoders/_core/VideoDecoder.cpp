@@ -1275,10 +1275,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   for (auto f = 0; f < frameIndices.size(); ++f) {
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
-    if (indexInVideo < 0 || indexInVideo >= getNumFrames(streamMetadata)) {
-      throw std::runtime_error(
-          "Invalid frame index=" + std::to_string(indexInVideo));
-    }
+    validateFrameIndex(streamMetadata, indexInVideo);
+
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
       auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
