@@ -51,9 +51,9 @@ class VideoDecoder:
             Default: 1.
         device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
         seek_mode (str, optional): Determines if frame access will be "exact" or
-            "approximate". Exact guarantees that requesting frame i will always returns frame i,
+            "approximate". Exact guarantees that requesting frame i will always return frame i,
             but doing so requires an initial :term:`scan` of the file. Approximate is faster as it avoids scanning the
-            file, but less accurate uses the file's metadata to calculate where i probably is. Default: "exact".
+            file, but less accurate as it uses the file's metadata to calculate where i probably is. Default: "exact".
 
 
     Attributes:
