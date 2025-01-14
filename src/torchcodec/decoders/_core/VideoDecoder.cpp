@@ -483,6 +483,11 @@ void VideoDecoder::addVideoStreamDecoder(
         " is not a video stream.");
   }
 
+  if (options.device.type() == torch::kCUDA) {
+    codec = findCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
+                .value_or(codec);
+  }
+
   AVCodecContext* codecContext = avcodec_alloc_context3(codec);
   TORCH_CHECK(codecContext != nullptr);
   codecContext->thread_count = options.ffmpegThreadCount.value_or(0);
