@@ -600,7 +600,9 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
         streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
         packet->pts + packet->duration);
 
-    FrameInfo frameInfo{.pts = packet->pts};
+    // Note that we set the other value in this struct, nextPts, only after
+    // we have scanned all packets and sorted by pts.
+    FrameInfo frameInfo = {.pts = packet->pts};
     if (packet->flags & AV_PKT_FLAG_KEY) {
       streams_[streamIndex].keyFrames.push_back(frameInfo);
     }
