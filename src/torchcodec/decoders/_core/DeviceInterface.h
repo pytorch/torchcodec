@@ -10,6 +10,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include "FFMPEGCommon.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 extern "C" {
@@ -42,5 +43,9 @@ void convertAVFrameToDecodedOutputOnCuda(
 void releaseContextOnCuda(
     const torch::Device& device,
     AVCodecContext* codecContext);
+
+std::optional<AVCodecPtr> findCudaCodec(
+    const torch::Device& device,
+    const AVCodecID& codecId);
 
 } // namespace facebook::torchcodec
