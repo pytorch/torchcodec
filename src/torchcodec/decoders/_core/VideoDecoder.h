@@ -373,7 +373,6 @@ class VideoDecoder {
   void validateUserProvidedStreamIndex(uint64_t streamIndex);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
-      const StreamInfo& streamInfo,
       const StreamMetadata& streamMetadata,
       int64_t frameIndex);
 
@@ -384,9 +383,7 @@ class VideoDecoder {
       int expectedOutputHeight,
       int expectedOutputWidth);
 
-  int64_t getNumFrames(
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata);
+  int64_t getNumFrames(const StreamMetadata& streamMetadata);
 
   int64_t getPts(
       const StreamInfo& streamInfo,
