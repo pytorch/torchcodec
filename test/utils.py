@@ -312,3 +312,18 @@ H265_VIDEO = TestVideo(
         },
     },
 )
+
+AV1_VIDEO = TestVideo(
+    filename="av1_video.mkv",
+    default_stream_index=0,
+    # This metadata is extracted manually.
+    #  $ ffprobe -v error -hide_banner -select_streams v:0 -show_frames -of json test/resources/av1_video.mkv > out.json
+    stream_infos={
+        0: TestVideoStreamInfo(width=640, height=360, num_color_channels=3),
+    },
+    frames={
+        0: {
+            10: TestFrameInfo(pts_seconds=0.400000, duration_seconds=0.040000),
+        },
+    },
+)
