@@ -109,7 +109,7 @@ AVBufferRef* getFFMPEGContextFromExistingCudaContext(
 #else
 
 AVBufferRef* getFFMPEGContextFromNewCudaContext(
-    const torch::Device& device,
+    [[maybe_unused]] const torch::Device& device,
     torch::DeviceIndex nonNegativeDeviceIndex,
     enum AVHWDeviceType type) {
   AVBufferRef* hw_device_ctx = nullptr;
