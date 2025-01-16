@@ -265,7 +265,7 @@ std::optional<const AVCodec*> findCudaCodec(
   throwErrorIfNonCudaDevice(device);
 
   void* i = nullptr;
-  const AVCodec** codec = nullptr;
+  std::unique_ptr<const AVCodec*> codec(new AVCodec*);
   while ((*codec = av_codec_iterate(&i)) != nullptr) {
     if ((*codec)->id != codecId || !av_codec_is_decoder(*codec)) {
       continue;
