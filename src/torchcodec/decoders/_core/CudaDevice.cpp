@@ -266,13 +266,13 @@ std::optional<const AVCodec*> findCudaCodec(
   throwErrorIfNonCudaDevice(device);
 
   void* i = nullptr;
-  while (const AVCodec* codec = av_codec_iterate(&i)) {
+  while ((AVCodec* codec = av_codec_iterate(&i)) != nullptr) {
     if (codec->id != codecId || !av_codec_is_decoder(codec)) {
       continue;
     }
 
     for (int j = 0;
-         (const AVCodecHWConfig* config = avcodec_get_hw_config(codec, j));
+         (AVCodecHWConfig* config = avcodec_get_hw_config(codec, j)) != nullptr;
          j++) {
       if (config->device_type == AV_HWDEVICE_TYPE_CUDA) {
         return codec;
