@@ -75,7 +75,8 @@ int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
       bufferData->current,
       ", size=",
       bufferData->size);
-  buf_size = FFMIN(buf_size, bufferData->size - bufferData->current);
+  buf_size =
+      FFMIN(buf_size, static_cast<int>(bufferData->size - bufferData->current));
   TORCH_CHECK(
       buf_size >= 0,
       "Tried to read negative bytes: buf_size=",
