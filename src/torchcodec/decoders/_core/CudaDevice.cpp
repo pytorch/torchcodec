@@ -9,7 +9,6 @@
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 extern "C" {
-#include <libavcodec/avcodec.h>
 #include <libavutil/hwcontext_cuda.h>
 #include <libavutil/pixdesc.h>
 }
@@ -266,14 +265,15 @@ std::optional<const AVCodec*> findCudaCodec(
   throwErrorIfNonCudaDevice(device);
 
   void* i = nullptr;
-  while ((AVCodec* codec = av_codec_iterate(&i)) != nullptr) {
+  const AVCodec** codec = nullptr;
+  while ((*codec = av_codec_iterate(&i)) != nullptr) {
     if (codec->id != codecId || !av_codec_is_decoder(codec)) {
       continue;
     }
 
-    for (int j = 0;
-         (AVCodecHWConfig* config = avcodec_get_hw_config(codec, j)) != nullptr;
-         j++) {
+    const AVCodecHWConfig** config = nullptr;
+    for (int j = 0; (*config = avcodec_get_hw_config(codec, j)) != nullptr;
+         ++j) {
       if (config->device_type == AV_HWDEVICE_TYPE_CUDA) {
         return codec;
       }
