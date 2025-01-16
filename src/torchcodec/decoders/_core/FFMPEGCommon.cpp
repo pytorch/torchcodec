@@ -21,7 +21,7 @@ int64_t getDuration(const UniqueAVFrame& frame) {
 }
 
 int64_t getDuration(const AVFrame* frame) {
-#if LIBAVUTIL_VERSION_MAJOR < 59
+#if LIBAVUTIL_VERSION_MAJOR < 58
   return frame->pkt_duration;
 #else
   return frame->duration;

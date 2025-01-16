@@ -206,7 +206,8 @@ VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
 
 bool VideoDecoder::DecodedFrameContext::operator==(
     const VideoDecoder::DecodedFrameContext& other) {
-  return decodedWidth == other.decodedWidth && decodedHeight == decodedHeight &&
+  return decodedWidth == other.decodedWidth &&
+      decodedHeight == other.decodedHeight &&
       decodedFormat == other.decodedFormat &&
       expectedWidth == other.expectedWidth &&
       expectedHeight == other.expectedHeight;
@@ -249,12 +250,12 @@ void VideoDecoder::initializeDecoder() {
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
 
-  for (int i = 0; i < formatContext_->nb_streams; i++) {
+  for (unsigned int i = 0; i < formatContext_->nb_streams; i++) {
     AVStream* stream = formatContext_->streams[i];
     StreamMetadata meta;
 
     TORCH_CHECK(
-        i == stream->index,
+        static_cast<int>(i) == stream->index,
         "Our stream index, " + std::to_string(i) +
             ", does not match AVStream's index, " +
             std::to_string(stream->index) + ".");
@@ -577,7 +578,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     }
     streams_[streamIndex].allFrames.push_back(frameInfo);
   }
-  for (int i = 0; i < containerMetadata_.streams.size(); ++i) {
+  for (size_t i = 0; i < containerMetadata_.streams.size(); ++i) {
     auto& streamMetadata = containerMetadata_.streams[i];
     auto stream = formatContext_->streams[i];
     if (streamMetadata.minPtsFromScan.has_value()) {
@@ -610,7 +611,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
           return frameInfo1.pts < frameInfo2.pts;
         });
 
-    for (int i = 0; i < stream.allFrames.size(); ++i) {
+    for (size_t i = 0; i < stream.allFrames.size(); ++i) {
       if (i + 1 < stream.allFrames.size()) {
         stream.allFrames[i].nextPts = stream.allFrames[i + 1].pts;
       }
@@ -1050,8 +1051,8 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   return output;
 }
 
-void VideoDecoder::validateUserProvidedStreamIndex(uint64_t streamIndex) {
-  size_t streamsSize = containerMetadata_.streams.size();
+void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
+  int streamsSize = static_cast<int>(containerMetadata_.streams.size());
   TORCH_CHECK(
       streamIndex >= 0 && streamIndex < streamsSize,
       "Invalid stream index=" + std::to_string(streamIndex) +
@@ -1074,7 +1075,7 @@ void VideoDecoder::validateFrameIndex(
     const StreamInfo& stream,
     int64_t frameIndex) {
   TORCH_CHECK(
-      frameIndex >= 0 && frameIndex < stream.allFrames.size(),
+      frameIndex >= 0 && frameIndex < static_cast<int>(stream.allFrames.size()),
       "Invalid frame index=" + std::to_string(frameIndex) +
           " for streamIndex=" + std::to_string(stream.streamIndex) +
           " numFrames=" + std::to_string(stream.allFrames.size()));
@@ -1134,10 +1135,11 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
 
   auto previousIndexInVideo = -1;
-  for (auto f = 0; f < frameIndices.size(); ++f) {
+  for (size_t f = 0; f < frameIndices.size(); ++f) {
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
-    if (indexInVideo < 0 || indexInVideo >= stream.allFrames.size()) {
+    if (indexInVideo < 0 ||
+        indexInVideo >= static_cast<int>(stream.allFrames.size())) {
       throw std::runtime_error(
           "Invalid frame index=" + std::to_string(indexInVideo));
     }
@@ -1180,7 +1182,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
   double maxSeconds = streamMetadata.maxPtsSecondsFromScan.value();
 
   std::vector<int64_t> frameIndices(timestamps.size());
-  for (auto i = 0; i < timestamps.size(); ++i) {
+  for (size_t i = 0; i < timestamps.size(); ++i) {
     auto framePts = timestamps[i];
     TORCH_CHECK(
         framePts >= minSeconds && framePts < maxSeconds,
@@ -1215,7 +1217,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
   TORCH_CHECK(
       start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
   TORCH_CHECK(
-      stop <= stream.allFrames.size(),
+      stop <= static_cast<int64_t>(stream.allFrames.size()),
       "Range stop, " + std::to_string(stop) +
           ", is more than the number of frames, " +
           std::to_string(stream.allFrames.size()));

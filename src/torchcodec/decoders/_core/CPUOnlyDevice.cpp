@@ -16,28 +16,28 @@ namespace facebook::torchcodec {
 
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
-    const VideoDecoder::VideoStreamDecoderOptions& options,
-    VideoDecoder::RawDecodedOutput& rawOutput,
-    VideoDecoder::DecodedOutput& output,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    [[maybe_unused]] const VideoDecoder::VideoStreamDecoderOptions& options,
+    [[maybe_unused]] VideoDecoder::RawDecodedOutput& rawOutput,
+    [[maybe_unused]] VideoDecoder::DecodedOutput& output,
+    [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
   throwUnsupportedDeviceError(device);
 }
 
 void initializeContextOnCuda(
     const torch::Device& device,
-    AVCodecContext* codecContext) {
+    [[maybe_unused]] AVCodecContext* codecContext) {
   throwUnsupportedDeviceError(device);
 }
 
 void releaseContextOnCuda(
     const torch::Device& device,
-    AVCodecContext* codecContext) {
+    [[maybe_unused]] AVCodecContext* codecContext) {
   throwUnsupportedDeviceError(device);
 }
 
 std::optional<AVCodecPtr> findCudaCodec(
     const torch::Device& device,
-    const AVCodecID& codecId) {
+    [[maybe_unused]] const AVCodecID& codecId) {
   throwUnsupportedDeviceError(device);
 }
 
