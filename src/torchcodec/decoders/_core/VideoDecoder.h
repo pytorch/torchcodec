@@ -370,7 +370,7 @@ class VideoDecoder {
   // for more details about the heuristics.
   int getBestStreamIndex(AVMediaType mediaType);
   void initializeDecoder();
-  void validateUserProvidedStreamIndex(uint64_t streamIndex);
+  void validateUserProvidedStreamIndex(int streamIndex);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
       const StreamMetadata& streamMetadata,

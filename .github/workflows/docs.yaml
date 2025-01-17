@@ -112,7 +112,7 @@ jobs:
         run: |
           cd docs
           ${CONDA_RUN} make html
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: Built-Docs
           path: docs/build/html/
