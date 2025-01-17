@@ -603,7 +603,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
-    FrameInfo frameInfo = {.pts = packet->pts};
+    FrameInfo frameInfo = {packet->pts};
     if (packet->flags & AV_PKT_FLAG_KEY) {
       streams_[streamIndex].keyFrames.push_back(frameInfo);
     }
