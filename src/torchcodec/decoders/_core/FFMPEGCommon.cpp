@@ -10,6 +10,14 @@
 
 namespace facebook::torchcodec {
 
+AVCodecPtrBestStream makeAVCodecPtrBestStream(const AVCodec* codec) {
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 18, 100)
+  return const_cast<AVCodec*>(codec);
+#else
+  return codec;
+#endif
+}
+
 std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
   char errorBuffer[AV_ERROR_MAX_STRING_SIZE] = {0};
   av_strerror(errorCode, errorBuffer, AV_ERROR_MAX_STRING_SIZE);
