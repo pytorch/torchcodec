@@ -27,8 +27,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
       "torchcodec.decoders._core.video_decoder_ops",
       "//pytorch/torchcodec:torchcodec");
-  m.def("create_from_file(str filename) -> Tensor");
-  m.def("create_from_tensor(Tensor video_tensor) -> Tensor");
+  m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
+  m.def(
+      "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def(
       "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
   m.def(
@@ -88,31 +89,67 @@ OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
     VideoDecoder::BatchDecodedOutput& batch) {
   return std::make_tuple(batch.frames, batch.ptsSeconds, batch.durationSeconds);
 }
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
+  if (seekMode == "exact") {
+    return VideoDecoder::SeekMode::exact;
+  } else if (seekMode == "approximate") {
+    return VideoDecoder::SeekMode::approximate;
+  } else {
+    throw std::runtime_error("Invalid seek mode: " + std::string(seekMode));
+  }
+}
+
 } // namespace
 
 // ==============================
 // Implementations for the operators
 // ==============================
 
-at::Tensor create_from_file(std::string_view filename) {
+at::Tensor create_from_file(
+    std::string_view filename,
+    std::optional<std::string_view> seek_mode) {
   std::string filenameStr(filename);
+
+  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  if (seek_mode.has_value()) {
+    realSeek = seekModeFromString(seek_mode.value());
+  }
+
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromFilePath(filenameStr);
+      VideoDecoder::createFromFilePath(filenameStr, realSeek);
+
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
-at::Tensor create_from_tensor(at::Tensor video_tensor) {
+at::Tensor create_from_tensor(
+    at::Tensor video_tensor,
+    std::optional<std::string_view> seek_mode) {
   TORCH_CHECK(video_tensor.is_contiguous(), "video_tensor must be contiguous");
   void* buffer = video_tensor.mutable_data_ptr();
   size_t length = video_tensor.numel();
+
+  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  if (seek_mode.has_value()) {
+    realSeek = seekModeFromString(seek_mode.value());
+  }
+
   std::unique_ptr<VideoDecoder> videoDecoder =
-      VideoDecoder::createFromBuffer(buffer, length);
+      VideoDecoder::createFromBuffer(buffer, length, realSeek);
   return wrapDecoderPointerToTensor(std::move(videoDecoder));
 }
 
-at::Tensor create_from_buffer(const void* buffer, size_t length) {
+at::Tensor create_from_buffer(
+    const void* buffer,
+    size_t length,
+    std::optional<std::string_view> seek_mode) {
+  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  if (seek_mode.has_value()) {
+    realSeek = seekModeFromString(seek_mode.value());
+  }
+
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromBuffer(buffer, length);
+      VideoDecoder::createFromBuffer(buffer, length, realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 

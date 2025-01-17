@@ -50,6 +50,10 @@ class VideoDecoder:
             Passing 0 lets FFmpeg decide on the number of threads.
             Default: 1.
         device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
+        seek_mode (str, optional): Determines if frame access will be "exact" or
+            "approximate". Exact guarantees that requesting frame i will always return frame i,
+            but doing so requires an initial :term:`scan` of the file. Approximate is faster as it avoids scanning the
+            file, but less accurate as it uses the file's metadata to calculate where i probably is. Default: "exact".
 
 
     Attributes:
@@ -67,15 +71,23 @@ class VideoDecoder:
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, device]] = "cpu",
+        seek_mode: Literal["exact", "approximate"] = "exact",
     ):
+        allowed_seek_modes = ("exact", "approximate")
+        if seek_mode not in allowed_seek_modes:
+            raise ValueError(
+                f"Invalid seek mode ({seek_mode}). "
+                f"Supported values are {', '.join(allowed_seek_modes)}."
+            )
+
         if isinstance(source, str):
-            self._decoder = core.create_from_file(source)
+            self._decoder = core.create_from_file(source, seek_mode)
         elif isinstance(source, Path):
-            self._decoder = core.create_from_file(str(source))
+            self._decoder = core.create_from_file(str(source), seek_mode)
         elif isinstance(source, bytes):
-            self._decoder = core.create_from_bytes(source)
+            self._decoder = core.create_from_bytes(source, seek_mode)
         elif isinstance(source, Tensor):
-            self._decoder = core.create_from_tensor(source)
+            self._decoder = core.create_from_tensor(source, seek_mode)
         else:
             raise TypeError(
                 f"Unknown source type: {type(source)}. "
@@ -92,7 +104,6 @@ class VideoDecoder:
         if num_ffmpeg_threads is None:
             raise ValueError(f"{num_ffmpeg_threads = } should be an int.")
 
-        core.scan_all_streams_to_update_metadata(self._decoder)
         core.add_video_stream(
             self._decoder,
             stream_index=stream_index,
@@ -105,11 +116,11 @@ class VideoDecoder:
             self._decoder, stream_index
         )
 
-        if self.metadata.num_frames_from_content is None:
+        if self.metadata.num_frames is None:
             raise ValueError(
                 "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
             )
-        self._num_frames = self.metadata.num_frames_from_content
+        self._num_frames = self.metadata.num_frames
 
         if self.metadata.begin_stream_seconds is None:
             raise ValueError(

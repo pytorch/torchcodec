@@ -38,12 +38,13 @@ def _validate_params_time_based(
             "Could not infer average fps from video metadata. "
             "Try using an index-based sampler instead."
         )
-    if (
-        decoder.metadata.end_stream_seconds is None
-        or decoder.metadata.begin_stream_seconds is None
-    ):
+
+    # Note that metadata.begin_stream_seconds is a property that will always yield a valid
+    # value; if it is not present in the actual metadata, the metadata object will return 0.
+    # Hence, we do not test for it here and only test metadata.end_stream_seconds.
+    if decoder.metadata.end_stream_seconds is None:
         raise ValueError(
-            "Could not infer stream end and start from video metadata. "
+            "Could not infer stream end from video metadata. "
             "Try using an index-based sampler instead."
         )
 
