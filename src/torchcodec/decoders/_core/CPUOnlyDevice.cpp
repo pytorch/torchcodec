@@ -35,7 +35,7 @@ void releaseContextOnCuda(
   throwUnsupportedDeviceError(device);
 }
 
-std::optional<AVCodecPtrBestStream> findCudaCodec(
+std::optional<const AVCodec*> findCudaCodec(
     const torch::Device& device,
     [[maybe_unused]] const AVCodecID& codecId) {
   throwUnsupportedDeviceError(device);
