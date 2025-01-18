@@ -366,7 +366,7 @@ class VideoDecoder {
   // for more details about the heuristics.
   int getBestStreamIndex(AVMediaType mediaType);
   void initializeDecoder();
-  void validateUserProvidedStreamIndex(uint64_t streamIndex);
+  void validateUserProvidedStreamIndex(int streamIndex);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
   // Creates and initializes a filter graph for a stream. The filter graph can

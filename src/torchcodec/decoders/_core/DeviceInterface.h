@@ -13,10 +13,6 @@
 #include "FFMPEGCommon.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-}
-
 namespace facebook::torchcodec {
 
 // Note that all these device functions should only be called if the device is

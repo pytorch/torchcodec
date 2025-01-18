@@ -9,7 +9,6 @@
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 extern "C" {
-#include <libavcodec/avcodec.h>
 #include <libavutil/hwcontext_cuda.h>
 #include <libavutil/pixdesc.h>
 }
@@ -110,7 +109,7 @@ AVBufferRef* getFFMPEGContextFromExistingCudaContext(
 #else
 
 AVBufferRef* getFFMPEGContextFromNewCudaContext(
-    const torch::Device& device,
+    [[maybe_unused]] const torch::Device& device,
     torch::DeviceIndex nonNegativeDeviceIndex,
     enum AVHWDeviceType type) {
   AVBufferRef* hw_device_ctx = nullptr;
@@ -260,24 +259,23 @@ void convertAVFrameToDecodedOutputOnCuda(
 // we have to do this because of an FFmpeg bug where hardware decoding is not
 // appropriately set, so we just go off and find the matching codec for the CUDA
 // device
-std::optional<AVCodecPtr> findCudaCodec(
+std::optional<const AVCodec*> findCudaCodec(
     const torch::Device& device,
     const AVCodecID& codecId) {
   throwErrorIfNonCudaDevice(device);
 
-  void* i = NULL;
-
-  AVCodecPtr c;
-  while (c = av_codec_iterate(&i)) {
-    const AVCodecHWConfig* config;
-
-    if (c->id != codecId || !av_codec_is_decoder(c)) {
+  void* i = nullptr;
+  const AVCodec* codec = nullptr;
+  while ((codec = av_codec_iterate(&i)) != nullptr) {
+    if (codec->id != codecId || !av_codec_is_decoder(codec)) {
       continue;
     }
 
-    for (int j = 0; config = avcodec_get_hw_config(c, j); j++) {
+    const AVCodecHWConfig* config = nullptr;
+    for (int j = 0; (config = avcodec_get_hw_config(codec, j)) != nullptr;
+         ++j) {
       if (config->device_type == AV_HWDEVICE_TYPE_CUDA) {
-        return c;
+        return codec;
       }
     }
   }
