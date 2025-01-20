@@ -179,11 +179,6 @@ class VideoDecoder {
     UniqueAVFrame frame;
     // The stream index of the decoded frame.
     int streamIndex;
-    // This is an unowned pointer that we copy the frame data to after color
-    // conversion.
-    // For a single tensor this points to the start of data_ptr. For a batch
-    // tensor it may point to the middle of the allocated batch tensor.
-    void* data = nullptr;
     // We carry around the size to ensure we don't stomp on memory while doing
     // color conversion.
     size_t size = 0;
