@@ -191,8 +191,6 @@ class VideoDecoder {
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
     torch::Tensor frame;
-    // Could be AVMEDIA_TYPE_VIDEO or AVMEDIA_TYPE_AUDIO.
-    AVMediaType streamType;
     // The stream index of the decoded frame. Used to distinguish
     // between streams that are of the same type.
     int streamIndex;
