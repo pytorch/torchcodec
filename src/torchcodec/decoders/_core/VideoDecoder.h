@@ -160,9 +160,8 @@ class VideoDecoder {
   // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
-  // This structure ensures we always keep the streamIndex and frame together
-  // with the data output. Note that AVFrame itself doesn't retain the
-  // streamIndex.
+  // This structure ensures we always keep the streamIndex and AVFrame together
+  // Note that AVFrame itself doesn't retain the streamIndex.
   struct RawDecodedOutput {
     // The actual decoded output as a unique pointer to an AVFrame.
     UniqueAVFrame frame;
