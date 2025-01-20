@@ -869,7 +869,6 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   AVFrame* frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streams_[streamIndex];
-  output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
   output.pts = frame->pts;
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
@@ -930,86 +929,78 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 
   torch::Tensor outputTensor;
-  if (output.streamType == AVMEDIA_TYPE_VIDEO) {
-    // We need to compare the current frame context with our previous frame
-    // context. If they are different, then we need to re-create our colorspace
-    // conversion objects. We create our colorspace conversion objects late so
-    // that we don't have to depend on the unreliable metadata in the header.
-    // And we sometimes re-create them because it's possible for frame
-    // resolution to change mid-stream. Finally, we want to reuse the colorspace
-    // conversion objects as much as possible for performance reasons.
-    enum AVPixelFormat frameFormat =
-        static_cast<enum AVPixelFormat>(frame->format);
-    auto frameContext = DecodedFrameContext{
-        frame->width,
-        frame->height,
-        frameFormat,
-        expectedOutputWidth,
-        expectedOutputHeight};
+  // We need to compare the current frame context with our previous frame
+  // context. If they are different, then we need to re-create our colorspace
+  // conversion objects. We create our colorspace conversion objects late so
+  // that we don't have to depend on the unreliable metadata in the header.
+  // And we sometimes re-create them because it's possible for frame
+  // resolution to change mid-stream. Finally, we want to reuse the colorspace
+  // conversion objects as much as possible for performance reasons.
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(frame->format);
+  auto frameContext = DecodedFrameContext{
+      frame->width,
+      frame->height,
+      frameFormat,
+      expectedOutputWidth,
+      expectedOutputHeight};
 
-    if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
-          expectedOutputHeight, expectedOutputWidth, torch::kCPU));
+  if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+    outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
+        expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-      if (!streamInfo.swsContext ||
-          streamInfo.prevFrameContext != frameContext) {
-        createSwsContext(streamInfo, frameContext, frame->colorspace);
-        streamInfo.prevFrameContext = frameContext;
-      }
-      int resultHeight =
-          convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
-      // If this check failed, it would mean that the frame wasn't reshaped to
-      // the expected height.
-      // TODO: Can we do the same check for width?
-      TORCH_CHECK(
-          resultHeight == expectedOutputHeight,
-          "resultHeight != expectedOutputHeight: ",
-          resultHeight,
-          " != ",
-          expectedOutputHeight);
-
-      output.frame = outputTensor;
-    } else if (
-        streamInfo.colorConversionLibrary ==
-        ColorConversionLibrary::FILTERGRAPH) {
-      if (!streamInfo.filterState.filterGraph ||
-          streamInfo.prevFrameContext != frameContext) {
-        createFilterGraph(
-            streamInfo, expectedOutputHeight, expectedOutputWidth);
-        streamInfo.prevFrameContext = frameContext;
-      }
-      outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
-
-      // Similarly to above, if this check fails it means the frame wasn't
-      // reshaped to its expected dimensions by filtergraph.
-      auto shape = outputTensor.sizes();
-      TORCH_CHECK(
-          (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
-              (shape[1] == expectedOutputWidth) && (shape[2] == 3),
-          "Expected output tensor of shape ",
-          expectedOutputHeight,
-          "x",
-          expectedOutputWidth,
-          "x3, got ",
-          shape);
-
-      if (preAllocatedOutputTensor.has_value()) {
-        // We have already validated that preAllocatedOutputTensor and
-        // outputTensor have the same shape.
-        preAllocatedOutputTensor.value().copy_(outputTensor);
-        output.frame = preAllocatedOutputTensor.value();
-      } else {
-        output.frame = outputTensor;
-      }
-    } else {
-      throw std::runtime_error(
-          "Invalid color conversion library: " +
-          std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
+    if (!streamInfo.swsContext || streamInfo.prevFrameContext != frameContext) {
+      createSwsContext(streamInfo, frameContext, frame->colorspace);
+      streamInfo.prevFrameContext = frameContext;
     }
-  } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
-    // audio decoding.
-    throw std::runtime_error("Audio is not supported yet.");
+    int resultHeight =
+        convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
+    // If this check failed, it would mean that the frame wasn't reshaped to
+    // the expected height.
+    // TODO: Can we do the same check for width?
+    TORCH_CHECK(
+        resultHeight == expectedOutputHeight,
+        "resultHeight != expectedOutputHeight: ",
+        resultHeight,
+        " != ",
+        expectedOutputHeight);
+
+    output.frame = outputTensor;
+  } else if (
+      streamInfo.colorConversionLibrary ==
+      ColorConversionLibrary::FILTERGRAPH) {
+    if (!streamInfo.filterState.filterGraph ||
+        streamInfo.prevFrameContext != frameContext) {
+      createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
+      streamInfo.prevFrameContext = frameContext;
+    }
+    outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+
+    // Similarly to above, if this check fails it means the frame wasn't
+    // reshaped to its expected dimensions by filtergraph.
+    auto shape = outputTensor.sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+            (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+        "Expected output tensor of shape ",
+        expectedOutputHeight,
+        "x",
+        expectedOutputWidth,
+        "x3, got ",
+        shape);
+
+    if (preAllocatedOutputTensor.has_value()) {
+      // We have already validated that preAllocatedOutputTensor and
+      // outputTensor have the same shape.
+      preAllocatedOutputTensor.value().copy_(outputTensor);
+      output.frame = preAllocatedOutputTensor.value();
+    } else {
+      output.frame = outputTensor;
+    }
+  } else {
+    throw std::runtime_error(
+        "Invalid color conversion library: " +
+        std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
   }
 }
 
