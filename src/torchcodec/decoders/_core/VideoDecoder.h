@@ -160,17 +160,6 @@ class VideoDecoder {
   // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
-  // This is an internal structure that is used to store the decoded output
-  // from decoding a frame through color conversion. Example usage is:
-  //
-  // RawDecodedOutput rawOutput = getDecodedOutputWithFilter();
-  // // Now allocate a single tensor or a batch tensor.
-  // torch::Tensor userOutput = torch::empty(...);
-  // // Now fill in `data` and `size`.
-  // rawOutput.data = userOutput.data_ptr();
-  // // Now run the color conversion.
-  // convertFrameToBufferUsingSwsScale(rawOutput);
-  //
   // This structure ensures we always keep the streamIndex and frame together
   // with the data output. Note that AVFrame itself doesn't retain the
   // streamIndex.
