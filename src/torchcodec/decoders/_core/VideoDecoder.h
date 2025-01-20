@@ -179,9 +179,6 @@ class VideoDecoder {
     UniqueAVFrame frame;
     // The stream index of the decoded frame.
     int streamIndex;
-    // We carry around the size to ensure we don't stomp on memory while doing
-    // color conversion.
-    size_t size = 0;
   };
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
