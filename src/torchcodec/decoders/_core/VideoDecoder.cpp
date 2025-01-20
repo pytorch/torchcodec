@@ -869,10 +869,8 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   AVFrame* frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streams_[streamIndex];
-  output.pts = frame->pts;
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
-  output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.

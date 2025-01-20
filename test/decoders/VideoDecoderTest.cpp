@@ -172,12 +172,10 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   torch::Tensor tensor0FromOurDecoder = output.frame;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
-  EXPECT_EQ(output.pts, 0);
   output = ourDecoder->getNextFrameNoDemux();
   torch::Tensor tensor1FromOurDecoder = output.frame;
   EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
-  EXPECT_EQ(output.pts, 1001);
 
   torch::Tensor tensor0FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.stream3.frame000000.pt");
