@@ -174,12 +174,8 @@ class VideoDecoder {
     // The stream index of the decoded frame. Used to distinguish
     // between streams that are of the same type.
     int streamIndex;
-    // The presentation timestamp of the decoded frame in time base.
-    int64_t pts;
     // The presentation timestamp of the decoded frame in seconds.
     double ptsSeconds;
-    // The duration of the decoded frame in time base.
-    int64_t duration;
     // The duration of the decoded frame in seconds.
     double durationSeconds;
   };

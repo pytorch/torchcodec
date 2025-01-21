@@ -872,10 +872,8 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.streamIndex = streamIndex;
   auto& streamInfo = streams_[streamIndex];
   TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
-  output.pts = frame->pts;
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
-  output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
