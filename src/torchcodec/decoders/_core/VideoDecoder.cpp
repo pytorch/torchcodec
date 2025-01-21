@@ -763,6 +763,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   }
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame frame(av_frame_alloc());
+  UniqueAVPacket packet(av_packet_alloc());
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   int frameStreamIndex = -1;
@@ -802,7 +803,6 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       // pulling frames from its internal buffers.
       continue;
     }
-    UniqueAVPacket packet(av_packet_alloc());
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
     if (ffmpegStatus == AVERROR_EOF) {
@@ -820,6 +820,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
         }
       }
       reachedEOF = true;
+      av_packet_unref(packet.get());
       continue;
     }
     if (ffmpegStatus < AVSUCCESS) {
@@ -829,16 +830,18 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     }
     if (activeStreamIndices_.count(packet->stream_index) == 0) {
       // This packet is not for any of the active streams.
+      av_packet_unref(packet.get());
       continue;
     }
     ffmpegStatus = avcodec_send_packet(
         streams_[packet->stream_index].codecContext.get(), packet.get());
-    decodeStats_.numPacketsSentToDecoder++;
     if (ffmpegStatus < AVSUCCESS) {
       throw std::runtime_error(
           "Could not push packet to decoder: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
     }
+    decodeStats_.numPacketsSentToDecoder++;
+    av_packet_unref(packet.get());
   }
   if (ffmpegStatus < AVSUCCESS) {
     if (reachedEOF || ffmpegStatus == AVERROR_EOF) {
