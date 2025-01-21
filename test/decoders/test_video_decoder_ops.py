@@ -528,9 +528,7 @@ class TestOps:
         if height_scaling_factor != 1.0:
             assert target_height != input_video.height
 
-        filtergraph_decoder = create_from_file(
-            str(input_video.path)
-        )
+        filtergraph_decoder = create_from_file(str(input_video.path))
         _add_video_stream(
             filtergraph_decoder,
             width=target_width,
@@ -539,9 +537,7 @@ class TestOps:
         )
         filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
 
-        swscale_decoder = create_from_file(
-            str(input_video.path)
-        )
+        swscale_decoder = create_from_file(str(input_video.path))
         _add_video_stream(
             swscale_decoder,
             width=target_width,

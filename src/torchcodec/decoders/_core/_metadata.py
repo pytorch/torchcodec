@@ -110,17 +110,27 @@ class VideoStreamMetadata:
 
     @property
     def begin_stream_seconds(self) -> float:
-        """TODO."""
+        """Beginning of the stream, in seconds (float). Conceptually, this
+        corresponds to the first frame's :term:`pts`. If
+        ``begin_stream_seconds_from_content`` is not None, then it is returned.
+        Otherwise, this value is 0.
+        """
         if self.begin_stream_seconds_from_content is None:
             return 0
-        return self.begin_stream_seconds_from_content
+        else:
+            return self.begin_stream_seconds_from_content
 
     @property
     def end_stream_seconds(self) -> Optional[float]:
-        """TODO."""
+        """End of the stream, in seconds (float or None).
+        Conceptually, this corresponds to last_frame.pts + last_frame.duration.
+        If ``end_stream_seconds_from_content`` is not None, then that value is
+        returned. Otherwise, returns ``duration_seconds``.
+        """
         if self.end_stream_seconds_from_content is None:
             return self.duration_seconds
-        return self.end_stream_seconds_from_content
+        else:
+            return self.end_stream_seconds_from_content
 
     def __repr__(self):
         # Overridden because properites are not printed by default.
