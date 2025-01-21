@@ -562,13 +562,14 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
       continue;
     }
-    auto& stream = containerMetadata_.streams[streamIndex];
-    stream.minPtsFromScan =
-        std::min(stream.minPtsFromScan.value_or(INT64_MAX), packet->pts);
-    stream.maxPtsFromScan = std::max(
-        stream.maxPtsFromScan.value_or(INT64_MIN),
+    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    streamMetadata.minPtsFromScan = std::min(
+        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
+    streamMetadata.maxPtsFromScan = std::max(
+        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
         packet->pts + packet->duration);
-    stream.numFramesFromScan = stream.numFramesFromScan.value_or(0) + 1;
+    streamMetadata.numFramesFromScan =
+        streamMetadata.numFramesFromScan.value_or(0) + 1;
 
     FrameInfo frameInfo;
     frameInfo.pts = packet->pts;
@@ -578,16 +579,17 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     }
     streams_[streamIndex].allFrames.push_back(frameInfo);
   }
-  for (size_t i = 0; i < containerMetadata_.streams.size(); ++i) {
-    auto& streamMetadata = containerMetadata_.streams[i];
-    auto stream = formatContext_->streams[i];
+  for (size_t streamIndex = 0; streamIndex < containerMetadata_.streams.size();
+       ++streamIndex) {
+    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    auto avStream = formatContext_->streams[streamIndex];
     if (streamMetadata.minPtsFromScan.has_value()) {
       streamMetadata.minPtsSecondsFromScan =
-          *streamMetadata.minPtsFromScan * av_q2d(stream->time_base);
+          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
     }
     if (streamMetadata.maxPtsFromScan.has_value()) {
       streamMetadata.maxPtsSecondsFromScan =
-          *streamMetadata.maxPtsFromScan * av_q2d(stream->time_base);
+          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
     }
   }
   int ffmepgStatus =
@@ -597,23 +599,23 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
         "Could not seek file to pts=0: " +
         getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
   }
-  for (auto& [streamIndex, stream] : streams_) {
+  for (auto& [streamIndex, streamInfo] : streams_) {
     std::sort(
-        stream.keyFrames.begin(),
-        stream.keyFrames.end(),
+        streamInfo.keyFrames.begin(),
+        streamInfo.keyFrames.end(),
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
     std::sort(
-        stream.allFrames.begin(),
-        stream.allFrames.end(),
+        streamInfo.allFrames.begin(),
+        streamInfo.allFrames.end(),
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
 
-    for (size_t i = 0; i < stream.allFrames.size(); ++i) {
-      if (i + 1 < stream.allFrames.size()) {
-        stream.allFrames[i].nextPts = stream.allFrames[i + 1].pts;
+    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
+      if (i + 1 < streamInfo.allFrames.size()) {
+        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
       }
     }
   }
@@ -869,6 +871,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   AVFrame* frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streams_[streamIndex];
+  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
   output.durationSeconds = ptsToSeconds(
