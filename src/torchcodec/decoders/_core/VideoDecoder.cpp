@@ -546,8 +546,9 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scanned_all_streams_) {
     return;
   }
+
+  UniqueAVPacket packet(av_packet_alloc());
   while (true) {
-    UniqueAVPacket packet(av_packet_alloc());
     int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     if (ffmpegStatus == AVERROR_EOF) {
       break;
@@ -560,6 +561,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     int streamIndex = packet->stream_index;
 
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
+      av_packet_unref(packet.get());
       continue;
     }
     auto& streamMetadata = containerMetadata_.streams[streamIndex];
@@ -578,6 +580,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
       streams_[streamIndex].keyFrames.push_back(frameInfo);
     }
     streams_[streamIndex].allFrames.push_back(frameInfo);
+    av_packet_unref(packet.get());
   }
   for (size_t streamIndex = 0; streamIndex < containerMetadata_.streams.size();
        ++streamIndex) {
