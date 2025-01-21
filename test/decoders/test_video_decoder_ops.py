@@ -65,7 +65,7 @@ class ReferenceDecoder:
 class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_and_next(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -82,7 +82,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_to_negative_pts(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -94,7 +94,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_pts(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
@@ -118,7 +118,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_index(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -132,7 +132,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_with_info_at_index(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         frame6, pts, duration = get_frame_at_index(
             decoder, stream_index=3, frame_index=180
@@ -146,7 +146,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         frames0and180, *_ = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
@@ -160,7 +160,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices_unsorted_indices(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
         stream_index = 3
 
@@ -191,7 +191,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_by_pts(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
         stream_index = 3
 
@@ -225,7 +225,7 @@ class TestOps:
         # Get all frames in the video, then query all frames with all time-based
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
 
         metadata = get_json_metadata(decoder)
@@ -281,7 +281,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_in_range(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
 
         # ensure that the degenerate case of a range of size 1 works
@@ -331,7 +331,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_throws_exception_at_eof(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
@@ -342,7 +342,7 @@ class TestOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_throws_exception_if_seek_too_far(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
         # pts=12.979633 is the last frame in the video.
         seek_to_pts(decoder, 12.979633 + 1.0e-4)
@@ -364,7 +364,7 @@ class TestOps:
 
         # NB: create needs to happen outside the torch.compile region,
         # for now. Otherwise torch.compile constant-props it.
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         frame0, frame_time6 = get_frame1_and_frame_time6(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
@@ -442,7 +442,7 @@ class TestOps:
             assert metadata_dict["bitRate"] == 324915.0
 
     def test_video_get_json_metadata_with_stream(self):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -469,7 +469,7 @@ class TestOps:
         assert "ffmpeg_version" in ffmpeg_dict
 
     def test_frame_pts_equality(self):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder)
 
         # Note that for all of these tests, we store the return value of
@@ -489,7 +489,7 @@ class TestOps:
 
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
     def test_color_conversion_library(self, color_conversion_library):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="approximate")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, color_conversion_library=color_conversion_library)
         frame0, *_ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -514,7 +514,7 @@ class TestOps:
     def test_color_conversion_library_with_scaling(
         self, input_video, width_scaling_factor, height_scaling_factor
     ):
-        decoder = create_from_file(str(input_video.path), seek_mode="exact")
+        decoder = create_from_file(str(input_video.path))
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -529,7 +529,7 @@ class TestOps:
             assert target_height != input_video.height
 
         filtergraph_decoder = create_from_file(
-            str(input_video.path), seek_mode="approximate"
+            str(input_video.path)
         )
         _add_video_stream(
             filtergraph_decoder,
@@ -540,7 +540,7 @@ class TestOps:
         filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
 
         swscale_decoder = create_from_file(
-            str(input_video.path), seek_mode="approximate"
+            str(input_video.path)
         )
         _add_video_stream(
             swscale_decoder,
@@ -556,7 +556,7 @@ class TestOps:
     def test_color_conversion_library_with_dimension_order(
         self, dimension_order, color_conversion_library
     ):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(
             decoder,
             color_conversion_library=color_conversion_library,
@@ -641,7 +641,7 @@ class TestOps:
         ]
         subprocess.check_call(command)
 
-        decoder = create_from_file(str(video_path), seek_mode="exact")
+        decoder = create_from_file(str(video_path))
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -655,7 +655,7 @@ class TestOps:
         if height_scaling_factor != 1.0:
             assert target_height != height
 
-        filtergraph_decoder = create_from_file(str(video_path), seek_mode="approximate")
+        filtergraph_decoder = create_from_file(str(video_path))
         _add_video_stream(
             filtergraph_decoder,
             width=target_width,
@@ -664,7 +664,7 @@ class TestOps:
         )
         filtergraph_frame0, _, _ = get_next_frame(filtergraph_decoder)
 
-        auto_decoder = create_from_file(str(video_path), seek_mode="approximate")
+        auto_decoder = create_from_file(str(video_path))
         add_video_stream(
             auto_decoder,
             width=target_width,
@@ -675,7 +675,7 @@ class TestOps:
 
     @needs_cuda
     def test_cuda_decoder(self):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode="exact")
+        decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device="cuda")
         frame0, pts, duration = get_next_frame(decoder)
         assert frame0.device.type == "cuda"
