@@ -124,7 +124,7 @@ VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
     int streamIndex,
     torch::Tensor& hwcTensor) {
-  if (streamInfos_[streamIndex].options.dimensionOrder == "NHWC") {
+  if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
     return hwcTensor;
   }
   auto numDimensions = hwcTensor.dim();
@@ -141,7 +141,7 @@ torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
   }
 }
 
-VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
+VideoDecoder::VideoStreamOptions::VideoStreamOptions(
     const std::string& optionsString) {
   std::vector<std::string> tokens =
       splitStringWithDelimiters(optionsString, ",");
@@ -194,14 +194,14 @@ VideoDecoder::VideoStreamDecoderOptions::VideoStreamDecoderOptions(
 
 VideoDecoder::BatchDecodedOutput::BatchDecodedOutput(
     int64_t numFrames,
-    const VideoStreamDecoderOptions& options,
+    const VideoStreamOptions& videoStreamOptions,
     const StreamMetadata& streamMetadata)
     : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
       durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(options, streamMetadata);
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(videoStreamOptions, streamMetadata);
   int height = frameDims.height;
   int width = frameDims.width;
-  frames = allocateEmptyHWCTensor(height, width, options.device, numFrames);
+  frames = allocateEmptyHWCTensor(height, width, videoStreamOptions.device, numFrames);
 }
 
 bool VideoDecoder::DecodedFrameContext::operator==(
@@ -338,9 +338,9 @@ void VideoDecoder::createFilterGraph(
   filterState.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterState.filterGraph.get() != nullptr);
 
-  if (streamInfo.options.ffmpegThreadCount.has_value()) {
+  if (streamInfo.videoStreamOptions.ffmpegThreadCount.has_value()) {
     filterState.filterGraph->nb_threads =
-        streamInfo.options.ffmpegThreadCount.value();
+        streamInfo.videoStreamOptions.ffmpegThreadCount.value();
   }
 
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
@@ -444,7 +444,7 @@ int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
 
 void VideoDecoder::addVideoStreamDecoder(
     int preferredStreamIndex,
-    const VideoStreamDecoderOptions& options) {
+    const VideoStreamOptions& videoStreamOptions) {
   if (activeStreamIndices_.count(preferredStreamIndex) > 0) {
     throw std::invalid_argument(
         "Stream with index " + std::to_string(preferredStreamIndex) +
@@ -484,26 +484,26 @@ void VideoDecoder::addVideoStreamDecoder(
         " is not a video stream.");
   }
 
-  if (options.device.type() == torch::kCUDA) {
-    codec = findCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
+  if (videoStreamOptions.device.type() == torch::kCUDA) {
+    codec = findCudaCodec(videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
                 .value_or(codec);
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(codec);
   TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = options.ffmpegThreadCount.value_or(0);
+  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
-  if (options.device.type() == torch::kCPU) {
+  if (videoStreamOptions.device.type() == torch::kCPU) {
     // No more initialization needed for CPU.
-  } else if (options.device.type() == torch::kCUDA) {
-    initializeContextOnCuda(options.device, codecContext);
+  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(videoStreamOptions.device, codecContext);
   } else {
-    TORCH_CHECK(false, "Invalid device type: " + options.device.str());
+    TORCH_CHECK(false, "Invalid device type: " + videoStreamOptions.device.str());
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
@@ -514,7 +514,7 @@ void VideoDecoder::addVideoStreamDecoder(
   codecContext->time_base = streamInfo.stream->time_base;
   activeStreamIndices_.insert(streamIndex);
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
-  streamInfo.options = options;
+  streamInfo.videoStreamOptions = videoStreamOptions;
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
@@ -523,10 +523,10 @@ void VideoDecoder::addVideoStreamDecoder(
   // swscale's width requirements to be violated. We don't expose the ability to
   // choose color conversion library publicly; we only use this ability
   // internally.
-  int width = options.width.value_or(codecContext->width);
+  int width = videoStreamOptions.width.value_or(codecContext->width);
   auto defaultLibrary = getDefaultColorConversionLibrary(width);
   streamInfo.colorConversionLibrary =
-      options.colorConversionLibrary.value_or(defaultLibrary);
+      videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
 }
 
 void VideoDecoder::updateMetadataWithCodecContext(
@@ -920,19 +920,19 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   output.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
-  if (streamInfo.options.device.type() == torch::kCPU) {
+  if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToDecodedOutputOnCPU(
         rawOutput, output, preAllocatedOutputTensor);
-  } else if (streamInfo.options.device.type() == torch::kCUDA) {
+  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
     convertAVFrameToDecodedOutputOnCuda(
-        streamInfo.options.device,
-        streamInfo.options,
+        streamInfo.videoStreamOptions.device,
+        streamInfo.videoStreamOptions,
         rawOutput,
         output,
         preAllocatedOutputTensor);
   } else {
     TORCH_CHECK(
-        false, "Invalid device type: " + streamInfo.options.device.str());
+        false, "Invalid device type: " + streamInfo.videoStreamOptions.device.str());
   }
   return output;
 }
@@ -955,7 +955,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   auto& streamInfo = streamInfos_[streamIndex];
 
   auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *avFrame);
+      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.videoStreamOptions, *avFrame);
   int expectedOutputHeight = frameDims.height;
   int expectedOutputWidth = frameDims.width;
 
@@ -1262,8 +1262,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
 
   const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& options = streamInfo.options;
-  BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+  BatchDecodedOutput output(frameIndices.size(), videoStreamOptions, streamMetadata);
 
   auto previousIndexInVideo = -1;
   for (size_t f = 0; f < frameIndices.size(); ++f) {
@@ -1344,8 +1344,8 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
       step > 0, "Step must be greater than 0; is " + std::to_string(step));
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
-  const auto& options = streamInfo.options;
-  BatchDecodedOutput output(numOutputFrames, options, streamMetadata);
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+  BatchDecodedOutput output(numOutputFrames, videoStreamOptions, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     DecodedOutput singleOut =
@@ -1372,7 +1372,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
           std::to_string(stopSeconds) + ".");
 
   const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& options = streamInfo.options;
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
 
   // Special case needed to implement a half-open range. At first glance, this
   // may seem unnecessary, as our search for stopFrame can return the end, and
@@ -1392,7 +1392,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
-    BatchDecodedOutput output(0, options, streamMetadata);
+    BatchDecodedOutput output(0, videoStreamOptions, streamMetadata);
     output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
     return output;
   }
@@ -1429,7 +1429,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
       secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
-  BatchDecodedOutput output(numFrames, options, streamMetadata);
+  BatchDecodedOutput output(numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     DecodedOutput singleOut =
         getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
@@ -1584,7 +1584,7 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 
 VideoDecoder::~VideoDecoder() {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    auto& device = streamInfo.options.device;
+    auto& device = streamInfo.videoStreamOptions.device;
     if (device.type() == torch::kCPU) {
     } else if (device.type() == torch::kCUDA) {
       releaseContextOnCuda(device, streamInfo.codecContext.get());
@@ -1599,19 +1599,19 @@ FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
 }
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     const VideoDecoder::StreamMetadata& streamMetadata) {
   return FrameDims(
-      options.height.value_or(*streamMetadata.height),
-      options.width.value_or(*streamMetadata.width));
+      videoStreamOptions.height.value_or(*streamMetadata.height),
+      videoStreamOptions.width.value_or(*streamMetadata.width));
 }
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     const AVFrame& avFrame) {
   return FrameDims(
-      options.height.value_or(avFrame.height),
-      options.width.value_or(avFrame.width));
+      videoStreamOptions.height.value_or(avFrame.height),
+      videoStreamOptions.width.value_or(avFrame.width));
 }
 
 torch::Tensor allocateEmptyHWCTensor(

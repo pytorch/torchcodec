@@ -130,9 +130,9 @@ class VideoDecoder {
     // Use the libswscale library for color conversion.
     SWSCALE
   };
-  struct VideoStreamDecoderOptions {
-    VideoStreamDecoderOptions() {}
-    explicit VideoStreamDecoderOptions(const std::string& optionsString);
+  struct VideoStreamOptions {
+    VideoStreamOptions() {}
+    explicit VideoStreamOptions(const std::string& optionsString);
     // Number of threads we pass to FFMPEG for decoding.
     // 0 means FFMPEG will choose the number of threads automatically to fully
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
@@ -149,13 +149,13 @@ class VideoDecoder {
     // By default we use CPU for decoding for both C++ and python users.
     torch::Device device = torch::kCPU;
   };
-  struct AudioStreamDecoderOptions {};
+  struct AudioStreamOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
-      const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
   void addAudioStreamDecoder(
       int streamIndex,
-      const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
+      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
   torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
@@ -214,7 +214,7 @@ class VideoDecoder {
 
     explicit BatchDecodedOutput(
         int64_t numFrames,
-        const VideoStreamDecoderOptions& options,
+        const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
   };
 
@@ -313,7 +313,7 @@ class VideoDecoder {
     // this pts to the user when they request a frame.
     // We update this field if the user requested a seek.
     int64_t discardFramesBeforePts = INT64_MIN;
-    VideoStreamDecoderOptions options;
+    VideoStreamOptions videoStreamOptions;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
     FilterState filterState;
@@ -488,11 +488,11 @@ struct FrameDims {
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     const VideoDecoder::StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     const AVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(

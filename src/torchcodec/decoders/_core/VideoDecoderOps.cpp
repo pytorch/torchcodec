@@ -180,23 +180,23 @@ void _add_video_stream(
     std::optional<int64_t> stream_index,
     std::optional<std::string_view> device,
     std::optional<std::string_view> color_conversion_library) {
-  VideoDecoder::VideoStreamDecoderOptions options;
-  options.width = width;
-  options.height = height;
-  options.ffmpegThreadCount = num_threads;
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.width = width;
+  videoStreamOptions.height = height;
+  videoStreamOptions.ffmpegThreadCount = num_threads;
 
   if (dimension_order.has_value()) {
     std::string stdDimensionOrder{dimension_order.value()};
     TORCH_CHECK(stdDimensionOrder == "NHWC" || stdDimensionOrder == "NCHW");
-    options.dimensionOrder = stdDimensionOrder;
+    videoStreamOptions.dimensionOrder = stdDimensionOrder;
   }
   if (color_conversion_library.has_value()) {
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
-      options.colorConversionLibrary =
+      videoStreamOptions.colorConversionLibrary =
           VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
     } else if (stdColorConversionLibrary == "swscale") {
-      options.colorConversionLibrary =
+      videoStreamOptions.colorConversionLibrary =
           VideoDecoder::ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(
@@ -206,10 +206,10 @@ void _add_video_stream(
   }
   if (device.has_value()) {
     if (device.value() == "cpu") {
-      options.device = torch::Device(torch::kCPU);
+      videoStreamOptions.device = torch::Device(torch::kCPU);
     } else if (device.value().rfind("cuda", 0) == 0) { // starts with "cuda"
       std::string deviceStr(device.value());
-      options.device = torch::Device(deviceStr);
+      videoStreamOptions.device = torch::Device(deviceStr);
     } else {
       throw std::runtime_error(
           "Invalid device=" + std::string(device.value()) +
@@ -218,7 +218,7 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(stream_index.value_or(-1), options);
+  videoDecoder->addVideoStreamDecoder(stream_index.value_or(-1), videoStreamOptions);
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
