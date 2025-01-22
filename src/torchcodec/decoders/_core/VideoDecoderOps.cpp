@@ -218,7 +218,8 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStreamDecoder(
+      stream_index.value_or(-1), videoStreamOptions);
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
@@ -359,7 +360,8 @@ std::string get_json_metadata(at::Tensor& decoder) {
   }
 
   if (maybeBestVideoStreamIndex.has_value()) {
-    auto streamMetadata = videoMetadata.streamMetadatas[*maybeBestVideoStreamIndex];
+    auto streamMetadata =
+        videoMetadata.streamMetadatas[*maybeBestVideoStreamIndex];
     if (streamMetadata.numFramesFromScan.has_value()) {
       metadataMap["numFrames"] =
           std::to_string(*streamMetadata.numFramesFromScan);
