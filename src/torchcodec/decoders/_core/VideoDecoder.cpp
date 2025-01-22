@@ -426,7 +426,7 @@ void VideoDecoder::createFilterGraph(
 }
 
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
-  AVCodecPtrBestStream codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream codec = nullptr;
   int streamNumber =
       av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &codec, 0);
   return streamNumber;
@@ -441,7 +441,7 @@ void VideoDecoder::addVideoStreamDecoder(
         " is already active.");
   }
   TORCH_CHECK(formatContext_.get() != nullptr);
-  AVCodecPtrBestStream codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream codec = nullptr;
   int streamNumber = av_find_best_stream(
       formatContext_.get(),
       AVMEDIA_TYPE_VIDEO,
@@ -464,7 +464,7 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   if (options.device.type() == torch::kCUDA) {
-    codec = makeAVCodecPtrBestStream(
+    codec = makeAVCodecOnlyUseForCallingAVFindBestStream(
         findCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
             .value_or(codec));
   }
