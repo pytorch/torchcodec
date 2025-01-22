@@ -1600,10 +1600,10 @@ FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    const VideoDecoder::StreamMetadata& metadata) {
+    const VideoDecoder::StreamMetadata& streamMetadata) {
   return FrameDims(
-      options.height.value_or(*metadata.height),
-      options.width.value_or(*metadata.width));
+      options.height.value_or(*streamMetadata.height),
+      options.width.value_or(*streamMetadata.width));
 }
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(

@@ -215,7 +215,7 @@ class VideoDecoder {
     explicit BatchDecodedOutput(
         int64_t numFrames,
         const VideoStreamDecoderOptions& options,
-        const StreamMetadata& metadata);
+        const StreamMetadata& streamMetadata);
   };
 
   // Returns frames at the given indices for a given stream as a single stacked
@@ -489,7 +489,7 @@ FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
     const VideoDecoder::VideoStreamDecoderOptions& options,
-    const VideoDecoder::StreamMetadata& metadata);
+    const VideoDecoder::StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamDecoderOptions& options,
