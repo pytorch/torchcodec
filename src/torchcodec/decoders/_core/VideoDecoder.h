@@ -168,7 +168,7 @@ class VideoDecoder {
   // Note that AVFrame itself doesn't retain the streamIndex.
   struct RawDecodedOutput {
     // The actual decoded output as a unique pointer to an AVFrame.
-    UniqueAVFrame frame;
+    UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
   };

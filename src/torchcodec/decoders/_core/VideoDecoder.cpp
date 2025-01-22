@@ -901,7 +901,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   activeStreamInfo.currentDuration = getDuration(avFrame);
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
-  rawOutput.frame = std::move(avFrame);
+  rawOutput.avFrame = std::move(avFrame);
   return rawOutput;
 }
 
@@ -911,7 +911,7 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
-  AVFrame* avFrame = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.avFrame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
   TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
@@ -951,7 +951,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
-  AVFrame* avFrame = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.avFrame.get();
   auto& streamInfo = streamInfos_[streamIndex];
 
   auto frameDims =
