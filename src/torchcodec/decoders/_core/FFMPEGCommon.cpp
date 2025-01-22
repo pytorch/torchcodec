@@ -10,6 +10,25 @@
 
 namespace facebook::torchcodec {
 
+AutoAVPacket::AutoAVPacket() : avPacket_(av_packet_alloc()) {
+  TORCH_CHECK(avPacket_ != nullptr, "Couldn't allocate avPacket.");
+}
+AutoAVPacket::~AutoAVPacket() {
+  av_packet_free(&avPacket_);
+}
+
+ReferenceAVPacket::ReferenceAVPacket(AutoAVPacket& shared)
+    : avPacket_(shared.avPacket_) {}
+ReferenceAVPacket::~ReferenceAVPacket() {
+  av_packet_unref(avPacket_);
+}
+AVPacket* ReferenceAVPacket::get() {
+  return avPacket_;
+}
+AVPacket* ReferenceAVPacket::operator->() {
+  return avPacket_;
+}
+
 AVCodecOnlyUseForCallingAVFindBestStream
 makeAVCodecOnlyUseForCallingAVFindBestStream(const AVCodec* codec) {
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 18, 100)
