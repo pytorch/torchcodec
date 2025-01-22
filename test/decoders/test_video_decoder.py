@@ -23,7 +23,8 @@ from ..utils import (
 
 class TestVideoDecoder:
     @pytest.mark.parametrize("source_kind", ("str", "path", "tensor", "bytes"))
-    def test_create(self, source_kind):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_create(self, source_kind, seek_mode):
         if source_kind == "str":
             source = str(NASA_VIDEO.path)
         elif source_kind == "path":
@@ -37,14 +38,9 @@ class TestVideoDecoder:
         else:
             raise ValueError("Oops, double check the parametrization of this test!")
 
-        decoder = VideoDecoder(source)
+        decoder = VideoDecoder(source, seek_mode=seek_mode)
         assert isinstance(decoder.metadata, _core.VideoStreamMetadata)
-        assert (
-            len(decoder)
-            == decoder._num_frames
-            == decoder.metadata.num_frames_from_content
-            == 390
-        )
+        assert len(decoder) == decoder._num_frames == 390
         assert decoder.stream_index == decoder.metadata.stream_index == 3
         assert decoder.metadata.duration_seconds == pytest.approx(13.013)
         assert decoder.metadata.average_fps == pytest.approx(29.970029)
@@ -62,11 +58,18 @@ class TestVideoDecoder:
         with pytest.raises(ValueError, match="No valid stream found"):
             decoder = VideoDecoder(NASA_VIDEO.path, stream_index=1)  # noqa
 
+        with pytest.raises(ValueError, match="Invalid seek mode"):
+            decoder = VideoDecoder(NASA_VIDEO.path, seek_mode="blah")  # noqa
+
     @pytest.mark.parametrize("num_ffmpeg_threads", (1, 4))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_getitem_int(self, num_ffmpeg_threads, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_getitem_int(self, num_ffmpeg_threads, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, num_ffmpeg_threads=num_ffmpeg_threads, device=device
+            NASA_VIDEO.path,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=device,
+            seek_mode=seek_mode,
         )
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0).to(device)
@@ -110,8 +113,9 @@ class TestVideoDecoder:
         assert_frames_equal(ref_frame180, decoder[numpy.uint32(180)])
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_getitem_slice(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_getitem_slice(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         # ensure that the degenerate case of a range of size 1 works
 
@@ -251,8 +255,9 @@ class TestVideoDecoder:
                 assert_frames_equal(sliced, ref)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_getitem_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_getitem_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder[1000]  # noqa
@@ -267,8 +272,9 @@ class TestVideoDecoder:
             frame = decoder[2.3]  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_iteration(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_iteration(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0).to(device)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1).to(device)
@@ -312,8 +318,9 @@ class TestVideoDecoder:
         assert iterations == len(decoder) == 390
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_at(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9).to(device)
         frame9 = decoder.get_frame_at(9)
@@ -355,8 +362,9 @@ class TestVideoDecoder:
         assert frame.duration_seconds == duration
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_at_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(-1)  # noqa
@@ -365,8 +373,9 @@ class TestVideoDecoder:
             frame = decoder.get_frame_at(10000)  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_at(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_at(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         frames = decoder.get_frames_at([35, 25])
 
@@ -404,8 +413,9 @@ class TestVideoDecoder:
         )
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_at_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_at_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(RuntimeError, match="Invalid frame index=-1"):
             decoder.get_frames_at([-1])
@@ -430,8 +440,9 @@ class TestVideoDecoder:
         assert_frames_equal(decoded_frame10.data, ref_frame10.to(device=device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_played_at(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_played_at(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         ref_frame_played_at_6 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
         assert_frames_equal(
@@ -451,13 +462,16 @@ class TestVideoDecoder:
         # We don't parametrize with CUDA because the current GPUs on CI do not
         # support x265:
         # https://github.com/pytorch/torchcodec/pull/350#issuecomment-2465011730
-        decoder = VideoDecoder(H265_VIDEO.path)
+        # Note that because our internal fix-up depends on the key frame index, it
+        # only works in exact seeking mode.
+        decoder = VideoDecoder(H265_VIDEO.path, seek_mode="exact")
         ref_frame6 = H265_VIDEO.get_frame_data_by_index(5)
         assert_frames_equal(ref_frame6, decoder.get_frame_played_at(0.5).data)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_played_at_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_played_at_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(IndexError, match="Invalid pts in seconds"):
             frame = decoder.get_frame_played_at(-1.0)  # noqa
@@ -466,9 +480,10 @@ class TestVideoDecoder:
             frame = decoder.get_frame_played_at(100.0)  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_played_at(self, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_played_at(self, device, seek_mode):
 
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         # Note: We know the frame at ~0.84s has index 25, the one at 1.16s has
         # index 35. We use those indices as reference to test against.
@@ -482,6 +497,7 @@ class TestVideoDecoder:
             assert_frames_equal(
                 frames.data[i],
                 NASA_VIDEO.get_frame_data_by_index(reference_indices[i]).to(device),
+                msg=f"index {i}",
             )
 
         assert frames.pts_seconds.device.type == "cpu"
@@ -503,8 +519,9 @@ class TestVideoDecoder:
         )
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_played_at_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_played_at_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(RuntimeError, match="must be in range"):
             decoder.get_frames_played_at([-1])
@@ -517,9 +534,13 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("stream_index", [0, 3, None])
-    def test_get_frames_in_range(self, stream_index, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range(self, stream_index, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, stream_index=stream_index, device=device
+            NASA_VIDEO.path,
+            stream_index=stream_index,
+            device=device,
+            seek_mode=seek_mode,
         )
 
         # test degenerate case where we only actually get 1 frame
@@ -630,9 +651,13 @@ class TestVideoDecoder:
         ),
     )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_dimension_order(self, dimension_order, frame_getter, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_dimension_order(self, dimension_order, frame_getter, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, dimension_order=dimension_order, device=device
+            NASA_VIDEO.path,
+            dimension_order=dimension_order,
+            device=device,
+            seek_mode=seek_mode,
         )
         frame = frame_getter(decoder)
 
@@ -654,9 +679,13 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("stream_index", [0, 3, None])
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_by_pts_in_range(self, stream_index, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_by_pts_in_range(self, stream_index, device, seek_mode):
         decoder = VideoDecoder(
-            NASA_VIDEO.path, stream_index=stream_index, device=device
+            NASA_VIDEO.path,
+            stream_index=stream_index,
+            device=device,
+            seek_mode=seek_mode,
         )
 
         # Note that we are comparing the results of VideoDecoder's method:
@@ -789,8 +818,9 @@ class TestVideoDecoder:
         assert_frames_equal(all_frames.data, decoder[:])
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_by_pts_in_range_fails(self, device):
-        decoder = VideoDecoder(NASA_VIDEO.path, device=device)
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_by_pts_in_range_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(ValueError, match="Invalid start seconds"):
             frame = decoder.get_frames_played_in_range(100.0, 1.0)  # noqa

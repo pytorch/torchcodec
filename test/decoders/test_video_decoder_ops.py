@@ -32,7 +32,6 @@ from torchcodec.decoders._core import (
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,
-    scan_all_streams_to_update_metadata,
     seek_to_pts,
 )
 
@@ -84,7 +83,6 @@ class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_to_negative_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -121,7 +119,6 @@ class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
@@ -136,7 +133,6 @@ class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
         frame6, pts, duration = get_frame_at_index(
             decoder, stream_index=3, frame_index=180
@@ -151,7 +147,6 @@ class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_at_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
         frames0and180, *_ = get_frames_at_indices(
             decoder, stream_index=3, frame_indices=[0, 180]
@@ -167,7 +162,6 @@ class TestOps:
     def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
-        scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
         frame_indices = [2, 0, 1, 0, 2]
@@ -199,7 +193,6 @@ class TestOps:
     def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
-        scan_all_streams_to_update_metadata(decoder)
         stream_index = 3
 
         # Note: 13.01 should give the last video frame for the NASA video
@@ -233,7 +226,6 @@ class TestOps:
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
 
         metadata = get_json_metadata(decoder)
@@ -290,7 +282,6 @@ class TestOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_in_range(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device=device)
 
         # ensure that the degenerate case of a range of size 1 works
@@ -452,7 +443,6 @@ class TestOps:
 
     def test_video_get_json_metadata_with_stream(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -480,7 +470,6 @@ class TestOps:
 
     def test_frame_pts_equality(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
 
         # Note that for all of these tests, we store the return value of
@@ -526,7 +515,6 @@ class TestOps:
         self, input_video, width_scaling_factor, height_scaling_factor
     ):
         decoder = create_from_file(str(input_video.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -570,7 +558,6 @@ class TestOps:
             color_conversion_library=color_conversion_library,
             dimension_order=dimension_order,
         )
-        scan_all_streams_to_update_metadata(decoder)
 
         frame0_ref = NASA_VIDEO.get_frame_data_by_index(0)
         if dimension_order == "NHWC":
@@ -651,7 +638,6 @@ class TestOps:
         subprocess.check_call(command)
 
         decoder = create_from_file(str(video_path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder)
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -686,7 +672,6 @@ class TestOps:
     @needs_cuda
     def test_cuda_decoder(self):
         decoder = create_from_file(str(NASA_VIDEO.path))
-        scan_all_streams_to_update_metadata(decoder)
         add_video_stream(decoder, device="cuda")
         frame0, pts, duration = get_next_frame(decoder)
         assert frame0.device.type == "cuda"

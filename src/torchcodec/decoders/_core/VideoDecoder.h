@@ -50,19 +50,23 @@ class VideoDecoder {
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
+  enum class SeekMode { exact, approximate };
+
   // Creates a VideoDecoder from the video at videoFilePath.
-  explicit VideoDecoder(const std::string& videoFilePath);
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
-  explicit VideoDecoder(const void* buffer, size_t length);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
 
   static std::unique_ptr<VideoDecoder> createFromFilePath(
-      const std::string& videoFilePath);
+      const std::string& videoFilePath,
+      SeekMode seekMode = SeekMode::exact);
 
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
-      size_t length);
+      size_t length,
+      SeekMode seekMode = SeekMode::exact);
 
   // --------------------------------------------------------------------------
   // VIDEO METADATA QUERY API
@@ -157,7 +161,7 @@ class VideoDecoder {
 
   // ---- SINGLE FRAME SEEK AND DECODING API ----
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameOutputNoDemuxInternal() will return the first frame at
+  // Calling getNextFrameNoDemuxInternal() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
   // This structure ensures we always keep the streamIndex and AVFrame together
@@ -342,17 +346,42 @@ class VideoDecoder {
   void initializeDecoder();
   void validateUserProvidedStreamIndex(int streamIndex);
   void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(const StreamInfo& stream, int64_t frameIndex);
+  void validateFrameIndex(
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
+
   // Creates and initializes a filter graph for a stream. The filter graph can
   // do rescaling and color conversion.
   void createFilterGraph(
       StreamInfo& streamInfo,
       int expectedOutputHeight,
       int expectedOutputWidth);
+
+  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+
+  int64_t getPts(
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
+
+  double getMinSeconds(const StreamMetadata& streamMetadata);
+  double getMaxSeconds(const StreamMetadata& streamMetadata);
+
+  int64_t secondsToIndexLowerBound(
+      double seconds,
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata);
+
+  int64_t secondsToIndexUpperBound(
+      double seconds,
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata);
+
   void createSwsContext(
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
+
   void maybeSeekToBeforeDesiredPts();
   RawDecodedOutput getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
@@ -379,9 +408,10 @@ class VideoDecoder {
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  DecodedOutput getNextFrameOutputNoDemuxInternal(
+  DecodedOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streams_;
@@ -397,7 +427,7 @@ class VideoDecoder {
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
   // Whether or not we have already scanned all streams to update the metadata.
-  bool scanned_all_streams_ = false;
+  bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
 };

@@ -50,9 +50,11 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       content_ = outputStringStream.str();
       void* buffer = content_.data();
       size_t length = outputStringStream.str().length();
-      return VideoDecoder::createFromBuffer(buffer, length);
+      return VideoDecoder::createFromBuffer(
+          buffer, length, VideoDecoder::SeekMode::approximate);
     } else {
-      return VideoDecoder::createFromFilePath(filepath);
+      return VideoDecoder::createFromFilePath(
+          filepath, VideoDecoder::SeekMode::approximate);
     }
   }
   std::string content_;
