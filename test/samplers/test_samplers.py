@@ -590,22 +590,15 @@ def test_time_based_sampler_errors(sampler):
             decoder.metadata = original_metadata
 
     with restore_metadata():
-        decoder.metadata.begin_stream_seconds = None
+        decoder.metadata.end_stream_seconds_from_content = None
+        decoder.metadata.duration_seconds_from_header = None
         with pytest.raises(
-            ValueError, match="Could not infer stream end and start from video metadata"
+            ValueError, match="Could not infer stream end from video metadata"
         ):
             sampler(decoder)
 
     with restore_metadata():
-        decoder.metadata.end_stream_seconds = None
-        with pytest.raises(
-            ValueError, match="Could not infer stream end and start from video metadata"
-        ):
-            sampler(decoder)
-
-    with restore_metadata():
-        decoder.metadata.begin_stream_seconds = None
-        decoder.metadata.end_stream_seconds = None
+        decoder.metadata.end_stream_seconds_from_content = None
         decoder.metadata.average_fps_from_header = None
         with pytest.raises(ValueError, match="Could not infer average fps"):
             sampler(decoder)

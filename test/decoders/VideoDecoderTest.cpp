@@ -50,9 +50,11 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       content_ = outputStringStream.str();
       void* buffer = content_.data();
       size_t length = outputStringStream.str().length();
-      return VideoDecoder::createFromBuffer(buffer, length);
+      return VideoDecoder::createFromBuffer(
+          buffer, length, VideoDecoder::SeekMode::approximate);
     } else {
-      return VideoDecoder::createFromFilePath(filepath);
+      return VideoDecoder::createFromFilePath(
+          filepath, VideoDecoder::SeekMode::approximate);
     }
   }
   std::string content_;
@@ -172,12 +174,10 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   torch::Tensor tensor0FromOurDecoder = output.frame;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
-  EXPECT_EQ(output.pts, 0);
   output = ourDecoder->getNextFrameNoDemux();
   torch::Tensor tensor1FromOurDecoder = output.frame;
   EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
-  EXPECT_EQ(output.pts, 1001);
 
   torch::Tensor tensor0FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.stream3.frame000000.pt");

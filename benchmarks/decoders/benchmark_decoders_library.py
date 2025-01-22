@@ -22,7 +22,6 @@ from torchcodec.decoders._core import (
     get_frames_by_pts,
     get_json_metadata,
     get_next_frame,
-    scan_all_streams_to_update_metadata,
     seek_to_pts,
 )
 
@@ -154,8 +153,7 @@ class TorchCodecCore(AbstractDecoder):
         self._device = device
 
     def decode_frames(self, video_file, pts_list):
-        decoder = create_from_file(video_file)
-        scan_all_streams_to_update_metadata(decoder)
+        decoder = create_from_file(video_file, seek_mode="exact")
         _add_video_stream(
             decoder,
             num_threads=self._num_threads,
@@ -170,7 +168,7 @@ class TorchCodecCore(AbstractDecoder):
         return frames
 
     def decode_first_n_frames(self, video_file, n):
-        decoder = create_from_file(video_file)
+        decoder = create_from_file(video_file, seek_mode="approximate")
         _add_video_stream(
             decoder,
             num_threads=self._num_threads,
@@ -197,7 +195,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
         self.transforms_v2 = transforms_v2
 
     def decode_frames(self, video_file, pts_list):
-        decoder = create_from_file(video_file)
+        decoder = create_from_file(video_file, seek_mode="approximate")
         num_threads = int(self._num_threads) if self._num_threads else 0
         _add_video_stream(
             decoder,
@@ -216,7 +214,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
     def decode_first_n_frames(self, video_file, n):
         num_threads = int(self._num_threads) if self._num_threads else 0
-        decoder = create_from_file(video_file)
+        decoder = create_from_file(video_file, seek_mode="approximate")
         _add_video_stream(
             decoder,
             num_threads=num_threads,
@@ -233,7 +231,7 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
     def decode_and_resize(self, video_file, pts_list, height, width, device):
         num_threads = int(self._num_threads) if self._num_threads else 1
-        decoder = create_from_file(video_file)
+        decoder = create_from_file(video_file, seek_mode="approximate")
         _add_video_stream(
             decoder,
             num_threads=num_threads,
@@ -263,8 +261,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         self._device = device
 
     def decode_frames(self, video_file, pts_list):
-        decoder = create_from_file(video_file)
-        scan_all_streams_to_update_metadata(decoder)
+        decoder = create_from_file(video_file, seek_mode="exact")
         _add_video_stream(
             decoder,
             num_threads=self._num_threads,
@@ -279,8 +276,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         return frames
 
     def decode_first_n_frames(self, video_file, n):
-        decoder = create_from_file(video_file)
-        scan_all_streams_to_update_metadata(decoder)
+        decoder = create_from_file(video_file, seek_mode="exact")
         _add_video_stream(
             decoder,
             num_threads=self._num_threads,
@@ -297,9 +293,10 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 
 class TorchCodecPublic(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu"):
+    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="exact"):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
+        self._seek_mode = seek_mode
 
         from torchvision.transforms import v2 as transforms_v2
 
@@ -310,7 +307,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         return decoder.get_frames_played_at(pts_list)
 
@@ -319,7 +319,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = []
         count = 0
@@ -335,7 +338,10 @@ class TorchCodecPublic(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = decoder.get_frames_played_at(pts_list)
         frames = self.transforms_v2.functional.resize(frames.data, (height, width))
@@ -343,9 +349,10 @@ class TorchCodecPublic(AbstractDecoder):
 
 
 class TorchCodecPublicNonBatch(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu"):
+    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="approximate"):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
+        self._seek_mode = seek_mode
 
         from torchvision.transforms import v2 as transforms_v2
 
@@ -356,7 +363,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
 
         frames = []
@@ -370,7 +380,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 0
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
         frames = []
         count = 0
@@ -386,7 +399,10 @@ class TorchCodecPublicNonBatch(AbstractDecoder):
             int(self._num_ffmpeg_threads) if self._num_ffmpeg_threads else 1
         )
         decoder = VideoDecoder(
-            video_file, num_ffmpeg_threads=num_ffmpeg_threads, device=self._device
+            video_file,
+            num_ffmpeg_threads=num_ffmpeg_threads,
+            device=self._device,
+            seek_mode=self._seek_mode,
         )
 
         frames = []
