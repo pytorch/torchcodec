@@ -563,13 +563,14 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
       continue;
     }
-    auto& stream = containerMetadata_.streams[streamIndex];
-    stream.minPtsFromScan =
-        std::min(stream.minPtsFromScan.value_or(INT64_MAX), packet->pts);
-    stream.maxPtsFromScan = std::max(
-        stream.maxPtsFromScan.value_or(INT64_MIN),
+    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    streamMetadata.minPtsFromScan = std::min(
+        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
+    streamMetadata.maxPtsFromScan = std::max(
+        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
         packet->pts + packet->duration);
-    stream.numFramesFromScan = stream.numFramesFromScan.value_or(0) + 1;
+    streamMetadata.numFramesFromScan =
+        streamMetadata.numFramesFromScan.value_or(0) + 1;
 
     FrameInfo frameInfo;
     frameInfo.pts = packet->pts;
@@ -579,16 +580,17 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     }
     streams_[streamIndex].allFrames.push_back(frameInfo);
   }
-  for (size_t i = 0; i < containerMetadata_.streams.size(); ++i) {
-    auto& streamMetadata = containerMetadata_.streams[i];
-    auto stream = formatContext_->streams[i];
+  for (size_t streamIndex = 0; streamIndex < containerMetadata_.streams.size();
+       ++streamIndex) {
+    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    auto avStream = formatContext_->streams[streamIndex];
     if (streamMetadata.minPtsFromScan.has_value()) {
       streamMetadata.minPtsSecondsFromScan =
-          *streamMetadata.minPtsFromScan * av_q2d(stream->time_base);
+          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
     }
     if (streamMetadata.maxPtsFromScan.has_value()) {
       streamMetadata.maxPtsSecondsFromScan =
-          *streamMetadata.maxPtsFromScan * av_q2d(stream->time_base);
+          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
     }
   }
   int ffmepgStatus =
@@ -598,23 +600,23 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
         "Could not seek file to pts=0: " +
         getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
   }
-  for (auto& [streamIndex, stream] : streams_) {
+  for (auto& [streamIndex, streamInfo] : streams_) {
     std::sort(
-        stream.keyFrames.begin(),
-        stream.keyFrames.end(),
+        streamInfo.keyFrames.begin(),
+        streamInfo.keyFrames.end(),
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
     std::sort(
-        stream.allFrames.begin(),
-        stream.allFrames.end(),
+        streamInfo.allFrames.begin(),
+        streamInfo.allFrames.end(),
         [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
           return frameInfo1.pts < frameInfo2.pts;
         });
 
-    for (size_t i = 0; i < stream.allFrames.size(); ++i) {
-      if (i + 1 < stream.allFrames.size()) {
-        stream.allFrames[i].nextPts = stream.allFrames[i + 1].pts;
+    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
+      if (i + 1 < streamInfo.allFrames.size()) {
+        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
       }
     }
   }
@@ -870,11 +872,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   AVFrame* frame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streams_[streamIndex];
-  output.streamType = streams_[streamIndex].stream->codecpar->codec_type;
-  output.pts = frame->pts;
+  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
   output.ptsSeconds =
       ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
-  output.duration = getDuration(frame);
   output.durationSeconds = ptsToSeconds(
       getDuration(frame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
@@ -931,86 +931,78 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 
   torch::Tensor outputTensor;
-  if (output.streamType == AVMEDIA_TYPE_VIDEO) {
-    // We need to compare the current frame context with our previous frame
-    // context. If they are different, then we need to re-create our colorspace
-    // conversion objects. We create our colorspace conversion objects late so
-    // that we don't have to depend on the unreliable metadata in the header.
-    // And we sometimes re-create them because it's possible for frame
-    // resolution to change mid-stream. Finally, we want to reuse the colorspace
-    // conversion objects as much as possible for performance reasons.
-    enum AVPixelFormat frameFormat =
-        static_cast<enum AVPixelFormat>(frame->format);
-    auto frameContext = DecodedFrameContext{
-        frame->width,
-        frame->height,
-        frameFormat,
-        expectedOutputWidth,
-        expectedOutputHeight};
+  // We need to compare the current frame context with our previous frame
+  // context. If they are different, then we need to re-create our colorspace
+  // conversion objects. We create our colorspace conversion objects late so
+  // that we don't have to depend on the unreliable metadata in the header.
+  // And we sometimes re-create them because it's possible for frame
+  // resolution to change mid-stream. Finally, we want to reuse the colorspace
+  // conversion objects as much as possible for performance reasons.
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(frame->format);
+  auto frameContext = DecodedFrameContext{
+      frame->width,
+      frame->height,
+      frameFormat,
+      expectedOutputWidth,
+      expectedOutputHeight};
 
-    if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
-      outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
-          expectedOutputHeight, expectedOutputWidth, torch::kCPU));
+  if (streamInfo.colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+    outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
+        expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-      if (!streamInfo.swsContext ||
-          streamInfo.prevFrameContext != frameContext) {
-        createSwsContext(streamInfo, frameContext, frame->colorspace);
-        streamInfo.prevFrameContext = frameContext;
-      }
-      int resultHeight =
-          convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
-      // If this check failed, it would mean that the frame wasn't reshaped to
-      // the expected height.
-      // TODO: Can we do the same check for width?
-      TORCH_CHECK(
-          resultHeight == expectedOutputHeight,
-          "resultHeight != expectedOutputHeight: ",
-          resultHeight,
-          " != ",
-          expectedOutputHeight);
-
-      output.frame = outputTensor;
-    } else if (
-        streamInfo.colorConversionLibrary ==
-        ColorConversionLibrary::FILTERGRAPH) {
-      if (!streamInfo.filterState.filterGraph ||
-          streamInfo.prevFrameContext != frameContext) {
-        createFilterGraph(
-            streamInfo, expectedOutputHeight, expectedOutputWidth);
-        streamInfo.prevFrameContext = frameContext;
-      }
-      outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
-
-      // Similarly to above, if this check fails it means the frame wasn't
-      // reshaped to its expected dimensions by filtergraph.
-      auto shape = outputTensor.sizes();
-      TORCH_CHECK(
-          (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
-              (shape[1] == expectedOutputWidth) && (shape[2] == 3),
-          "Expected output tensor of shape ",
-          expectedOutputHeight,
-          "x",
-          expectedOutputWidth,
-          "x3, got ",
-          shape);
-
-      if (preAllocatedOutputTensor.has_value()) {
-        // We have already validated that preAllocatedOutputTensor and
-        // outputTensor have the same shape.
-        preAllocatedOutputTensor.value().copy_(outputTensor);
-        output.frame = preAllocatedOutputTensor.value();
-      } else {
-        output.frame = outputTensor;
-      }
-    } else {
-      throw std::runtime_error(
-          "Invalid color conversion library: " +
-          std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
+    if (!streamInfo.swsContext || streamInfo.prevFrameContext != frameContext) {
+      createSwsContext(streamInfo, frameContext, frame->colorspace);
+      streamInfo.prevFrameContext = frameContext;
     }
-  } else if (output.streamType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/85 implement
-    // audio decoding.
-    throw std::runtime_error("Audio is not supported yet.");
+    int resultHeight =
+        convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
+    // If this check failed, it would mean that the frame wasn't reshaped to
+    // the expected height.
+    // TODO: Can we do the same check for width?
+    TORCH_CHECK(
+        resultHeight == expectedOutputHeight,
+        "resultHeight != expectedOutputHeight: ",
+        resultHeight,
+        " != ",
+        expectedOutputHeight);
+
+    output.frame = outputTensor;
+  } else if (
+      streamInfo.colorConversionLibrary ==
+      ColorConversionLibrary::FILTERGRAPH) {
+    if (!streamInfo.filterState.filterGraph ||
+        streamInfo.prevFrameContext != frameContext) {
+      createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
+      streamInfo.prevFrameContext = frameContext;
+    }
+    outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+
+    // Similarly to above, if this check fails it means the frame wasn't
+    // reshaped to its expected dimensions by filtergraph.
+    auto shape = outputTensor.sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == expectedOutputHeight) &&
+            (shape[1] == expectedOutputWidth) && (shape[2] == 3),
+        "Expected output tensor of shape ",
+        expectedOutputHeight,
+        "x",
+        expectedOutputWidth,
+        "x3, got ",
+        shape);
+
+    if (preAllocatedOutputTensor.has_value()) {
+      // We have already validated that preAllocatedOutputTensor and
+      // outputTensor have the same shape.
+      preAllocatedOutputTensor.value().copy_(outputTensor);
+      output.frame = preAllocatedOutputTensor.value();
+    } else {
+      output.frame = outputTensor;
+    }
+  } else {
+    throw std::runtime_error(
+        "Invalid color conversion library: " +
+        std::to_string(static_cast<int>(streamInfo.colorConversionLibrary)));
   }
 }
 
