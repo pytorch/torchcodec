@@ -71,37 +71,37 @@ using UniqueSwsContext =
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
 //
-// AutoFreedAVPacket autoFreedAVPacket; // <-- malloc for AVPacket happens here
+// AutoAVPacket autoAVPacket; // <-- malloc for AVPacket happens here
 // while(...){
-//   AutoUnrefedAVPacket packet(autoFreedAVPacket);
+//   ReferenceAVPacket packet(autoAVPacket);
 //   av_read_frame(..., packet.get());  <-- av_packet_ref() called by FFmpeg
 // } <-- av_packet_unref() called here
 //
 // This achieves a few desirable things:
 // - Memory allocation of the underlying AVPacket happens only once, when
-//   autoFreedAVPacket is created.
-// - av_packet_free() is called when autoFreedAVPacket gets out of scope
+//   autoAVPacket is created.
+// - av_packet_free() is called when autoAVPacket gets out of scope
 // - av_packet_unref() is automatically called when needed, i.e. at the end of
 //   each loop iteration (or when hitting break / continue). This prevents the
 //   risk of us forgetting to call it.
-class AutoFreedAVPacket {
-  friend class AutoUnrefedAVPacket;
+class AutoAVPacket {
+  friend class ReferenceAVPacket;
 
  private:
   AVPacket* avPacket_;
 
  public:
-  AutoFreedAVPacket();
-  ~AutoFreedAVPacket();
+  AutoAVPacket();
+  ~AutoAVPacket();
 };
 
-class AutoUnrefedAVPacket {
+class ReferenceAVPacket {
  private:
   AVPacket* avPacket_;
 
  public:
-  AutoUnrefedAVPacket(AutoFreedAVPacket& shared);
-  ~AutoUnrefedAVPacket();
+  ReferenceAVPacket(AutoAVPacket& shared);
+  ~ReferenceAVPacket();
   AVPacket* get();
   AVPacket* operator->();
 };

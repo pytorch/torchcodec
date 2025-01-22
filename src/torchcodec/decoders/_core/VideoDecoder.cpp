@@ -573,9 +573,9 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
-  AutoFreedAVPacket autoFreedAVPacket;
+  AutoAVPacket autoAVPacket;
   while (true) {
-    AutoUnrefedAVPacket packet(autoFreedAVPacket);
+    ReferenceAVPacket packet(autoAVPacket);
 
     // av_read_frame is a misleading name: it gets the next **packet**.
     int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
@@ -806,7 +806,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   }
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame frame(av_frame_alloc());
-  AutoFreedAVPacket autoFreedAVPacket;
+  AutoAVPacket autoAVPacket;
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   int frameStreamIndex = -1;
@@ -846,7 +846,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       // pulling frames from its internal buffers.
       continue;
     }
-    AutoUnrefedAVPacket packet(autoFreedAVPacket);
+    ReferenceAVPacket packet(autoAVPacket);
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
     if (ffmpegStatus == AVERROR_EOF) {

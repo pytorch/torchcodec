@@ -10,22 +10,22 @@
 
 namespace facebook::torchcodec {
 
-AutoFreedAVPacket::AutoFreedAVPacket() : avPacket_(av_packet_alloc()) {
+AutoAVPacket::AutoAVPacket() : avPacket_(av_packet_alloc()) {
   TORCH_CHECK(avPacket_ != nullptr, "Couldn't allocate avPacket.");
 }
-AutoFreedAVPacket::~AutoFreedAVPacket() {
+AutoAVPacket::~AutoAVPacket() {
   av_packet_free(&avPacket_);
 }
 
-AutoUnrefedAVPacket::AutoUnrefedAVPacket(AutoFreedAVPacket& shared)
+ReferenceAVPacket::ReferenceAVPacket(AutoAVPacket& shared)
     : avPacket_(shared.avPacket_) {}
-AutoUnrefedAVPacket::~AutoUnrefedAVPacket() {
+ReferenceAVPacket::~ReferenceAVPacket() {
   av_packet_unref(avPacket_);
 }
-AVPacket* AutoUnrefedAVPacket::get() {
+AVPacket* ReferenceAVPacket::get() {
   return avPacket_;
 }
-AVPacket* AutoUnrefedAVPacket::operator->() {
+AVPacket* ReferenceAVPacket::operator->() {
   return avPacket_;
 }
 
