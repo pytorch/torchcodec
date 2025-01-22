@@ -414,7 +414,7 @@ class VideoDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
-  std::map<int, StreamInfo> streams_;
+  std::map<int, StreamInfo> streamInfos_;
   // Stores the stream indices of the active streams, i.e. the streams we are
   // decoding and returning to the user.
   std::set<int> activeStreamIndices_;
