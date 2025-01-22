@@ -393,12 +393,12 @@ class VideoDecoder {
       int streamIndex,
       AVCodecContext* codecContext);
   void populateVideoMetadataFromStreamIndex(int streamIndex);
-  torch::Tensor convertFrameToTensorUsingFilterGraph(
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
       int streamIndex,
-      const AVFrame* frame);
-  int convertFrameToTensorUsingSwsScale(
+      const AVFrame* avFrame);
+  int convertAVFrameToTensorUsingSwsScale(
       int streamIndex,
-      const AVFrame* frame,
+      const AVFrame* avFrame,
       torch::Tensor& outputTensor);
   DecodedOutput convertAVFrameToDecodedOutput(
       RawDecodedOutput& rawOutput,

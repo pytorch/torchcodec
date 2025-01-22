@@ -802,7 +802,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     maybeDesiredPts_ = std::nullopt;
   }
   // Need to get the next frame or error from PopFrame.
-  UniqueAVFrame frame(av_frame_alloc());
+  UniqueAVFrame avFrame(av_frame_alloc());
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   int frameStreamIndex = -1;
@@ -812,7 +812,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     for (int streamIndex : activeStreamIndices_) {
       StreamInfo& streamInfo = streamInfos_[streamIndex];
       ffmpegStatus =
-          avcodec_receive_frame(streamInfo.codecContext.get(), frame.get());
+          avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
       bool gotNonRetriableError =
           ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN);
       if (gotNonRetriableError) {
@@ -829,7 +829,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     }
     decodeStats_.numFramesReceivedByDecoder++;
     bool gotNeededFrame = ffmpegStatus == AVSUCCESS &&
-        filterFunction(frameStreamIndex, frame.get());
+        filterFunction(frameStreamIndex, avFrame.get());
     if (gotNeededFrame) {
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
@@ -897,11 +897,11 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   // av_receive_frame() or the user will have seeked to a different location in
   // the file and that will flush the decoder.
   StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
-  activeStreamInfo.currentPts = frame->pts;
-  activeStreamInfo.currentDuration = getDuration(frame);
+  activeStreamInfo.currentPts = avFrame->pts;
+  activeStreamInfo.currentDuration = getDuration(avFrame);
   RawDecodedOutput rawOutput;
   rawOutput.streamIndex = frameStreamIndex;
-  rawOutput.frame = std::move(frame);
+  rawOutput.frame = std::move(avFrame);
   return rawOutput;
 }
 
@@ -911,14 +911,14 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
   // Convert the frame to tensor.
   DecodedOutput output;
   int streamIndex = rawOutput.streamIndex;
-  AVFrame* frame = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.frame.get();
   output.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
   TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
   output.ptsSeconds =
-      ptsToSeconds(frame->pts, formatContext_->streams[streamIndex]->time_base);
+      ptsToSeconds(avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   output.durationSeconds = ptsToSeconds(
-      getDuration(frame), formatContext_->streams[streamIndex]->time_base);
+      getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into RawDecodedOutput.
   if (streamInfo.options.device.type() == torch::kCPU) {
     convertAVFrameToDecodedOutputOnCPU(
@@ -951,11 +951,11 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
     DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
-  AVFrame* frame = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.frame.get();
   auto& streamInfo = streamInfos_[streamIndex];
 
   auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *frame);
+      getHeightAndWidthFromOptionsOrAVFrame(streamInfo.options, *avFrame);
   int expectedOutputHeight = frameDims.height;
   int expectedOutputWidth = frameDims.width;
 
@@ -981,10 +981,10 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   // resolution to change mid-stream. Finally, we want to reuse the colorspace
   // conversion objects as much as possible for performance reasons.
   enum AVPixelFormat frameFormat =
-      static_cast<enum AVPixelFormat>(frame->format);
+      static_cast<enum AVPixelFormat>(avFrame->format);
   auto frameContext = DecodedFrameContext{
-      frame->width,
-      frame->height,
+      avFrame->width,
+      avFrame->height,
       frameFormat,
       expectedOutputWidth,
       expectedOutputHeight};
@@ -994,11 +994,11 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
         expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
     if (!streamInfo.swsContext || streamInfo.prevFrameContext != frameContext) {
-      createSwsContext(streamInfo, frameContext, frame->colorspace);
+      createSwsContext(streamInfo, frameContext, avFrame->colorspace);
       streamInfo.prevFrameContext = frameContext;
     }
     int resultHeight =
-        convertFrameToTensorUsingSwsScale(streamIndex, frame, outputTensor);
+        convertAVFrameToTensorUsingSwsScale(streamIndex, avFrame, outputTensor);
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?
@@ -1018,7 +1018,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
       createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
       streamInfo.prevFrameContext = frameContext;
     }
-    outputTensor = convertFrameToTensorUsingFilterGraph(streamIndex, frame);
+    outputTensor = convertAVFrameToTensorUsingFilterGraph(streamIndex, avFrame);
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -1064,11 +1064,11 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
 
   setCursorPtsInSeconds(seconds);
   RawDecodedOutput rawOutput = getDecodedOutputWithFilter(
-      [seconds, this](int frameStreamIndex, AVFrame* frame) {
+      [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
-        double frameStartTime = ptsToSeconds(frame->pts, streamInfo.timeBase);
+        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
         double frameEndTime =
-            ptsToSeconds(frame->pts + getDuration(frame), streamInfo.timeBase);
+            ptsToSeconds(avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
         if (frameStartTime > seconds) {
           // FFMPEG seeked past the frame we are looking for even though we
           // set max_ts to be our needed timestamp in avformat_seek_file()
@@ -1443,9 +1443,9 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
 
 VideoDecoder::RawDecodedOutput VideoDecoder::getNextRawDecodedOutputNoDemux() {
   auto rawOutput =
-      getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* frame) {
+      getDecodedOutputWithFilter([this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
-        return frame->pts >= activeStreamInfo.discardFramesBeforePts;
+        return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
   return rawOutput;
 }
@@ -1534,9 +1534,9 @@ void VideoDecoder::createSwsContext(
   streamInfo.swsContext.reset(swsContext);
 }
 
-int VideoDecoder::convertFrameToTensorUsingSwsScale(
+int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
     int streamIndex,
-    const AVFrame* frame,
+    const AVFrame* avFrame,
     torch::Tensor& outputTensor) {
   StreamInfo& activeStreamInfo = streamInfos_[streamIndex];
   SwsContext* swsContext = activeStreamInfo.swsContext.get();
@@ -1546,40 +1546,40 @@ int VideoDecoder::convertFrameToTensorUsingSwsScale(
   int linesizes[4] = {expectedOutputWidth * 3, 0, 0, 0};
   int resultHeight = sws_scale(
       swsContext,
-      frame->data,
-      frame->linesize,
+      avFrame->data,
+      avFrame->linesize,
       0,
-      frame->height,
+      avFrame->height,
       pointers,
       linesizes);
   return resultHeight;
 }
 
-torch::Tensor VideoDecoder::convertFrameToTensorUsingFilterGraph(
+torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
     int streamIndex,
-    const AVFrame* frame) {
+    const AVFrame* avFrame) {
   FilterState& filterState = streamInfos_[streamIndex].filterState;
-  int ffmpegStatus = av_buffersrc_write_frame(filterState.sourceContext, frame);
+  int ffmpegStatus = av_buffersrc_write_frame(filterState.sourceContext, avFrame);
   if (ffmpegStatus < AVSUCCESS) {
     throw std::runtime_error("Failed to add frame to buffer source context");
   }
 
-  UniqueAVFrame filteredFrame(av_frame_alloc());
+  UniqueAVFrame filteredAVFrame(av_frame_alloc());
   ffmpegStatus =
-      av_buffersink_get_frame(filterState.sinkContext, filteredFrame.get());
-  TORCH_CHECK_EQ(filteredFrame->format, AV_PIX_FMT_RGB24);
+      av_buffersink_get_frame(filterState.sinkContext, filteredAVFrame.get());
+  TORCH_CHECK_EQ(filteredAVFrame->format, AV_PIX_FMT_RGB24);
 
-  auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredFrame.get());
+  auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredAVFrame.get());
   int height = frameDims.height;
   int width = frameDims.width;
   std::vector<int64_t> shape = {height, width, 3};
-  std::vector<int64_t> strides = {filteredFrame->linesize[0], 3, 1};
-  AVFrame* filteredFramePtr = filteredFrame.release();
-  auto deleter = [filteredFramePtr](void*) {
-    UniqueAVFrame frameToDelete(filteredFramePtr);
+  std::vector<int64_t> strides = {filteredAVFrame->linesize[0], 3, 1};
+  AVFrame* filteredAVFramePtr = filteredAVFrame.release();
+  auto deleter = [filteredAVFramePtr](void*) {
+    UniqueAVFrame avFrameToDelete(filteredAVFramePtr);
   };
   return torch::from_blob(
-      filteredFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
+      filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
 VideoDecoder::~VideoDecoder() {
