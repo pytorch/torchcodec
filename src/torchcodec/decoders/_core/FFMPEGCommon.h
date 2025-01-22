@@ -68,39 +68,40 @@ using UniqueAVIOContext = std::
 using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
 
-// These 2 classes are meant to be used in tandem, like so:
-// ```
-// AVPacketHandler avPacketHandler;
+// These 2 classes share the same underlying AVPacket object. They are meant to
+// be used in tandem, like so:
+//
+// AutoFreedAVPacket autoFreedAVPacket; // <-- malloc for AVPacket happens here
 // while(...){
-//   ReferencedAVPacket packet(avPacketHandler);
-//   av_read_frame(..., packet.get());
-// }
-// ```
+//   AutoUnrefedAVPacket packet(autoFreedAVPacket);
+//   av_read_frame(..., packet.get());  <-- av_packet_ref() called by FFmpeg
+// } <-- av_packet_unref() called here
+//
 // This achieves a few desirable things:
-// - Memory allocation of the underlying AVPacket happens only once, when the
-//   avPacketHandler created.
-// - av_packet_free() is called when avPacketHandler gets out of scope
+// - Memory allocation of the underlying AVPacket happens only once, when
+//   autoFreedAVPacket is created.
+// - av_packet_free() is called when autoFreedAVPacket gets out of scope
 // - av_packet_unref() is automatically called when needed, i.e. at the end of
 //   each loop iteration (or when hitting break / continue). This prevents the
 //   risk of us forgetting to call it.
-class AVPacketHandler {
-  friend class ReferencedAVPacket;
+class AutoFreedAVPacket {
+  friend class AutoUnrefedAVPacket;
 
  private:
   AVPacket* avPacket_;
 
  public:
-  AVPacketHandler();
-  ~AVPacketHandler();
+  AutoFreedAVPacket();
+  ~AutoFreedAVPacket();
 };
 
-class ReferencedAVPacket {
+class AutoUnrefedAVPacket {
  private:
   AVPacket* avPacket_;
 
  public:
-  ReferencedAVPacket(AVPacketHandler& shared);
-  ~ReferencedAVPacket();
+  AutoUnrefedAVPacket(AutoFreedAVPacket& shared);
+  ~AutoUnrefedAVPacket();
   AVPacket* get();
   AVPacket* operator->();
 };
