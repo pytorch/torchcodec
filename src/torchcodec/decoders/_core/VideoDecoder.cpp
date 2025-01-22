@@ -286,7 +286,7 @@ void VideoDecoder::initializeDecoder() {
       containerMetadata_.numAudioStreams++;
     }
 
-    containerMetadata_.streams.push_back(streamMetadata);
+    containerMetadata_.streamMetadatas.push_back(streamMetadata);
   }
 
   if (formatContext_->duration > 0) {
@@ -465,7 +465,7 @@ void VideoDecoder::addVideoStreamDecoder(
   }
   TORCH_CHECK(codec != nullptr);
 
-  StreamMetadata& streamMetadata = containerMetadata_.streams[streamIndex];
+  StreamMetadata& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   if (seekMode_ == SeekMode::approximate &&
       !streamMetadata.averageFps.has_value()) {
     throw std::runtime_error(
@@ -532,10 +532,10 @@ void VideoDecoder::addVideoStreamDecoder(
 void VideoDecoder::updateMetadataWithCodecContext(
     int streamIndex,
     AVCodecContext* codecContext) {
-  containerMetadata_.streams[streamIndex].width = codecContext->width;
-  containerMetadata_.streams[streamIndex].height = codecContext->height;
+  containerMetadata_.streamMetadatas[streamIndex].width = codecContext->width;
+  containerMetadata_.streamMetadatas[streamIndex].height = codecContext->height;
   auto codedId = codecContext->codec_id;
-  containerMetadata_.streams[streamIndex].codecName =
+  containerMetadata_.streamMetadatas[streamIndex].codecName =
       std::string(avcodec_get_name(codedId));
 }
 
@@ -594,7 +594,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     // We got a valid packet. Let's figure out what stream it belongs to and
     // record its relevant metadata.
     int streamIndex = packet->stream_index;
-    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
     streamMetadata.minPtsFromScan = std::min(
         streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
     streamMetadata.maxPtsFromScan = std::max(
@@ -614,9 +614,9 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
 
   // Set all per-stream metadata that requires knowing the content of all
   // packets.
-  for (size_t streamIndex = 0; streamIndex < containerMetadata_.streams.size();
+  for (size_t streamIndex = 0; streamIndex < containerMetadata_.streamMetadatas.size();
        ++streamIndex) {
-    auto& streamMetadata = containerMetadata_.streams[streamIndex];
+    auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
     auto avStream = formatContext_->streams[streamIndex];
 
     streamMetadata.numFramesFromScan = streamInfos_[streamIndex].allFrames.size();
@@ -1089,7 +1089,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
-  int streamsSize = static_cast<int>(containerMetadata_.streams.size());
+  int streamsSize = static_cast<int>(containerMetadata_.streamMetadatas.size());
   TORCH_CHECK(
       streamIndex >= 0 && streamIndex < streamsSize,
       "Invalid stream index=" + std::to_string(streamIndex) +
@@ -1228,7 +1228,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
   validateUserProvidedStreamIndex(streamIndex);
 
   const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   validateFrameIndex(streamMetadata, frameIndex);
 
   int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
@@ -1260,7 +1260,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesAtIndices(
         });
   }
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   const auto& streamInfo = streamInfos_[streamIndex];
   const auto& options = streamInfo.options;
   BatchDecodedOutput output(frameIndices.size(), options, streamMetadata);
@@ -1297,7 +1297,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesPlayedByTimestamps(
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   const auto& streamInfo = streamInfos_[streamIndex];
 
   double minSeconds = getMinSeconds(streamMetadata);
@@ -1331,7 +1331,7 @@ VideoDecoder::BatchDecodedOutput VideoDecoder::getFramesInRange(
     int64_t step) {
   validateUserProvidedStreamIndex(streamIndex);
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   const auto& streamInfo = streamInfos_[streamIndex];
   int64_t numFrames = getNumFrames(streamMetadata);
   TORCH_CHECK(
@@ -1364,7 +1364,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
     double stopSeconds) {
   validateUserProvidedStreamIndex(streamIndex);
 
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
@@ -1481,7 +1481,7 @@ double VideoDecoder::getPtsSecondsForFrame(
   validateScannedAllStreams("getPtsSecondsForFrame");
 
   const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& streamMetadata = containerMetadata_.streams[streamIndex];
+  const auto& streamMetadata = containerMetadata_.streamMetadatas[streamIndex];
   validateFrameIndex(streamMetadata, frameIndex);
 
   return ptsToSeconds(

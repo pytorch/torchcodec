@@ -344,9 +344,9 @@ std::string get_json_metadata(at::Tensor& decoder) {
   // serialize the metadata into a string std::stringstream ss;
   double durationSeconds = 0;
   if (maybeBestVideoStreamIndex.has_value() &&
-      videoMetadata.streams[*maybeBestVideoStreamIndex]
+      videoMetadata.streamMetadatas[*maybeBestVideoStreamIndex]
           .durationSeconds.has_value()) {
-    durationSeconds = videoMetadata.streams[*maybeBestVideoStreamIndex]
+    durationSeconds = videoMetadata.streamMetadatas[*maybeBestVideoStreamIndex]
                           .durationSeconds.value_or(0);
   } else {
     // Fallback to container-level duration if stream duration is not found.
@@ -359,7 +359,7 @@ std::string get_json_metadata(at::Tensor& decoder) {
   }
 
   if (maybeBestVideoStreamIndex.has_value()) {
-    auto streamMetadata = videoMetadata.streams[*maybeBestVideoStreamIndex];
+    auto streamMetadata = videoMetadata.streamMetadatas[*maybeBestVideoStreamIndex];
     if (streamMetadata.numFramesFromScan.has_value()) {
       metadataMap["numFrames"] =
           std::to_string(*streamMetadata.numFramesFromScan);
@@ -423,7 +423,7 @@ std::string get_container_json_metadata(at::Tensor& decoder) {
         std::to_string(*containerMetadata.bestAudioStreamIndex);
   }
 
-  map["numStreams"] = std::to_string(containerMetadata.streams.size());
+  map["numStreams"] = std::to_string(containerMetadata.streamMetadatas.size());
 
   return mapToJson(map);
 }
@@ -432,13 +432,13 @@ std::string get_stream_json_metadata(
     at::Tensor& decoder,
     int64_t stream_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto streams = videoDecoder->getContainerMetadata().streams;
+  auto streamMetadatas = videoDecoder->getContainerMetadata().streamMetadatas;
   if (stream_index < 0 ||
-      stream_index >= static_cast<int64_t>(streams.size())) {
+      stream_index >= static_cast<int64_t>(streamMetadatas.size())) {
     throw std::out_of_range(
         "stream_index out of bounds: " + std::to_string(stream_index));
   }
-  auto streamMetadata = streams[stream_index];
+  auto streamMetadata = streamMetadatas[stream_index];
 
   std::map<std::string, std::string> map;
 
