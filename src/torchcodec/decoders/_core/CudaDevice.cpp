@@ -189,14 +189,14 @@ void convertAVFrameToDecodedOutputOnCuda(
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrame* src = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.avFrame.get();
 
   TORCH_CHECK(
-      src->format == AV_PIX_FMT_CUDA,
+      avFrame->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
-          std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
+          std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
   auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *src);
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = output.frame;
@@ -220,21 +220,21 @@ void convertAVFrameToDecodedOutputOnCuda(
   c10::cuda::CUDAGuard deviceGuard(device);
 
   NppiSize oSizeROI = {width, height};
-  Npp8u* input[2] = {src->data[0], src->data[1]};
+  Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
   auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
-  if (src->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+  if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
     status = nppiNV12ToRGB_709CSC_8u_P2C3R(
         input,
-        src->linesize[0],
+        avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI);
   } else {
     status = nppiNV12ToRGB_8u_P2C3R(
         input,
-        src->linesize[0],
+        avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI);
