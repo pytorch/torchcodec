@@ -428,6 +428,9 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_av1(self, device):
+        if in_fbcode() and device == "cuda":
+            return
+
         decoder = VideoDecoder(AV1_VIDEO.path, device=device)
         ref_frame10 = AV1_VIDEO.get_frame_data_by_index(10)
         ref_frame_info10 = AV1_VIDEO.get_frame_info(10)

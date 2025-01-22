@@ -439,9 +439,9 @@ void VideoDecoder::createFilterGraph(
 }
 
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
-  AVCodecPtr codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
   int streamIndex =
-      av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &codec, 0);
+      av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &avCodec, 0);
   return streamIndex;
 }
 
@@ -455,18 +455,18 @@ void VideoDecoder::addVideoStreamDecoder(
   }
   TORCH_CHECK(formatContext_.get() != nullptr);
 
-  AVCodecPtr codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
   int streamIndex = av_find_best_stream(
       formatContext_.get(),
       AVMEDIA_TYPE_VIDEO,
       preferredStreamIndex,
       -1,
-      &codec,
+      &avCodec,
       0);
   if (streamIndex < 0) {
     throw std::invalid_argument("No valid stream found in input file.");
   }
-  TORCH_CHECK(codec != nullptr);
+  TORCH_CHECK(avCodec != nullptr);
 
   StreamMetadata& streamMetadata =
       containerMetadata_.streamMetadatas[streamIndex];
@@ -489,13 +489,13 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   if (videoStreamOptions.device.type() == torch::kCUDA) {
-    codec =
+    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
         findCudaCodec(
             videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
-            .value_or(codec);
+            .value_or(avCodec));
   }
 
-  AVCodecContext* codecContext = avcodec_alloc_context3(codec);
+  AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
   codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
   streamInfo.codecContext.reset(codecContext);
@@ -513,7 +513,7 @@ void VideoDecoder::addVideoStreamDecoder(
         false, "Invalid device type: " + videoStreamOptions.device.str());
   }
 
-  retVal = avcodec_open2(streamInfo.codecContext.get(), codec, nullptr);
+  retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
   if (retVal < AVSUCCESS) {
     throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
   }
