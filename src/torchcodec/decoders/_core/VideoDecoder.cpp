@@ -468,15 +468,6 @@ void VideoDecoder::addVideoStreamDecoder(
   }
   TORCH_CHECK(avCodec != nullptr);
 
-  StreamMetadata& streamMetadata =
-      containerMetadata_.streamMetadatas[streamIndex];
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
-        " does not have an average fps in its metadata.");
-  }
-
   StreamInfo& streamInfo = streamInfos_[streamIndex];
   streamInfo.streamIndex = streamIndex;
   streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
@@ -493,6 +484,15 @@ void VideoDecoder::addVideoStreamDecoder(
         findCudaCodec(
             videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
             .value_or(avCodec));
+  }
+
+  StreamMetadata& streamMetadata =
+      containerMetadata_.streamMetadatas[streamIndex];
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
+        " does not have an average fps in its metadata.");
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
