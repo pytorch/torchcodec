@@ -185,7 +185,7 @@ void initializeContextOnCuda(
 
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
-    const VideoDecoder::VideoStreamOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -195,7 +195,8 @@ void convertAVFrameToDecodedOutputOnCuda(
       src->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
-  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(options, *src);
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *src);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = output.frame;
@@ -212,7 +213,7 @@ void convertAVFrameToDecodedOutputOnCuda(
         "x3, got ",
         shape);
   } else {
-    dst = allocateEmptyHWCTensor(height, width, options.device);
+    dst = allocateEmptyHWCTensor(height, width, videoStreamOptions.device);
   }
 
   // Use the user-requested GPU for running the NPP kernel.

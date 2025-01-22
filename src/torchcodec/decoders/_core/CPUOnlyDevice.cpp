@@ -16,7 +16,7 @@ namespace facebook::torchcodec {
 
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
-    [[maybe_unused]] const VideoDecoder::VideoStreamOptions& options,
+    [[maybe_unused]] const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] VideoDecoder::RawDecodedOutput& rawOutput,
     [[maybe_unused]] VideoDecoder::DecodedOutput& output,
     [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
