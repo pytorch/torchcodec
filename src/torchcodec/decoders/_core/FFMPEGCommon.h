@@ -75,11 +75,16 @@ using UniqueSwsContext =
 // which was released in FFMPEG version=5.0.3
 // with libavcodec's version=59.18.100
 // (https://www.ffmpeg.org/olddownload.html).
+// Note that the alias is so-named so that it is only used when interacting with
+// av_find_best_stream(). It is not needed elsewhere.
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 18, 100)
-using AVCodecPtr = AVCodec*;
+using AVCodecOnlyUseForCallingAVFindBestStream = AVCodec*;
 #else
-using AVCodecPtr = const AVCodec*;
+using AVCodecOnlyUseForCallingAVFindBestStream = const AVCodec*;
 #endif
+
+AVCodecOnlyUseForCallingAVFindBestStream
+makeAVCodecOnlyUseForCallingAVFindBestStream(const AVCodec* codec);
 
 // Success code from FFMPEG is just a 0. We define it to make the code more
 // readable.

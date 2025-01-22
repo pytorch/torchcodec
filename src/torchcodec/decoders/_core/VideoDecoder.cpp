@@ -436,7 +436,7 @@ void VideoDecoder::createFilterGraph(
 }
 
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
-  AVCodecPtr codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream codec = nullptr;
   int streamNumber =
       av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &codec, 0);
   return streamNumber;
@@ -452,7 +452,7 @@ void VideoDecoder::addVideoStreamDecoder(
   }
   TORCH_CHECK(formatContext_.get() != nullptr);
 
-  AVCodecPtr codec = nullptr;
+  AVCodecOnlyUseForCallingAVFindBestStream codec = nullptr;
   int streamNumber = av_find_best_stream(
       formatContext_.get(),
       AVMEDIA_TYPE_VIDEO,
@@ -464,14 +464,6 @@ void VideoDecoder::addVideoStreamDecoder(
     throw std::invalid_argument("No valid stream found in input file.");
   }
   TORCH_CHECK(codec != nullptr);
-
-  StreamMetadata& streamMetadata = containerMetadata_.streams[streamNumber];
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " + std::to_string(streamNumber) +
-        " does not have an average fps in its metadata.");
-  }
 
   StreamInfo& streamInfo = streams_[streamNumber];
   streamInfo.streamIndex = streamNumber;
@@ -485,8 +477,17 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   if (options.device.type() == torch::kCUDA) {
-    codec = findCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
-                .value_or(codec);
+    codec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+        findCudaCodec(options.device, streamInfo.stream->codecpar->codec_id)
+            .value_or(codec));
+  }
+
+  StreamMetadata& streamMetadata = containerMetadata_.streams[streamNumber];
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " + std::to_string(streamNumber) +
+        " does not have an average fps in its metadata.");
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(codec);
