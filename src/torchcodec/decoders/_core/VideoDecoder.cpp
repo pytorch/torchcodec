@@ -746,7 +746,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streamInfos_[streamIndex];
     // clang-format off: clang format clashes
-    streamInfo.discardFramesBeforePts = secondsToClosestPts(*maybeDesiredPts_, streamInfo.timeBase);
+    streamInfo.discardFramesBeforePts = secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
     // clang-format on
   }
 
@@ -756,7 +756,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   bool mustSeek = false;
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streamInfos_[streamIndex];
-    int64_t desiredPtsForStream = *maybeDesiredPts_ * streamInfo.timeBase.den;
+    int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
     if (!canWeAvoidSeekingForStream(
             streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
       mustSeek = true;
@@ -770,7 +770,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streamInfos_[firstActiveStreamIndex];
   int64_t desiredPts =
-      secondsToClosestPts(*maybeDesiredPts_, firstStreamInfo.timeBase);
+      secondsToClosestPts(*desiredPtsSeconds_, firstStreamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -809,9 +809,9 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     throw std::runtime_error("No active streams configured.");
   }
   resetDecodeStats();
-  if (maybeDesiredPts_.has_value()) {
+  if (desiredPtsSeconds_.has_value()) {
     maybeSeekToBeforeDesiredPts();
-    maybeDesiredPts_ = std::nullopt;
+    desiredPtsSeconds_ = std::nullopt;
   }
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
@@ -1487,7 +1487,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemuxInternal(
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-  maybeDesiredPts_ = seconds;
+  desiredPtsSeconds_ = seconds;
 }
 
 VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
