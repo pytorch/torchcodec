@@ -85,8 +85,8 @@ OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
-OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
-    VideoDecoder::BatchDecodedOutput& batch) {
+OpsFrameBatchOutput makeOpsFrameBatchOutput(
+    VideoDecoder::FrameBatchOutput& batch) {
   return std::make_tuple(batch.frames, batch.ptsSeconds, batch.durationSeconds);
 }
 
@@ -258,7 +258,7 @@ OpsDecodedOutput get_frame_at_index(
   return makeOpsDecodedOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_at_indices(
+OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices) {
@@ -266,10 +266,10 @@ OpsBatchDecodedOutput get_frames_at_indices(
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
   auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_in_range(
+OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,
@@ -278,9 +278,9 @@ OpsBatchDecodedOutput get_frames_in_range(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesInRange(
       stream_index, start, stop, step.value_or(1));
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
-OpsBatchDecodedOutput get_frames_by_pts(
+OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
     at::ArrayRef<double> timestamps) {
@@ -288,10 +288,10 @@ OpsBatchDecodedOutput get_frames_by_pts(
   std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
   auto result =
       videoDecoder->getFramesPlayedByTimestamps(stream_index, timestampsVec);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_by_pts_in_range(
+OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     double start_seconds,
@@ -299,7 +299,7 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesPlayedByTimestampInRange(
       stream_index, start_seconds, stop_seconds);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
 std::string quoteValue(const std::string& value) {

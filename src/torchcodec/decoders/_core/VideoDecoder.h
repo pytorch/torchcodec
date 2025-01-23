@@ -172,6 +172,7 @@ class VideoDecoder {
     // The stream index of the decoded frame.
     int streamIndex;
   };
+
   struct DecodedOutput {
     // The actual decoded output as a Tensor.
     torch::Tensor frame;
@@ -183,6 +184,18 @@ class VideoDecoder {
     // The duration of the decoded frame in seconds.
     double durationSeconds;
   };
+
+  struct FrameBatchOutput {
+    torch::Tensor frames;
+    torch::Tensor ptsSeconds;
+    torch::Tensor durationSeconds;
+
+    explicit FrameBatchOutput(
+        int64_t numFrames,
+        const VideoStreamOptions& videoStreamOptions,
+        const StreamMetadata& streamMetadata);
+  };
+
   class EndOfFileException : public std::runtime_error {
    public:
     explicit EndOfFileException(const std::string& msg)
@@ -207,24 +220,14 @@ class VideoDecoder {
       int streamIndex,
       int64_t frameIndex,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
-  struct BatchDecodedOutput {
-    torch::Tensor frames;
-    torch::Tensor ptsSeconds;
-    torch::Tensor durationSeconds;
-
-    explicit BatchDecodedOutput(
-        int64_t numFrames,
-        const VideoStreamOptions& videoStreamOptions,
-        const StreamMetadata& streamMetadata);
-  };
 
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
-  BatchDecodedOutput getFramesAtIndices(
+  FrameBatchOutput getFramesAtIndices(
       int streamIndex,
       const std::vector<int64_t>& frameIndices);
 
-  BatchDecodedOutput getFramesPlayedByTimestamps(
+  FrameBatchOutput getFramesPlayedByTimestamps(
       int streamIndex,
       const std::vector<double>& timestamps);
 
@@ -233,7 +236,7 @@ class VideoDecoder {
   // the range are:
   //    [start, start+step, start+(2*step), start+(3*step), ..., stop)
   // The default for step is 1.
-  BatchDecodedOutput
+  FrameBatchOutput
   getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
 
   // Returns frames within a given pts range for a given stream as a single
@@ -253,7 +256,7 @@ class VideoDecoder {
   // Valid values for startSeconds and stopSeconds are:
   //
   //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
-  BatchDecodedOutput getFramesPlayedByTimestampInRange(
+  FrameBatchOutput getFramesPlayedByTimestampInRange(
       int streamIndex,
       double startSeconds,
       double stopSeconds);
