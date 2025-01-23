@@ -711,8 +711,6 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
                           x              j         y
 
 (2) is more efficient than (1) if there is an I frame between x and y.
-
-We use av_index_search_timestamp to see if there is an I frame between x and y.
 */
 bool VideoDecoder::canWeAvoidSeekingForStream(
     const StreamInfo& streamInfo,
