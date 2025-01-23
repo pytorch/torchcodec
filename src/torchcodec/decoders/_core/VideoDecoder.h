@@ -104,7 +104,7 @@ class VideoDecoder {
     std::optional<int64_t> height;
   };
   struct ContainerMetadata {
-    std::vector<StreamMetadata> streams;
+    std::vector<StreamMetadata> allStreamMetadata;
     int numAudioStreams = 0;
     int numVideoStreams = 0;
     // Note that this is the container-level duration, which is usually the max
@@ -130,9 +130,9 @@ class VideoDecoder {
     // Use the libswscale library for color conversion.
     SWSCALE
   };
-  struct VideoStreamDecoderOptions {
-    VideoStreamDecoderOptions() {}
-    explicit VideoStreamDecoderOptions(const std::string& optionsString);
+  struct VideoStreamOptions {
+    VideoStreamOptions() {}
+    explicit VideoStreamOptions(const std::string& optionsString);
     // Number of threads we pass to FFMPEG for decoding.
     // 0 means FFMPEG will choose the number of threads automatically to fully
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
@@ -149,13 +149,13 @@ class VideoDecoder {
     // By default we use CPU for decoding for both C++ and python users.
     torch::Device device = torch::kCPU;
   };
-  struct AudioStreamDecoderOptions {};
+  struct AudioStreamOptions {};
   void addVideoStreamDecoder(
       int streamIndex,
-      const VideoStreamDecoderOptions& options = VideoStreamDecoderOptions());
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
   void addAudioStreamDecoder(
       int streamIndex,
-      const AudioStreamDecoderOptions& options = AudioStreamDecoderOptions());
+      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
   torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
@@ -168,7 +168,7 @@ class VideoDecoder {
   // Note that AVFrame itself doesn't retain the streamIndex.
   struct RawDecodedOutput {
     // The actual decoded output as a unique pointer to an AVFrame.
-    UniqueAVFrame frame;
+    UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
   };
@@ -214,8 +214,8 @@ class VideoDecoder {
 
     explicit BatchDecodedOutput(
         int64_t numFrames,
-        const VideoStreamDecoderOptions& options,
-        const StreamMetadata& metadata);
+        const VideoStreamOptions& videoStreamOptions,
+        const StreamMetadata& streamMetadata);
   };
 
   // Returns frames at the given indices for a given stream as a single stacked
@@ -313,7 +313,7 @@ class VideoDecoder {
     // this pts to the user when they request a frame.
     // We update this field if the user requested a seek.
     int64_t discardFramesBeforePts = INT64_MIN;
-    VideoStreamDecoderOptions options;
+    VideoStreamOptions videoStreamOptions;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
     FilterState filterState;
@@ -393,12 +393,12 @@ class VideoDecoder {
       int streamIndex,
       AVCodecContext* codecContext);
   void populateVideoMetadataFromStreamIndex(int streamIndex);
-  torch::Tensor convertFrameToTensorUsingFilterGraph(
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
       int streamIndex,
-      const AVFrame* frame);
-  int convertFrameToTensorUsingSwsScale(
+      const AVFrame* avFrame);
+  int convertAVFrameToTensorUsingSwsScale(
       int streamIndex,
-      const AVFrame* frame,
+      const AVFrame* avFrame,
       torch::Tensor& outputTensor);
   DecodedOutput convertAVFrameToDecodedOutput(
       RawDecodedOutput& rawOutput,
@@ -414,7 +414,7 @@ class VideoDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
-  std::map<int, StreamInfo> streams_;
+  std::map<int, StreamInfo> streamInfos_;
   // Stores the stream indices of the active streams, i.e. the streams we are
   // decoding and returning to the user.
   std::set<int> activeStreamIndices_;
@@ -488,11 +488,11 @@ struct FrameDims {
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
-    const VideoDecoder::StreamMetadata& metadata);
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoDecoder::StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     const AVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
