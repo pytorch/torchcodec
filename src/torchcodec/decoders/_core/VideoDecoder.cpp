@@ -383,6 +383,7 @@ void VideoDecoder::createFilterGraph(
   }
 
   enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
+
   ffmpegStatus = av_opt_set_int_list(
       filterState.sinkContext,
       "pix_fmts",
@@ -676,6 +677,7 @@ int VideoDecoder::getKeyFrameIndexForPts(
   }
   return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
 }
+
 /*
 Videos have I frames and non-I frames (P and B frames). Non-I frames need data
 from the previous I frame to be decoded.

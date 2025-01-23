@@ -57,6 +57,7 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
           filepath, VideoDecoder::SeekMode::approximate);
     }
   }
+
   std::string content_;
 };
 
