@@ -185,17 +185,18 @@ void initializeContextOnCuda(
 
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
-    const VideoDecoder::VideoStreamDecoderOptions& options,
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     VideoDecoder::RawDecodedOutput& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrame* src = rawOutput.frame.get();
+  AVFrame* avFrame = rawOutput.avFrame.get();
 
   TORCH_CHECK(
-      src->format == AV_PIX_FMT_CUDA,
+      avFrame->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
-          std::string(av_get_pix_fmt_name((AVPixelFormat)src->format)));
-  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(options, *src);
+          std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = output.frame;
@@ -212,28 +213,28 @@ void convertAVFrameToDecodedOutputOnCuda(
         "x3, got ",
         shape);
   } else {
-    dst = allocateEmptyHWCTensor(height, width, options.device);
+    dst = allocateEmptyHWCTensor(height, width, videoStreamOptions.device);
   }
 
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device);
 
   NppiSize oSizeROI = {width, height};
-  Npp8u* input[2] = {src->data[0], src->data[1]};
+  Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
   auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
-  if (src->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+  if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
     status = nppiNV12ToRGB_709CSC_8u_P2C3R(
         input,
-        src->linesize[0],
+        avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI);
   } else {
     status = nppiNV12ToRGB_8u_P2C3R(
         input,
-        src->linesize[0],
+        avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI);

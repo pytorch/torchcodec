@@ -73,8 +73,8 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
 #else
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
 #endif
-  EXPECT_EQ(metadata.streams.size(), 6);
-  const auto& videoStream = metadata.streams[3];
+  EXPECT_EQ(metadata.allStreamMetadata.size(), 6);
+  const auto& videoStream = metadata.allStreamMetadata[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
   EXPECT_EQ(videoStream.codecName, "h264");
   EXPECT_NEAR(*videoStream.averageFps, 29.97f, 1e-1);
@@ -86,7 +86,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
-  const auto& videoStream1 = metadata.streams[3];
+  const auto& videoStream1 = metadata.allStreamMetadata[3];
   EXPECT_EQ(*videoStream1.minPtsSecondsFromScan, 0);
   EXPECT_EQ(*videoStream1.maxPtsSecondsFromScan, 13.013);
   EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
@@ -147,10 +147,10 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> decoder =
       VideoDecoder::createFromFilePath(path);
-  VideoDecoder::VideoStreamDecoderOptions streamOptions;
-  streamOptions.width = 100;
-  streamOptions.height = 120;
-  decoder->addVideoStreamDecoder(-1, streamOptions);
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.width = 100;
+  videoStreamOptions.height = 120;
+  decoder->addVideoStreamDecoder(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
@@ -159,9 +159,9 @@ TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> decoder =
       VideoDecoder::createFromFilePath(path);
-  VideoDecoder::VideoStreamDecoderOptions streamOptions;
-  streamOptions.dimensionOrder = "NHWC";
-  decoder->addVideoStreamDecoder(-1, streamOptions);
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.dimensionOrder = "NHWC";
+  decoder->addVideoStreamDecoder(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
@@ -233,7 +233,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
-      VideoDecoder::VideoStreamDecoderOptions("dimension_order=NHWC"));
+      VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
   auto tensor = output.frames;
@@ -399,8 +399,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
-      VideoDecoder::VideoStreamDecoderOptions(
-          "color_conversion_library=filtergraph"));
+      VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
   auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
   EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
@@ -417,8 +416,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
-      VideoDecoder::VideoStreamDecoderOptions(
-          "color_conversion_library=swscale"));
+      VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
   auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
   EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
@@ -431,9 +429,9 @@ TEST_P(VideoDecoderTest, GetAudioMetadata) {
   VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 1);
   EXPECT_EQ(metadata.numVideoStreams, 0);
-  EXPECT_EQ(metadata.streams.size(), 1);
+  EXPECT_EQ(metadata.allStreamMetadata.size(), 1);
 
-  const auto& audioStream = metadata.streams[0];
+  const auto& audioStream = metadata.allStreamMetadata[0];
   EXPECT_EQ(audioStream.mediaType, AVMEDIA_TYPE_AUDIO);
   EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
 }
