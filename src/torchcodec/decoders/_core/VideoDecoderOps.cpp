@@ -245,7 +245,7 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
 
 OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFramePlayedAtTimestampNoDemux(seconds);
+  auto result = videoDecoder->getFramePlayedAtNoDemux(seconds);
   return makeOpsDecodedOutput(result);
 }
 
@@ -287,8 +287,7 @@ OpsBatchDecodedOutput get_frames_by_pts(
     at::ArrayRef<double> timestamps) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
-  auto result =
-      videoDecoder->getFramesPlayedByTimestamps(stream_index, timestampsVec);
+  auto result = videoDecoder->getFramesPlayedAt(stream_index, timestampsVec);
   return makeOpsBatchDecodedOutput(result);
 }
 
@@ -298,7 +297,7 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFramesPlayedByTimestampInRange(
+  auto result = videoDecoder->getFramesPlayedInRange(
       stream_index, start_seconds, stop_seconds);
   return makeOpsBatchDecodedOutput(result);
 }

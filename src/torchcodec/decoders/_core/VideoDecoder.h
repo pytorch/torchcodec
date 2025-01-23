@@ -208,7 +208,7 @@ class VideoDecoder {
   // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
-  DecodedOutput getFramePlayedAtTimestampNoDemux(double seconds);
+  DecodedOutput getFramePlayedAtNoDemux(double seconds);
 
   DecodedOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
   // This is morally private but needs to be exposed for C++ tests. Once
@@ -236,7 +236,7 @@ class VideoDecoder {
       int streamIndex,
       const std::vector<int64_t>& frameIndices);
 
-  BatchDecodedOutput getFramesPlayedByTimestamps(
+  BatchDecodedOutput getFramesPlayedAt(
       int streamIndex,
       const std::vector<double>& timestamps);
 
@@ -265,7 +265,7 @@ class VideoDecoder {
   // Valid values for startSeconds and stopSeconds are:
   //
   //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
-  BatchDecodedOutput getFramesPlayedByTimestampInRange(
+  BatchDecodedOutput getFramesPlayedInRange(
       int streamIndex,
       double startSeconds,
       double stopSeconds);
