@@ -579,9 +579,11 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
+  AutoAVPacket autoAVPacket;
   while (true) {
-    // Get the next packet.
-    UniqueAVPacket packet(av_packet_alloc());
+    ReferenceAVPacket packet(autoAVPacket);
+
+    // av_read_frame is a misleading name: it gets the next **packet**.
     int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
 
     if (ffmpegStatus == AVERROR_EOF) {
@@ -812,6 +814,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
   }
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
+  AutoAVPacket autoAVPacket;
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   int frameStreamIndex = -1;
@@ -851,7 +854,7 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
       // pulling frames from its internal buffers.
       continue;
     }
-    UniqueAVPacket packet(av_packet_alloc());
+    ReferenceAVPacket packet(autoAVPacket);
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
     if (ffmpegStatus == AVERROR_EOF) {
@@ -882,12 +885,12 @@ VideoDecoder::RawDecodedOutput VideoDecoder::getDecodedOutputWithFilter(
     }
     ffmpegStatus = avcodec_send_packet(
         streamInfos_[packet->stream_index].codecContext.get(), packet.get());
-    decodeStats_.numPacketsSentToDecoder++;
     if (ffmpegStatus < AVSUCCESS) {
       throw std::runtime_error(
           "Could not push packet to decoder: " +
           getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
     }
+    decodeStats_.numPacketsSentToDecoder++;
   }
   if (ffmpegStatus < AVSUCCESS) {
     if (reachedEOF || ffmpegStatus == AVERROR_EOF) {

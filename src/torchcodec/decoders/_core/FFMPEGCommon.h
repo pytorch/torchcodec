@@ -57,8 +57,6 @@ using UniqueAVCodecContext = std::unique_ptr<
     Deleterp<AVCodecContext, void, avcodec_free_context>>;
 using UniqueAVFrame =
     std::unique_ptr<AVFrame, Deleterp<AVFrame, void, av_frame_free>>;
-using UniqueAVPacket =
-    std::unique_ptr<AVPacket, Deleterp<AVPacket, void, av_packet_free>>;
 using UniqueAVFilterGraph = std::unique_ptr<
     AVFilterGraph,
     Deleterp<AVFilterGraph, void, avfilter_graph_free>>;
@@ -69,6 +67,44 @@ using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
 using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
+
+// These 2 classes share the same underlying AVPacket object. They are meant to
+// be used in tandem, like so:
+//
+// AutoAVPacket autoAVPacket; // <-- malloc for AVPacket happens here
+// while(...){
+//   ReferenceAVPacket packet(autoAVPacket);
+//   av_read_frame(..., packet.get());  <-- av_packet_ref() called by FFmpeg
+// } <-- av_packet_unref() called here
+//
+// This achieves a few desirable things:
+// - Memory allocation of the underlying AVPacket happens only once, when
+//   autoAVPacket is created.
+// - av_packet_free() is called when autoAVPacket gets out of scope
+// - av_packet_unref() is automatically called when needed, i.e. at the end of
+//   each loop iteration (or when hitting break / continue). This prevents the
+//   risk of us forgetting to call it.
+class AutoAVPacket {
+  friend class ReferenceAVPacket;
+
+ private:
+  AVPacket* avPacket_;
+
+ public:
+  AutoAVPacket();
+  ~AutoAVPacket();
+};
+
+class ReferenceAVPacket {
+ private:
+  AVPacket* avPacket_;
+
+ public:
+  ReferenceAVPacket(AutoAVPacket& shared);
+  ~ReferenceAVPacket();
+  AVPacket* get();
+  AVPacket* operator->();
+};
 
 // av_find_best_stream is not const-correct before commit:
 // https://github.com/FFmpeg/FFmpeg/commit/46dac8cf3d250184ab4247809bc03f60e14f4c0c
