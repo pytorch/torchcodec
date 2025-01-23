@@ -1472,15 +1472,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
   return frameBatchOutput;
 }
 
-VideoDecoder::AVFrameStream VideoDecoder::getNextAVFrameNoDemux() {
-  auto avFrameStream = getAVFrameUsingFilterFunction(
-      [this](int frameStreamIndex, AVFrame* avFrame) {
-        StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
-        return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
-      });
-  return avFrameStream;
-}
-
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextFrameNoDemuxInternal();
   output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
@@ -1489,7 +1480,11 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  auto avFrameStream = getNextAVFrameNoDemux();
+  AVFrameStream avFrameStream = getAVFrameUsingFilterFunction(
+      [this](int frameStreamIndex, AVFrame* avFrame) {
+        StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
+        return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
+      });
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
 }
 
