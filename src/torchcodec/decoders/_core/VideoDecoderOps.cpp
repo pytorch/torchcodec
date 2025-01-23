@@ -280,6 +280,7 @@ OpsFrameBatchOutput get_frames_in_range(
       stream_index, start, stop, step.value_or(1));
   return makeOpsFrameBatchOutput(result);
 }
+
 OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
