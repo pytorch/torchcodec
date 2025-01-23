@@ -1062,7 +1062,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
   }
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
     double seconds) {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     double frameStartTime =
@@ -1316,7 +1316,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestamps(
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
     int streamIndex,
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
@@ -1385,7 +1385,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
