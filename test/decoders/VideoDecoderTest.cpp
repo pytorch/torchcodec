@@ -150,7 +150,7 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   videoStreamOptions.width = 100;
   videoStreamOptions.height = 120;
   decoder->addVideoStreamDecoder(-1, videoStreamOptions);
-  torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
+  torch::Tensor tensor = decoder->getNextFrameNoDemux().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
 
@@ -161,7 +161,7 @@ TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStreamDecoder(-1, videoStreamOptions);
-  torch::Tensor tensor = decoder->getNextFrameNoDemux().frame;
+  torch::Tensor tensor = decoder->getNextFrameNoDemux().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
 
@@ -235,7 +235,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
       VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
-  auto tensor = output.;
+  auto tensor = output.data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
   torch::Tensor tensor0FromFFMPEG =
