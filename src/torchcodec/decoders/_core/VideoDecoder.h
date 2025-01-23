@@ -409,7 +409,7 @@ class VideoDecoder {
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   void convertAVFrameToFrameOutputOnCPU(
       AVFrameWithStreamIndex& rawOutput,
-      FrameOutput& output,
+      FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   FrameOutput getNextFrameNoDemuxInternal(

@@ -187,7 +187,7 @@ void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     VideoDecoder::AVFrameWithStreamIndex& rawOutput,
-    VideoDecoder::FrameOutput& output,
+    VideoDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   AVFrame* avFrame = rawOutput.avFrame.get();
 
@@ -199,7 +199,7 @@ void convertAVFrameToFrameOutputOnCuda(
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
-  torch::Tensor& dst = output.frame;
+  torch::Tensor& dst = frameOutput.data;
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
     auto shape = dst.sizes();
