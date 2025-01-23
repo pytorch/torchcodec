@@ -186,10 +186,10 @@ void initializeContextOnCuda(
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    VideoDecoder::AVFrameWithStreamIndex& rawOutput,
+    VideoDecoder::AVFrameWithStreamIndex& avFrameWithStreamIndex,
     VideoDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrame* avFrame = rawOutput.avFrame.get();
+  AVFrame* avFrame = avFrameWithStreamIndex.avFrame.get();
 
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,

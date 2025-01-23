@@ -17,7 +17,8 @@ namespace facebook::torchcodec {
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
     [[maybe_unused]] const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] VideoDecoder::AVFrameWithStreamIndex& rawOutput,
+    [[maybe_unused]] VideoDecoder::AVFrameWithStreamIndex&
+        avFrameWithStreamIndex,
     [[maybe_unused]] VideoDecoder::FrameOutput& frameOutput,
     [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
   throwUnsupportedDeviceError(device);
