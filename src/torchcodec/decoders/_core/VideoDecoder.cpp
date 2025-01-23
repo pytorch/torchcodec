@@ -1080,27 +1080,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   }
 
   setCursorPtsInSeconds(seconds);
-  AVFrameWithStreamIndex avFrameWithStreamIndex = getAVFrameUsingFilterFunction(
-      [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
-        StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
-        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
-        double frameEndTime = ptsToSeconds(
-            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
-        if (frameStartTime > seconds) {
-          // FFMPEG seeked past the frame we are looking for even though we
-          // set max_ts to be our needed timestamp in avformat_seek_file()
-          // in maybeSeekToBeforeDesiredPts().
-          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
-          // In this case we return the very next frame instead of throwing an
-          // exception.
-          // TODO: Maybe log to stderr for Debug builds?
-          return true;
-        }
-        return seconds >= frameStartTime && seconds < frameEndTime;
-      });
-
-  // Convert the frame to tensor.
-  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameWithStreamIndex);
+  FrameOutput frameOutput = getNextFrameNoDemuxInternal();
   frameOutput.data =
       maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
   return frameOutput;
