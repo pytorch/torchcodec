@@ -1282,7 +1282,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
       containerMetadata_.allStreamMetadata[streamIndex];
   const auto& streamInfo = streamInfos_[streamIndex];
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput output(
+  FrameBatchOutput frameBatchOutput(
       frameIndices.size(), videoStreamOptions, streamMetadata);
 
   auto previousIndexInVideo = -1;
@@ -1295,21 +1295,24 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
       auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
-      output.data[indexInOutput].copy_(output.data[previousIndexInOutput]);
-      output.ptsSeconds[indexInOutput] =
-          output.ptsSeconds[previousIndexInOutput];
-      output.durationSeconds[indexInOutput] =
-          output.durationSeconds[previousIndexInOutput];
+      frameBatchOutput.data[indexInOutput].copy_(
+          frameBatchOutput.data[previousIndexInOutput]);
+      frameBatchOutput.ptsSeconds[indexInOutput] =
+          frameBatchOutput.ptsSeconds[previousIndexInOutput];
+      frameBatchOutput.durationSeconds[indexInOutput] =
+          frameBatchOutput.durationSeconds[previousIndexInOutput];
     } else {
       FrameOutput singleOut = getFrameAtIndexInternal(
-          streamIndex, indexInVideo, output.data[indexInOutput]);
-      output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
-      output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
+          streamIndex, indexInVideo, frameBatchOutput.data[indexInOutput]);
+      frameBatchOutput.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
+      frameBatchOutput.durationSeconds[indexInOutput] =
+          singleOut.durationSeconds;
     }
     previousIndexInVideo = indexInVideo;
   }
-  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
-  return output;
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  return frameBatchOutput;
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestamps(
@@ -1367,16 +1370,18 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput output(numOutputFrames, videoStreamOptions, streamMetadata);
+  FrameBatchOutput frameBatchOutput(
+      numOutputFrames, videoStreamOptions, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput singleOut =
-        getFrameAtIndexInternal(streamIndex, i, output.data[f]);
-    output.ptsSeconds[f] = singleOut.ptsSeconds;
-    output.durationSeconds[f] = singleOut.durationSeconds;
+        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+    frameBatchOutput.ptsSeconds[f] = singleOut.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
-  return output;
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  return frameBatchOutput;
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
@@ -1414,9 +1419,9 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
-    FrameBatchOutput output(0, videoStreamOptions, streamMetadata);
-    output.data = maybePermuteHWC2CHW(streamIndex, output.data);
-    return output;
+    FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
+    frameBatchOutput.data = maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+    return frameBatchOutput;
   }
 
   double minSeconds = getMinSeconds(streamMetadata);
@@ -1451,16 +1456,18 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
       secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
-  FrameBatchOutput output(numFrames, videoStreamOptions, streamMetadata);
+  FrameBatchOutput frameBatchOutput(
+      numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput singleOut =
-        getFrameAtIndexInternal(streamIndex, i, output.data[f]);
-    output.ptsSeconds[f] = singleOut.ptsSeconds;
-    output.durationSeconds[f] = singleOut.durationSeconds;
+        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+    frameBatchOutput.ptsSeconds[f] = singleOut.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
 
-  return output;
+  return frameBatchOutput;
 }
 
 VideoDecoder::AVFrameWithStreamIndex
