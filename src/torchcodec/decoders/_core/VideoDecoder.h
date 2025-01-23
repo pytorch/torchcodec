@@ -175,7 +175,7 @@ class VideoDecoder {
 
   struct FrameOutput {
     // The actual decoded output as a Tensor.
-    torch::Tensor frame;
+    torch::Tensor data;
     // The stream index of the decoded frame. Used to distinguish
     // between streams that are of the same type.
     int streamIndex;

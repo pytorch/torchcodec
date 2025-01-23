@@ -952,7 +952,7 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
-// Callers may pass a pre-allocated tensor, where the output frame tensor will
+// Callers may pass a pre-allocated tensor, where the output.data tensor will
 // be stored. This parameter is honored in any case, but it only leads to a
 // speed-up when swscale is used. With swscale, we can tell ffmpeg to place the
 // decoded frame directly into `preAllocatedtensor.data_ptr()`. We haven't yet
@@ -1023,7 +1023,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
         " != ",
         expectedOutputHeight);
 
-    output.frame = outputTensor;
+    output.data = outputTensor;
   } else if (
       streamInfo.colorConversionLibrary ==
       ColorConversionLibrary::FILTERGRAPH) {
@@ -1051,9 +1051,9 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       // We have already validated that preAllocatedOutputTensor and
       // outputTensor have the same shape.
       preAllocatedOutputTensor.value().copy_(outputTensor);
-      output.frame = preAllocatedOutputTensor.value();
+      output.data = preAllocatedOutputTensor.value();
     } else {
-      output.frame = outputTensor;
+      output.data = outputTensor;
     }
   } else {
     throw std::runtime_error(
@@ -1100,7 +1100,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
 
   // Convert the frame to tensor.
   FrameOutput output = convertAVFrameToFrameOutput(rawOutput);
-  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
   return output;
 }
 
@@ -1140,7 +1140,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
   auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
-  output.frame = maybePermuteHWC2CHW(streamIndex, output.frame);
+  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
   return output;
 }
 
@@ -1367,8 +1367,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput output(
-      numOutputFrames, videoStreamOptions, streamMetadata);
+  FrameBatchOutput output(numOutputFrames, videoStreamOptions, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput singleOut =
@@ -1380,8 +1379,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
   return output;
 }
 
-VideoDecoder::FrameBatchOutput
-VideoDecoder::getFramesPlayedByTimestampInRange(
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
@@ -1465,9 +1463,10 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   return output;
 }
 
-VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
-  auto rawOutput = getFrameOutputWithFilter(
-      [this](int frameStreamIndex, AVFrame* avFrame) {
+VideoDecoder::AVFrameWithStreamIndex
+VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
+  auto rawOutput =
+      getFrameOutputWithFilter([this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
@@ -1476,7 +1475,7 @@ VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getNextAVFrameWithStreamIndex
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextFrameNoDemuxInternal();
-  output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
+  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
   return output;
 }
 

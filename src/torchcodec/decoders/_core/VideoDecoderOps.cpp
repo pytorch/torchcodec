@@ -80,7 +80,7 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 
 OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
   return std::make_tuple(
-      frame.frame,
+      frame.data,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
@@ -235,10 +235,10 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
-  if (result.frame.sizes().size() != 3) {
+  if (result.data.sizes().size() != 3) {
     throw std::runtime_error(
         "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.frame.sizes().size()));
+        std::to_string(result.data.sizes().size()));
   }
   return makeOpsFrameOutput(result);
 }

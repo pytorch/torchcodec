@@ -171,11 +171,11 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStreamDecoder(-1);
   auto output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor0FromOurDecoder = output.frame;
+  torch::Tensor tensor0FromOurDecoder = output.data;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 0.0);
   output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor1FromOurDecoder = output.frame;
+  torch::Tensor tensor1FromOurDecoder = output.data;
   EXPECT_EQ(tensor1FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
   EXPECT_EQ(output.ptsSeconds, 1'001. / 30'000);
 
@@ -211,7 +211,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   ourDecoder->addVideoStreamDecoder(bestVideoStreamIndex);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
-  auto tensor = output.frames;
+  auto tensor = output.data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
   torch::Tensor tensor0FromFFMPEG =
@@ -235,7 +235,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
       VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
-  auto tensor = output.frames;
+  auto tensor = output.;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
   torch::Tensor tensor0FromFFMPEG =
@@ -299,7 +299,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->addVideoStreamDecoder(-1);
   ourDecoder->setCursorPtsInSeconds(6.0);
   auto output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor6FromOurDecoder = output.frame;
+  torch::Tensor tensor6FromOurDecoder = output.data;
   EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
   torch::Tensor tensor6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
@@ -315,7 +315,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
 
   ourDecoder->setCursorPtsInSeconds(6.1);
   output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor61FromOurDecoder = output.frame;
+  torch::Tensor tensor61FromOurDecoder = output.data;
   EXPECT_EQ(output.ptsSeconds, 183'183. / 30'000);
   torch::Tensor tensor61FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.100000.pt");
@@ -335,7 +335,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
 
   ourDecoder->setCursorPtsInSeconds(10.0);
   output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor10FromOurDecoder = output.frame;
+  torch::Tensor tensor10FromOurDecoder = output.data;
   EXPECT_EQ(output.ptsSeconds, 300'300. / 30'000);
   torch::Tensor tensor10FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time10.000000.pt");
@@ -352,7 +352,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
 
   ourDecoder->setCursorPtsInSeconds(6.0);
   output = ourDecoder->getNextFrameNoDemux();
-  tensor6FromOurDecoder = output.frame;
+  tensor6FromOurDecoder = output.data;
   EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
   EXPECT_TRUE(torch::equal(tensor6FromOurDecoder, tensor6FromFFMPEG));
   EXPECT_EQ(ourDecoder->getDecodeStats().numSeeksAttempted, 1);
@@ -367,7 +367,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   constexpr double kPtsOfLastFrameInVideoStream = 389'389. / 30'000; // ~12.9
   ourDecoder->setCursorPtsInSeconds(kPtsOfLastFrameInVideoStream);
   output = ourDecoder->getNextFrameNoDemux();
-  torch::Tensor tensor7FromOurDecoder = output.frame;
+  torch::Tensor tensor7FromOurDecoder = output.data;
   EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
   torch::Tensor tensor7FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time12.979633.pt");
@@ -401,7 +401,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
       VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
   auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
-  EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
+  EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 
 TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
@@ -418,7 +418,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
       VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
   auto output = ourDecoder->getFrameAtIndexInternal(
       bestVideoStreamIndex, 0, preAllocatedOutputTensor);
-  EXPECT_EQ(output.frame.data_ptr(), preAllocatedOutputTensor.data_ptr());
+  EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 
 TEST_P(VideoDecoderTest, GetAudioMetadata) {
