@@ -963,7 +963,7 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameWithStreamIndex& avFrameWithStreamIndex,
-    FrameOutput& output,
+    FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = avFrameWithStreamIndex.streamIndex;
   AVFrame* avFrame = avFrameWithStreamIndex.avFrame.get();
@@ -1024,7 +1024,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
         " != ",
         expectedOutputHeight);
 
-    output.data = outputTensor;
+    frameOutput.data = outputTensor;
   } else if (
       streamInfo.colorConversionLibrary ==
       ColorConversionLibrary::FILTERGRAPH) {
@@ -1052,9 +1052,9 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       // We have already validated that preAllocatedOutputTensor and
       // outputTensor have the same shape.
       preAllocatedOutputTensor.value().copy_(outputTensor);
-      output.data = preAllocatedOutputTensor.value();
+      frameOutput.data = preAllocatedOutputTensor.value();
     } else {
-      output.data = outputTensor;
+      frameOutput.data = outputTensor;
     }
   } else {
     throw std::runtime_error(
