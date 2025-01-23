@@ -64,7 +64,7 @@ void seek_to_pts(at::Tensor& decoder, double seconds);
 //   3. A single float value for the duration in seconds.
 // The reason we use Tensors for the second and third values is so we can run
 // under torch.compile().
-using OpsDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
 // All elements of this tuple are tensors of the same leading dimension. The
 // tuple represents the frames for N total frames, where N is the dimension of
@@ -75,38 +75,38 @@ using OpsDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 //   float.
 //   3. Tensor of N durationis in seconds, where each duration is a
 //   single float.
-using OpsBatchDecodedOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
 // given timestamp T has T >= PTS and T < PTS + Duration.
-OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
+OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 
 // Return the frames at given ptss for a given stream
-OpsBatchDecodedOutput get_frames_by_pts(
+OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
     at::ArrayRef<double> timestamps);
 
 // Return the frame that is visible at a given index in the video.
-OpsDecodedOutput get_frame_at_index(
+OpsFrameOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index);
 
 // Get the next frame from the video as a tuple that has the frame data, pts and
 // duration as tensors.
-OpsDecodedOutput get_next_frame(at::Tensor& decoder);
+OpsFrameOutput get_next_frame(at::Tensor& decoder);
 
 // Return the frames at given indices for a given stream
-OpsBatchDecodedOutput get_frames_at_indices(
+OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices);
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
-OpsBatchDecodedOutput get_frames_in_range(
+OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,
@@ -116,7 +116,7 @@ OpsBatchDecodedOutput get_frames_in_range(
 // Return the frames inside the range as a single stacked Tensor. The range is
 // defined as [start_seconds, stop_seconds). The frames are stacked in pts
 // order.
-OpsBatchDecodedOutput get_frames_by_pts_in_range(
+OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     double start_seconds,
