@@ -87,7 +87,7 @@ OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
 
 OpsFrameBatchOutput makeOpsFrameBatchOutput(
     VideoDecoder::FrameBatchOutput& batch) {
-  return std::make_tuple(batch.frames, batch.ptsSeconds, batch.durationSeconds);
+  return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
 
 VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {

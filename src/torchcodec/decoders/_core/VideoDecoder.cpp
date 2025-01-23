@@ -202,7 +202,7 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       videoStreamOptions, streamMetadata);
   int height = frameDims.height;
   int width = frameDims.width;
-  frames = allocateEmptyHWCTensor(
+  data = allocateEmptyHWCTensor(
       height, width, videoStreamOptions.device, numFrames);
 }
 
@@ -1295,20 +1295,20 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
       auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
-      output.frames[indexInOutput].copy_(output.frames[previousIndexInOutput]);
+      output.data[indexInOutput].copy_(output.data[previousIndexInOutput]);
       output.ptsSeconds[indexInOutput] =
           output.ptsSeconds[previousIndexInOutput];
       output.durationSeconds[indexInOutput] =
           output.durationSeconds[previousIndexInOutput];
     } else {
       FrameOutput singleOut = getFrameAtIndexInternal(
-          streamIndex, indexInVideo, output.frames[indexInOutput]);
+          streamIndex, indexInVideo, output.data[indexInOutput]);
       output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
       output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
     }
     previousIndexInVideo = indexInVideo;
   }
-  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
+  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
   return output;
 }
 
@@ -1372,11 +1372,11 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput singleOut =
-        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
+        getFrameAtIndexInternal(streamIndex, i, output.data[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
+  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
   return output;
 }
 
@@ -1417,7 +1417,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     FrameBatchOutput output(0, videoStreamOptions, streamMetadata);
-    output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
+    output.data = maybePermuteHWC2CHW(streamIndex, output.data);
     return output;
   }
 
@@ -1456,11 +1456,11 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
   FrameBatchOutput output(numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput singleOut =
-        getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
+        getFrameAtIndexInternal(streamIndex, i, output.data[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
   }
-  output.frames = maybePermuteHWC2CHW(streamIndex, output.frames);
+  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
 
   return output;
 }

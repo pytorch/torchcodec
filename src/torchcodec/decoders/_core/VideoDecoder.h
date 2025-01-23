@@ -186,7 +186,7 @@ class VideoDecoder {
   };
 
   struct FrameBatchOutput {
-    torch::Tensor frames;
+    torch::Tensor data;
     torch::Tensor ptsSeconds;
     torch::Tensor durationSeconds;
 
