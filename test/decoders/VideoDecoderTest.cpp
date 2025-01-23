@@ -72,8 +72,8 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
 #else
   EXPECT_NEAR(metadata.bitRate.value(), 324915, 1e-1);
 #endif
-  EXPECT_EQ(metadata.streamMetadatas.size(), 6);
-  const auto& videoStream = metadata.streamMetadatas[3];
+  EXPECT_EQ(metadata.allStreamMetadata.size(), 6);
+  const auto& videoStream = metadata.allStreamMetadata[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
   EXPECT_EQ(videoStream.codecName, "h264");
   EXPECT_NEAR(*videoStream.averageFps, 29.97f, 1e-1);
@@ -85,7 +85,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
-  const auto& videoStream1 = metadata.streamMetadatas[3];
+  const auto& videoStream1 = metadata.allStreamMetadata[3];
   EXPECT_EQ(*videoStream1.minPtsSecondsFromScan, 0);
   EXPECT_EQ(*videoStream1.maxPtsSecondsFromScan, 13.013);
   EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
@@ -428,9 +428,9 @@ TEST_P(VideoDecoderTest, GetAudioMetadata) {
   VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 1);
   EXPECT_EQ(metadata.numVideoStreams, 0);
-  EXPECT_EQ(metadata.streamMetadatas.size(), 1);
+  EXPECT_EQ(metadata.allStreamMetadata.size(), 1);
 
-  const auto& audioStream = metadata.streamMetadatas[0];
+  const auto& audioStream = metadata.allStreamMetadata[0];
   EXPECT_EQ(audioStream.mediaType, AVMEDIA_TYPE_AUDIO);
   EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
 }

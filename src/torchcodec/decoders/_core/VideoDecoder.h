@@ -104,7 +104,7 @@ class VideoDecoder {
     std::optional<int64_t> height;
   };
   struct ContainerMetadata {
-    std::vector<StreamMetadata> streamMetadatas;
+    std::vector<StreamMetadata> allStreamMetadata;
     int numAudioStreams = 0;
     int numVideoStreams = 0;
     // Note that this is the container-level duration, which is usually the max
