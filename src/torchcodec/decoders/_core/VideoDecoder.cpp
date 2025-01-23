@@ -1474,7 +1474,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
 }
 
 VideoDecoder::AVFrameWithStreamIndex
-VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
+VideoDecoder::getNextAVFrameNoDemux() {
   auto rawOutput = getAVFrameUsingFilterFunction(
       [this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
@@ -1491,7 +1491,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  auto rawOutput = getNextAVFrameWithStreamIndexNoDemux();
+  auto rawOutput = getNextAVFrameNoDemux();
   return convertAVFrameToFrameOutput(rawOutput, preAllocatedOutputTensor);
 }
 

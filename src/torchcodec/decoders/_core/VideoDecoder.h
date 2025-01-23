@@ -164,6 +164,7 @@ class VideoDecoder {
   // Calling getNextFrameNoDemuxInternal() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
+
   // This structure ensures we always keep the streamIndex and AVFrame together
   // Note that AVFrame itself doesn't retain the streamIndex.
   struct AVFrameWithStreamIndex {
@@ -388,7 +389,7 @@ class VideoDecoder {
   void maybeSeekToBeforeDesiredPts();
   AVFrameWithStreamIndex getAVFrameUsingFilterFunction(
       std::function<bool(int, AVFrame*)>);
-  AVFrameWithStreamIndex getNextAVFrameWithStreamIndexNoDemux();
+  AVFrameWithStreamIndex getNextAVFrameNoDemux();
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
