@@ -166,7 +166,7 @@ class VideoDecoder {
   void setCursorPtsInSeconds(double seconds);
   // This structure ensures we always keep the streamIndex and AVFrame together
   // Note that AVFrame itself doesn't retain the streamIndex.
-  struct RawDecodedOutput {
+  struct AVFrameWithStreamIndex {
     // The actual decoded output as a unique pointer to an AVFrame.
     UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
@@ -386,9 +386,9 @@ class VideoDecoder {
       const enum AVColorSpace colorspace);
 
   void maybeSeekToBeforeDesiredPts();
-  RawDecodedOutput getDecodedOutputWithFilter(
+  AVFrameWithStreamIndex getDecodedOutputWithFilter(
       std::function<bool(int, AVFrame*)>);
-  RawDecodedOutput getNextRawDecodedOutputNoDemux();
+  AVFrameWithStreamIndex getNextAVFrameWithStreamIndexNoDemux();
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
@@ -404,10 +404,10 @@ class VideoDecoder {
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
   DecodedOutput convertAVFrameToDecodedOutput(
-      RawDecodedOutput& rawOutput,
+      AVFrameWithStreamIndex& rawOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
   void convertAVFrameToDecodedOutputOnCPU(
-      RawDecodedOutput& rawOutput,
+      AVFrameWithStreamIndex& rawOutput,
       DecodedOutput& output,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 

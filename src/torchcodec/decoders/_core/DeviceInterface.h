@@ -32,7 +32,7 @@ void initializeContextOnCuda(
 void convertAVFrameToDecodedOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    VideoDecoder::RawDecodedOutput& rawOutput,
+    VideoDecoder::AVFrameWithStreamIndex& rawOutput,
     VideoDecoder::DecodedOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
