@@ -386,7 +386,7 @@ class VideoDecoder {
       const enum AVColorSpace colorspace);
 
   void maybeSeekToBeforeDesiredPts();
-  AVFrameWithStreamIndex getFrameOutputWithFilter(
+  AVFrameWithStreamIndex getAVFrameUsingFilterFunction(
       std::function<bool(int, AVFrame*)>);
   AVFrameWithStreamIndex getNextAVFrameWithStreamIndexNoDemux();
   // Once we create a decoder can update the metadata with the codec context.

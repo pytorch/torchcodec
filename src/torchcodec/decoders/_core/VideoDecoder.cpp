@@ -803,7 +803,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getFrameOutputWithFilter(
+VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getAVFrameUsingFilterFunction(
     std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
@@ -1079,7 +1079,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   }
 
   setCursorPtsInSeconds(seconds);
-  AVFrameWithStreamIndex rawOutput = getFrameOutputWithFilter(
+  AVFrameWithStreamIndex rawOutput = getAVFrameUsingFilterFunction(
       [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
@@ -1473,7 +1473,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
 VideoDecoder::AVFrameWithStreamIndex
 VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
   auto rawOutput =
-      getFrameOutputWithFilter([this](int frameStreamIndex, AVFrame* avFrame) {
+      getAVFrameUsingFilterFunction([this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
