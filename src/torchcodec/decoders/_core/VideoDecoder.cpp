@@ -922,33 +922,33 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
     VideoDecoder::AVFrameWithStreamIndex& rawOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
-  FrameOutput output;
+  FrameOutput frameOutput;
   int streamIndex = rawOutput.streamIndex;
   AVFrame* avFrame = rawOutput.avFrame.get();
-  output.streamIndex = streamIndex;
+  frameOutput.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
   TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
-  output.ptsSeconds = ptsToSeconds(
+  frameOutput.ptsSeconds = ptsToSeconds(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
-  output.durationSeconds = ptsToSeconds(
+  frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into AVFrameWithStreamIndex.
   if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
-        rawOutput, output, preAllocatedOutputTensor);
+        rawOutput, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
     convertAVFrameToFrameOutputOnCuda(
         streamInfo.videoStreamOptions.device,
         streamInfo.videoStreamOptions,
         rawOutput,
-        output,
+        frameOutput,
         preAllocatedOutputTensor);
   } else {
     TORCH_CHECK(
         false,
         "Invalid device type: " + streamInfo.videoStreamOptions.device.str());
   }
-  return output;
+  return frameOutput;
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
@@ -1099,9 +1099,9 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
       });
 
   // Convert the frame to tensor.
-  FrameOutput output = convertAVFrameToFrameOutput(rawOutput);
-  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
-  return output;
+  FrameOutput frameOutput = convertAVFrameToFrameOutput(rawOutput);
+  frameOutput.data = maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
+  return frameOutput;
 }
 
 void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
@@ -1139,9 +1139,9 @@ void VideoDecoder::validateFrameIndex(
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
-  auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
-  output.data = maybePermuteHWC2CHW(streamIndex, output.data);
-  return output;
+  auto frameOutput = getFrameAtIndexInternal(streamIndex, frameIndex);
+  frameOutput.data = maybePermuteHWC2CHW(streamIndex, frameOutput.data);
+  return frameOutput;
 }
 
 int64_t VideoDecoder::getPts(
@@ -1302,11 +1302,11 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
       frameBatchOutput.durationSeconds[indexInOutput] =
           frameBatchOutput.durationSeconds[previousIndexInOutput];
     } else {
-      FrameOutput singleOut = getFrameAtIndexInternal(
+      FrameOutput frameOutput = getFrameAtIndexInternal(
           streamIndex, indexInVideo, frameBatchOutput.data[indexInOutput]);
-      frameBatchOutput.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
+      frameBatchOutput.ptsSeconds[indexInOutput] = frameOutput.ptsSeconds;
       frameBatchOutput.durationSeconds[indexInOutput] =
-          singleOut.durationSeconds;
+          frameOutput.durationSeconds;
     }
     previousIndexInVideo = indexInVideo;
   }
@@ -1374,10 +1374,10 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
       numOutputFrames, videoStreamOptions, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    FrameOutput singleOut =
+    FrameOutput frameOutput =
         getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
-    frameBatchOutput.ptsSeconds[f] = singleOut.ptsSeconds;
-    frameBatchOutput.durationSeconds[f] = singleOut.durationSeconds;
+    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
   frameBatchOutput.data =
       maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
@@ -1459,10 +1459,10 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
   FrameBatchOutput frameBatchOutput(
       numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    FrameOutput singleOut =
+    FrameOutput frameOutput =
         getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
-    frameBatchOutput.ptsSeconds[f] = singleOut.ptsSeconds;
-    frameBatchOutput.durationSeconds[f] = singleOut.durationSeconds;
+    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
   frameBatchOutput.data =
       maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
