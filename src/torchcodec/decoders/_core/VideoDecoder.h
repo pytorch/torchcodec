@@ -420,7 +420,7 @@ class VideoDecoder {
   std::set<int> activeStreamIndices_;
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
-  std::optional<double> desiredPts_;
+  std::optional<double> desiredPtsSeconds_;
 
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
