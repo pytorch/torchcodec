@@ -803,7 +803,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getAVFrameUsingFilterFunction(
+VideoDecoder::AVFrameWithStreamIndex
+VideoDecoder::getAVFrameUsingFilterFunction(
     std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
@@ -1100,7 +1101,8 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
 
   // Convert the frame to tensor.
   FrameOutput frameOutput = convertAVFrameToFrameOutput(rawOutput);
-  frameOutput.data = maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
+  frameOutput.data =
+      maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
   return frameOutput;
 }
 
@@ -1420,7 +1422,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
-    frameBatchOutput.data = maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+    frameBatchOutput.data =
+        maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
     return frameBatchOutput;
   }
 
@@ -1472,8 +1475,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
 
 VideoDecoder::AVFrameWithStreamIndex
 VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
-  auto rawOutput =
-      getAVFrameUsingFilterFunction([this](int frameStreamIndex, AVFrame* avFrame) {
+  auto rawOutput = getAVFrameUsingFilterFunction(
+      [this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
