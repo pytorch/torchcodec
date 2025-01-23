@@ -386,6 +386,7 @@ void VideoDecoder::createFilterGraph(
   }
 
   enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
+
   ffmpegStatus = av_opt_set_int_list(
       filterState.sinkContext,
       "pix_fmts",
@@ -685,6 +686,7 @@ int VideoDecoder::getKeyFrameIndexForPts(
   }
   return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
 }
+
 /*
 Videos have I frames and non-I frames (P and B frames). Non-I frames need data
 from the previous I frame to be decoded.
@@ -709,8 +711,6 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
                           x              j         y
 
 (2) is more efficient than (1) if there is an I frame between x and y.
-
-We use av_index_search_timestamp to see if there is an I frame between x and y.
 */
 bool VideoDecoder::canWeAvoidSeekingForStream(
     const StreamInfo& streamInfo,
@@ -746,7 +746,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streamInfos_[streamIndex];
     // clang-format off: clang format clashes
-    streamInfo.discardFramesBeforePts = secondsToClosestPts(*desiredPts_, streamInfo.timeBase);
+    streamInfo.discardFramesBeforePts = secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
     // clang-format on
   }
 
@@ -756,7 +756,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   bool mustSeek = false;
   for (int streamIndex : activeStreamIndices_) {
     StreamInfo& streamInfo = streamInfos_[streamIndex];
-    int64_t desiredPtsForStream = *desiredPts_ * streamInfo.timeBase.den;
+    int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
     if (!canWeAvoidSeekingForStream(
             streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
       mustSeek = true;
@@ -770,7 +770,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   int firstActiveStreamIndex = *activeStreamIndices_.begin();
   const auto& firstStreamInfo = streamInfos_[firstActiveStreamIndex];
   int64_t desiredPts =
-      secondsToClosestPts(*desiredPts_, firstStreamInfo.timeBase);
+      secondsToClosestPts(*desiredPtsSeconds_, firstStreamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -803,16 +803,15 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameWithStreamIndex
-VideoDecoder::getAVFrameUsingFilterFunction(
+VideoDecoder::AVFrameStream VideoDecoder::getAVFrameUsingFilterFunction(
     std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
   resetDecodeStats();
-  if (desiredPts_.has_value()) {
+  if (desiredPtsSeconds_.has_value()) {
     maybeSeekToBeforeDesiredPts();
-    desiredPts_ = std::nullopt;
+    desiredPtsSeconds_ = std::nullopt;
   }
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
@@ -913,19 +912,19 @@ VideoDecoder::getAVFrameUsingFilterFunction(
   StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
   activeStreamInfo.currentPts = avFrame->pts;
   activeStreamInfo.currentDuration = getDuration(avFrame);
-  AVFrameWithStreamIndex avFrameWithStreamIndex;
-  avFrameWithStreamIndex.streamIndex = frameStreamIndex;
-  avFrameWithStreamIndex.avFrame = std::move(avFrame);
-  return avFrameWithStreamIndex;
+  AVFrameStream avFrameStream;
+  avFrameStream.streamIndex = frameStreamIndex;
+  avFrameStream.avFrame = std::move(avFrame);
+  return avFrameStream;
 }
 
 VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
-    VideoDecoder::AVFrameWithStreamIndex& avFrameWithStreamIndex,
+    VideoDecoder::AVFrameStream& avFrameStream,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   FrameOutput frameOutput;
-  int streamIndex = avFrameWithStreamIndex.streamIndex;
-  AVFrame* avFrame = avFrameWithStreamIndex.avFrame.get();
+  int streamIndex = avFrameStream.streamIndex;
+  AVFrame* avFrame = avFrameStream.avFrame.get();
   frameOutput.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
   TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
@@ -933,15 +932,15 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
-  // TODO: we should fold preAllocatedOutputTensor into AVFrameWithStreamIndex.
+  // TODO: we should fold preAllocatedOutputTensor into AVFrameStream.
   if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
-        avFrameWithStreamIndex, frameOutput, preAllocatedOutputTensor);
+        avFrameStream, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
     convertAVFrameToFrameOutputOnCuda(
         streamInfo.videoStreamOptions.device,
         streamInfo.videoStreamOptions,
-        avFrameWithStreamIndex,
+        avFrameStream,
         frameOutput,
         preAllocatedOutputTensor);
   } else {
@@ -962,11 +961,11 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
 // Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
-    VideoDecoder::AVFrameWithStreamIndex& avFrameWithStreamIndex,
+    VideoDecoder::AVFrameStream& avFrameStream,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  int streamIndex = avFrameWithStreamIndex.streamIndex;
-  AVFrame* avFrame = avFrameWithStreamIndex.avFrame.get();
+  int streamIndex = avFrameStream.streamIndex;
+  AVFrame* avFrame = avFrameStream.avFrame.get();
   auto& streamInfo = streamInfos_[streamIndex];
 
   auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
@@ -1063,7 +1062,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
   }
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
     double seconds) {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     double frameStartTime =
@@ -1080,7 +1079,27 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   }
 
   setCursorPtsInSeconds(seconds);
-  FrameOutput frameOutput = getNextFrameNoDemuxInternal();
+  AVFrameStream avFrameStream = getAVFrameUsingFilterFunction(
+      [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
+        StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
+        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+        double frameEndTime = ptsToSeconds(
+            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+        if (frameStartTime > seconds) {
+          // FFMPEG seeked past the frame we are looking for even though we
+          // set max_ts to be our needed timestamp in avformat_seek_file()
+          // in maybeSeekToBeforeDesiredPts().
+          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
+          // In this case we return the very next frame instead of throwing an
+          // exception.
+          // TODO: Maybe log to stderr for Debug builds?
+          return true;
+        }
+        return seconds >= frameStartTime && seconds < frameEndTime;
+      });
+
+  // Convert the frame to tensor.
+  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
   frameOutput.data =
       maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
   return frameOutput;
@@ -1297,7 +1316,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestamps(
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
     int streamIndex,
     const std::vector<double>& timestamps) {
   validateUserProvidedStreamIndex(streamIndex);
@@ -1366,7 +1385,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedByTimestampInRange(
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
@@ -1461,17 +1480,16 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  auto avFrameWithStreamIndex = getAVFrameUsingFilterFunction(
+  AVFrameStream avFrameStream = getAVFrameUsingFilterFunction(
       [this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
-  return convertAVFrameToFrameOutput(
-      avFrameWithStreamIndex, preAllocatedOutputTensor);
+  return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-  desiredPts_ = seconds;
+  desiredPtsSeconds_ = seconds;
 }
 
 VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
