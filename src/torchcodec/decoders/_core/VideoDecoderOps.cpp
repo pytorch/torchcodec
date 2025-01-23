@@ -78,16 +78,16 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   return decoder;
 }
 
-OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
+OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
   return std::make_tuple(
-      frame.frame,
+      frame.data,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
-OpsBatchDecodedOutput makeOpsBatchDecodedOutput(
-    VideoDecoder::BatchDecodedOutput& batch) {
-  return std::make_tuple(batch.frames, batch.ptsSeconds, batch.durationSeconds);
+OpsFrameBatchOutput makeOpsFrameBatchOutput(
+    VideoDecoder::FrameBatchOutput& batch) {
+  return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
 
 VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
@@ -227,38 +227,38 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
   videoDecoder->setCursorPtsInSeconds(seconds);
 }
 
-OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
+OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  VideoDecoder::DecodedOutput result;
+  VideoDecoder::FrameOutput result;
   try {
     result = videoDecoder->getNextFrameNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
-  if (result.frame.sizes().size() != 3) {
+  if (result.data.sizes().size() != 3) {
     throw std::runtime_error(
         "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.frame.sizes().size()));
+        std::to_string(result.data.sizes().size()));
   }
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
-OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
+OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramePlayedAtNoDemux(seconds);
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
-OpsDecodedOutput get_frame_at_index(
+OpsFrameOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_at_indices(
+OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
     int64_t stream_index,
     at::IntArrayRef frame_indices) {
@@ -266,10 +266,10 @@ OpsBatchDecodedOutput get_frames_at_indices(
   std::vector<int64_t> frameIndicesVec(
       frame_indices.begin(), frame_indices.end());
   auto result = videoDecoder->getFramesAtIndices(stream_index, frameIndicesVec);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_in_range(
+OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t start,
@@ -278,20 +278,20 @@ OpsBatchDecodedOutput get_frames_in_range(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesInRange(
       stream_index, start, stop, step.value_or(1));
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_by_pts(
+OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
     int64_t stream_index,
     at::ArrayRef<double> timestamps) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
   auto result = videoDecoder->getFramesPlayedAt(stream_index, timestampsVec);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
-OpsBatchDecodedOutput get_frames_by_pts_in_range(
+OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
     int64_t stream_index,
     double start_seconds,
@@ -299,7 +299,7 @@ OpsBatchDecodedOutput get_frames_by_pts_in_range(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesPlayedInRange(
       stream_index, start_seconds, stop_seconds);
-  return makeOpsBatchDecodedOutput(result);
+  return makeOpsFrameBatchOutput(result);
 }
 
 std::string quoteValue(const std::string& value) {
