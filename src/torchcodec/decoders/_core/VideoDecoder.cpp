@@ -803,7 +803,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getDecodedOutputWithFilter(
+VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getFrameOutputWithFilter(
     std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
@@ -918,11 +918,11 @@ VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getDecodedOutputWithFilter(
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
+VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
     VideoDecoder::AVFrameWithStreamIndex& rawOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
-  DecodedOutput output;
+  FrameOutput output;
   int streamIndex = rawOutput.streamIndex;
   AVFrame* avFrame = rawOutput.avFrame.get();
   output.streamIndex = streamIndex;
@@ -934,10 +934,10 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
   // TODO: we should fold preAllocatedOutputTensor into AVFrameWithStreamIndex.
   if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
-    convertAVFrameToDecodedOutputOnCPU(
+    convertAVFrameToFrameOutputOnCPU(
         rawOutput, output, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
-    convertAVFrameToDecodedOutputOnCuda(
+    convertAVFrameToFrameOutputOnCuda(
         streamInfo.videoStreamOptions.device,
         streamInfo.videoStreamOptions,
         rawOutput,
@@ -960,9 +960,9 @@ VideoDecoder::DecodedOutput VideoDecoder::convertAVFrameToDecodedOutput(
 // TODO: Figure out whether that's possible!
 // Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
-void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
+void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameWithStreamIndex& rawOutput,
-    DecodedOutput& output,
+    FrameOutput& output,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   int streamIndex = rawOutput.streamIndex;
   AVFrame* avFrame = rawOutput.avFrame.get();
@@ -1062,7 +1062,7 @@ void VideoDecoder::convertAVFrameToDecodedOutputOnCPU(
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
     double seconds) {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     double frameStartTime =
@@ -1079,7 +1079,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
   }
 
   setCursorPtsInSeconds(seconds);
-  AVFrameWithStreamIndex rawOutput = getDecodedOutputWithFilter(
+  AVFrameWithStreamIndex rawOutput = getFrameOutputWithFilter(
       [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
@@ -1099,7 +1099,7 @@ VideoDecoder::DecodedOutput VideoDecoder::getFramePlayedAtTimestampNoDemux(
       });
 
   // Convert the frame to tensor.
-  DecodedOutput output = convertAVFrameToDecodedOutput(rawOutput);
+  FrameOutput output = convertAVFrameToFrameOutput(rawOutput);
   output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
@@ -1136,7 +1136,7 @@ void VideoDecoder::validateFrameIndex(
           " numFrames=" + std::to_string(numFrames));
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndex(
+VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
     int streamIndex,
     int64_t frameIndex) {
   auto output = getFrameAtIndexInternal(streamIndex, frameIndex);
@@ -1238,7 +1238,7 @@ int64_t VideoDecoder::secondsToIndexUpperBound(
   }
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getFrameAtIndexInternal(
+VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
     int streamIndex,
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -1301,7 +1301,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
       output.durationSeconds[indexInOutput] =
           output.durationSeconds[previousIndexInOutput];
     } else {
-      DecodedOutput singleOut = getFrameAtIndexInternal(
+      FrameOutput singleOut = getFrameAtIndexInternal(
           streamIndex, indexInVideo, output.frames[indexInOutput]);
       output.ptsSeconds[indexInOutput] = singleOut.ptsSeconds;
       output.durationSeconds[indexInOutput] = singleOut.durationSeconds;
@@ -1371,7 +1371,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
       numOutputFrames, videoStreamOptions, streamMetadata);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    DecodedOutput singleOut =
+    FrameOutput singleOut =
         getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
@@ -1455,7 +1455,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
 
   FrameBatchOutput output(numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    DecodedOutput singleOut =
+    FrameOutput singleOut =
         getFrameAtIndexInternal(streamIndex, i, output.frames[f]);
     output.ptsSeconds[f] = singleOut.ptsSeconds;
     output.durationSeconds[f] = singleOut.durationSeconds;
@@ -1466,7 +1466,7 @@ VideoDecoder::getFramesPlayedByTimestampInRange(
 }
 
 VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getNextAVFrameWithStreamIndexNoDemux() {
-  auto rawOutput = getDecodedOutputWithFilter(
+  auto rawOutput = getFrameOutputWithFilter(
       [this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
@@ -1474,16 +1474,16 @@ VideoDecoder::AVFrameWithStreamIndex VideoDecoder::getNextAVFrameWithStreamIndex
   return rawOutput;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemux() {
+VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextFrameNoDemuxInternal();
   output.frame = maybePermuteHWC2CHW(output.streamIndex, output.frame);
   return output;
 }
 
-VideoDecoder::DecodedOutput VideoDecoder::getNextFrameNoDemuxInternal(
+VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   auto rawOutput = getNextAVFrameWithStreamIndexNoDemux();
-  return convertAVFrameToDecodedOutput(rawOutput, preAllocatedOutputTensor);
+  return convertAVFrameToFrameOutput(rawOutput, preAllocatedOutputTensor);
 }
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {

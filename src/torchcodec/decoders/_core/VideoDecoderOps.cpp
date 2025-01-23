@@ -78,7 +78,7 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   return decoder;
 }
 
-OpsDecodedOutput makeOpsDecodedOutput(VideoDecoder::DecodedOutput& frame) {
+OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
   return std::make_tuple(
       frame.frame,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
@@ -227,9 +227,9 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
   videoDecoder->setCursorPtsInSeconds(seconds);
 }
 
-OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
+OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  VideoDecoder::DecodedOutput result;
+  VideoDecoder::FrameOutput result;
   try {
     result = videoDecoder->getNextFrameNoDemux();
   } catch (const VideoDecoder::EndOfFileException& e) {
@@ -240,22 +240,22 @@ OpsDecodedOutput get_next_frame(at::Tensor& decoder) {
         "image_size is unexpected. Expected 3, got: " +
         std::to_string(result.frame.sizes().size()));
   }
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
-OpsDecodedOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
+OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramePlayedAtTimestampNoDemux(seconds);
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
-OpsDecodedOutput get_frame_at_index(
+OpsFrameOutput get_frame_at_index(
     at::Tensor& decoder,
     int64_t stream_index,
     int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(stream_index, frame_index);
-  return makeOpsDecodedOutput(result);
+  return makeOpsFrameOutput(result);
 }
 
 OpsFrameBatchOutput get_frames_at_indices(
