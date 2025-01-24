@@ -92,6 +92,8 @@ class AutoAVPacket {
 
  public:
   AutoAVPacket();
+  AutoAVPacket(const AutoAVPacket& other) = delete;
+  AutoAVPacket& operator=(const AutoAVPacket& other) = delete;
   ~AutoAVPacket();
 };
 
@@ -100,7 +102,9 @@ class ReferenceAVPacket {
   AVPacket* avPacket_;
 
  public:
-  ReferenceAVPacket(AutoAVPacket& shared);
+  explicit ReferenceAVPacket(AutoAVPacket& shared);
+  ReferenceAVPacket(const ReferenceAVPacket& other) = delete;
+  ReferenceAVPacket& operator=(const ReferenceAVPacket& other) = delete;
   ~ReferenceAVPacket();
   AVPacket* get();
   AVPacket* operator->();
