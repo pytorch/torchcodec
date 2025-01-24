@@ -275,10 +275,9 @@ class VideoDecoder {
   void resetDecodeStats();
 
  private:
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
-  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
-
+  // --------------------------------------------------------------------------
+  // STREAMINFO AND ASSOCIATED STRUCTS
+  // --------------------------------------------------------------------------
   struct FrameInfo {
     int64_t pts = 0;
     // The value of this default is important: the last frame's nextPts will be
@@ -305,73 +304,117 @@ class VideoDecoder {
     bool operator!=(const DecodedFrameContext&);
   };
 
-  // Stores information for each stream.
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
-    // The current position of the cursor in the stream.
+
+    // The FrameInfo indices we built when scanFileAndUpdateMetadataAndIndex was
+    // called.
+    std::vector<FrameInfo> keyFrames;
+    std::vector<FrameInfo> allFrames;
+
+    // The current position of the cursor in the stream, and associated frame
+    // duration.
     int64_t currentPts = 0;
     int64_t currentDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
-    // We update this field if the user requested a seek.
+    // We update this field if the user requested a seek. This typically
+    // corresponds to the decoder's desiredPts_ attribute.
     int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamOptions videoStreamOptions;
-    // The filter state associated with this stream (for video streams). The
-    // actual graph will be nullptr for inactive streams.
-    FilterGraphContext filterGraphContext;
+
+    // color-conversion fields. Only one of FilterGraphContextr and
+    // UniqueSwsContext should be non-null.
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
-    std::vector<FrameInfo> keyFrames;
-    std::vector<FrameInfo> allFrames;
-    DecodedFrameContext prevFrameContext;
+    FilterGraphContext filterGraphContext;
     UniqueSwsContext swsContext;
+
+    // Used to know whether a new FilterGraphContext or UniqueSwsContext should
+    // be created before decoding a new frame.
+    DecodedFrameContext prevFrameContext;
   };
 
-  // Returns the key frame index of the presentation timestamp using FFMPEG's
-  // index. Note that this index may be truncated for some files.
-  int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
-      const;
-  // Returns the key frame index of the presentation timestamp using our index.
-  // We build this index by scanning the file in buildKeyFrameIndex().
-  int getKeyFrameIndexForPtsUsingScannedIndex(
-      const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-      int64_t pts) const;
-  int getKeyFrameIndexForPts(const StreamInfo& stream, int64_t pts) const;
+  // --------------------------------------------------------------------------
+  // CONSTRUCTORS AND INITIALIZERS
+  // --------------------------------------------------------------------------
+  // Don't use those, use the static methods to create a decoder object.
+
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
+  void initializeDecoder();
+  void updateMetadataWithCodecContext(
+      int streamIndex,
+      AVCodecContext* codecContext);
+
+  // --------------------------------------------------------------------------
+  // DECODING APIS AND RELATED UTILS
+  // --------------------------------------------------------------------------
+
   bool canWeAvoidSeekingForStream(
       const StreamInfo& stream,
       int64_t currentPts,
       int64_t targetPts) const;
-  // Returns the "best" stream index for a given media type. The "best" is
-  // determined by various heuristics in FFMPEG.
-  // See
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga757780d38f482deb4d809c6c521fbcc2
-  // for more details about the heuristics.
-  int getBestStreamIndex(AVMediaType mediaType);
-  void initializeDecoder();
-  void validateUserProvidedStreamIndex(int streamIndex);
-  void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
 
-  // Creates and initializes a filter graph for a stream. The filter graph can
-  // do rescaling and color conversion.
+  void maybeSeekToBeforeDesiredPts();
+
+  AVFrameStream getAVFrameUsingFilterFunction(
+      std::function<bool(int, AVFrame*)>);
+
+  FrameOutput getNextFrameNoDemuxInternal(
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+
+  FrameOutput convertAVFrameToFrameOutput(
+      AVFrameStream& avFrameStream,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  void convertAVFrameToFrameOutputOnCPU(
+      AVFrameStream& avFrameStream,
+      FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
+      int streamIndex,
+      const AVFrame* avFrame);
+
+  int convertAVFrameToTensorUsingSwsScale(
+      int streamIndex,
+      const AVFrame* avFrame,
+      torch::Tensor& outputTensor);
+
+  // --------------------------------------------------------------------------
+  // COLOR CONVERSION LIBRARIES HANDLERS CREATION
+  // --------------------------------------------------------------------------
+
   void createFilterGraph(
       StreamInfo& streamInfo,
       int expectedOutputHeight,
       int expectedOutputWidth);
 
-  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+  void createSwsContext(
+      StreamInfo& streamInfo,
+      const DecodedFrameContext& frameContext,
+      const enum AVColorSpace colorspace);
 
-  int64_t getPts(
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
+  // --------------------------------------------------------------------------
+  // PTS <-> INDEX CONVERSIONS
+  // --------------------------------------------------------------------------
 
-  double getMinSeconds(const StreamMetadata& streamMetadata);
-  double getMaxSeconds(const StreamMetadata& streamMetadata);
+  int getKeyFrameIndexForPts(const StreamInfo& stream, int64_t pts) const;
+
+  // Returns the key frame index of the presentation timestamp using our index.
+  // We build this index by scanning the file in
+  // scanFileAndUpdateMetadataAndIndex
+  int getKeyFrameIndexForPtsUsingScannedIndex(
+      const std::vector<VideoDecoder::FrameInfo>& keyFrames,
+      int64_t pts) const;
+  // Return key frame index, from FFmpeg. Potentially less accurate
+  int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
+      const;
 
   int64_t secondsToIndexLowerBound(
       double seconds,
@@ -383,39 +426,41 @@ class VideoDecoder {
       const StreamInfo& streamInfo,
       const StreamMetadata& streamMetadata);
 
-  void createSwsContext(
-      StreamInfo& streamInfo,
-      const DecodedFrameContext& frameContext,
-      const enum AVColorSpace colorspace);
+  int64_t getPts(
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
 
-  void maybeSeekToBeforeDesiredPts();
+  // --------------------------------------------------------------------------
+  // STREAM AND METADATA APIS
+  // --------------------------------------------------------------------------
 
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
-  // Once we create a decoder can update the metadata with the codec context.
-  // For example, for video streams, we can add the height and width of the
-  // decoded stream.
-  void updateMetadataWithCodecContext(
-      int streamIndex,
-      AVCodecContext* codecContext);
-  void populateVideoMetadataFromStreamIndex(int streamIndex);
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      int streamIndex,
-      const AVFrame* avFrame);
-  int convertAVFrameToTensorUsingSwsScale(
-      int streamIndex,
-      const AVFrame* avFrame,
-      torch::Tensor& outputTensor);
-  FrameOutput convertAVFrameToFrameOutput(
-      AVFrameStream& avFrameStream,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
-  void convertAVFrameToFrameOutputOnCPU(
-      AVFrameStream& avFrameStream,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  // Returns the "best" stream index for a given media type. The "best" is
+  // determined by various heuristics in FFMPEG.
+  // See
+  // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga757780d38f482deb4d809c6c521fbcc2
+  // for more details about the heuristics.
+  // Returns the key frame index of the presentation timestamp using FFMPEG's
+  // index. Note that this index may be truncated for some files.
+  int getBestStreamIndex(AVMediaType mediaType);
 
-  FrameOutput getNextFrameNoDemuxInternal(
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+  double getMinSeconds(const StreamMetadata& streamMetadata);
+  double getMaxSeconds(const StreamMetadata& streamMetadata);
+
+  // --------------------------------------------------------------------------
+  // VALIDATION UTILS
+  // --------------------------------------------------------------------------
+
+  void validateUserProvidedStreamIndex(int streamIndex);
+  void validateScannedAllStreams(const std::string& msg);
+  void validateFrameIndex(
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
+
+  // --------------------------------------------------------------------------
+  // ATTRIBUTES
+  // --------------------------------------------------------------------------
 
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
@@ -427,7 +472,6 @@ class VideoDecoder {
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
   std::optional<double> desiredPtsSeconds_;
-
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
