@@ -803,7 +803,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameStream VideoDecoder::getAVFrameUsingFilterFunction(
+VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
     std::function<bool(int, AVFrame*)> filter) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
@@ -1103,8 +1103,8 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
   }
 
   setCursorPtsInSeconds(seconds);
-  AVFrameStream avFrameStream = getAVFrameUsingFilterFunction(
-      [seconds, this](int frameStreamIndex, AVFrame* avFrame) {
+  AVFrameStream avFrameStream =
+      filteredDecode([seconds, this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
         double frameEndTime = ptsToSeconds(
@@ -1504,8 +1504,8 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrameStream avFrameStream = getAVFrameUsingFilterFunction(
-      [this](int frameStreamIndex, AVFrame* avFrame) {
+  AVFrameStream avFrameStream =
+      filteredDecode([this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });

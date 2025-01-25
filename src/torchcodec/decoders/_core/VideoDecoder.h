@@ -404,8 +404,7 @@ class VideoDecoder {
       const enum AVColorSpace colorspace);
 
   void maybeSeekToBeforeDesiredPts();
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
+  AVFrameStream filteredDecode(std::function<bool(int, AVFrame*)>);
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
