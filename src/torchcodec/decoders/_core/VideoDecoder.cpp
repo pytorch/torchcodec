@@ -827,7 +827,7 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
     frameStreamIndex = -1;
     bool gotPermanentErrorOnAnyActiveStream = false;
 
-    // Get a frame on an active stream
+    // Get a frame on an active stream.
     for (int streamIndex : activeStreamIndices_) {
       StreamInfo& streamInfo = streamInfos_[streamIndex];
       ffmpegStatus =
@@ -839,7 +839,7 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
         break;
       }
 
-      // Found one.
+      // Found one!
       if (ffmpegStatus == AVSUCCESS) {
         frameStreamIndex = streamIndex;
         break;
@@ -854,14 +854,14 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
 
     // Is this the kind of frame we're looking for?
     if (ffmpegStatus == AVSUCCESS && filter(frameStreamIndex, avFrame.get())) {
-      // Yes, this is the frame we'll return.
+      // Yes, this is the frame we'll return; break out of the decoding loop.
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
       // No, but we received a valid frame - just not the kind we're looking
       // for. The logic below will read packets and send them to the decoder.
       // But since we did just receive a frame, we should skip reading more
-      // packets and sending them to the decoder and just try to get more frames
-      // from the decoder
+      // packets and sending them to the decoder and just try to receive more
+      // frames from the decoder.
       continue;
     }
 
@@ -876,6 +876,7 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
     ReferenceAVPacket packet(autoAVPacket);
     ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
     decodeStats_.numPacketsRead++;
+
     if (ffmpegStatus == AVERROR_EOF) {
       // End of file reached. We must drain all codecs by sending a nullptr
       // packet.
@@ -890,6 +891,10 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
               getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
         }
       }
+
+      // We've reached the end of file so we can't read any more packets from
+      // it, but the decoder may still have frames to read in its buffer.
+      // Continue iterating to try reading frames.
       reachedEOF = true;
       continue;
     }
