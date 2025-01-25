@@ -179,6 +179,9 @@ class VideoDecoder {
     UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
+
+    explicit AVFrameStream(UniqueAVFrame&& a, int s)
+        : avFrame(std::move(a)), streamIndex(s) {}
   };
 
   struct FrameOutput {
