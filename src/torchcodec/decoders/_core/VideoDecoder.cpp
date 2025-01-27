@@ -803,8 +803,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   }
 }
 
-VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
-    std::function<bool(int, AVFrame*)> filter) {
+VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
+    std::function<bool(int, AVFrame*)> filterFunction) {
   if (activeStreamIndices_.size() == 0) {
     throw std::runtime_error("No active streams configured.");
   }
@@ -827,19 +827,19 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
     frameStreamIndex = -1;
     bool gotPermanentErrorOnAnyActiveStream = false;
 
-    // Get a frame on an active stream.
+    // Get a frame on an active stream. Note that we don't know ahead of time
+    // which streams have frames to receive, so we linearly try the active
+    // streams.
     for (int streamIndex : activeStreamIndices_) {
       StreamInfo& streamInfo = streamInfos_[streamIndex];
       ffmpegStatus =
           avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
 
-      // Did we hit any non-retryable errors?
       if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
         gotPermanentErrorOnAnyActiveStream = true;
         break;
       }
 
-      // Found one!
       if (ffmpegStatus == AVSUCCESS) {
         frameStreamIndex = streamIndex;
         break;
@@ -853,7 +853,8 @@ VideoDecoder::AVFrameStream VideoDecoder::filteredDecode(
     decodeStats_.numFramesReceivedByDecoder++;
 
     // Is this the kind of frame we're looking for?
-    if (ffmpegStatus == AVSUCCESS && filter(frameStreamIndex, avFrame.get())) {
+    if (ffmpegStatus == AVSUCCESS &&
+        filterFunction(frameStreamIndex, avFrame.get())) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
@@ -1109,7 +1110,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
 
   setCursorPtsInSeconds(seconds);
   AVFrameStream avFrameStream =
-      filteredDecode([seconds, this](int frameStreamIndex, AVFrame* avFrame) {
+      decodeAVFrame([seconds, this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& streamInfo = streamInfos_[frameStreamIndex];
         double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
         double frameEndTime = ptsToSeconds(
@@ -1510,7 +1511,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   AVFrameStream avFrameStream =
-      filteredDecode([this](int frameStreamIndex, AVFrame* avFrame) {
+      decodeAVFrame([this](int frameStreamIndex, AVFrame* avFrame) {
         StreamInfo& activeStreamInfo = streamInfos_[frameStreamIndex];
         return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
       });
