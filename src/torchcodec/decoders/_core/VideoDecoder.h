@@ -29,6 +29,9 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
+
   // Creates a VideoDecoder from the video at videoFilePath.
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath,
@@ -278,8 +281,6 @@ class VideoDecoder {
   void resetDecodeStats();
 
  private:
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
   torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
   struct FrameInfo {
