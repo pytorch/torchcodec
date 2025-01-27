@@ -29,6 +29,9 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
+
   // Creates a VideoDecoder from the video at videoFilePath.
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath,
@@ -247,6 +250,9 @@ class VideoDecoder {
     UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
+
+    explicit AVFrameStream(UniqueAVFrame&& a, int s)
+        : avFrame(std::move(a)), streamIndex(s) {}
   };
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
@@ -275,8 +281,6 @@ class VideoDecoder {
   void resetDecodeStats();
 
  private:
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
   torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
 
   struct FrameInfo {
@@ -390,8 +394,9 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
+  AVFrameStream decodeAVFrame(
+      std::function<bool(int, AVFrame*)> filterFunction);
+
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
