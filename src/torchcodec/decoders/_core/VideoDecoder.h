@@ -100,6 +100,8 @@ class VideoDecoder {
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
+  std::vector<int64_t> getKeyFrameIndices(int streamIndex);
+
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------

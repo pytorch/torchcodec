@@ -553,6 +553,20 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
 
+std::vector<int64_t> VideoDecoder::getKeyFrameIndices(int streamIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getKeyFrameIndices");
+
+  std::vector<int64_t> keyFrameIndices;
+  const StreamInfo& streamInfo = streamInfos_[streamIndex];
+  for (const FrameInfo& frameInfo : streamInfo.keyFrames) {
+    keyFrameIndices.push_back(
+        getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, frameInfo.pts));
+  }
+
+  return keyFrameIndices;
+}
+
 int VideoDecoder::getKeyFrameIndexForPtsUsingEncoderIndex(
     AVStream* stream,
     int64_t pts) const {
