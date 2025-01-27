@@ -257,7 +257,9 @@ def get_frames_by_pts_in_range_abstract(
 
 
 @register_fake("torchcodec_ns::get_key_frame_indices")
-def get_key_frame_indices_abstract(decoder: torch.Tensor, *, stream_index: int) -> List[int]:
+def get_key_frame_indices_abstract(
+    decoder: torch.Tensor, *, stream_index: int
+) -> List[int]:
     return []
 
 

@@ -560,8 +560,8 @@ std::vector<int64_t> VideoDecoder::getKeyFrameIndices(int streamIndex) {
   std::vector<int64_t> keyFrameIndices;
   const StreamInfo& streamInfo = streamInfos_[streamIndex];
   for (const FrameInfo& frameInfo : streamInfo.keyFrames) {
-    keyFrameIndices.push_back(
-        getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, frameInfo.pts));
+    keyFrameIndices.push_back(getKeyFrameIndexForPtsUsingScannedIndex(
+        streamInfo.keyFrames, frameInfo.pts));
   }
 
   return keyFrameIndices;
