@@ -247,6 +247,9 @@ class VideoDecoder {
     UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
+
+    explicit AVFrameStream(UniqueAVFrame&& a, int s)
+        : avFrame(std::move(a)), streamIndex(s) {}
   };
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
@@ -390,8 +393,9 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
+  AVFrameStream decodeAVFrame(
+      std::function<bool(int, AVFrame*)> filterFunction);
+
   // Once we create a decoder can update the metadata with the codec context.
   // For example, for video streams, we can add the height and width of the
   // decoded stream.
