@@ -29,6 +29,9 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
+  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
+  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
+
   // Creates a VideoDecoder from the video at videoFilePath.
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath,
@@ -247,6 +250,9 @@ class VideoDecoder {
     UniqueAVFrame avFrame;
     // The stream index of the decoded frame.
     int streamIndex;
+
+    explicit AVFrameStream(UniqueAVFrame&& a, int s)
+        : avFrame(std::move(a)), streamIndex(s) {}
   };
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
@@ -278,6 +284,7 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // STREAMINFO AND ASSOCIATED STRUCTS
   // --------------------------------------------------------------------------
+
   struct FrameInfo {
     int64_t pts = 0;
     // The value of this default is important: the last frame's nextPts will be
@@ -326,10 +333,10 @@ class VideoDecoder {
     int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamOptions videoStreamOptions;
 
-    // color-conversion fields. Only one of FilterGraphContextr and
+    // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
-    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     FilterGraphContext filterGraphContext;
+    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     UniqueSwsContext swsContext;
 
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
@@ -338,12 +345,9 @@ class VideoDecoder {
   };
 
   // --------------------------------------------------------------------------
-  // CONSTRUCTORS AND INITIALIZERS
+  // INITIALIZERS
   // --------------------------------------------------------------------------
-  // Don't use those, use the static methods to create a decoder object.
 
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
   void initializeDecoder();
   void updateMetadataWithCodecContext(
       int streamIndex,
@@ -360,8 +364,8 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
+  AVFrameStream decodeAVFrame(
+      std::function<bool(int, AVFrame*)> filterFunction);
 
   FrameOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -434,6 +438,8 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
+
+  void populateVideoMetadataFromStreamIndex(int streamIndex);
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
