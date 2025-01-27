@@ -364,8 +364,7 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream decodeAVFrame(
-      std::function<bool(int, AVFrame*)> filterFunction);
+  AVFrameStream decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
 
   FrameOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -472,9 +471,7 @@ class VideoDecoder {
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streamInfos_;
-  // Stores the stream indices of the active streams, i.e. the streams we are
-  // decoding and returning to the user.
-  std::set<int> activeStreamIndices_;
+  int activeStreamIndex_ = -1;
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
   std::optional<double> desiredPtsSeconds_;
