@@ -293,7 +293,7 @@ class VideoDecoder {
     int64_t nextPts = INT64_MAX;
   };
 
-  struct FilterState {
+  struct FilterGraphContext {
     UniqueAVFilterGraph filterGraph;
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
@@ -325,7 +325,7 @@ class VideoDecoder {
     VideoStreamOptions videoStreamOptions;
     // The filter state associated with this stream (for video streams). The
     // actual graph will be nullptr for inactive streams.
-    FilterState filterState;
+    FilterGraphContext filterGraphContext;
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
