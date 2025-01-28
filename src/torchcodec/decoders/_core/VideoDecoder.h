@@ -416,9 +416,6 @@ class VideoDecoder {
   int getKeyFrameIndexForPtsUsingScannedIndex(
       const std::vector<VideoDecoder::FrameInfo>& keyFrames,
       int64_t pts) const;
-  // Return key frame index, from FFmpeg. Potentially less accurate
-  int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
-      const;
 
   int64_t secondsToIndexLowerBound(
       double seconds,

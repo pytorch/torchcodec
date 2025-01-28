@@ -553,14 +553,6 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
 
-int VideoDecoder::getKeyFrameIndexForPtsUsingEncoderIndex(
-    AVStream* stream,
-    int64_t pts) const {
-  int currentKeyFrameIndex =
-      av_index_search_timestamp(stream, pts, AVSEEK_FLAG_BACKWARD);
-  return currentKeyFrameIndex;
-}
-
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
     const std::vector<VideoDecoder::FrameInfo>& keyFrames,
     int64_t pts) const {
@@ -683,9 +675,11 @@ int VideoDecoder::getKeyFrameIndexForPts(
     const StreamInfo& streamInfo,
     int64_t pts) const {
   if (streamInfo.keyFrames.empty()) {
-    return getKeyFrameIndexForPtsUsingEncoderIndex(streamInfo.stream, pts);
+    return av_index_search_timestamp(
+        streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
+  } else {
+    return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
   }
-  return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
 }
 
 /*
