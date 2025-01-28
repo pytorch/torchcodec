@@ -137,6 +137,8 @@ bool _test_frame_pts_equality(
     int64_t frame_index,
     double pts_seconds_to_test);
 
+torch::Tensor _get_key_frame_indices(at::Tensor& decoder, int64_t stream_index);
+
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
 
