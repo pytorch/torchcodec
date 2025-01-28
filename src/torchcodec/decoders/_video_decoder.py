@@ -186,7 +186,7 @@ class VideoDecoder:
         )
 
     def _get_key_frame_indices(self) -> list[int]:
-        return core.get_key_frame_indices(self._decoder, stream_index=self.stream_index)
+        return core._get_key_frame_indices(self._decoder, stream_index=self.stream_index)
 
     def get_frame_at(self, index: int) -> Frame:
         """Return a single frame at the given index.

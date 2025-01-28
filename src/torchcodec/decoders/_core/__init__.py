@@ -13,6 +13,7 @@ from ._metadata import (
 )
 from .video_decoder_ops import (
     _add_video_stream,
+    _get_key_frame_indices,
     _test_frame_pts_equality,
     add_video_stream,
     create_from_bytes,
@@ -26,7 +27,6 @@ from .video_decoder_ops import (
     get_frames_by_pts_in_range,
     get_frames_in_range,
     get_json_metadata,
-    get_key_frame_indices,
     get_next_frame,
     scan_all_streams_to_update_metadata,
     seek_to_pts,

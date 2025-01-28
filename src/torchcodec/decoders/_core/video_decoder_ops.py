@@ -77,12 +77,12 @@ get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_by_pts = torch.ops.torchcodec_ns.get_frames_by_pts.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
-get_key_frame_indices = torch.ops.torchcodec_ns.get_key_frame_indices.default
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 _test_frame_pts_equality = torch.ops.torchcodec_ns._test_frame_pts_equality.default
 _get_container_json_metadata = (
     torch.ops.torchcodec_ns.get_container_json_metadata.default
 )
+_get_key_frame_indices = torch.ops.torchcodec_ns._get_key_frame_indices.default
 scan_all_streams_to_update_metadata = (
     torch.ops.torchcodec_ns.scan_all_streams_to_update_metadata.default
 )
@@ -256,7 +256,7 @@ def get_frames_by_pts_in_range_abstract(
     )
 
 
-@register_fake("torchcodec_ns::get_key_frame_indices")
+@register_fake("torchcodec_ns::_get_key_frame_indices")
 def get_key_frame_indices_abstract(
     decoder: torch.Tensor, *, stream_index: int
 ) -> List[int]:
