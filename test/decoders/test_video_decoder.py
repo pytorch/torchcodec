@@ -835,9 +835,23 @@ class TestVideoDecoder:
     def test_get_key_frame_indices(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode="exact")
         key_frame_indices = decoder._get_key_frame_indices()
-        size = key_frame_indices.size()
-        assert size[0] > 0
-        assert len(size) == 1
+
+        # The key frame indices were generated from the following command:
+        #   $ ffprobe -v error -hide_banner -select_streams v:1 -show_frames -of csv test/resources/nasa_13013.mp4 | grep -n ",I," | cut -d ':' -f 1 > key_frames.txt
+        # What it's doing:
+        #   1. Calling ffprobe on the second video stream, which is absolute stream index 3.
+        #   2. Showing all frames for that stream.
+        #   3. Using grep to find and count the "I" frames, which are the key frames.
+        #   4. Using cut to extract just the count for the frame.
+        # Finally, because the above produces a count, which is index + 1, we subtract
+        # one from all values manually to arrive at the values below.
+        # TODO: decide if/how we want to incorporate key frame indices into the utils
+        # framework.
+        reference_key_frame_indices = torch.tensor([0, 240])
+
+        torch.testing.assert_close(
+            key_frame_indices, reference_key_frame_indices, atol=0, rtol=0
+        )
 
 
 if __name__ == "__main__":

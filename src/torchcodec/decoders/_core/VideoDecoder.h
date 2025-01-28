@@ -291,12 +291,19 @@ class VideoDecoder {
 
   struct FrameInfo {
     int64_t pts = 0;
-    // The value of this default is important: the last frame's nextPts will be
-    // INT64_MAX, which ensures that the allFrames vec contains FrameInfo
-    // structs with *increasing* nextPts values. That's a necessary condition
-    // for the binary searches on those values to work properly (as typically
-    // done during pts -> index conversions.)
+
+    // The value of the nextPts default is important: the last frame's nextPts
+    // will be INT64_MAX, which ensures that the allFrames vec contains
+    // FrameInfo structs with *increasing* nextPts values. That's a necessary
+    // condition for the binary searches on those values to work properly (as
+    // typically done during pts -> index conversions).
     int64_t nextPts = INT64_MAX;
+
+    // Note that frameIndex is ALWAYS the index into all of the frames in that
+    // stream, even when the FrameInfo is part of the key frame index. Given a
+    // FrameInfo for a key frame, the frameIndex allows us to know which frame
+    // that is in the stream.
+    int64_t frameIndex = 0;
   };
 
   struct FilterGraphContext {
