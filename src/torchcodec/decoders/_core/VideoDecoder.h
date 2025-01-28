@@ -16,30 +16,7 @@
 
 namespace facebook::torchcodec {
 
-/*
-The VideoDecoder class can be used to decode video frames to Tensors.
-
-Example usage of this class:
-std::string video_file_path = "/path/to/video.mp4";
-VideoDecoder video_decoder = VideoDecoder::createFromFilePath(video_file_path);
-
-// After creating the decoder, we can query the metadata:
-auto metadata = video_decoder.getContainerMetadata();
-
-// We can also add streams to the decoder:
-// -1 sets the default stream.
-video_decoder.addVideoStreamDecoder(-1);
-
-// API for seeking and frame extraction:
-// Let's extract the first frame at or after pts=5.0 seconds.
-video_decoder.setCursorPtsInSeconds(5.0);
-auto output = video_decoder->getNextFrameOutput();
-torch::Tensor frame = output.frame;
-double presentation_timestamp = output.ptsSeconds;
-// Note that presentation_timestamp can be any timestamp at 5.0 or above
-// because the frame time may not align exactly with the seek time.
-CHECK_GE(presentation_timestamp, 5.0);
-*/
+// The VideoDecoder class can be used to decode video frames to Tensors.
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
 class VideoDecoder {
@@ -52,17 +29,16 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
-  // Creates a VideoDecoder from the video at videoFilePath.
   explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-
-  // Creates a VideoDecoder from a given buffer. Note that the buffer is not
-  // owned by the VideoDecoder.
   explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
 
+  // Creates a VideoDecoder from the video at videoFilePath.
   static std::unique_ptr<VideoDecoder> createFromFilePath(
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
+  // Creates a VideoDecoder from a given buffer. Note that the buffer is not
+  // owned by the VideoDecoder.
   static std::unique_ptr<VideoDecoder> createFromBuffer(
       const void* buffer,
       size_t length,
@@ -71,8 +47,10 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // VIDEO METADATA QUERY API
   // --------------------------------------------------------------------------
+
   // Updates the metadata of the video to accurate values obtained by scanning
-  // the contents of the video file.
+  // the contents of the video file. Also updates each StreamInfo's index, i.e.
+  // the allFrames and keyFrames vectors.
   void scanFileAndUpdateMetadataAndIndex();
 
   struct StreamMetadata {
@@ -88,7 +66,6 @@ class VideoDecoder {
     std::optional<int64_t> numKeyFrames;
     std::optional<double> averageFps;
     std::optional<double> bitRate;
-    std::optional<std::vector<int64_t>> keyFrames;
 
     // More accurate duration, obtained by scanning the file.
     // These presentation timestamps are in time base.
@@ -126,6 +103,7 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
+
   enum ColorConversionLibrary {
     // TODO: Add an AUTO option later.
     // Use the libavfilter library for color conversion.
@@ -164,39 +142,26 @@ class VideoDecoder {
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
-  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+  // --------------------------------------------------------------------------
+  // DECODING AND SEEKING APIs
+  // --------------------------------------------------------------------------
 
-  // ---- SINGLE FRAME SEEK AND DECODING API ----
-  // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameNoDemuxInternal() will return the first frame at
-  // or after this position.
-  void setCursorPtsInSeconds(double seconds);
-
-  // This structure ensures we always keep the streamIndex and AVFrame together
-  // Note that AVFrame itself doesn't retain the streamIndex.
-  struct AVFrameStream {
-    // The actual decoded output as a unique pointer to an AVFrame.
-    UniqueAVFrame avFrame;
-    // The stream index of the decoded frame.
-    int streamIndex;
-  };
-
+  // All public decoding entry points return either a FrameOutput or a
+  // FrameBatchOutput.
+  // They are the equivalent of the user-facing Frame and FrameBatch classes in
+  // Python. They contain RGB decoded frames along with some associated data
+  // like PTS and duration.
   struct FrameOutput {
-    // The actual decoded output as a Tensor.
-    torch::Tensor data;
-    // The stream index of the decoded frame. Used to distinguish
-    // between streams that are of the same type.
+    torch::Tensor data; // 3D: of shape CHW or HWC.
     int streamIndex;
-    // The presentation timestamp of the decoded frame in seconds.
     double ptsSeconds;
-    // The duration of the decoded frame in seconds.
     double durationSeconds;
   };
 
   struct FrameBatchOutput {
-    torch::Tensor data;
-    torch::Tensor ptsSeconds;
-    torch::Tensor durationSeconds;
+    torch::Tensor data; // 4D: of shape NCHW or NHWC.
+    torch::Tensor ptsSeconds; // 1D of shape (N,)
+    torch::Tensor durationSeconds; // 1D of shape (N,)
 
     explicit FrameBatchOutput(
         int64_t numFrames,
@@ -204,15 +169,29 @@ class VideoDecoder {
         const StreamMetadata& streamMetadata);
   };
 
-  class EndOfFileException : public std::runtime_error {
-   public:
-    explicit EndOfFileException(const std::string& msg)
-        : std::runtime_error(msg) {}
-  };
+  // Places the cursor at the first frame on or after the position in seconds.
+  // Calling getNextFrameNoDemux() will return the first frame at
+  // or after this position.
+  void setCursorPtsInSeconds(double seconds);
 
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
   FrameOutput getNextFrameNoDemux();
+
+  FrameOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+
+  // Returns frames at the given indices for a given stream as a single stacked
+  // Tensor.
+  FrameBatchOutput getFramesAtIndices(
+      int streamIndex,
+      const std::vector<int64_t>& frameIndices);
+
+  // Returns frames within a given range. The range is defined by [start, stop).
+  // The values retrieved from the range are: [start, start+step,
+  // start+(2*step), start+(3*step), ..., stop). The default for step is 1.
+  FrameBatchOutput
+  getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
+
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
   // duration. For example, if a frame has presentation timestamp of 5.0s and a
@@ -221,36 +200,13 @@ class VideoDecoder {
   // seconds=5.999, etc.
   FrameOutput getFramePlayedAtNoDemux(double seconds);
 
-  FrameOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
-  // This is morally private but needs to be exposed for C++ tests. Once
-  // getFrameAtIndex supports the preAllocatedOutputTensor parameter, we can
-  // move it back to private.
-  FrameOutput getFrameAtIndexInternal(
-      int streamIndex,
-      int64_t frameIndex,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
-
-  // Returns frames at the given indices for a given stream as a single stacked
-  // Tensor.
-  FrameBatchOutput getFramesAtIndices(
-      int streamIndex,
-      const std::vector<int64_t>& frameIndices);
-
   FrameBatchOutput getFramesPlayedAt(
       int streamIndex,
       const std::vector<double>& timestamps);
 
-  // Returns frames within a given range for a given stream as a single stacked
-  // Tensor. The range is defined by [start, stop). The values retrieved from
-  // the range are:
-  //    [start, start+step, start+(2*step), start+(3*step), ..., stop)
-  // The default for step is 1.
-  FrameBatchOutput
-  getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
-
-  // Returns frames within a given pts range for a given stream as a single
-  // stacked tensor. The range is defined by [startSeconds, stopSeconds) with
-  // respect to the pts values for frames. The returned frames are in pts order.
+  // Returns frames within a given pts range. The range is defined by
+  // [startSeconds, stopSeconds) with respect to the pts values for frames. The
+  // returned frames are in pts order.
   //
   // Note that while stopSeconds is excluded in the half open range, this really
   // only makes a difference when stopSeconds is exactly the pts value for a
@@ -270,11 +226,47 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
-  // --------------------------------------------------------------------------
-  // DECODER PERFORMANCE STATISTICS API
-  // --------------------------------------------------------------------------
+  class EndOfFileException : public std::runtime_error {
+   public:
+    explicit EndOfFileException(const std::string& msg)
+        : std::runtime_error(msg) {}
+  };
 
-  // Only exposed for performance testing.
+  // --------------------------------------------------------------------------
+  // MORALLY PRIVATE APIS
+  // --------------------------------------------------------------------------
+  // These are APIs that should be private, but that are effectively exposed for
+  // practical reasons, typically for testing purposes.
+
+  // This struct is needed because AVFrame doesn't retain the streamIndex. Only
+  // the AVPacket knows its stream. This is what the low-level private decoding
+  // entry points return. The AVFrameStream is then converted to a FrameOutput
+  // with convertAVFrameToFrameOutput. It should be private, but is currently
+  // used by DeviceInterface.
+  struct AVFrameStream {
+    // The actual decoded output as a unique pointer to an AVFrame.
+    // Usually, this is a YUV frame. It'll be converted to RGB in
+    // convertAVFrameToFrameOutput.
+    UniqueAVFrame avFrame;
+    // The stream index of the decoded frame.
+    int streamIndex;
+
+    explicit AVFrameStream(UniqueAVFrame&& a, int s)
+        : avFrame(std::move(a)), streamIndex(s) {}
+  };
+
+  // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
+  // can move it back to private.
+  FrameOutput getFrameAtIndexInternal(
+      int streamIndex,
+      int64_t frameIndex,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  // Exposed for _test_frame_pts_equality, which is used to test non-regression
+  // of pts resolution (64 to 32 bit floats)
+  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+
+  // Exposed for performance testing.
   struct DecodeStats {
     int64_t numSeeksAttempted = 0;
     int64_t numSeeksDone = 0;
@@ -288,9 +280,11 @@ class VideoDecoder {
   DecodeStats getDecodeStats() const;
   void resetDecodeStats();
 
-  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
-
  private:
+  // --------------------------------------------------------------------------
+  // STREAMINFO AND ASSOCIATED STRUCTS
+  // --------------------------------------------------------------------------
+
   struct FrameInfo {
     int64_t pts = 0;
     // The value of this default is important: the last frame's nextPts will be
@@ -301,7 +295,7 @@ class VideoDecoder {
     int64_t nextPts = INT64_MAX;
   };
 
-  struct FilterState {
+  struct FilterGraphContext {
     UniqueAVFilterGraph filterGraph;
     AVFilterContext* sourceContext = nullptr;
     AVFilterContext* sinkContext = nullptr;
@@ -317,73 +311,114 @@ class VideoDecoder {
     bool operator!=(const DecodedFrameContext&);
   };
 
-  // Stores information for each stream.
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
-    // The current position of the cursor in the stream.
+
+    // The FrameInfo indices we built when scanFileAndUpdateMetadataAndIndex was
+    // called.
+    std::vector<FrameInfo> keyFrames;
+    std::vector<FrameInfo> allFrames;
+
+    // The current position of the cursor in the stream, and associated frame
+    // duration.
     int64_t currentPts = 0;
     int64_t currentDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
-    // We update this field if the user requested a seek.
+    // We update this field if the user requested a seek. This typically
+    // corresponds to the decoder's desiredPts_ attribute.
     int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamOptions videoStreamOptions;
-    // The filter state associated with this stream (for video streams). The
-    // actual graph will be nullptr for inactive streams.
-    FilterState filterState;
+
+    // color-conversion fields. Only one of FilterGraphContext and
+    // UniqueSwsContext should be non-null.
+    FilterGraphContext filterGraphContext;
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
-    std::vector<FrameInfo> keyFrames;
-    std::vector<FrameInfo> allFrames;
-    DecodedFrameContext prevFrameContext;
     UniqueSwsContext swsContext;
+
+    // Used to know whether a new FilterGraphContext or UniqueSwsContext should
+    // be created before decoding a new frame.
+    DecodedFrameContext prevFrameContext;
   };
 
-  // Returns the key frame index of the presentation timestamp using FFMPEG's
-  // index. Note that this index may be truncated for some files.
-  int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
-      const;
-  // Returns the key frame index of the presentation timestamp using our index.
-  // We build this index by scanning the file in buildKeyFrameIndex().
-  int getKeyFrameIndexForPtsUsingScannedIndex(
-      const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-      int64_t pts) const;
-  int getKeyFrameIndexForPts(const StreamInfo& stream, int64_t pts) const;
+  // --------------------------------------------------------------------------
+  // INITIALIZERS
+  // --------------------------------------------------------------------------
+
+  void initializeDecoder();
+  void updateMetadataWithCodecContext(
+      int streamIndex,
+      AVCodecContext* codecContext);
+
+  // --------------------------------------------------------------------------
+  // DECODING APIS AND RELATED UTILS
+  // --------------------------------------------------------------------------
+
   bool canWeAvoidSeekingForStream(
       const StreamInfo& stream,
       int64_t currentPts,
       int64_t targetPts) const;
-  // Returns the "best" stream index for a given media type. The "best" is
-  // determined by various heuristics in FFMPEG.
-  // See
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga757780d38f482deb4d809c6c521fbcc2
-  // for more details about the heuristics.
-  int getBestStreamIndex(AVMediaType mediaType);
-  void initializeDecoder();
-  void validateUserProvidedStreamIndex(int streamIndex);
-  void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
 
-  // Creates and initializes a filter graph for a stream. The filter graph can
-  // do rescaling and color conversion.
+  void maybeSeekToBeforeDesiredPts();
+
+  AVFrameStream decodeAVFrame(
+      std::function<bool(int, AVFrame*)> filterFunction);
+
+  FrameOutput getNextFrameNoDemuxInternal(
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+
+  FrameOutput convertAVFrameToFrameOutput(
+      AVFrameStream& avFrameStream,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  void convertAVFrameToFrameOutputOnCPU(
+      AVFrameStream& avFrameStream,
+      FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
+      int streamIndex,
+      const AVFrame* avFrame);
+
+  int convertAVFrameToTensorUsingSwsScale(
+      int streamIndex,
+      const AVFrame* avFrame,
+      torch::Tensor& outputTensor);
+
+  // --------------------------------------------------------------------------
+  // COLOR CONVERSION LIBRARIES HANDLERS CREATION
+  // --------------------------------------------------------------------------
+
   void createFilterGraph(
       StreamInfo& streamInfo,
       int expectedOutputHeight,
       int expectedOutputWidth);
 
-  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+  void createSwsContext(
+      StreamInfo& streamInfo,
+      const DecodedFrameContext& frameContext,
+      const enum AVColorSpace colorspace);
 
-  int64_t getPts(
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
+  // --------------------------------------------------------------------------
+  // PTS <-> INDEX CONVERSIONS
+  // --------------------------------------------------------------------------
 
-  double getMinSeconds(const StreamMetadata& streamMetadata);
-  double getMaxSeconds(const StreamMetadata& streamMetadata);
+  int getKeyFrameIndexForPts(const StreamInfo& stream, int64_t pts) const;
+
+  // Returns the key frame index of the presentation timestamp using our index.
+  // We build this index by scanning the file in
+  // scanFileAndUpdateMetadataAndIndex
+  int getKeyFrameIndexForPtsUsingScannedIndex(
+      const std::vector<VideoDecoder::FrameInfo>& keyFrames,
+      int64_t pts) const;
+  // Return key frame index, from FFmpeg. Potentially less accurate
+  int getKeyFrameIndexForPtsUsingEncoderIndex(AVStream* stream, int64_t pts)
+      const;
 
   int64_t secondsToIndexLowerBound(
       double seconds,
@@ -395,38 +430,43 @@ class VideoDecoder {
       const StreamInfo& streamInfo,
       const StreamMetadata& streamMetadata);
 
-  void createSwsContext(
-      StreamInfo& streamInfo,
-      const DecodedFrameContext& frameContext,
-      const enum AVColorSpace colorspace);
+  int64_t getPts(
+      const StreamInfo& streamInfo,
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
 
-  void maybeSeekToBeforeDesiredPts();
-  AVFrameStream getAVFrameUsingFilterFunction(
-      std::function<bool(int, AVFrame*)>);
-  // Once we create a decoder can update the metadata with the codec context.
-  // For example, for video streams, we can add the height and width of the
-  // decoded stream.
-  void updateMetadataWithCodecContext(
-      int streamIndex,
-      AVCodecContext* codecContext);
+  // --------------------------------------------------------------------------
+  // STREAM AND METADATA APIS
+  // --------------------------------------------------------------------------
+
   void populateVideoMetadataFromStreamIndex(int streamIndex);
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      int streamIndex,
-      const AVFrame* avFrame);
-  int convertAVFrameToTensorUsingSwsScale(
-      int streamIndex,
-      const AVFrame* avFrame,
-      torch::Tensor& outputTensor);
-  FrameOutput convertAVFrameToFrameOutput(
-      AVFrameStream& avFrameStream,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
-  void convertAVFrameToFrameOutputOnCPU(
-      AVFrameStream& avFrameStream,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  FrameOutput getNextFrameNoDemuxInternal(
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  // Returns the "best" stream index for a given media type. The "best" is
+  // determined by various heuristics in FFMPEG.
+  // See
+  // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga757780d38f482deb4d809c6c521fbcc2
+  // for more details about the heuristics.
+  // Returns the key frame index of the presentation timestamp using FFMPEG's
+  // index. Note that this index may be truncated for some files.
+  int getBestStreamIndex(AVMediaType mediaType);
+
+  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+  double getMinSeconds(const StreamMetadata& streamMetadata);
+  double getMaxSeconds(const StreamMetadata& streamMetadata);
+
+  // --------------------------------------------------------------------------
+  // VALIDATION UTILS
+  // --------------------------------------------------------------------------
+
+  void validateUserProvidedStreamIndex(int streamIndex);
+  void validateScannedAllStreams(const std::string& msg);
+  void validateFrameIndex(
+      const StreamMetadata& streamMetadata,
+      int64_t frameIndex);
+
+  // --------------------------------------------------------------------------
+  // ATTRIBUTES
+  // --------------------------------------------------------------------------
 
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
@@ -438,7 +478,6 @@ class VideoDecoder {
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
   std::optional<double> desiredPtsSeconds_;
-
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
