@@ -318,21 +318,6 @@ void VideoDecoder::initializeDecoder() {
   initialized_ = true;
 }
 
-std::unique_ptr<VideoDecoder> VideoDecoder::createFromFilePath(
-    const std::string& videoFilePath,
-    SeekMode seekMode) {
-  return std::unique_ptr<VideoDecoder>(
-      new VideoDecoder(videoFilePath, seekMode));
-}
-
-std::unique_ptr<VideoDecoder> VideoDecoder::createFromBuffer(
-    const void* buffer,
-    size_t length,
-    SeekMode seekMode) {
-  return std::unique_ptr<VideoDecoder>(
-      new VideoDecoder(buffer, length, seekMode));
-}
-
 void VideoDecoder::createFilterGraph(
     StreamInfo& streamInfo,
     int expectedOutputHeight,

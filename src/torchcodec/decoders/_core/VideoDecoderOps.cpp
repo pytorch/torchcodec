@@ -117,7 +117,7 @@ at::Tensor create_from_file(
   }
 
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromFilePath(filenameStr, realSeek);
+      std::make_unique<VideoDecoder>(filenameStr, realSeek);
 
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
@@ -134,9 +134,9 @@ at::Tensor create_from_tensor(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  std::unique_ptr<VideoDecoder> videoDecoder =
-      VideoDecoder::createFromBuffer(buffer, length, realSeek);
-  return wrapDecoderPointerToTensor(std::move(videoDecoder));
+  std::unique_ptr<VideoDecoder> uniqueDecoder =
+      std::make_unique<VideoDecoder>(buffer, length, realSeek);
+  return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
 at::Tensor create_from_buffer(
@@ -149,7 +149,7 @@ at::Tensor create_from_buffer(
   }
 
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromBuffer(buffer, length, realSeek);
+      std::make_unique<VideoDecoder>(buffer, length, realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 

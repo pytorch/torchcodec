@@ -50,10 +50,10 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       content_ = outputStringStream.str();
       void* buffer = content_.data();
       size_t length = outputStringStream.str().length();
-      return VideoDecoder::createFromBuffer(
+      return std::make_unique<VideoDecoder>(
           buffer, length, VideoDecoder::SeekMode::approximate);
     } else {
-      return VideoDecoder::createFromFilePath(
+      return std::make_unique<VideoDecoder>(
           filepath, VideoDecoder::SeekMode::approximate);
     }
   }
@@ -94,8 +94,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
 
 TEST(VideoDecoderTest, MissingVideoFileThrowsException) {
   EXPECT_THROW(
-      VideoDecoder::createFromFilePath("/this/file/does/not/exist"),
-      std::invalid_argument);
+      VideoDecoder("/this/file/does/not/exist"), std::invalid_argument);
 }
 
 void dumpTensorToDisk(
@@ -145,8 +144,7 @@ double computeAverageCosineSimilarity(
 
 TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> decoder =
-      VideoDecoder::createFromFilePath(path);
+  std::unique_ptr<VideoDecoder> decoder = std::make_unique<VideoDecoder>(path);
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = 100;
   videoStreamOptions.height = 120;
@@ -157,8 +155,7 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
 
 TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> decoder =
-      VideoDecoder::createFromFilePath(path);
+  std::unique_ptr<VideoDecoder> decoder = std::make_unique<VideoDecoder>(path);
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStreamDecoder(-1, videoStreamOptions);
