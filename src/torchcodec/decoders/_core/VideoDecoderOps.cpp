@@ -48,7 +48,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] timestamps) -> (Tensor, Tensor, Tensor)");
-  m.def("_get_key_frame_indices(Tensor(a!) decoder, int stream_index) -> int[]");
+  m.def(
+      "_get_key_frame_indices(Tensor(a!) decoder, int stream_index) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -335,7 +336,7 @@ bool _test_frame_pts_equality(
       videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
 }
 
-std::vector<int64_t> _get_key_frame_indices(
+torch::Tensor _get_key_frame_indices(
     at::Tensor& decoder,
     int64_t stream_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

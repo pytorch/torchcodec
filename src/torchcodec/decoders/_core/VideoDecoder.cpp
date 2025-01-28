@@ -553,15 +553,17 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
 
-std::vector<int64_t> VideoDecoder::getKeyFrameIndices(int streamIndex) {
+torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
   validateUserProvidedStreamIndex(streamIndex);
   validateScannedAllStreams("getKeyFrameIndices");
 
-  std::vector<int64_t> keyFrameIndices;
-  const StreamInfo& streamInfo = streamInfos_[streamIndex];
-  for (const FrameInfo& frameInfo : streamInfo.keyFrames) {
-    keyFrameIndices.push_back(getKeyFrameIndexForPtsUsingScannedIndex(
-        streamInfo.keyFrames, frameInfo.pts));
+  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
+  torch::Tensor keyFrameIndices =
+      torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
+  for (size_t i = 0; i < keyFrames.size(); ++i) {
+    int64_t pts = keyFrames[i].pts;
+    keyFrameIndices[i] =
+        getKeyFrameIndexForPtsUsingScannedIndex(keyFrames, pts);
   }
 
   return keyFrameIndices;

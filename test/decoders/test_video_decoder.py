@@ -835,7 +835,9 @@ class TestVideoDecoder:
     def test_get_key_frame_indices(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode="exact")
         key_frame_indices = decoder._get_key_frame_indices()
-        assert len(key_frame_indices) > 0
+        size = key_frame_indices.size()
+        assert size[0] > 0
+        assert len(size) == 1
 
 
 if __name__ == "__main__":
