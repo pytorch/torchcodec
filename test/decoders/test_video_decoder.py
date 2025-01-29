@@ -874,5 +874,6 @@ class TestVideoDecoder:
             key_frame_indices, h265_reference_key_frame_indices, atol=0, rtol=0
         )
 
+
 if __name__ == "__main__":
     pytest.main()
