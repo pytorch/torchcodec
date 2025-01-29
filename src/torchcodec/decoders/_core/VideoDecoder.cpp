@@ -671,10 +671,18 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     size_t keyIndex = 0;
     for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
       streamInfo.allFrames[i].frameIndex = i;
-      if (streamInfo.keyFrames[keyIndex].pts == streamInfo.allFrames[i].pts) {
+
+      // For correctly encoded files, we shouldn't need to ensure that keyIndex
+      // is less than the number of key frames. That is, the relationship
+      // between the frames in allFrames and keyFrames should be such that
+      // keyIndex is always a valid index into keyFrames. But we're being
+      // defensive in case we encounter incorrectly encoded files.
+      if (keyIndex < streamInfo.keyFrames.size() &&
+          streamInfo.keyFrames[keyIndex].pts == streamInfo.allFrames[i].pts) {
         streamInfo.keyFrames[keyIndex].frameIndex = i;
         ++keyIndex;
       }
+
       if (i + 1 < streamInfo.allFrames.size()) {
         streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
       }
