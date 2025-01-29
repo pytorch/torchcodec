@@ -435,7 +435,9 @@ int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
 void VideoDecoder::addVideoStreamDecoder(
     int preferredStreamIndex,
     const VideoStreamOptions& videoStreamOptions) {
-  TORCH_CHECK(activeStreamIndex_ == -1, "Can only add one single stream.");
+  TORCH_CHECK(
+      activeStreamIndex_ == NO_ACTIVE_STREAM,
+      "Can only add one single stream.");
   TORCH_CHECK(formatContext_.get() != nullptr);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
@@ -722,7 +724,7 @@ bool VideoDecoder::canWeAvoidSeekingForStream(
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
-  if (activeStreamIndex_ == -1) {
+  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
     return;
   }
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
@@ -770,7 +772,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
-  if (activeStreamIndex_ == -1) {
+  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
     throw std::runtime_error("No active streams configured.");
   }
 

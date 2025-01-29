@@ -468,7 +468,8 @@ class VideoDecoder {
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streamInfos_;
-  int activeStreamIndex_ = -1;
+  const int NO_ACTIVE_STREAM = -2;
+  int activeStreamIndex_ = NO_ACTIVE_STREAM;
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
   std::optional<double> desiredPtsSeconds_;
