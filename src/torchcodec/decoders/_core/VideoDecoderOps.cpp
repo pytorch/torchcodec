@@ -48,6 +48,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] timestamps) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "_get_key_frame_indices(Tensor(a!) decoder, int stream_index) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
@@ -117,7 +119,7 @@ at::Tensor create_from_file(
   }
 
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromFilePath(filenameStr, realSeek);
+      std::make_unique<VideoDecoder>(filenameStr, realSeek);
 
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
@@ -134,9 +136,9 @@ at::Tensor create_from_tensor(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  std::unique_ptr<VideoDecoder> videoDecoder =
-      VideoDecoder::createFromBuffer(buffer, length, realSeek);
-  return wrapDecoderPointerToTensor(std::move(videoDecoder));
+  std::unique_ptr<VideoDecoder> uniqueDecoder =
+      std::make_unique<VideoDecoder>(buffer, length, realSeek);
+  return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
 at::Tensor create_from_buffer(
@@ -149,7 +151,7 @@ at::Tensor create_from_buffer(
   }
 
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      VideoDecoder::createFromBuffer(buffer, length, realSeek);
+      std::make_unique<VideoDecoder>(buffer, length, realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -332,6 +334,13 @@ bool _test_frame_pts_equality(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   return pts_seconds_to_test ==
       videoDecoder->getPtsSecondsForFrame(stream_index, frame_index);
+}
+
+torch::Tensor _get_key_frame_indices(
+    at::Tensor& decoder,
+    int64_t stream_index) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  return videoDecoder->getKeyFrameIndices(stream_index);
 }
 
 std::string get_json_metadata(at::Tensor& decoder) {
@@ -526,6 +535,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("add_video_stream", &add_video_stream);
   m.impl("_add_video_stream", &_add_video_stream);
   m.impl("get_next_frame", &get_next_frame);
+  m.impl("_get_key_frame_indices", &_get_key_frame_indices);
   m.impl("get_json_metadata", &get_json_metadata);
   m.impl("get_container_json_metadata", &get_container_json_metadata);
   m.impl("get_stream_json_metadata", &get_stream_json_metadata);

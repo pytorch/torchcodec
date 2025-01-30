@@ -29,17 +29,14 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
-  explicit VideoDecoder(const std::string& videoFilePath, SeekMode seekMode);
-  explicit VideoDecoder(const void* buffer, size_t length, SeekMode seekMode);
-
   // Creates a VideoDecoder from the video at videoFilePath.
-  static std::unique_ptr<VideoDecoder> createFromFilePath(
+  explicit VideoDecoder(
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
   // Creates a VideoDecoder from a given buffer. Note that the buffer is not
   // owned by the VideoDecoder.
-  static std::unique_ptr<VideoDecoder> createFromBuffer(
+  explicit VideoDecoder(
       const void* buffer,
       size_t length,
       SeekMode seekMode = SeekMode::exact);
@@ -99,6 +96,10 @@ class VideoDecoder {
 
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
+
+  // Returns the key frame indices as a tensor. The tensor is 1D and contains
+  // int64 values, where each value is the frame index for a key frame.
+  torch::Tensor getKeyFrameIndices(int streamIndex);
 
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
@@ -287,12 +288,19 @@ class VideoDecoder {
 
   struct FrameInfo {
     int64_t pts = 0;
-    // The value of this default is important: the last frame's nextPts will be
-    // INT64_MAX, which ensures that the allFrames vec contains FrameInfo
-    // structs with *increasing* nextPts values. That's a necessary condition
-    // for the binary searches on those values to work properly (as typically
-    // done during pts -> index conversions.)
+
+    // The value of the nextPts default is important: the last frame's nextPts
+    // will be INT64_MAX, which ensures that the allFrames vec contains
+    // FrameInfo structs with *increasing* nextPts values. That's a necessary
+    // condition for the binary searches on those values to work properly (as
+    // typically done during pts -> index conversions).
     int64_t nextPts = INT64_MAX;
+
+    // Note that frameIndex is ALWAYS the index into all of the frames in that
+    // stream, even when the FrameInfo is part of the key frame index. Given a
+    // FrameInfo for a key frame, the frameIndex allows us to know which frame
+    // that is in the stream.
+    int64_t frameIndex = 0;
   };
 
   struct FilterGraphContext {
@@ -364,8 +372,7 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream decodeAVFrame(
-      std::function<bool(int, AVFrame*)> filterFunction);
+  AVFrameStream decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
 
   FrameOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -469,9 +476,8 @@ class VideoDecoder {
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
   std::map<int, StreamInfo> streamInfos_;
-  // Stores the stream indices of the active streams, i.e. the streams we are
-  // decoding and returning to the user.
-  std::set<int> activeStreamIndices_;
+  const int NO_ACTIVE_STREAM = -2;
+  int activeStreamIndex_ = NO_ACTIVE_STREAM;
   // Set when the user wants to seek and stores the desired pts that the user
   // wants to seek to.
   std::optional<double> desiredPtsSeconds_;
