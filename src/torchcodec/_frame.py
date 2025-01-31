@@ -41,8 +41,8 @@ class Frame(Iterable):
     def __post_init__(self):
         # This is called after __init__() when a Frame is created. We can run
         # input validation checks here.
-        if not self.data.ndim == 3:
-            raise ValueError(f"data must be 3-dimensional, got {self.data.shape = }")
+        # if not self.data.ndim == 3:
+        #     raise ValueError(f"data must be 3-dimensional, got {self.data.shape = }")
         self.pts_seconds = float(self.pts_seconds)
         self.duration_seconds = float(self.duration_seconds)
 

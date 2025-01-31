@@ -124,6 +124,7 @@ VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
     int streamIndex,
     torch::Tensor& hwcTensor) {
+  return hwcTensor;
   if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
     return hwcTensor;
   }
@@ -439,11 +440,12 @@ void VideoDecoder::addVideoStreamDecoder(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
   TORCH_CHECK(formatContext_.get() != nullptr);
+  printf("Adding stream %d\n", preferredStreamIndex);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
   int streamIndex = av_find_best_stream(
       formatContext_.get(),
-      AVMEDIA_TYPE_VIDEO,
+      AVMEDIA_TYPE_AUDIO,
       preferredStreamIndex,
       -1,
       &avCodec,
@@ -458,7 +460,7 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
   streamInfo.stream = formatContext_->streams[streamIndex];
 
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
     throw std::invalid_argument(
         "Stream with index " + std::to_string(streamIndex) +
         " is not a video stream.");
@@ -915,18 +917,47 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
 VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
     VideoDecoder::AVFrameStream& avFrameStream,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+    [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   FrameOutput frameOutput;
   int streamIndex = avFrameStream.streamIndex;
   AVFrame* avFrame = avFrameStream.avFrame.get();
   frameOutput.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
-  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
+  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO);
   frameOutput.ptsSeconds = ptsToSeconds(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
+
+  auto numSamples = avFrame->nb_samples;
+  auto sampleRate = avFrame->sample_rate;
+  auto numChannels = avFrame->ch_layout.nb_channels;
+
+  printf("numSamples: %d\n", numSamples);
+  printf("sample rate: %d\n", sampleRate);
+
+  printf("numChannels: %d\n", numChannels);
+  int bytesPerSample =
+      av_get_bytes_per_sample(streamInfo.codecContext->sample_fmt);
+  printf("bytes per sample: %d\n", bytesPerSample);
+
+  // Assuming format is FLTP (float 32bits ???)
+
+  // This is slow, use accessor. or just memcpy?
+  torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+  for (auto channel = 0; channel < numChannels; ++channel) {
+    // auto channelDataPtr = data[channel].data_ptr<uint8_t>();
+    // std::memcpy(channelDataPtr, avFrame->data[channel], numSamples *
+    // bytesPerSample);
+    float* dataFloatPtr = (float*)(avFrame->data[channel]);
+    for (auto sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex) {
+      data[channel][sampleIndex] = dataFloatPtr[sampleIndex];
+    }
+  }
+  frameOutput.data = data;
+  return frameOutput;
+
   // TODO: we should fold preAllocatedOutputTensor into AVFrameStream.
   if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
