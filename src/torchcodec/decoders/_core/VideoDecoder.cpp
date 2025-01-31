@@ -610,6 +610,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     // we have scanned all packets and sorted by pts.
     FrameInfo frameInfo = {packet->pts};
     if (packet->flags & AV_PKT_FLAG_KEY) {
+      frameInfo.isKeyFrame = true;
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
     }
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
@@ -660,25 +661,23 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
           return frameInfo1.pts < frameInfo2.pts;
         });
 
-    size_t keyIndex = 0;
+    size_t keyFrameIndex = 0;
     for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
       streamInfo.allFrames[i].frameIndex = i;
-
-      // For correctly encoded files, we shouldn't need to ensure that keyIndex
-      // is less than the number of key frames. That is, the relationship
-      // between the frames in allFrames and keyFrames should be such that
-      // keyIndex is always a valid index into keyFrames. But we're being
-      // defensive in case we encounter incorrectly encoded files.
-      if (keyIndex < streamInfo.keyFrames.size() &&
-          streamInfo.keyFrames[keyIndex].pts == streamInfo.allFrames[i].pts) {
-        streamInfo.keyFrames[keyIndex].frameIndex = i;
-        ++keyIndex;
+      if (streamInfo.allFrames[i].isKeyFrame) {
+        TORCH_CHECK(
+            keyFrameIndex < streamInfo.keyFrames.size(),
+            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
+        ++keyFrameIndex;
       }
-
       if (i + 1 < streamInfo.allFrames.size()) {
         streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
       }
     }
+    TORCH_CHECK(
+        keyFrameIndex == streamInfo.keyFrames.size(),
+        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
   }
 
   scannedAllStreams_ = true;
