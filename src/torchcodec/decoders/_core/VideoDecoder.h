@@ -294,6 +294,8 @@ class VideoDecoder {
     // FrameInfo structs with *increasing* nextPts values. That's a necessary
     // condition for the binary searches on those values to work properly (as
     // typically done during pts -> index conversions).
+    // TODO: This field is unset (left to the default) for entries in the
+    // keyFrames vec!
     int64_t nextPts = INT64_MAX;
 
     // Note that frameIndex is ALWAYS the index into all of the frames in that
@@ -301,6 +303,11 @@ class VideoDecoder {
     // FrameInfo for a key frame, the frameIndex allows us to know which frame
     // that is in the stream.
     int64_t frameIndex = 0;
+
+    // Indicates whether a frame is a key frame. It may appear redundant as it's
+    // only true for FrameInfos in the keyFrames index, but it is needed to
+    // correctly map frames between allFrames and keyFrames during the scan.
+    bool isKeyFrame = false;
   };
 
   struct FilterGraphContext {
