@@ -44,46 +44,6 @@ struct AVInput {
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
 };
 
-AVInput createAVFormatContextFromFilePath(const std::string& videoFilePath) {
-  AVFormatContext* formatContext = nullptr;
-  int open_ret = avformat_open_input(
-      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
-  if (open_ret != 0) {
-    throw std::invalid_argument(
-        "Could not open input file: " + videoFilePath + " " +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  TORCH_CHECK(formatContext != nullptr);
-  AVInput toReturn;
-  toReturn.formatContext.reset(formatContext);
-  return toReturn;
-}
-
-AVInput createAVFormatContextFromBuffer(const void* buffer, size_t length) {
-  AVInput toReturn;
-  toReturn.formatContext.reset(avformat_alloc_context());
-  TORCH_CHECK(
-      toReturn.formatContext.get() != nullptr,
-      "Unable to alloc avformat context");
-  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
-  toReturn.ioBytesContext.reset(
-      new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
-  if (!toReturn.ioBytesContext) {
-    throw std::runtime_error("Failed to create AVIOBytesContext");
-  }
-  toReturn.formatContext->pb = toReturn.ioBytesContext->getAVIO();
-  AVFormatContext* tempFormatContext = toReturn.formatContext.release();
-  int open_ret =
-      avformat_open_input(&tempFormatContext, nullptr, nullptr, nullptr);
-  toReturn.formatContext.reset(tempFormatContext);
-  if (open_ret != 0) {
-    throw std::runtime_error(
-        std::string("Failed to open input buffer: ") +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  return toReturn;
-}
-
 std::vector<std::string> splitStringWithDelimiters(
     const std::string& str,
     const std::string& delims) {
@@ -101,128 +61,25 @@ std::vector<std::string> splitStringWithDelimiters(
   return result;
 }
 
-VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
-    int width) {
-  VideoDecoder::ColorConversionLibrary library =
-      VideoDecoder::ColorConversionLibrary::SWSCALE;
-  // However, swscale requires widths to be multiples of 32:
-  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
-  // so we fall back to filtergraph if the width is not a multiple of 32.
-  if (width % 32 != 0) {
-    library = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
-  }
-  return library;
-}
-
 } // namespace
 
-// Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
-// The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
-// or 4D.
-// Calling permute() is guaranteed to return a view as per the docs:
-// https://pytorch.org/docs/stable/generated/torch.permute.html
-torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
-    int streamIndex,
-    torch::Tensor& hwcTensor) {
-  if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
-    return hwcTensor;
-  }
-  auto numDimensions = hwcTensor.dim();
-  auto shape = hwcTensor.sizes();
-  if (numDimensions == 3) {
-    TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
-    return hwcTensor.permute({2, 0, 1});
-  } else if (numDimensions == 4) {
-    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
-    return hwcTensor.permute({0, 3, 1, 2});
-  } else {
-    TORCH_CHECK(
-        false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
-  }
-}
-
-VideoDecoder::VideoStreamOptions::VideoStreamOptions(
-    const std::string& optionsString) {
-  std::vector<std::string> tokens =
-      splitStringWithDelimiters(optionsString, ",");
-  for (auto token : tokens) {
-    std::vector<std::string> pairs = splitStringWithDelimiters(token, "=");
-    if (pairs.size() != 2) {
-      throw std::runtime_error(
-          "Invalid option: " + token +
-          ". Options must be in the form 'option=value'.");
-    }
-    std::string key = pairs[0];
-    std::string value = pairs[1];
-    if (key == "ffmpeg_thread_count") {
-      ffmpegThreadCount = std::stoi(value);
-      if (ffmpegThreadCount < 0) {
-        throw std::runtime_error(
-            "Invalid ffmpeg_thread_count=" + value +
-            ". ffmpeg_thread_count must be >= 0.");
-      }
-    } else if (key == "dimension_order") {
-      if (value != "NHWC" && value != "NCHW") {
-        throw std::runtime_error(
-            "Invalid dimension_order=" + value +
-            ". dimensionOrder must be either NHWC or NCHW.");
-      }
-      dimensionOrder = value;
-    } else if (key == "width") {
-      width = std::stoi(value);
-    } else if (key == "height") {
-      height = std::stoi(value);
-    } else if (key == "color_conversion_library") {
-      if (value == "filtergraph") {
-        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-      } else if (value == "swscale") {
-        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
-      } else {
-        throw std::runtime_error(
-            "Invalid color_conversion_library=" + value +
-            ". color_conversion_library must be either "
-            "filtergraph or swscale.");
-      }
-    } else {
-      throw std::runtime_error(
-          "Invalid option: " + key +
-          ". Valid options are: "
-          "ffmpeg_thread_count=<int>,dimension_order=<string>");
-    }
-  }
-}
-
-VideoDecoder::FrameBatchOutput::FrameBatchOutput(
-    int64_t numFrames,
-    const VideoStreamOptions& videoStreamOptions,
-    const StreamMetadata& streamMetadata)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
-      videoStreamOptions, streamMetadata);
-  int height = frameDims.height;
-  int width = frameDims.width;
-  data = allocateEmptyHWCTensor(
-      height, width, videoStreamOptions.device, numFrames);
-}
-
-bool VideoDecoder::DecodedFrameContext::operator==(
-    const VideoDecoder::DecodedFrameContext& other) {
-  return decodedWidth == other.decodedWidth &&
-      decodedHeight == other.decodedHeight &&
-      decodedFormat == other.decodedFormat &&
-      expectedWidth == other.expectedWidth &&
-      expectedHeight == other.expectedHeight;
-}
-
-bool VideoDecoder::DecodedFrameContext::operator!=(
-    const VideoDecoder::DecodedFrameContext& other) {
-  return !(*this == other);
-}
+// --------------------------------------------------------------------------
+// CONSTRUCTORS, INITIALIZATION, DESTRUCTORS
+// --------------------------------------------------------------------------
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
-  AVInput input = createAVFormatContextFromFilePath(videoFilePath);
+  AVFormatContext* formatContext = nullptr;
+  int open_ret = avformat_open_input(
+      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
+  if (open_ret != 0) {
+    throw std::invalid_argument(
+        "Could not open input file: " + videoFilePath + " " +
+        getFFMPEGErrorStringFromErrorCode(open_ret));
+  }
+  TORCH_CHECK(formatContext != nullptr);
+  AVInput input;
+  input.formatContext.reset(formatContext);
   formatContext_ = std::move(input.formatContext);
 
   initializeDecoder();
@@ -232,11 +89,42 @@ VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
 
-  AVInput input = createAVFormatContextFromBuffer(buffer, length);
+  AVInput input;
+  input.formatContext.reset(avformat_alloc_context());
+  TORCH_CHECK(
+      input.formatContext.get() != nullptr, "Unable to alloc avformat context");
+  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
+  input.ioBytesContext.reset(
+      new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
+  if (!input.ioBytesContext) {
+    throw std::runtime_error("Failed to create AVIOBytesContext");
+  }
+  input.formatContext->pb = input.ioBytesContext->getAVIO();
+  AVFormatContext* tempFormatContext = input.formatContext.release();
+  int open_ret =
+      avformat_open_input(&tempFormatContext, nullptr, nullptr, nullptr);
+  input.formatContext.reset(tempFormatContext);
+  if (open_ret != 0) {
+    throw std::runtime_error(
+        std::string("Failed to open input buffer: ") +
+        getFFMPEGErrorStringFromErrorCode(open_ret));
+  }
   formatContext_ = std::move(input.formatContext);
   ioBytesContext_ = std::move(input.ioBytesContext);
 
   initializeDecoder();
+}
+
+VideoDecoder::~VideoDecoder() {
+  for (auto& [streamIndex, streamInfo] : streamInfos_) {
+    auto& device = streamInfo.videoStreamOptions.device;
+    if (device.type() == torch::kCPU) {
+    } else if (device.type() == torch::kCUDA) {
+      releaseContextOnCuda(device, streamInfo.codecContext.get());
+    } else {
+      TORCH_CHECK(false, "Invalid device type: " + device.str());
+    }
+  }
 }
 
 void VideoDecoder::initializeDecoder() {
@@ -318,113 +206,6 @@ void VideoDecoder::initializeDecoder() {
   initialized_ = true;
 }
 
-void VideoDecoder::createFilterGraph(
-    StreamInfo& streamInfo,
-    int expectedOutputHeight,
-    int expectedOutputWidth) {
-  FilterGraphContext& filterGraphContext = streamInfo.filterGraphContext;
-  filterGraphContext.filterGraph.reset(avfilter_graph_alloc());
-  TORCH_CHECK(filterGraphContext.filterGraph.get() != nullptr);
-
-  if (streamInfo.videoStreamOptions.ffmpegThreadCount.has_value()) {
-    filterGraphContext.filterGraph->nb_threads =
-        streamInfo.videoStreamOptions.ffmpegThreadCount.value();
-  }
-
-  const AVFilter* buffersrc = avfilter_get_by_name("buffer");
-  const AVFilter* buffersink = avfilter_get_by_name("buffersink");
-  AVCodecContext* codecContext = streamInfo.codecContext.get();
-
-  std::stringstream filterArgs;
-  filterArgs << "video_size=" << codecContext->width << "x"
-             << codecContext->height;
-  filterArgs << ":pix_fmt=" << codecContext->pix_fmt;
-  filterArgs << ":time_base=" << streamInfo.stream->time_base.num << "/"
-             << streamInfo.stream->time_base.den;
-  filterArgs << ":pixel_aspect=" << codecContext->sample_aspect_ratio.num << "/"
-             << codecContext->sample_aspect_ratio.den;
-
-  int ffmpegStatus = avfilter_graph_create_filter(
-      &filterGraphContext.sourceContext,
-      buffersrc,
-      "in",
-      filterArgs.str().c_str(),
-      nullptr,
-      filterGraphContext.filterGraph.get());
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        std::string("Failed to create filter graph: ") + filterArgs.str() +
-        ": " + getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-
-  ffmpegStatus = avfilter_graph_create_filter(
-      &filterGraphContext.sinkContext,
-      buffersink,
-      "out",
-      nullptr,
-      nullptr,
-      filterGraphContext.filterGraph.get());
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        "Failed to create filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-
-  enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
-
-  ffmpegStatus = av_opt_set_int_list(
-      filterGraphContext.sinkContext,
-      "pix_fmts",
-      pix_fmts,
-      AV_PIX_FMT_NONE,
-      AV_OPT_SEARCH_CHILDREN);
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        "Failed to set output pixel formats: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-
-  UniqueAVFilterInOut outputs(avfilter_inout_alloc());
-  UniqueAVFilterInOut inputs(avfilter_inout_alloc());
-
-  outputs->name = av_strdup("in");
-  outputs->filter_ctx = filterGraphContext.sourceContext;
-  outputs->pad_idx = 0;
-  outputs->next = nullptr;
-  inputs->name = av_strdup("out");
-  inputs->filter_ctx = filterGraphContext.sinkContext;
-  inputs->pad_idx = 0;
-  inputs->next = nullptr;
-
-  std::stringstream description;
-  description << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
-  description << ":sws_flags=bilinear";
-
-  AVFilterInOut* outputsTmp = outputs.release();
-  AVFilterInOut* inputsTmp = inputs.release();
-  ffmpegStatus = avfilter_graph_parse_ptr(
-      filterGraphContext.filterGraph.get(),
-      description.str().c_str(),
-      &inputsTmp,
-      &outputsTmp,
-      nullptr);
-  outputs.reset(outputsTmp);
-  inputs.reset(inputsTmp);
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        "Failed to parse filter description: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-
-  ffmpegStatus =
-      avfilter_graph_config(filterGraphContext.filterGraph.get(), nullptr);
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        "Failed to configure filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-}
-
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
   int streamIndex =
@@ -432,139 +213,9 @@ int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
   return streamIndex;
 }
 
-void VideoDecoder::addVideoStreamDecoder(
-    int preferredStreamIndex,
-    const VideoStreamOptions& videoStreamOptions) {
-  TORCH_CHECK(
-      activeStreamIndex_ == NO_ACTIVE_STREAM,
-      "Can only add one single stream.");
-  TORCH_CHECK(formatContext_.get() != nullptr);
-
-  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
-  int streamIndex = av_find_best_stream(
-      formatContext_.get(),
-      AVMEDIA_TYPE_VIDEO,
-      preferredStreamIndex,
-      -1,
-      &avCodec,
-      0);
-  if (streamIndex < 0) {
-    throw std::invalid_argument("No valid stream found in input file.");
-  }
-  TORCH_CHECK(avCodec != nullptr);
-
-  StreamInfo& streamInfo = streamInfos_[streamIndex];
-  streamInfo.streamIndex = streamIndex;
-  streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
-  streamInfo.stream = formatContext_->streams[streamIndex];
-
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
-    throw std::invalid_argument(
-        "Stream with index " + std::to_string(streamIndex) +
-        " is not a video stream.");
-  }
-
-  if (videoStreamOptions.device.type() == torch::kCUDA) {
-    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(
-            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
-            .value_or(avCodec));
-  }
-
-  StreamMetadata& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
-        " does not have an average fps in its metadata.");
-  }
-
-  AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
-  TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
-  streamInfo.codecContext.reset(codecContext);
-
-  int retVal = avcodec_parameters_to_context(
-      streamInfo.codecContext.get(), streamInfo.stream->codecpar);
-  TORCH_CHECK_EQ(retVal, AVSUCCESS);
-
-  if (videoStreamOptions.device.type() == torch::kCPU) {
-    // No more initialization needed for CPU.
-  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
-    initializeContextOnCuda(videoStreamOptions.device, codecContext);
-  } else {
-    TORCH_CHECK(
-        false, "Invalid device type: " + videoStreamOptions.device.str());
-  }
-
-  retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
-  if (retVal < AVSUCCESS) {
-    throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
-  }
-
-  codecContext->time_base = streamInfo.stream->time_base;
-  activeStreamIndex_ = streamIndex;
-  updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
-  streamInfo.videoStreamOptions = videoStreamOptions;
-
-  // By default, we want to use swscale for color conversion because it is
-  // faster. However, it has width requirements, so we may need to fall back
-  // to filtergraph. We also need to respect what was requested from the
-  // options; we respect the options unconditionally, so it's possible for
-  // swscale's width requirements to be violated. We don't expose the ability to
-  // choose color conversion library publicly; we only use this ability
-  // internally.
-  int width = videoStreamOptions.width.value_or(codecContext->width);
-  auto defaultLibrary = getDefaultColorConversionLibrary(width);
-  streamInfo.colorConversionLibrary =
-      videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
-}
-
-void VideoDecoder::updateMetadataWithCodecContext(
-    int streamIndex,
-    AVCodecContext* codecContext) {
-  containerMetadata_.allStreamMetadata[streamIndex].width = codecContext->width;
-  containerMetadata_.allStreamMetadata[streamIndex].height =
-      codecContext->height;
-  auto codedId = codecContext->codec_id;
-  containerMetadata_.allStreamMetadata[streamIndex].codecName =
-      std::string(avcodec_get_name(codedId));
-}
-
-VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
-  return containerMetadata_;
-}
-
-torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getKeyFrameIndices");
-
-  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
-  torch::Tensor keyFrameIndices =
-      torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
-  for (size_t i = 0; i < keyFrames.size(); ++i) {
-    keyFrameIndices[i] = keyFrames[i].frameIndex;
-  }
-
-  return keyFrameIndices;
-}
-
-int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
-    const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-    int64_t pts) const {
-  auto upperBound = std::upper_bound(
-      keyFrames.begin(),
-      keyFrames.end(),
-      pts,
-      [](int64_t pts, const VideoDecoder::FrameInfo& frameInfo) {
-        return pts < frameInfo.pts;
-      });
-  if (upperBound == keyFrames.begin()) {
-    return -1;
-  }
-  return upperBound - 1 - keyFrames.begin();
-}
+// --------------------------------------------------------------------------
+// VIDEO METADATA QUERY API
+// --------------------------------------------------------------------------
 
 void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scannedAllStreams_) {
@@ -681,15 +332,495 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   scannedAllStreams_ = true;
 }
 
-int VideoDecoder::getKeyFrameIndexForPts(
-    const StreamInfo& streamInfo,
-    int64_t pts) const {
-  if (streamInfo.keyFrames.empty()) {
-    return av_index_search_timestamp(
-        streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
-  } else {
-    return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
+VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
+  return containerMetadata_;
+}
+
+torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getKeyFrameIndices");
+
+  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
+  torch::Tensor keyFrameIndices =
+      torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
+  for (size_t i = 0; i < keyFrames.size(); ++i) {
+    keyFrameIndices[i] = keyFrames[i].frameIndex;
   }
+
+  return keyFrameIndices;
+}
+
+// --------------------------------------------------------------------------
+// ADDING STREAMS API
+// --------------------------------------------------------------------------
+
+VideoDecoder::VideoStreamOptions::VideoStreamOptions(
+    const std::string& optionsString) {
+  std::vector<std::string> tokens =
+      splitStringWithDelimiters(optionsString, ",");
+  for (auto token : tokens) {
+    std::vector<std::string> pairs = splitStringWithDelimiters(token, "=");
+    if (pairs.size() != 2) {
+      throw std::runtime_error(
+          "Invalid option: " + token +
+          ". Options must be in the form 'option=value'.");
+    }
+    std::string key = pairs[0];
+    std::string value = pairs[1];
+    if (key == "ffmpeg_thread_count") {
+      ffmpegThreadCount = std::stoi(value);
+      if (ffmpegThreadCount < 0) {
+        throw std::runtime_error(
+            "Invalid ffmpeg_thread_count=" + value +
+            ". ffmpeg_thread_count must be >= 0.");
+      }
+    } else if (key == "dimension_order") {
+      if (value != "NHWC" && value != "NCHW") {
+        throw std::runtime_error(
+            "Invalid dimension_order=" + value +
+            ". dimensionOrder must be either NHWC or NCHW.");
+      }
+      dimensionOrder = value;
+    } else if (key == "width") {
+      width = std::stoi(value);
+    } else if (key == "height") {
+      height = std::stoi(value);
+    } else if (key == "color_conversion_library") {
+      if (value == "filtergraph") {
+        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+      } else if (value == "swscale") {
+        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+      } else {
+        throw std::runtime_error(
+            "Invalid color_conversion_library=" + value +
+            ". color_conversion_library must be either "
+            "filtergraph or swscale.");
+      }
+    } else {
+      throw std::runtime_error(
+          "Invalid option: " + key +
+          ". Valid options are: "
+          "ffmpeg_thread_count=<int>,dimension_order=<string>");
+    }
+  }
+}
+
+void VideoDecoder::addVideoStreamDecoder(
+    int preferredStreamIndex,
+    const VideoStreamOptions& videoStreamOptions) {
+  TORCH_CHECK(
+      activeStreamIndex_ == NO_ACTIVE_STREAM,
+      "Can only add one single stream.");
+  TORCH_CHECK(formatContext_.get() != nullptr);
+
+  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
+  int streamIndex = av_find_best_stream(
+      formatContext_.get(),
+      AVMEDIA_TYPE_VIDEO,
+      preferredStreamIndex,
+      -1,
+      &avCodec,
+      0);
+  if (streamIndex < 0) {
+    throw std::invalid_argument("No valid stream found in input file.");
+  }
+  TORCH_CHECK(avCodec != nullptr);
+
+  StreamInfo& streamInfo = streamInfos_[streamIndex];
+  streamInfo.streamIndex = streamIndex;
+  streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
+  streamInfo.stream = formatContext_->streams[streamIndex];
+
+  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+    throw std::invalid_argument(
+        "Stream with index " + std::to_string(streamIndex) +
+        " is not a video stream.");
+  }
+
+  if (videoStreamOptions.device.type() == torch::kCUDA) {
+    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+        findCudaCodec(
+            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
+            .value_or(avCodec));
+  }
+
+  StreamMetadata& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
+        " does not have an average fps in its metadata.");
+  }
+
+  AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
+  TORCH_CHECK(codecContext != nullptr);
+  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
+  streamInfo.codecContext.reset(codecContext);
+
+  int retVal = avcodec_parameters_to_context(
+      streamInfo.codecContext.get(), streamInfo.stream->codecpar);
+  TORCH_CHECK_EQ(retVal, AVSUCCESS);
+
+  if (videoStreamOptions.device.type() == torch::kCPU) {
+    // No more initialization needed for CPU.
+  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(videoStreamOptions.device, codecContext);
+  } else {
+    TORCH_CHECK(
+        false, "Invalid device type: " + videoStreamOptions.device.str());
+  }
+
+  retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
+  if (retVal < AVSUCCESS) {
+    throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
+  }
+
+  codecContext->time_base = streamInfo.stream->time_base;
+  activeStreamIndex_ = streamIndex;
+  updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
+  streamInfo.videoStreamOptions = videoStreamOptions;
+
+  // By default, we want to use swscale for color conversion because it is
+  // faster. However, it has width requirements, so we may need to fall back
+  // to filtergraph. We also need to respect what was requested from the
+  // options; we respect the options unconditionally, so it's possible for
+  // swscale's width requirements to be violated. We don't expose the ability to
+  // choose color conversion library publicly; we only use this ability
+  // internally.
+  int width = videoStreamOptions.width.value_or(codecContext->width);
+
+  // swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // so we fall back to filtergraph if the width is not a multiple of 32.
+  auto defaultLibrary = (width % 32 == 0)
+      ? VideoDecoder::ColorConversionLibrary::SWSCALE
+      : VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+
+  streamInfo.colorConversionLibrary =
+      videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
+}
+
+void VideoDecoder::updateMetadataWithCodecContext(
+    int streamIndex,
+    AVCodecContext* codecContext) {
+  containerMetadata_.allStreamMetadata[streamIndex].width = codecContext->width;
+  containerMetadata_.allStreamMetadata[streamIndex].height =
+      codecContext->height;
+  auto codedId = codecContext->codec_id;
+  containerMetadata_.allStreamMetadata[streamIndex].codecName =
+      std::string(avcodec_get_name(codedId));
+}
+
+// --------------------------------------------------------------------------
+// HIGH-LEVEL DECODING ENTRY-POINTS
+// --------------------------------------------------------------------------
+
+VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
+  auto output = getNextFrameNoDemuxInternal();
+  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
+  return output;
+}
+
+VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
+    StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
+    return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
+  });
+  return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
+}
+
+VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
+    int streamIndex,
+    int64_t frameIndex) {
+  auto frameOutput = getFrameAtIndexInternal(streamIndex, frameIndex);
+  frameOutput.data = maybePermuteHWC2CHW(streamIndex, frameOutput.data);
+  return frameOutput;
+}
+
+VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
+    int streamIndex,
+    int64_t frameIndex,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  validateUserProvidedStreamIndex(streamIndex);
+
+  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  validateFrameIndex(streamMetadata, frameIndex);
+
+  int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
+  setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
+  return getNextFrameNoDemuxInternal(preAllocatedOutputTensor);
+}
+
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
+    int streamIndex,
+    const std::vector<int64_t>& frameIndices) {
+  validateUserProvidedStreamIndex(streamIndex);
+
+  auto indicesAreSorted =
+      std::is_sorted(frameIndices.begin(), frameIndices.end());
+
+  std::vector<size_t> argsort;
+  if (!indicesAreSorted) {
+    // if frameIndices is [13, 10, 12, 11]
+    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
+    //                                         to use to decode the frames
+    // and argsort is     [ 1,  3,  2,  0]
+    argsort.resize(frameIndices.size());
+    for (size_t i = 0; i < argsort.size(); ++i) {
+      argsort[i] = i;
+    }
+    std::sort(
+        argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
+          return frameIndices[a] < frameIndices[b];
+        });
+  }
+
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+  FrameBatchOutput frameBatchOutput(
+      frameIndices.size(), videoStreamOptions, streamMetadata);
+
+  auto previousIndexInVideo = -1;
+  for (size_t f = 0; f < frameIndices.size(); ++f) {
+    auto indexInOutput = indicesAreSorted ? f : argsort[f];
+    auto indexInVideo = frameIndices[indexInOutput];
+
+    validateFrameIndex(streamMetadata, indexInVideo);
+
+    if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
+      // Avoid decoding the same frame twice
+      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
+      frameBatchOutput.data[indexInOutput].copy_(
+          frameBatchOutput.data[previousIndexInOutput]);
+      frameBatchOutput.ptsSeconds[indexInOutput] =
+          frameBatchOutput.ptsSeconds[previousIndexInOutput];
+      frameBatchOutput.durationSeconds[indexInOutput] =
+          frameBatchOutput.durationSeconds[previousIndexInOutput];
+    } else {
+      FrameOutput frameOutput = getFrameAtIndexInternal(
+          streamIndex, indexInVideo, frameBatchOutput.data[indexInOutput]);
+      frameBatchOutput.ptsSeconds[indexInOutput] = frameOutput.ptsSeconds;
+      frameBatchOutput.durationSeconds[indexInOutput] =
+          frameOutput.durationSeconds;
+    }
+    previousIndexInVideo = indexInVideo;
+  }
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  return frameBatchOutput;
+}
+
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
+    int streamIndex,
+    int64_t start,
+    int64_t stop,
+    int64_t step) {
+  validateUserProvidedStreamIndex(streamIndex);
+
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  const auto& streamInfo = streamInfos_[streamIndex];
+  int64_t numFrames = getNumFrames(streamMetadata);
+  TORCH_CHECK(
+      start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
+  TORCH_CHECK(
+      stop <= numFrames,
+      "Range stop, " + std::to_string(stop) +
+          ", is more than the number of frames, " + std::to_string(numFrames));
+  TORCH_CHECK(
+      step > 0, "Step must be greater than 0; is " + std::to_string(step));
+
+  int64_t numOutputFrames = std::ceil((stop - start) / double(step));
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+  FrameBatchOutput frameBatchOutput(
+      numOutputFrames, videoStreamOptions, streamMetadata);
+
+  for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
+    FrameOutput frameOutput =
+        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
+  }
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  return frameBatchOutput;
+}
+
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
+    double seconds) {
+  for (auto& [streamIndex, streamInfo] : streamInfos_) {
+    double frameStartTime =
+        ptsToSeconds(streamInfo.currentPts, streamInfo.timeBase);
+    double frameEndTime = ptsToSeconds(
+        streamInfo.currentPts + streamInfo.currentDuration,
+        streamInfo.timeBase);
+    if (seconds >= frameStartTime && seconds < frameEndTime) {
+      // We are in the same frame as the one we just returned. However, since we
+      // don't cache it locally, we have to rewind back.
+      seconds = frameStartTime;
+      break;
+    }
+  }
+
+  setCursorPtsInSeconds(seconds);
+  AVFrameStream avFrameStream =
+      decodeAVFrame([seconds, this](AVFrame* avFrame) {
+        StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+        double frameEndTime = ptsToSeconds(
+            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+        if (frameStartTime > seconds) {
+          // FFMPEG seeked past the frame we are looking for even though we
+          // set max_ts to be our needed timestamp in avformat_seek_file()
+          // in maybeSeekToBeforeDesiredPts().
+          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
+          // In this case we return the very next frame instead of throwing an
+          // exception.
+          // TODO: Maybe log to stderr for Debug builds?
+          return true;
+        }
+        return seconds >= frameStartTime && seconds < frameEndTime;
+      });
+
+  // Convert the frame to tensor.
+  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
+  frameOutput.data =
+      maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
+  return frameOutput;
+}
+
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
+    int streamIndex,
+    const std::vector<double>& timestamps) {
+  validateUserProvidedStreamIndex(streamIndex);
+
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  const auto& streamInfo = streamInfos_[streamIndex];
+
+  double minSeconds = getMinSeconds(streamMetadata);
+  double maxSeconds = getMaxSeconds(streamMetadata);
+
+  // The frame played at timestamp t and the one played at timestamp `t +
+  // eps` are probably the same frame, with the same index. The easiest way to
+  // avoid decoding that unique frame twice is to convert the input timestamps
+  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
+
+  std::vector<int64_t> frameIndices(timestamps.size());
+  for (size_t i = 0; i < timestamps.size(); ++i) {
+    auto frameSeconds = timestamps[i];
+    TORCH_CHECK(
+        frameSeconds >= minSeconds && frameSeconds < maxSeconds,
+        "frame pts is " + std::to_string(frameSeconds) +
+            "; must be in range [" + std::to_string(minSeconds) + ", " +
+            std::to_string(maxSeconds) + ").");
+
+    frameIndices[i] =
+        secondsToIndexLowerBound(frameSeconds, streamInfo, streamMetadata);
+  }
+
+  return getFramesAtIndices(streamIndex, frameIndices);
+}
+
+VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
+    int streamIndex,
+    double startSeconds,
+    double stopSeconds) {
+  validateUserProvidedStreamIndex(streamIndex);
+
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+
+  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+
+  // Special case needed to implement a half-open range. At first glance, this
+  // may seem unnecessary, as our search for stopFrame can return the end, and
+  // we don't include stopFramIndex in our output. However, consider the
+  // following scenario:
+  //
+  //   frame=0, pts=0.0
+  //   frame=1, pts=0.3
+  //
+  //   interval A: [0.2, 0.2)
+  //   interval B: [0.2, 0.15)
+  //
+  // Both intervals take place between the pts values for frame 0 and frame 1,
+  // which by our abstract player, means that both intervals map to frame 0. By
+  // the definition of a half open interval, interval A should return no frames.
+  // Interval B should return frame 0. However, for both A and B, the individual
+  // values of the intervals will map to the same frame indices below. Hence, we
+  // need this special case below.
+  if (startSeconds == stopSeconds) {
+    FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
+    frameBatchOutput.data =
+        maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+    return frameBatchOutput;
+  }
+
+  double minSeconds = getMinSeconds(streamMetadata);
+  double maxSeconds = getMaxSeconds(streamMetadata);
+  TORCH_CHECK(
+      startSeconds >= minSeconds && startSeconds < maxSeconds,
+      "Start seconds is " + std::to_string(startSeconds) +
+          "; must be in range [" + std::to_string(minSeconds) + ", " +
+          std::to_string(maxSeconds) + ").");
+  TORCH_CHECK(
+      stopSeconds <= maxSeconds,
+      "Stop seconds (" + std::to_string(stopSeconds) +
+          "; must be less than or equal to " + std::to_string(maxSeconds) +
+          ").");
+
+  // Note that we look at nextPts for a frame, and not its pts or duration.
+  // Our abstract player displays frames starting at the pts for that frame
+  // until the pts for the next frame. There are two consequences:
+  //
+  //   1. We ignore the duration for a frame. A frame is played until the
+  //   next frame replaces it. This model is robust to durations being 0 or
+  //   incorrect; our source of truth is the pts for frames. If duration is
+  //   accurate, the nextPts for a frame would be equivalent to pts +
+  //   duration.
+  //   2. In order to establish if the start of an interval maps to a
+  //   particular frame, we need to figure out if it is ordered after the
+  //   frame's pts, but before the next frames's pts.
+
+  int64_t startFrameIndex =
+      secondsToIndexLowerBound(startSeconds, streamInfo, streamMetadata);
+  int64_t stopFrameIndex =
+      secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
+  int64_t numFrames = stopFrameIndex - startFrameIndex;
+
+  FrameBatchOutput frameBatchOutput(
+      numFrames, videoStreamOptions, streamMetadata);
+  for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
+    FrameOutput frameOutput =
+        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
+    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
+  }
+  frameBatchOutput.data =
+      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+
+  return frameBatchOutput;
+}
+
+// --------------------------------------------------------------------------
+// SEEKING APIs
+// --------------------------------------------------------------------------
+
+void VideoDecoder::setCursorPtsInSeconds(double seconds) {
+  desiredPtsSeconds_ = seconds;
 }
 
 /*
@@ -790,6 +921,10 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
 }
+
+// --------------------------------------------------------------------------
+// LOW-LEVEL DECODING
+// --------------------------------------------------------------------------
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
@@ -911,6 +1046,10 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
 }
+
+// --------------------------------------------------------------------------
+// AVFRAME <-> FRAME OUTPUT CONVERSION
+// --------------------------------------------------------------------------
 
 VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
     VideoDecoder::AVFrameStream& avFrameStream,
@@ -1056,504 +1195,6 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
   }
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
-    double seconds) {
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    double frameStartTime =
-        ptsToSeconds(streamInfo.currentPts, streamInfo.timeBase);
-    double frameEndTime = ptsToSeconds(
-        streamInfo.currentPts + streamInfo.currentDuration,
-        streamInfo.timeBase);
-    if (seconds >= frameStartTime && seconds < frameEndTime) {
-      // We are in the same frame as the one we just returned. However, since we
-      // don't cache it locally, we have to rewind back.
-      seconds = frameStartTime;
-      break;
-    }
-  }
-
-  setCursorPtsInSeconds(seconds);
-  AVFrameStream avFrameStream =
-      decodeAVFrame([seconds, this](AVFrame* avFrame) {
-        StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
-        double frameEndTime = ptsToSeconds(
-            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
-        if (frameStartTime > seconds) {
-          // FFMPEG seeked past the frame we are looking for even though we
-          // set max_ts to be our needed timestamp in avformat_seek_file()
-          // in maybeSeekToBeforeDesiredPts().
-          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
-          // In this case we return the very next frame instead of throwing an
-          // exception.
-          // TODO: Maybe log to stderr for Debug builds?
-          return true;
-        }
-        return seconds >= frameStartTime && seconds < frameEndTime;
-      });
-
-  // Convert the frame to tensor.
-  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
-  frameOutput.data =
-      maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
-  return frameOutput;
-}
-
-void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
-  int streamsSize =
-      static_cast<int>(containerMetadata_.allStreamMetadata.size());
-  TORCH_CHECK(
-      streamIndex >= 0 && streamIndex < streamsSize,
-      "Invalid stream index=" + std::to_string(streamIndex) +
-          "; valid indices are in the range [0, " +
-          std::to_string(streamsSize) + ").");
-  TORCH_CHECK(
-      streamInfos_.count(streamIndex) > 0,
-      "Provided stream index=" + std::to_string(streamIndex) +
-          " was not previously added.");
-}
-
-void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
-  if (!scannedAllStreams_) {
-    throw std::runtime_error(
-        "Must scan all streams to update metadata before calling " + msg);
-  }
-}
-
-void VideoDecoder::validateFrameIndex(
-    const StreamMetadata& streamMetadata,
-    int64_t frameIndex) {
-  int64_t numFrames = getNumFrames(streamMetadata);
-  TORCH_CHECK(
-      frameIndex >= 0 && frameIndex < numFrames,
-      "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-          " numFrames=" + std::to_string(numFrames));
-}
-
-VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
-    int streamIndex,
-    int64_t frameIndex) {
-  auto frameOutput = getFrameAtIndexInternal(streamIndex, frameIndex);
-  frameOutput.data = maybePermuteHWC2CHW(streamIndex, frameOutput.data);
-  return frameOutput;
-}
-
-int64_t VideoDecoder::getPts(
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata,
-    int64_t frameIndex) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamInfo.allFrames[frameIndex].pts;
-    case SeekMode::approximate:
-      return secondsToClosestPts(
-          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.numFramesFromScan.value();
-    case SeekMode::approximate:
-      return streamMetadata.numFrames.value();
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-double VideoDecoder::getMinSeconds(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.minPtsSecondsFromScan.value();
-    case SeekMode::approximate:
-      return 0;
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.maxPtsSecondsFromScan.value();
-    case SeekMode::approximate:
-      return streamMetadata.durationSeconds.value();
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-int64_t VideoDecoder::secondsToIndexLowerBound(
-    double seconds,
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact: {
-      auto frame = std::lower_bound(
-          streamInfo.allFrames.begin(),
-          streamInfo.allFrames.end(),
-          seconds,
-          [&streamInfo](const FrameInfo& info, double start) {
-            return ptsToSeconds(info.nextPts, streamInfo.timeBase) <= start;
-          });
-
-      return frame - streamInfo.allFrames.begin();
-    }
-    case SeekMode::approximate:
-      return std::floor(seconds * streamMetadata.averageFps.value());
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-int64_t VideoDecoder::secondsToIndexUpperBound(
-    double seconds,
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact: {
-      auto frame = std::upper_bound(
-          streamInfo.allFrames.begin(),
-          streamInfo.allFrames.end(),
-          seconds,
-          [&streamInfo](double stop, const FrameInfo& info) {
-            return stop <= ptsToSeconds(info.pts, streamInfo.timeBase);
-          });
-
-      return frame - streamInfo.allFrames.begin();
-    }
-    case SeekMode::approximate:
-      return std::ceil(seconds * streamMetadata.averageFps.value());
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
-    int streamIndex,
-    int64_t frameIndex,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateUserProvidedStreamIndex(streamIndex);
-
-  const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  validateFrameIndex(streamMetadata, frameIndex);
-
-  int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
-  setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
-  return getNextFrameNoDemuxInternal(preAllocatedOutputTensor);
-}
-
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
-    int streamIndex,
-    const std::vector<int64_t>& frameIndices) {
-  validateUserProvidedStreamIndex(streamIndex);
-
-  auto indicesAreSorted =
-      std::is_sorted(frameIndices.begin(), frameIndices.end());
-
-  std::vector<size_t> argsort;
-  if (!indicesAreSorted) {
-    // if frameIndices is [13, 10, 12, 11]
-    // when sorted, it's  [10, 11, 12, 13] <-- this is the sorted order we want
-    //                                         to use to decode the frames
-    // and argsort is     [ 1,  3,  2,  0]
-    argsort.resize(frameIndices.size());
-    for (size_t i = 0; i < argsort.size(); ++i) {
-      argsort[i] = i;
-    }
-    std::sort(
-        argsort.begin(), argsort.end(), [&frameIndices](size_t a, size_t b) {
-          return frameIndices[a] < frameIndices[b];
-        });
-  }
-
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput frameBatchOutput(
-      frameIndices.size(), videoStreamOptions, streamMetadata);
-
-  auto previousIndexInVideo = -1;
-  for (size_t f = 0; f < frameIndices.size(); ++f) {
-    auto indexInOutput = indicesAreSorted ? f : argsort[f];
-    auto indexInVideo = frameIndices[indexInOutput];
-
-    validateFrameIndex(streamMetadata, indexInVideo);
-
-    if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
-      // Avoid decoding the same frame twice
-      auto previousIndexInOutput = indicesAreSorted ? f - 1 : argsort[f - 1];
-      frameBatchOutput.data[indexInOutput].copy_(
-          frameBatchOutput.data[previousIndexInOutput]);
-      frameBatchOutput.ptsSeconds[indexInOutput] =
-          frameBatchOutput.ptsSeconds[previousIndexInOutput];
-      frameBatchOutput.durationSeconds[indexInOutput] =
-          frameBatchOutput.durationSeconds[previousIndexInOutput];
-    } else {
-      FrameOutput frameOutput = getFrameAtIndexInternal(
-          streamIndex, indexInVideo, frameBatchOutput.data[indexInOutput]);
-      frameBatchOutput.ptsSeconds[indexInOutput] = frameOutput.ptsSeconds;
-      frameBatchOutput.durationSeconds[indexInOutput] =
-          frameOutput.durationSeconds;
-    }
-    previousIndexInVideo = indexInVideo;
-  }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
-  return frameBatchOutput;
-}
-
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
-    int streamIndex,
-    const std::vector<double>& timestamps) {
-  validateUserProvidedStreamIndex(streamIndex);
-
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
-
-  double minSeconds = getMinSeconds(streamMetadata);
-  double maxSeconds = getMaxSeconds(streamMetadata);
-
-  // The frame played at timestamp t and the one played at timestamp `t +
-  // eps` are probably the same frame, with the same index. The easiest way to
-  // avoid decoding that unique frame twice is to convert the input timestamps
-  // to indices, and leverage the de-duplication logic of getFramesAtIndices.
-
-  std::vector<int64_t> frameIndices(timestamps.size());
-  for (size_t i = 0; i < timestamps.size(); ++i) {
-    auto frameSeconds = timestamps[i];
-    TORCH_CHECK(
-        frameSeconds >= minSeconds && frameSeconds < maxSeconds,
-        "frame pts is " + std::to_string(frameSeconds) +
-            "; must be in range [" + std::to_string(minSeconds) + ", " +
-            std::to_string(maxSeconds) + ").");
-
-    frameIndices[i] =
-        secondsToIndexLowerBound(frameSeconds, streamInfo, streamMetadata);
-  }
-
-  return getFramesAtIndices(streamIndex, frameIndices);
-}
-
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
-    int streamIndex,
-    int64_t start,
-    int64_t stop,
-    int64_t step) {
-  validateUserProvidedStreamIndex(streamIndex);
-
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
-  int64_t numFrames = getNumFrames(streamMetadata);
-  TORCH_CHECK(
-      start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
-  TORCH_CHECK(
-      stop <= numFrames,
-      "Range stop, " + std::to_string(stop) +
-          ", is more than the number of frames, " + std::to_string(numFrames));
-  TORCH_CHECK(
-      step > 0, "Step must be greater than 0; is " + std::to_string(step));
-
-  int64_t numOutputFrames = std::ceil((stop - start) / double(step));
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput frameBatchOutput(
-      numOutputFrames, videoStreamOptions, streamMetadata);
-
-  for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
-    FrameOutput frameOutput =
-        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
-    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
-    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
-  }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
-  return frameBatchOutput;
-}
-
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
-    int streamIndex,
-    double startSeconds,
-    double stopSeconds) {
-  validateUserProvidedStreamIndex(streamIndex);
-
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  TORCH_CHECK(
-      startSeconds <= stopSeconds,
-      "Start seconds (" + std::to_string(startSeconds) +
-          ") must be less than or equal to stop seconds (" +
-          std::to_string(stopSeconds) + ".");
-
-  const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-
-  // Special case needed to implement a half-open range. At first glance, this
-  // may seem unnecessary, as our search for stopFrame can return the end, and
-  // we don't include stopFramIndex in our output. However, consider the
-  // following scenario:
-  //
-  //   frame=0, pts=0.0
-  //   frame=1, pts=0.3
-  //
-  //   interval A: [0.2, 0.2)
-  //   interval B: [0.2, 0.15)
-  //
-  // Both intervals take place between the pts values for frame 0 and frame 1,
-  // which by our abstract player, means that both intervals map to frame 0. By
-  // the definition of a half open interval, interval A should return no frames.
-  // Interval B should return frame 0. However, for both A and B, the individual
-  // values of the intervals will map to the same frame indices below. Hence, we
-  // need this special case below.
-  if (startSeconds == stopSeconds) {
-    FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
-    frameBatchOutput.data =
-        maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
-    return frameBatchOutput;
-  }
-
-  double minSeconds = getMinSeconds(streamMetadata);
-  double maxSeconds = getMaxSeconds(streamMetadata);
-  TORCH_CHECK(
-      startSeconds >= minSeconds && startSeconds < maxSeconds,
-      "Start seconds is " + std::to_string(startSeconds) +
-          "; must be in range [" + std::to_string(minSeconds) + ", " +
-          std::to_string(maxSeconds) + ").");
-  TORCH_CHECK(
-      stopSeconds <= maxSeconds,
-      "Stop seconds (" + std::to_string(stopSeconds) +
-          "; must be less than or equal to " + std::to_string(maxSeconds) +
-          ").");
-
-  // Note that we look at nextPts for a frame, and not its pts or duration.
-  // Our abstract player displays frames starting at the pts for that frame
-  // until the pts for the next frame. There are two consequences:
-  //
-  //   1. We ignore the duration for a frame. A frame is played until the
-  //   next frame replaces it. This model is robust to durations being 0 or
-  //   incorrect; our source of truth is the pts for frames. If duration is
-  //   accurate, the nextPts for a frame would be equivalent to pts +
-  //   duration.
-  //   2. In order to establish if the start of an interval maps to a
-  //   particular frame, we need to figure out if it is ordered after the
-  //   frame's pts, but before the next frames's pts.
-
-  int64_t startFrameIndex =
-      secondsToIndexLowerBound(startSeconds, streamInfo, streamMetadata);
-  int64_t stopFrameIndex =
-      secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
-  int64_t numFrames = stopFrameIndex - startFrameIndex;
-
-  FrameBatchOutput frameBatchOutput(
-      numFrames, videoStreamOptions, streamMetadata);
-  for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
-    FrameOutput frameOutput =
-        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
-    frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
-    frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
-  }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
-
-  return frameBatchOutput;
-}
-
-VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
-  auto output = getNextFrameNoDemuxInternal();
-  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
-  return output;
-}
-
-VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
-    StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
-    return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
-  });
-  return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
-}
-
-void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-  desiredPtsSeconds_ = seconds;
-}
-
-VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
-  return decodeStats_;
-}
-
-void VideoDecoder::resetDecodeStats() {
-  decodeStats_ = DecodeStats{};
-}
-
-double VideoDecoder::getPtsSecondsForFrame(
-    int streamIndex,
-    int64_t frameIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getPtsSecondsForFrame");
-
-  const auto& streamInfo = streamInfos_[streamIndex];
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  validateFrameIndex(streamMetadata, frameIndex);
-
-  return ptsToSeconds(
-      streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
-}
-
-void VideoDecoder::createSwsContext(
-    StreamInfo& streamInfo,
-    const DecodedFrameContext& frameContext,
-    const enum AVColorSpace colorspace) {
-  SwsContext* swsContext = sws_getContext(
-      frameContext.decodedWidth,
-      frameContext.decodedHeight,
-      frameContext.decodedFormat,
-      frameContext.expectedWidth,
-      frameContext.expectedHeight,
-      AV_PIX_FMT_RGB24,
-      SWS_BILINEAR,
-      nullptr,
-      nullptr,
-      nullptr);
-  TORCH_CHECK(swsContext, "sws_getContext() returned nullptr");
-
-  int* invTable = nullptr;
-  int* table = nullptr;
-  int srcRange, dstRange, brightness, contrast, saturation;
-  int ret = sws_getColorspaceDetails(
-      swsContext,
-      &invTable,
-      &srcRange,
-      &table,
-      &dstRange,
-      &brightness,
-      &contrast,
-      &saturation);
-  TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
-
-  const int* colorspaceTable = sws_getCoefficients(colorspace);
-  ret = sws_setColorspaceDetails(
-      swsContext,
-      colorspaceTable,
-      srcRange,
-      colorspaceTable,
-      dstRange,
-      brightness,
-      contrast,
-      saturation);
-  TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
-
-  streamInfo.swsContext.reset(swsContext);
-}
-
 int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
     int streamIndex,
     const AVFrame* avFrame,
@@ -1604,36 +1245,22 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
       filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
-VideoDecoder::~VideoDecoder() {
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    auto& device = streamInfo.videoStreamOptions.device;
-    if (device.type() == torch::kCPU) {
-    } else if (device.type() == torch::kCUDA) {
-      releaseContextOnCuda(device, streamInfo.codecContext.get());
-    } else {
-      TORCH_CHECK(false, "Invalid device type: " + device.str());
-    }
-  }
-}
+// --------------------------------------------------------------------------
+// OUTPUT ALLOCATION AND SHAPE CONVERSION
+// --------------------------------------------------------------------------
 
-FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
-  return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
-}
-
-FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const VideoDecoder::StreamMetadata& streamMetadata) {
-  return FrameDims(
-      videoStreamOptions.height.value_or(*streamMetadata.height),
-      videoStreamOptions.width.value_or(*streamMetadata.width));
-}
-
-FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const AVFrame& avFrame) {
-  return FrameDims(
-      videoStreamOptions.height.value_or(avFrame.height),
-      videoStreamOptions.width.value_or(avFrame.width));
+VideoDecoder::FrameBatchOutput::FrameBatchOutput(
+    int64_t numFrames,
+    const VideoStreamOptions& videoStreamOptions,
+    const StreamMetadata& streamMetadata)
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
+  auto frameDims = getHeightAndWidthFromOptionsOrMetadata(
+      videoStreamOptions, streamMetadata);
+  int height = frameDims.height;
+  int width = frameDims.width;
+  data = allocateEmptyHWCTensor(
+      height, width, videoStreamOptions.device, numFrames);
 }
 
 torch::Tensor allocateEmptyHWCTensor(
@@ -1657,6 +1284,375 @@ torch::Tensor allocateEmptyHWCTensor(
   }
 }
 
+// Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
+// The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
+// or 4D.
+// Calling permute() is guaranteed to return a view as per the docs:
+// https://pytorch.org/docs/stable/generated/torch.permute.html
+torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
+    int streamIndex,
+    torch::Tensor& hwcTensor) {
+  if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
+    return hwcTensor;
+  }
+  auto numDimensions = hwcTensor.dim();
+  auto shape = hwcTensor.sizes();
+  if (numDimensions == 3) {
+    TORCH_CHECK(shape[2] == 3, "Not a HWC tensor: ", shape);
+    return hwcTensor.permute({2, 0, 1});
+  } else if (numDimensions == 4) {
+    TORCH_CHECK(shape[3] == 3, "Not a NHWC tensor: ", shape);
+    return hwcTensor.permute({0, 3, 1, 2});
+  } else {
+    TORCH_CHECK(
+        false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
+  }
+}
+
+// --------------------------------------------------------------------------
+// COLOR CONVERSION UTILS AND INITIALIZERS
+// --------------------------------------------------------------------------
+
+bool VideoDecoder::DecodedFrameContext::operator==(
+    const VideoDecoder::DecodedFrameContext& other) {
+  return decodedWidth == other.decodedWidth &&
+      decodedHeight == other.decodedHeight &&
+      decodedFormat == other.decodedFormat &&
+      expectedWidth == other.expectedWidth &&
+      expectedHeight == other.expectedHeight;
+}
+
+bool VideoDecoder::DecodedFrameContext::operator!=(
+    const VideoDecoder::DecodedFrameContext& other) {
+  return !(*this == other);
+}
+
+void VideoDecoder::createFilterGraph(
+    StreamInfo& streamInfo,
+    int expectedOutputHeight,
+    int expectedOutputWidth) {
+  FilterGraphContext& filterGraphContext = streamInfo.filterGraphContext;
+  filterGraphContext.filterGraph.reset(avfilter_graph_alloc());
+  TORCH_CHECK(filterGraphContext.filterGraph.get() != nullptr);
+
+  if (streamInfo.videoStreamOptions.ffmpegThreadCount.has_value()) {
+    filterGraphContext.filterGraph->nb_threads =
+        streamInfo.videoStreamOptions.ffmpegThreadCount.value();
+  }
+
+  const AVFilter* buffersrc = avfilter_get_by_name("buffer");
+  const AVFilter* buffersink = avfilter_get_by_name("buffersink");
+  AVCodecContext* codecContext = streamInfo.codecContext.get();
+
+  std::stringstream filterArgs;
+  filterArgs << "video_size=" << codecContext->width << "x"
+             << codecContext->height;
+  filterArgs << ":pix_fmt=" << codecContext->pix_fmt;
+  filterArgs << ":time_base=" << streamInfo.stream->time_base.num << "/"
+             << streamInfo.stream->time_base.den;
+  filterArgs << ":pixel_aspect=" << codecContext->sample_aspect_ratio.num << "/"
+             << codecContext->sample_aspect_ratio.den;
+
+  int ffmpegStatus = avfilter_graph_create_filter(
+      &filterGraphContext.sourceContext,
+      buffersrc,
+      "in",
+      filterArgs.str().c_str(),
+      nullptr,
+      filterGraphContext.filterGraph.get());
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        std::string("Failed to create filter graph: ") + filterArgs.str() +
+        ": " + getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+
+  ffmpegStatus = avfilter_graph_create_filter(
+      &filterGraphContext.sinkContext,
+      buffersink,
+      "out",
+      nullptr,
+      nullptr,
+      filterGraphContext.filterGraph.get());
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        "Failed to create filter graph: " +
+        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+
+  enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
+
+  ffmpegStatus = av_opt_set_int_list(
+      filterGraphContext.sinkContext,
+      "pix_fmts",
+      pix_fmts,
+      AV_PIX_FMT_NONE,
+      AV_OPT_SEARCH_CHILDREN);
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        "Failed to set output pixel formats: " +
+        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+
+  UniqueAVFilterInOut outputs(avfilter_inout_alloc());
+  UniqueAVFilterInOut inputs(avfilter_inout_alloc());
+
+  outputs->name = av_strdup("in");
+  outputs->filter_ctx = filterGraphContext.sourceContext;
+  outputs->pad_idx = 0;
+  outputs->next = nullptr;
+  inputs->name = av_strdup("out");
+  inputs->filter_ctx = filterGraphContext.sinkContext;
+  inputs->pad_idx = 0;
+  inputs->next = nullptr;
+
+  std::stringstream description;
+  description << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
+  description << ":sws_flags=bilinear";
+
+  AVFilterInOut* outputsTmp = outputs.release();
+  AVFilterInOut* inputsTmp = inputs.release();
+  ffmpegStatus = avfilter_graph_parse_ptr(
+      filterGraphContext.filterGraph.get(),
+      description.str().c_str(),
+      &inputsTmp,
+      &outputsTmp,
+      nullptr);
+  outputs.reset(outputsTmp);
+  inputs.reset(inputsTmp);
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        "Failed to parse filter description: " +
+        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+
+  ffmpegStatus =
+      avfilter_graph_config(filterGraphContext.filterGraph.get(), nullptr);
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        "Failed to configure filter graph: " +
+        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+}
+
+void VideoDecoder::createSwsContext(
+    StreamInfo& streamInfo,
+    const DecodedFrameContext& frameContext,
+    const enum AVColorSpace colorspace) {
+  SwsContext* swsContext = sws_getContext(
+      frameContext.decodedWidth,
+      frameContext.decodedHeight,
+      frameContext.decodedFormat,
+      frameContext.expectedWidth,
+      frameContext.expectedHeight,
+      AV_PIX_FMT_RGB24,
+      SWS_BILINEAR,
+      nullptr,
+      nullptr,
+      nullptr);
+  TORCH_CHECK(swsContext, "sws_getContext() returned nullptr");
+
+  int* invTable = nullptr;
+  int* table = nullptr;
+  int srcRange, dstRange, brightness, contrast, saturation;
+  int ret = sws_getColorspaceDetails(
+      swsContext,
+      &invTable,
+      &srcRange,
+      &table,
+      &dstRange,
+      &brightness,
+      &contrast,
+      &saturation);
+  TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
+
+  const int* colorspaceTable = sws_getCoefficients(colorspace);
+  ret = sws_setColorspaceDetails(
+      swsContext,
+      colorspaceTable,
+      srcRange,
+      colorspaceTable,
+      dstRange,
+      brightness,
+      contrast,
+      saturation);
+  TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
+
+  streamInfo.swsContext.reset(swsContext);
+}
+
+// --------------------------------------------------------------------------
+// PTS <-> INDEX CONVERSIONS
+// --------------------------------------------------------------------------
+
+int VideoDecoder::getKeyFrameIndexForPts(
+    const StreamInfo& streamInfo,
+    int64_t pts) const {
+  if (streamInfo.keyFrames.empty()) {
+    return av_index_search_timestamp(
+        streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
+  } else {
+    return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
+  }
+}
+
+int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
+    const std::vector<VideoDecoder::FrameInfo>& keyFrames,
+    int64_t pts) const {
+  auto upperBound = std::upper_bound(
+      keyFrames.begin(),
+      keyFrames.end(),
+      pts,
+      [](int64_t pts, const VideoDecoder::FrameInfo& frameInfo) {
+        return pts < frameInfo.pts;
+      });
+  if (upperBound == keyFrames.begin()) {
+    return -1;
+  }
+  return upperBound - 1 - keyFrames.begin();
+}
+
+int64_t VideoDecoder::secondsToIndexLowerBound(
+    double seconds,
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact: {
+      auto frame = std::lower_bound(
+          streamInfo.allFrames.begin(),
+          streamInfo.allFrames.end(),
+          seconds,
+          [&streamInfo](const FrameInfo& info, double start) {
+            return ptsToSeconds(info.nextPts, streamInfo.timeBase) <= start;
+          });
+
+      return frame - streamInfo.allFrames.begin();
+    }
+    case SeekMode::approximate:
+      return std::floor(seconds * streamMetadata.averageFps.value());
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+int64_t VideoDecoder::secondsToIndexUpperBound(
+    double seconds,
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact: {
+      auto frame = std::upper_bound(
+          streamInfo.allFrames.begin(),
+          streamInfo.allFrames.end(),
+          seconds,
+          [&streamInfo](double stop, const FrameInfo& info) {
+            return stop <= ptsToSeconds(info.pts, streamInfo.timeBase);
+          });
+
+      return frame - streamInfo.allFrames.begin();
+    }
+    case SeekMode::approximate:
+      return std::ceil(seconds * streamMetadata.averageFps.value());
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+int64_t VideoDecoder::getPts(
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata,
+    int64_t frameIndex) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamInfo.allFrames[frameIndex].pts;
+    case SeekMode::approximate:
+      return secondsToClosestPts(
+          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+// --------------------------------------------------------------------------
+// STREAM AND METADATA APIS
+// --------------------------------------------------------------------------
+
+int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.numFramesFromScan.value();
+    case SeekMode::approximate:
+      return streamMetadata.numFrames.value();
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+double VideoDecoder::getMinSeconds(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.minPtsSecondsFromScan.value();
+    case SeekMode::approximate:
+      return 0;
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.maxPtsSecondsFromScan.value();
+    case SeekMode::approximate:
+      return streamMetadata.durationSeconds.value();
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+// --------------------------------------------------------------------------
+// VALIDATION UTILS
+// --------------------------------------------------------------------------
+
+void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
+  int streamsSize =
+      static_cast<int>(containerMetadata_.allStreamMetadata.size());
+  TORCH_CHECK(
+      streamIndex >= 0 && streamIndex < streamsSize,
+      "Invalid stream index=" + std::to_string(streamIndex) +
+          "; valid indices are in the range [0, " +
+          std::to_string(streamsSize) + ").");
+  TORCH_CHECK(
+      streamInfos_.count(streamIndex) > 0,
+      "Provided stream index=" + std::to_string(streamIndex) +
+          " was not previously added.");
+}
+
+void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
+  if (!scannedAllStreams_) {
+    throw std::runtime_error(
+        "Must scan all streams to update metadata before calling " + msg);
+  }
+}
+
+void VideoDecoder::validateFrameIndex(
+    const StreamMetadata& streamMetadata,
+    int64_t frameIndex) {
+  int64_t numFrames = getNumFrames(streamMetadata);
+  TORCH_CHECK(
+      frameIndex >= 0 && frameIndex < numFrames,
+      "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+          " numFrames=" + std::to_string(numFrames));
+}
+
+// --------------------------------------------------------------------------
+// MORALLY PRIVATE UTILS
+// --------------------------------------------------------------------------
+
+VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
+  return decodeStats_;
+}
+
 std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats) {
@@ -1669,6 +1665,49 @@ std::ostream& operator<<(
      << ", numFlushes=" << stats.numFlushes << "}";
 
   return os;
+}
+
+void VideoDecoder::resetDecodeStats() {
+  decodeStats_ = DecodeStats{};
+}
+
+double VideoDecoder::getPtsSecondsForFrame(
+    int streamIndex,
+    int64_t frameIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getPtsSecondsForFrame");
+
+  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  validateFrameIndex(streamMetadata, frameIndex);
+
+  return ptsToSeconds(
+      streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
+}
+
+// --------------------------------------------------------------------------
+// FrameDims APIs
+// --------------------------------------------------------------------------
+
+FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
+  return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
+}
+
+FrameDims getHeightAndWidthFromOptionsOrMetadata(
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoDecoder::StreamMetadata& streamMetadata) {
+  return FrameDims(
+      videoStreamOptions.height.value_or(*streamMetadata.height),
+      videoStreamOptions.width.value_or(*streamMetadata.width));
+}
+
+FrameDims getHeightAndWidthFromOptionsOrAVFrame(
+    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const AVFrame& avFrame) {
+  return FrameDims(
+      videoStreamOptions.height.value_or(avFrame.height),
+      videoStreamOptions.width.value_or(avFrame.width));
 }
 
 } // namespace facebook::torchcodec
