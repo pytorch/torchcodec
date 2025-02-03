@@ -44,46 +44,6 @@ struct AVInput {
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
 };
 
-AVInput createAVFormatContextFromFilePath(const std::string& videoFilePath) {
-  AVFormatContext* formatContext = nullptr;
-  int open_ret = avformat_open_input(
-      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
-  if (open_ret != 0) {
-    throw std::invalid_argument(
-        "Could not open input file: " + videoFilePath + " " +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  TORCH_CHECK(formatContext != nullptr);
-  AVInput toReturn;
-  toReturn.formatContext.reset(formatContext);
-  return toReturn;
-}
-
-AVInput createAVFormatContextFromBuffer(const void* buffer, size_t length) {
-  AVInput toReturn;
-  toReturn.formatContext.reset(avformat_alloc_context());
-  TORCH_CHECK(
-      toReturn.formatContext.get() != nullptr,
-      "Unable to alloc avformat context");
-  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
-  toReturn.ioBytesContext.reset(
-      new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
-  if (!toReturn.ioBytesContext) {
-    throw std::runtime_error("Failed to create AVIOBytesContext");
-  }
-  toReturn.formatContext->pb = toReturn.ioBytesContext->getAVIO();
-  AVFormatContext* tempFormatContext = toReturn.formatContext.release();
-  int open_ret =
-      avformat_open_input(&tempFormatContext, nullptr, nullptr, nullptr);
-  toReturn.formatContext.reset(tempFormatContext);
-  if (open_ret != 0) {
-    throw std::runtime_error(
-        std::string("Failed to open input buffer: ") +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  return toReturn;
-}
-
 std::vector<std::string> splitStringWithDelimiters(
     const std::string& str,
     const std::string& delims) {
@@ -115,6 +75,54 @@ VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
 }
 
 } // namespace
+
+VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
+    : seekMode_(seekMode) {
+  AVFormatContext* formatContext = nullptr;
+  int open_ret = avformat_open_input(
+      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
+  if (open_ret != 0) {
+    throw std::invalid_argument(
+        "Could not open input file: " + videoFilePath + " " +
+        getFFMPEGErrorStringFromErrorCode(open_ret));
+  }
+  TORCH_CHECK(formatContext != nullptr);
+  AVInput input;
+  input.formatContext.reset(formatContext);
+  formatContext_ = std::move(input.formatContext);
+
+  initializeDecoder();
+}
+
+VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
+    : seekMode_(seekMode) {
+  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+
+  AVInput input;
+  input.formatContext.reset(avformat_alloc_context());
+  TORCH_CHECK(
+      input.formatContext.get() != nullptr, "Unable to alloc avformat context");
+  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
+  input.ioBytesContext.reset(
+      new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
+  if (!input.ioBytesContext) {
+    throw std::runtime_error("Failed to create AVIOBytesContext");
+  }
+  input.formatContext->pb = input.ioBytesContext->getAVIO();
+  AVFormatContext* tempFormatContext = input.formatContext.release();
+  int open_ret =
+      avformat_open_input(&tempFormatContext, nullptr, nullptr, nullptr);
+  input.formatContext.reset(tempFormatContext);
+  if (open_ret != 0) {
+    throw std::runtime_error(
+        std::string("Failed to open input buffer: ") +
+        getFFMPEGErrorStringFromErrorCode(open_ret));
+  }
+  formatContext_ = std::move(input.formatContext);
+  ioBytesContext_ = std::move(input.ioBytesContext);
+
+  initializeDecoder();
+}
 
 // Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
 // The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
@@ -218,25 +226,6 @@ bool VideoDecoder::DecodedFrameContext::operator==(
 bool VideoDecoder::DecodedFrameContext::operator!=(
     const VideoDecoder::DecodedFrameContext& other) {
   return !(*this == other);
-}
-
-VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
-    : seekMode_(seekMode) {
-  AVInput input = createAVFormatContextFromFilePath(videoFilePath);
-  formatContext_ = std::move(input.formatContext);
-
-  initializeDecoder();
-}
-
-VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
-    : seekMode_(seekMode) {
-  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
-
-  AVInput input = createAVFormatContextFromBuffer(buffer, length);
-  formatContext_ = std::move(input.formatContext);
-  ioBytesContext_ = std::move(input.ioBytesContext);
-
-  initializeDecoder();
 }
 
 void VideoDecoder::initializeDecoder() {
