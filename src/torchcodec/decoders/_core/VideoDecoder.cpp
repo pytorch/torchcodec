@@ -332,6 +332,168 @@ torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
 }
 
 // --------------------------------------------------------------------------
+// ADDING STREAMS API
+// --------------------------------------------------------------------------
+
+VideoDecoder::VideoStreamOptions::VideoStreamOptions(
+    const std::string& optionsString) {
+  std::vector<std::string> tokens =
+      splitStringWithDelimiters(optionsString, ",");
+  for (auto token : tokens) {
+    std::vector<std::string> pairs = splitStringWithDelimiters(token, "=");
+    if (pairs.size() != 2) {
+      throw std::runtime_error(
+          "Invalid option: " + token +
+          ". Options must be in the form 'option=value'.");
+    }
+    std::string key = pairs[0];
+    std::string value = pairs[1];
+    if (key == "ffmpeg_thread_count") {
+      ffmpegThreadCount = std::stoi(value);
+      if (ffmpegThreadCount < 0) {
+        throw std::runtime_error(
+            "Invalid ffmpeg_thread_count=" + value +
+            ". ffmpeg_thread_count must be >= 0.");
+      }
+    } else if (key == "dimension_order") {
+      if (value != "NHWC" && value != "NCHW") {
+        throw std::runtime_error(
+            "Invalid dimension_order=" + value +
+            ". dimensionOrder must be either NHWC or NCHW.");
+      }
+      dimensionOrder = value;
+    } else if (key == "width") {
+      width = std::stoi(value);
+    } else if (key == "height") {
+      height = std::stoi(value);
+    } else if (key == "color_conversion_library") {
+      if (value == "filtergraph") {
+        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
+      } else if (value == "swscale") {
+        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
+      } else {
+        throw std::runtime_error(
+            "Invalid color_conversion_library=" + value +
+            ". color_conversion_library must be either "
+            "filtergraph or swscale.");
+      }
+    } else {
+      throw std::runtime_error(
+          "Invalid option: " + key +
+          ". Valid options are: "
+          "ffmpeg_thread_count=<int>,dimension_order=<string>");
+    }
+  }
+}
+
+void VideoDecoder::addVideoStreamDecoder(
+    int preferredStreamIndex,
+    const VideoStreamOptions& videoStreamOptions) {
+  TORCH_CHECK(
+      activeStreamIndex_ == NO_ACTIVE_STREAM,
+      "Can only add one single stream.");
+  TORCH_CHECK(formatContext_.get() != nullptr);
+
+  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
+  int streamIndex = av_find_best_stream(
+      formatContext_.get(),
+      AVMEDIA_TYPE_VIDEO,
+      preferredStreamIndex,
+      -1,
+      &avCodec,
+      0);
+  if (streamIndex < 0) {
+    throw std::invalid_argument("No valid stream found in input file.");
+  }
+  TORCH_CHECK(avCodec != nullptr);
+
+  StreamInfo& streamInfo = streamInfos_[streamIndex];
+  streamInfo.streamIndex = streamIndex;
+  streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
+  streamInfo.stream = formatContext_->streams[streamIndex];
+
+  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+    throw std::invalid_argument(
+        "Stream with index " + std::to_string(streamIndex) +
+        " is not a video stream.");
+  }
+
+  if (videoStreamOptions.device.type() == torch::kCUDA) {
+    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+        findCudaCodec(
+            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
+            .value_or(avCodec));
+  }
+
+  StreamMetadata& streamMetadata =
+      containerMetadata_.allStreamMetadata[streamIndex];
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
+        " does not have an average fps in its metadata.");
+  }
+
+  AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
+  TORCH_CHECK(codecContext != nullptr);
+  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
+  streamInfo.codecContext.reset(codecContext);
+
+  int retVal = avcodec_parameters_to_context(
+      streamInfo.codecContext.get(), streamInfo.stream->codecpar);
+  TORCH_CHECK_EQ(retVal, AVSUCCESS);
+
+  if (videoStreamOptions.device.type() == torch::kCPU) {
+    // No more initialization needed for CPU.
+  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
+    initializeContextOnCuda(videoStreamOptions.device, codecContext);
+  } else {
+    TORCH_CHECK(
+        false, "Invalid device type: " + videoStreamOptions.device.str());
+  }
+
+  retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
+  if (retVal < AVSUCCESS) {
+    throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
+  }
+
+  codecContext->time_base = streamInfo.stream->time_base;
+  activeStreamIndex_ = streamIndex;
+  updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
+  streamInfo.videoStreamOptions = videoStreamOptions;
+
+  // By default, we want to use swscale for color conversion because it is
+  // faster. However, it has width requirements, so we may need to fall back
+  // to filtergraph. We also need to respect what was requested from the
+  // options; we respect the options unconditionally, so it's possible for
+  // swscale's width requirements to be violated. We don't expose the ability to
+  // choose color conversion library publicly; we only use this ability
+  // internally.
+  int width = videoStreamOptions.width.value_or(codecContext->width);
+
+  // swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // so we fall back to filtergraph if the width is not a multiple of 32.
+  auto defaultLibrary = (width % 32 == 0)
+      ? VideoDecoder::ColorConversionLibrary::SWSCALE
+      : VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+
+  streamInfo.colorConversionLibrary =
+      videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
+}
+
+void VideoDecoder::updateMetadataWithCodecContext(
+    int streamIndex,
+    AVCodecContext* codecContext) {
+  containerMetadata_.allStreamMetadata[streamIndex].width = codecContext->width;
+  containerMetadata_.allStreamMetadata[streamIndex].height =
+      codecContext->height;
+  auto codedId = codecContext->codec_id;
+  containerMetadata_.allStreamMetadata[streamIndex].codecName =
+      std::string(avcodec_get_name(codedId));
+}
+
+// --------------------------------------------------------------------------
 // DECODING AND SEEKING APIS
 // --------------------------------------------------------------------------
 
@@ -663,57 +825,6 @@ torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
   }
 }
 
-VideoDecoder::VideoStreamOptions::VideoStreamOptions(
-    const std::string& optionsString) {
-  std::vector<std::string> tokens =
-      splitStringWithDelimiters(optionsString, ",");
-  for (auto token : tokens) {
-    std::vector<std::string> pairs = splitStringWithDelimiters(token, "=");
-    if (pairs.size() != 2) {
-      throw std::runtime_error(
-          "Invalid option: " + token +
-          ". Options must be in the form 'option=value'.");
-    }
-    std::string key = pairs[0];
-    std::string value = pairs[1];
-    if (key == "ffmpeg_thread_count") {
-      ffmpegThreadCount = std::stoi(value);
-      if (ffmpegThreadCount < 0) {
-        throw std::runtime_error(
-            "Invalid ffmpeg_thread_count=" + value +
-            ". ffmpeg_thread_count must be >= 0.");
-      }
-    } else if (key == "dimension_order") {
-      if (value != "NHWC" && value != "NCHW") {
-        throw std::runtime_error(
-            "Invalid dimension_order=" + value +
-            ". dimensionOrder must be either NHWC or NCHW.");
-      }
-      dimensionOrder = value;
-    } else if (key == "width") {
-      width = std::stoi(value);
-    } else if (key == "height") {
-      height = std::stoi(value);
-    } else if (key == "color_conversion_library") {
-      if (value == "filtergraph") {
-        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-      } else if (value == "swscale") {
-        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
-      } else {
-        throw std::runtime_error(
-            "Invalid color_conversion_library=" + value +
-            ". color_conversion_library must be either "
-            "filtergraph or swscale.");
-      }
-    } else {
-      throw std::runtime_error(
-          "Invalid option: " + key +
-          ". Valid options are: "
-          "ffmpeg_thread_count=<int>,dimension_order=<string>");
-    }
-  }
-}
-
 VideoDecoder::FrameBatchOutput::FrameBatchOutput(
     int64_t numFrames,
     const VideoStreamOptions& videoStreamOptions,
@@ -854,113 +965,6 @@ int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
   int streamIndex =
       av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &avCodec, 0);
   return streamIndex;
-}
-
-void VideoDecoder::addVideoStreamDecoder(
-    int preferredStreamIndex,
-    const VideoStreamOptions& videoStreamOptions) {
-  TORCH_CHECK(
-      activeStreamIndex_ == NO_ACTIVE_STREAM,
-      "Can only add one single stream.");
-  TORCH_CHECK(formatContext_.get() != nullptr);
-
-  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
-  int streamIndex = av_find_best_stream(
-      formatContext_.get(),
-      AVMEDIA_TYPE_VIDEO,
-      preferredStreamIndex,
-      -1,
-      &avCodec,
-      0);
-  if (streamIndex < 0) {
-    throw std::invalid_argument("No valid stream found in input file.");
-  }
-  TORCH_CHECK(avCodec != nullptr);
-
-  StreamInfo& streamInfo = streamInfos_[streamIndex];
-  streamInfo.streamIndex = streamIndex;
-  streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
-  streamInfo.stream = formatContext_->streams[streamIndex];
-
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
-    throw std::invalid_argument(
-        "Stream with index " + std::to_string(streamIndex) +
-        " is not a video stream.");
-  }
-
-  if (videoStreamOptions.device.type() == torch::kCUDA) {
-    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(
-            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
-            .value_or(avCodec));
-  }
-
-  StreamMetadata& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
-        " does not have an average fps in its metadata.");
-  }
-
-  AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
-  TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
-  streamInfo.codecContext.reset(codecContext);
-
-  int retVal = avcodec_parameters_to_context(
-      streamInfo.codecContext.get(), streamInfo.stream->codecpar);
-  TORCH_CHECK_EQ(retVal, AVSUCCESS);
-
-  if (videoStreamOptions.device.type() == torch::kCPU) {
-    // No more initialization needed for CPU.
-  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
-    initializeContextOnCuda(videoStreamOptions.device, codecContext);
-  } else {
-    TORCH_CHECK(
-        false, "Invalid device type: " + videoStreamOptions.device.str());
-  }
-
-  retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
-  if (retVal < AVSUCCESS) {
-    throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
-  }
-
-  codecContext->time_base = streamInfo.stream->time_base;
-  activeStreamIndex_ = streamIndex;
-  updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
-  streamInfo.videoStreamOptions = videoStreamOptions;
-
-  // By default, we want to use swscale for color conversion because it is
-  // faster. However, it has width requirements, so we may need to fall back
-  // to filtergraph. We also need to respect what was requested from the
-  // options; we respect the options unconditionally, so it's possible for
-  // swscale's width requirements to be violated. We don't expose the ability to
-  // choose color conversion library publicly; we only use this ability
-  // internally.
-  int width = videoStreamOptions.width.value_or(codecContext->width);
-
-  // swscale requires widths to be multiples of 32:
-  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
-  // so we fall back to filtergraph if the width is not a multiple of 32.
-  auto defaultLibrary = (width % 32 == 0)
-      ? VideoDecoder::ColorConversionLibrary::SWSCALE
-      : VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
-
-  streamInfo.colorConversionLibrary =
-      videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
-}
-
-void VideoDecoder::updateMetadataWithCodecContext(
-    int streamIndex,
-    AVCodecContext* codecContext) {
-  containerMetadata_.allStreamMetadata[streamIndex].width = codecContext->width;
-  containerMetadata_.allStreamMetadata[streamIndex].height =
-      codecContext->height;
-  auto codedId = codecContext->codec_id;
-  containerMetadata_.allStreamMetadata[streamIndex].codecName =
-      std::string(avcodec_get_name(codedId));
 }
 
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
