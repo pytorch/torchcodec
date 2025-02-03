@@ -61,19 +61,6 @@ std::vector<std::string> splitStringWithDelimiters(
   return result;
 }
 
-VideoDecoder::ColorConversionLibrary getDefaultColorConversionLibrary(
-    int width) {
-  VideoDecoder::ColorConversionLibrary library =
-      VideoDecoder::ColorConversionLibrary::SWSCALE;
-  // However, swscale requires widths to be multiples of 32:
-  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
-  // so we fall back to filtergraph if the width is not a multiple of 32.
-  if (width % 32 != 0) {
-    library = VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
-  }
-  return library;
-}
-
 } // namespace
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
@@ -505,7 +492,14 @@ void VideoDecoder::addVideoStreamDecoder(
   // choose color conversion library publicly; we only use this ability
   // internally.
   int width = videoStreamOptions.width.value_or(codecContext->width);
-  auto defaultLibrary = getDefaultColorConversionLibrary(width);
+
+  // swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  // so we fall back to filtergraph if the width is not a multiple of 32.
+  auto defaultLibrary = (width % 32 == 0)
+      ? VideoDecoder::ColorConversionLibrary::SWSCALE
+      : VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
 }
