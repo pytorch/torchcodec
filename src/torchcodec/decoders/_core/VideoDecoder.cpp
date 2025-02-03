@@ -206,6 +206,13 @@ void VideoDecoder::initializeDecoder() {
   initialized_ = true;
 }
 
+int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
+  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
+  int streamIndex =
+      av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &avCodec, 0);
+  return streamIndex;
+}
+
 // --------------------------------------------------------------------------
 // VIDEO METADATA QUERY API
 // --------------------------------------------------------------------------
@@ -809,6 +816,113 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 }
 
 // --------------------------------------------------------------------------
+// SEEKING APIs
+// --------------------------------------------------------------------------
+
+void VideoDecoder::setCursorPtsInSeconds(double seconds) {
+  desiredPtsSeconds_ = seconds;
+}
+
+/*
+Videos have I frames and non-I frames (P and B frames). Non-I frames need data
+from the previous I frame to be decoded.
+
+Imagine the cursor is at a random frame with PTS=x and we wish to seek to a
+user-specified PTS=y.
+
+If y < x, we don't have a choice but to seek backwards to the highest I frame
+before y.
+
+If y > x, we have two choices:
+
+1. We could keep decoding forward until we hit y. Illustrated below:
+
+I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
+                          x         y
+
+2. We could try to jump to an I frame between x and y (indicated by j below).
+And then start decoding until we encounter y. Illustrated below:
+
+I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
+                          x              j         y
+
+(2) is more efficient than (1) if there is an I frame between x and y.
+*/
+bool VideoDecoder::canWeAvoidSeekingForStream(
+    const StreamInfo& streamInfo,
+    int64_t currentPts,
+    int64_t targetPts) const {
+  if (targetPts < currentPts) {
+    // We can never skip a seek if we are seeking backwards.
+    return false;
+  }
+  if (currentPts == targetPts) {
+    // We are seeking to the exact same frame as we are currently at. Without
+    // caching we have to rewind back and decode the frame again.
+    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // implement caching.
+    return false;
+  }
+  // We are seeking forwards.
+  // We can only skip a seek if both currentPts and targetPts share the same
+  // keyframe.
+  int currentKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, currentPts);
+  int targetKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, targetPts);
+  return currentKeyFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
+      currentKeyFrameIndex == targetKeyFrameIndex;
+}
+
+// This method looks at currentPts and desiredPts and seeks in the
+// AVFormatContext if it is needed. We can skip seeking in certain cases. See
+// the comment of canWeAvoidSeeking() for details.
+void VideoDecoder::maybeSeekToBeforeDesiredPts() {
+  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
+    return;
+  }
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.discardFramesBeforePts =
+      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
+
+  decodeStats_.numSeeksAttempted++;
+
+  int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
+  if (canWeAvoidSeekingForStream(
+          streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
+    decodeStats_.numSeeksSkipped++;
+    return;
+  }
+  int64_t desiredPts =
+      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
+
+  // For some encodings like H265, FFMPEG sometimes seeks past the point we
+  // set as the max_ts. So we use our own index to give it the exact pts of
+  // the key frame that we want to seek to.
+  // See https://github.com/pytorch/torchcodec/issues/179 for more details.
+  // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
+  if (!streamInfo.keyFrames.empty()) {
+    int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
+        streamInfo.keyFrames, desiredPts);
+    desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
+    desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
+  }
+
+  int ffmepgStatus = avformat_seek_file(
+      formatContext_.get(),
+      streamInfo.streamIndex,
+      INT64_MIN,
+      desiredPts,
+      desiredPts,
+      0);
+  if (ffmepgStatus < 0) {
+    throw std::runtime_error(
+        "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
+        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+  }
+  decodeStats_.numFlushes++;
+  avcodec_flush_buffers(streamInfo.codecContext.get());
+}
+
+// --------------------------------------------------------------------------
 // LOW-LEVEL DECODING
 // --------------------------------------------------------------------------
 
@@ -931,113 +1045,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   streamInfo.currentDuration = getDuration(avFrame);
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
-}
-
-// --------------------------------------------------------------------------
-// SEEKING APIs
-// --------------------------------------------------------------------------
-
-void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-  desiredPtsSeconds_ = seconds;
-}
-
-/*
-Videos have I frames and non-I frames (P and B frames). Non-I frames need data
-from the previous I frame to be decoded.
-
-Imagine the cursor is at a random frame with PTS=x and we wish to seek to a
-user-specified PTS=y.
-
-If y < x, we don't have a choice but to seek backwards to the highest I frame
-before y.
-
-If y > x, we have two choices:
-
-1. We could keep decoding forward until we hit y. Illustrated below:
-
-I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
-                          x         y
-
-2. We could try to jump to an I frame between x and y (indicated by j below).
-And then start decoding until we encounter y. Illustrated below:
-
-I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
-                          x              j         y
-
-(2) is more efficient than (1) if there is an I frame between x and y.
-*/
-bool VideoDecoder::canWeAvoidSeekingForStream(
-    const StreamInfo& streamInfo,
-    int64_t currentPts,
-    int64_t targetPts) const {
-  if (targetPts < currentPts) {
-    // We can never skip a seek if we are seeking backwards.
-    return false;
-  }
-  if (currentPts == targetPts) {
-    // We are seeking to the exact same frame as we are currently at. Without
-    // caching we have to rewind back and decode the frame again.
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
-    // implement caching.
-    return false;
-  }
-  // We are seeking forwards.
-  // We can only skip a seek if both currentPts and targetPts share the same
-  // keyframe.
-  int currentKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, currentPts);
-  int targetKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, targetPts);
-  return currentKeyFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
-      currentKeyFrameIndex == targetKeyFrameIndex;
-}
-
-// This method looks at currentPts and desiredPts and seeks in the
-// AVFormatContext if it is needed. We can skip seeking in certain cases. See
-// the comment of canWeAvoidSeeking() for details.
-void VideoDecoder::maybeSeekToBeforeDesiredPts() {
-  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
-    return;
-  }
-  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  streamInfo.discardFramesBeforePts =
-      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
-
-  decodeStats_.numSeeksAttempted++;
-
-  int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeekingForStream(
-          streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
-    decodeStats_.numSeeksSkipped++;
-    return;
-  }
-  int64_t desiredPts =
-      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
-
-  // For some encodings like H265, FFMPEG sometimes seeks past the point we
-  // set as the max_ts. So we use our own index to give it the exact pts of
-  // the key frame that we want to seek to.
-  // See https://github.com/pytorch/torchcodec/issues/179 for more details.
-  // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
-  if (!streamInfo.keyFrames.empty()) {
-    int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
-        streamInfo.keyFrames, desiredPts);
-    desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
-    desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
-  }
-
-  int ffmepgStatus = avformat_seek_file(
-      formatContext_.get(),
-      streamInfo.streamIndex,
-      INT64_MIN,
-      desiredPts,
-      desiredPts,
-      0);
-  if (ffmepgStatus < 0) {
-    throw std::runtime_error(
-        "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
-  }
-  decodeStats_.numFlushes++;
-  avcodec_flush_buffers(streamInfo.codecContext.get());
 }
 
 // --------------------------------------------------------------------------
@@ -1473,11 +1480,19 @@ void VideoDecoder::createSwsContext(
   streamInfo.swsContext.reset(swsContext);
 }
 
-int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
-  AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
-  int streamIndex =
-      av_find_best_stream(formatContext_.get(), mediaType, -1, -1, &avCodec, 0);
-  return streamIndex;
+// --------------------------------------------------------------------------
+// PTS <-> INDEX CONVERSIONS
+// --------------------------------------------------------------------------
+
+int VideoDecoder::getKeyFrameIndexForPts(
+    const StreamInfo& streamInfo,
+    int64_t pts) const {
+  if (streamInfo.keyFrames.empty()) {
+    return av_index_search_timestamp(
+        streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
+  } else {
+    return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
+  }
 }
 
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
@@ -1494,97 +1509,6 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
     return -1;
   }
   return upperBound - 1 - keyFrames.begin();
-}
-
-int VideoDecoder::getKeyFrameIndexForPts(
-    const StreamInfo& streamInfo,
-    int64_t pts) const {
-  if (streamInfo.keyFrames.empty()) {
-    return av_index_search_timestamp(
-        streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
-  } else {
-    return getKeyFrameIndexForPtsUsingScannedIndex(streamInfo.keyFrames, pts);
-  }
-}
-
-void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
-  int streamsSize =
-      static_cast<int>(containerMetadata_.allStreamMetadata.size());
-  TORCH_CHECK(
-      streamIndex >= 0 && streamIndex < streamsSize,
-      "Invalid stream index=" + std::to_string(streamIndex) +
-          "; valid indices are in the range [0, " +
-          std::to_string(streamsSize) + ").");
-  TORCH_CHECK(
-      streamInfos_.count(streamIndex) > 0,
-      "Provided stream index=" + std::to_string(streamIndex) +
-          " was not previously added.");
-}
-
-void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
-  if (!scannedAllStreams_) {
-    throw std::runtime_error(
-        "Must scan all streams to update metadata before calling " + msg);
-  }
-}
-
-void VideoDecoder::validateFrameIndex(
-    const StreamMetadata& streamMetadata,
-    int64_t frameIndex) {
-  int64_t numFrames = getNumFrames(streamMetadata);
-  TORCH_CHECK(
-      frameIndex >= 0 && frameIndex < numFrames,
-      "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-          " numFrames=" + std::to_string(numFrames));
-}
-
-int64_t VideoDecoder::getPts(
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata,
-    int64_t frameIndex) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamInfo.allFrames[frameIndex].pts;
-    case SeekMode::approximate:
-      return secondsToClosestPts(
-          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.numFramesFromScan.value();
-    case SeekMode::approximate:
-      return streamMetadata.numFrames.value();
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-double VideoDecoder::getMinSeconds(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.minPtsSecondsFromScan.value();
-    case SeekMode::approximate:
-      return 0;
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
-}
-
-double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
-  switch (seekMode_) {
-    case SeekMode::exact:
-      return streamMetadata.maxPtsSecondsFromScan.value();
-    case SeekMode::approximate:
-      return streamMetadata.durationSeconds.value();
-    default:
-      throw std::runtime_error("Unknown SeekMode");
-  }
 }
 
 int64_t VideoDecoder::secondsToIndexLowerBound(
@@ -1633,12 +1557,114 @@ int64_t VideoDecoder::secondsToIndexUpperBound(
   }
 }
 
+int64_t VideoDecoder::getPts(
+    const StreamInfo& streamInfo,
+    const StreamMetadata& streamMetadata,
+    int64_t frameIndex) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamInfo.allFrames[frameIndex].pts;
+    case SeekMode::approximate:
+      return secondsToClosestPts(
+          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+// --------------------------------------------------------------------------
+// STREAM AND METADATA APIS
+// --------------------------------------------------------------------------
+
+int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.numFramesFromScan.value();
+    case SeekMode::approximate:
+      return streamMetadata.numFrames.value();
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+double VideoDecoder::getMinSeconds(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.minPtsSecondsFromScan.value();
+    case SeekMode::approximate:
+      return 0;
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
+  switch (seekMode_) {
+    case SeekMode::exact:
+      return streamMetadata.maxPtsSecondsFromScan.value();
+    case SeekMode::approximate:
+      return streamMetadata.durationSeconds.value();
+    default:
+      throw std::runtime_error("Unknown SeekMode");
+  }
+}
+
+// --------------------------------------------------------------------------
+// VALIDATION UTILS
+// --------------------------------------------------------------------------
+
+void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
+  int streamsSize =
+      static_cast<int>(containerMetadata_.allStreamMetadata.size());
+  TORCH_CHECK(
+      streamIndex >= 0 && streamIndex < streamsSize,
+      "Invalid stream index=" + std::to_string(streamIndex) +
+          "; valid indices are in the range [0, " +
+          std::to_string(streamsSize) + ").");
+  TORCH_CHECK(
+      streamInfos_.count(streamIndex) > 0,
+      "Provided stream index=" + std::to_string(streamIndex) +
+          " was not previously added.");
+}
+
+void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
+  if (!scannedAllStreams_) {
+    throw std::runtime_error(
+        "Must scan all streams to update metadata before calling " + msg);
+  }
+}
+
+void VideoDecoder::validateFrameIndex(
+    const StreamMetadata& streamMetadata,
+    int64_t frameIndex) {
+  int64_t numFrames = getNumFrames(streamMetadata);
+  TORCH_CHECK(
+      frameIndex >= 0 && frameIndex < numFrames,
+      "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+          " numFrames=" + std::to_string(numFrames));
+}
+
 // --------------------------------------------------------------------------
 // MORALLY PRIVATE UTILS
 // --------------------------------------------------------------------------
 
 VideoDecoder::DecodeStats VideoDecoder::getDecodeStats() const {
   return decodeStats_;
+}
+
+std::ostream& operator<<(
+    std::ostream& os,
+    const VideoDecoder::DecodeStats& stats) {
+  os << "DecodeStats{"
+     << "numFramesReceivedByDecoder=" << stats.numFramesReceivedByDecoder
+     << ", numPacketsRead=" << stats.numPacketsRead
+     << ", numPacketsSentToDecoder=" << stats.numPacketsSentToDecoder
+     << ", numSeeksAttempted=" << stats.numSeeksAttempted
+     << ", numSeeksSkipped=" << stats.numSeeksSkipped
+     << ", numFlushes=" << stats.numFlushes << "}";
+
+  return os;
 }
 
 void VideoDecoder::resetDecodeStats() {
@@ -1660,6 +1686,10 @@ double VideoDecoder::getPtsSecondsForFrame(
       streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
 }
 
+// --------------------------------------------------------------------------
+// FrameDims APIs
+// --------------------------------------------------------------------------
+
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
   return FrameDims(resizedAVFrame.height, resizedAVFrame.width);
 }
@@ -1678,20 +1708,6 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
   return FrameDims(
       videoStreamOptions.height.value_or(avFrame.height),
       videoStreamOptions.width.value_or(avFrame.width));
-}
-
-std::ostream& operator<<(
-    std::ostream& os,
-    const VideoDecoder::DecodeStats& stats) {
-  os << "DecodeStats{"
-     << "numFramesReceivedByDecoder=" << stats.numFramesReceivedByDecoder
-     << ", numPacketsRead=" << stats.numPacketsRead
-     << ", numPacketsSentToDecoder=" << stats.numPacketsSentToDecoder
-     << ", numSeeksAttempted=" << stats.numSeeksAttempted
-     << ", numSeeksSkipped=" << stats.numSeeksSkipped
-     << ", numFlushes=" << stats.numFlushes << "}";
-
-  return os;
 }
 
 } // namespace facebook::torchcodec
