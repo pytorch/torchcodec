@@ -194,6 +194,10 @@ void VideoDecoder::initializeDecoder() {
   initialized_ = true;
 }
 
+// --------------------------------------------------------------------------
+// VIDEO METADATA QUERY API
+// --------------------------------------------------------------------------
+
 void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scannedAllStreams_) {
     return;
@@ -307,6 +311,24 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   }
 
   scannedAllStreams_ = true;
+}
+
+VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
+  return containerMetadata_;
+}
+
+torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
+  validateUserProvidedStreamIndex(streamIndex);
+  validateScannedAllStreams("getKeyFrameIndices");
+
+  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
+  torch::Tensor keyFrameIndices =
+      torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
+  for (size_t i = 0; i < keyFrames.size(); ++i) {
+    keyFrameIndices[i] = keyFrames[i].frameIndex;
+  }
+
+  return keyFrameIndices;
 }
 
 // --------------------------------------------------------------------------
@@ -939,24 +961,6 @@ void VideoDecoder::updateMetadataWithCodecContext(
   auto codedId = codecContext->codec_id;
   containerMetadata_.allStreamMetadata[streamIndex].codecName =
       std::string(avcodec_get_name(codedId));
-}
-
-VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
-  return containerMetadata_;
-}
-
-torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
-  validateScannedAllStreams("getKeyFrameIndices");
-
-  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
-  torch::Tensor keyFrameIndices =
-      torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
-  for (size_t i = 0; i < keyFrames.size(); ++i) {
-    keyFrameIndices[i] = keyFrames[i].frameIndex;
-  }
-
-  return keyFrameIndices;
 }
 
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
