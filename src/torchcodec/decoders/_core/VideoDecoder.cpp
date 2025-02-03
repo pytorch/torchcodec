@@ -1238,6 +1238,10 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
       filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
+// --------------------------------------------------------------------------
+// OUTPUT ALLOCATION AND SHAPE CONVERSION
+// --------------------------------------------------------------------------
+
 VideoDecoder::FrameBatchOutput::FrameBatchOutput(
     int64_t numFrames,
     const VideoStreamOptions& videoStreamOptions,
@@ -1297,6 +1301,10 @@ torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
         false, "Expected tensor with 3 or 4 dimensions, got ", numDimensions);
   }
 }
+
+// --------------------------------------------------------------------------
+// COLOR CONVERSION UTILS AND INITIALIZERS
+// --------------------------------------------------------------------------
 
 bool VideoDecoder::DecodedFrameContext::operator==(
     const VideoDecoder::DecodedFrameContext& other) {
@@ -1417,6 +1425,52 @@ void VideoDecoder::createFilterGraph(
         "Failed to configure filter graph: " +
         getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
   }
+}
+
+void VideoDecoder::createSwsContext(
+    StreamInfo& streamInfo,
+    const DecodedFrameContext& frameContext,
+    const enum AVColorSpace colorspace) {
+  SwsContext* swsContext = sws_getContext(
+      frameContext.decodedWidth,
+      frameContext.decodedHeight,
+      frameContext.decodedFormat,
+      frameContext.expectedWidth,
+      frameContext.expectedHeight,
+      AV_PIX_FMT_RGB24,
+      SWS_BILINEAR,
+      nullptr,
+      nullptr,
+      nullptr);
+  TORCH_CHECK(swsContext, "sws_getContext() returned nullptr");
+
+  int* invTable = nullptr;
+  int* table = nullptr;
+  int srcRange, dstRange, brightness, contrast, saturation;
+  int ret = sws_getColorspaceDetails(
+      swsContext,
+      &invTable,
+      &srcRange,
+      &table,
+      &dstRange,
+      &brightness,
+      &contrast,
+      &saturation);
+  TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
+
+  const int* colorspaceTable = sws_getCoefficients(colorspace);
+  ret = sws_setColorspaceDetails(
+      swsContext,
+      colorspaceTable,
+      srcRange,
+      colorspaceTable,
+      dstRange,
+      brightness,
+      contrast,
+      saturation);
+  TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
+
+  streamInfo.swsContext.reset(swsContext);
 }
 
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
@@ -1604,52 +1658,6 @@ double VideoDecoder::getPtsSecondsForFrame(
 
   return ptsToSeconds(
       streamInfo.allFrames[frameIndex].pts, streamInfo.timeBase);
-}
-
-void VideoDecoder::createSwsContext(
-    StreamInfo& streamInfo,
-    const DecodedFrameContext& frameContext,
-    const enum AVColorSpace colorspace) {
-  SwsContext* swsContext = sws_getContext(
-      frameContext.decodedWidth,
-      frameContext.decodedHeight,
-      frameContext.decodedFormat,
-      frameContext.expectedWidth,
-      frameContext.expectedHeight,
-      AV_PIX_FMT_RGB24,
-      SWS_BILINEAR,
-      nullptr,
-      nullptr,
-      nullptr);
-  TORCH_CHECK(swsContext, "sws_getContext() returned nullptr");
-
-  int* invTable = nullptr;
-  int* table = nullptr;
-  int srcRange, dstRange, brightness, contrast, saturation;
-  int ret = sws_getColorspaceDetails(
-      swsContext,
-      &invTable,
-      &srcRange,
-      &table,
-      &dstRange,
-      &brightness,
-      &contrast,
-      &saturation);
-  TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
-
-  const int* colorspaceTable = sws_getCoefficients(colorspace);
-  ret = sws_setColorspaceDetails(
-      swsContext,
-      colorspaceTable,
-      srcRange,
-      colorspaceTable,
-      dstRange,
-      brightness,
-      contrast,
-      saturation);
-  TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
-
-  streamInfo.swsContext.reset(swsContext);
 }
 
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
