@@ -63,6 +63,10 @@ std::vector<std::string> splitStringWithDelimiters(
 
 } // namespace
 
+// --------------------------------------------------------------------------
+// CONSTRUCTORS, INITIALIZATION, DESTRUCTORS
+// --------------------------------------------------------------------------
+
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
   AVFormatContext* formatContext = nullptr;
@@ -109,6 +113,200 @@ VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
   ioBytesContext_ = std::move(input.ioBytesContext);
 
   initializeDecoder();
+}
+
+void VideoDecoder::initializeDecoder() {
+  TORCH_CHECK(!initialized_, "Attempted double initialization.");
+
+  // In principle, the AVFormatContext should be filled in by the call to
+  // avformat_open_input() which reads the header. However, some formats do not
+  // store enough info in the header, so we call avformat_find_stream_info()
+  // which decodes a few frames to get missing info. For more, see:
+  //   https://ffmpeg.org/doxygen/7.0/group__lavf__decoding.html
+  int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
+  if (ffmpegStatus < 0) {
+    throw std::runtime_error(
+        "Failed to find stream info: " +
+        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+  }
+
+  for (unsigned int i = 0; i < formatContext_->nb_streams; i++) {
+    AVStream* avStream = formatContext_->streams[i];
+    StreamMetadata streamMetadata;
+
+    TORCH_CHECK(
+        static_cast<int>(i) == avStream->index,
+        "Our stream index, " + std::to_string(i) +
+            ", does not match AVStream's index, " +
+            std::to_string(avStream->index) + ".");
+    streamMetadata.streamIndex = i;
+    streamMetadata.mediaType = avStream->codecpar->codec_type;
+    streamMetadata.codecName = avcodec_get_name(avStream->codecpar->codec_id);
+    streamMetadata.bitRate = avStream->codecpar->bit_rate;
+
+    int64_t frameCount = avStream->nb_frames;
+    if (frameCount > 0) {
+      streamMetadata.numFrames = frameCount;
+    }
+
+    if (avStream->duration > 0 && avStream->time_base.den > 0) {
+      streamMetadata.durationSeconds =
+          av_q2d(avStream->time_base) * avStream->duration;
+    }
+
+    double fps = av_q2d(avStream->r_frame_rate);
+    if (fps > 0) {
+      streamMetadata.averageFps = fps;
+    }
+
+    if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      containerMetadata_.numVideoStreams++;
+    } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+      containerMetadata_.numAudioStreams++;
+    }
+
+    containerMetadata_.allStreamMetadata.push_back(streamMetadata);
+  }
+
+  if (formatContext_->duration > 0) {
+    containerMetadata_.durationSeconds =
+        ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
+  }
+
+  if (formatContext_->bit_rate > 0) {
+    containerMetadata_.bitRate = formatContext_->bit_rate;
+  }
+
+  int bestVideoStream = getBestStreamIndex(AVMEDIA_TYPE_VIDEO);
+  if (bestVideoStream >= 0) {
+    containerMetadata_.bestVideoStreamIndex = bestVideoStream;
+  }
+
+  int bestAudioStream = getBestStreamIndex(AVMEDIA_TYPE_AUDIO);
+  if (bestAudioStream >= 0) {
+    containerMetadata_.bestAudioStreamIndex = bestAudioStream;
+  }
+
+  if (seekMode_ == SeekMode::exact) {
+    scanFileAndUpdateMetadataAndIndex();
+  }
+
+  initialized_ = true;
+}
+
+void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
+  if (scannedAllStreams_) {
+    return;
+  }
+
+  AutoAVPacket autoAVPacket;
+  while (true) {
+    ReferenceAVPacket packet(autoAVPacket);
+
+    // av_read_frame is a misleading name: it gets the next **packet**.
+    int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
+
+    if (ffmpegStatus == AVERROR_EOF) {
+      break;
+    }
+
+    if (ffmpegStatus != AVSUCCESS) {
+      throw std::runtime_error(
+          "Failed to read frame from input file: " +
+          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+    }
+
+    if (packet->flags & AV_PKT_FLAG_DISCARD) {
+      continue;
+    }
+
+    // We got a valid packet. Let's figure out what stream it belongs to and
+    // record its relevant metadata.
+    int streamIndex = packet->stream_index;
+    auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
+    streamMetadata.minPtsFromScan = std::min(
+        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
+    streamMetadata.maxPtsFromScan = std::max(
+        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
+        packet->pts + packet->duration);
+    streamMetadata.numFramesFromScan =
+        streamMetadata.numFramesFromScan.value_or(0) + 1;
+
+    // Note that we set the other value in this struct, nextPts, only after
+    // we have scanned all packets and sorted by pts.
+    FrameInfo frameInfo = {packet->pts};
+    if (packet->flags & AV_PKT_FLAG_KEY) {
+      frameInfo.isKeyFrame = true;
+      streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
+    }
+    streamInfos_[streamIndex].allFrames.push_back(frameInfo);
+  }
+
+  // Set all per-stream metadata that requires knowing the content of all
+  // packets.
+  for (size_t streamIndex = 0;
+       streamIndex < containerMetadata_.allStreamMetadata.size();
+       ++streamIndex) {
+    auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
+    auto avStream = formatContext_->streams[streamIndex];
+
+    streamMetadata.numFramesFromScan =
+        streamInfos_[streamIndex].allFrames.size();
+
+    if (streamMetadata.minPtsFromScan.has_value()) {
+      streamMetadata.minPtsSecondsFromScan =
+          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
+    }
+    if (streamMetadata.maxPtsFromScan.has_value()) {
+      streamMetadata.maxPtsSecondsFromScan =
+          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
+    }
+  }
+
+  // Reset the seek-cursor back to the beginning.
+  int ffmepgStatus =
+      avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
+  if (ffmepgStatus < 0) {
+    throw std::runtime_error(
+        "Could not seek file to pts=0: " +
+        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+  }
+
+  // Sort all frames by their pts.
+  for (auto& [streamIndex, streamInfo] : streamInfos_) {
+    std::sort(
+        streamInfo.keyFrames.begin(),
+        streamInfo.keyFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+    std::sort(
+        streamInfo.allFrames.begin(),
+        streamInfo.allFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+
+    size_t keyFrameIndex = 0;
+    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
+      streamInfo.allFrames[i].frameIndex = i;
+      if (streamInfo.allFrames[i].isKeyFrame) {
+        TORCH_CHECK(
+            keyFrameIndex < streamInfo.keyFrames.size(),
+            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
+        ++keyFrameIndex;
+      }
+      if (i + 1 < streamInfo.allFrames.size()) {
+        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
+      }
+    }
+    TORCH_CHECK(
+        keyFrameIndex == streamInfo.keyFrames.size(),
+        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+  }
+
+  scannedAllStreams_ = true;
 }
 
 // Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
@@ -213,85 +411,6 @@ bool VideoDecoder::DecodedFrameContext::operator==(
 bool VideoDecoder::DecodedFrameContext::operator!=(
     const VideoDecoder::DecodedFrameContext& other) {
   return !(*this == other);
-}
-
-void VideoDecoder::initializeDecoder() {
-  TORCH_CHECK(!initialized_, "Attempted double initialization.");
-
-  // In principle, the AVFormatContext should be filled in by the call to
-  // avformat_open_input() which reads the header. However, some formats do not
-  // store enough info in the header, so we call avformat_find_stream_info()
-  // which decodes a few frames to get missing info. For more, see:
-  //   https://ffmpeg.org/doxygen/7.0/group__lavf__decoding.html
-  int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
-  if (ffmpegStatus < 0) {
-    throw std::runtime_error(
-        "Failed to find stream info: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-  }
-
-  for (unsigned int i = 0; i < formatContext_->nb_streams; i++) {
-    AVStream* avStream = formatContext_->streams[i];
-    StreamMetadata streamMetadata;
-
-    TORCH_CHECK(
-        static_cast<int>(i) == avStream->index,
-        "Our stream index, " + std::to_string(i) +
-            ", does not match AVStream's index, " +
-            std::to_string(avStream->index) + ".");
-    streamMetadata.streamIndex = i;
-    streamMetadata.mediaType = avStream->codecpar->codec_type;
-    streamMetadata.codecName = avcodec_get_name(avStream->codecpar->codec_id);
-    streamMetadata.bitRate = avStream->codecpar->bit_rate;
-
-    int64_t frameCount = avStream->nb_frames;
-    if (frameCount > 0) {
-      streamMetadata.numFrames = frameCount;
-    }
-
-    if (avStream->duration > 0 && avStream->time_base.den > 0) {
-      streamMetadata.durationSeconds =
-          av_q2d(avStream->time_base) * avStream->duration;
-    }
-
-    double fps = av_q2d(avStream->r_frame_rate);
-    if (fps > 0) {
-      streamMetadata.averageFps = fps;
-    }
-
-    if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-      containerMetadata_.numVideoStreams++;
-    } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-      containerMetadata_.numAudioStreams++;
-    }
-
-    containerMetadata_.allStreamMetadata.push_back(streamMetadata);
-  }
-
-  if (formatContext_->duration > 0) {
-    containerMetadata_.durationSeconds =
-        ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
-  }
-
-  if (formatContext_->bit_rate > 0) {
-    containerMetadata_.bitRate = formatContext_->bit_rate;
-  }
-
-  int bestVideoStream = getBestStreamIndex(AVMEDIA_TYPE_VIDEO);
-  if (bestVideoStream >= 0) {
-    containerMetadata_.bestVideoStreamIndex = bestVideoStream;
-  }
-
-  int bestAudioStream = getBestStreamIndex(AVMEDIA_TYPE_AUDIO);
-  if (bestAudioStream >= 0) {
-    containerMetadata_.bestAudioStreamIndex = bestAudioStream;
-  }
-
-  if (seekMode_ == SeekMode::exact) {
-    scanFileAndUpdateMetadataAndIndex();
-  }
-
-  initialized_ = true;
 }
 
 void VideoDecoder::createFilterGraph(
@@ -547,121 +666,6 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
     return -1;
   }
   return upperBound - 1 - keyFrames.begin();
-}
-
-void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
-  if (scannedAllStreams_) {
-    return;
-  }
-
-  AutoAVPacket autoAVPacket;
-  while (true) {
-    ReferenceAVPacket packet(autoAVPacket);
-
-    // av_read_frame is a misleading name: it gets the next **packet**.
-    int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
-
-    if (ffmpegStatus == AVERROR_EOF) {
-      break;
-    }
-
-    if (ffmpegStatus != AVSUCCESS) {
-      throw std::runtime_error(
-          "Failed to read frame from input file: " +
-          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-    }
-
-    if (packet->flags & AV_PKT_FLAG_DISCARD) {
-      continue;
-    }
-
-    // We got a valid packet. Let's figure out what stream it belongs to and
-    // record its relevant metadata.
-    int streamIndex = packet->stream_index;
-    auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
-    streamMetadata.minPtsFromScan = std::min(
-        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
-    streamMetadata.maxPtsFromScan = std::max(
-        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
-        packet->pts + packet->duration);
-    streamMetadata.numFramesFromScan =
-        streamMetadata.numFramesFromScan.value_or(0) + 1;
-
-    // Note that we set the other value in this struct, nextPts, only after
-    // we have scanned all packets and sorted by pts.
-    FrameInfo frameInfo = {packet->pts};
-    if (packet->flags & AV_PKT_FLAG_KEY) {
-      frameInfo.isKeyFrame = true;
-      streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
-    }
-    streamInfos_[streamIndex].allFrames.push_back(frameInfo);
-  }
-
-  // Set all per-stream metadata that requires knowing the content of all
-  // packets.
-  for (size_t streamIndex = 0;
-       streamIndex < containerMetadata_.allStreamMetadata.size();
-       ++streamIndex) {
-    auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
-    auto avStream = formatContext_->streams[streamIndex];
-
-    streamMetadata.numFramesFromScan =
-        streamInfos_[streamIndex].allFrames.size();
-
-    if (streamMetadata.minPtsFromScan.has_value()) {
-      streamMetadata.minPtsSecondsFromScan =
-          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
-    }
-    if (streamMetadata.maxPtsFromScan.has_value()) {
-      streamMetadata.maxPtsSecondsFromScan =
-          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
-    }
-  }
-
-  // Reset the seek-cursor back to the beginning.
-  int ffmepgStatus =
-      avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
-  if (ffmepgStatus < 0) {
-    throw std::runtime_error(
-        "Could not seek file to pts=0: " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
-  }
-
-  // Sort all frames by their pts.
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    std::sort(
-        streamInfo.keyFrames.begin(),
-        streamInfo.keyFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-    std::sort(
-        streamInfo.allFrames.begin(),
-        streamInfo.allFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-
-    size_t keyFrameIndex = 0;
-    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
-      streamInfo.allFrames[i].frameIndex = i;
-      if (streamInfo.allFrames[i].isKeyFrame) {
-        TORCH_CHECK(
-            keyFrameIndex < streamInfo.keyFrames.size(),
-            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
-        ++keyFrameIndex;
-      }
-      if (i + 1 < streamInfo.allFrames.size()) {
-        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
-      }
-    }
-    TORCH_CHECK(
-        keyFrameIndex == streamInfo.keyFrames.size(),
-        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-  }
-
-  scannedAllStreams_ = true;
 }
 
 int VideoDecoder::getKeyFrameIndexForPts(
