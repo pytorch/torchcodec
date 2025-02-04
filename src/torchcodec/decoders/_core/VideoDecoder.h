@@ -450,8 +450,6 @@ class VideoDecoder {
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
 
-  void populateVideoMetadataFromStreamIndex(int streamIndex);
-
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
   // See
