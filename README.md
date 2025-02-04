@@ -135,8 +135,9 @@ The following table indicates the compatibility between versions of
 
 | `torchcodec`       | `torch`            | Python              |
 | ------------------ | ------------------ | ------------------- |
-| `main` / `nightly` | `main` / `nightly` | `>=3.9`, `<=3.12`   |
-| not yet supported  | `2.5`              | `>=3.9`, `<=3.12`   |
+| `main` / `nightly` | `main` / `nightly` | `>=3.9`, `<=3.13`   |
+| `0.2`              | `2.6`              | `>=3.9`, `<=3.13`   |
+| `0.1`              | `2.5`              | `>=3.9`, `<=3.12`   |
 | `0.0.3`            | `2.4`              | `>=3.8`, `<=3.12`   |
 
 ### Installing CUDA-enabled TorchCodec
