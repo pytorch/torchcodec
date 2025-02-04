@@ -416,7 +416,7 @@ void VideoDecoder::addVideoStreamDecoder(
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
   int streamIndex = av_find_best_stream(
       formatContext_.get(),
-      AVMEDIA_TYPE_VIDEO,
+      AVMEDIA_TYPE_AUDIO,
       preferredStreamIndex,
       -1,
       &avCodec,
@@ -431,7 +431,7 @@ void VideoDecoder::addVideoStreamDecoder(
   streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
   streamInfo.stream = formatContext_->streams[streamIndex];
 
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
     throw std::invalid_argument(
         "Stream with index " + std::to_string(streamIndex) +
         " is not a video stream.");
@@ -1321,6 +1321,7 @@ torch::Tensor allocateEmptyHWCTensor(
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
     int streamIndex,
     torch::Tensor& hwcTensor) {
+  return hwcTensor;
   if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
     return hwcTensor;
   }
