@@ -960,6 +960,8 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     // Is this the kind of frame we're looking for?
     if (ffmpegStatus == AVSUCCESS && filterFunction(avFrame.get())) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
+      printf("%ld %ld\n", avFrame->pts, avFrame->duration);
+
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
       // No, but we received a valid frame - just not the kind we're looking
@@ -1070,13 +1072,13 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
   auto sampleRate = avFrame->sample_rate;
   auto numChannels = avFrame->ch_layout.nb_channels;
 
-  printf("numSamples: %d\n", numSamples);
-  printf("sample rate: %d\n", sampleRate);
+//   printf("numSamples: %d\n", numSamples);
+//   printf("sample rate: %d\n", sampleRate);
 
-  printf("numChannels: %d\n", numChannels);
+//   printf("numChannels: %d\n", numChannels);
   int bytesPerSample =
       av_get_bytes_per_sample(streamInfo.codecContext->sample_fmt);
-  printf("bytes per sample: %d\n", bytesPerSample);
+//   printf("bytes per sample: %d\n", bytesPerSample);
 
   // Assuming format is FLTP (float 32bits ???)
 
