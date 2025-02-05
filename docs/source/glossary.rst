@@ -17,6 +17,9 @@ Glossary
        A scan corresponds to an entire pass over a video file, with the purpose
        of retrieving metadata about the different streams and frames. **It does
        not involve decoding**, so it is a lot cheaper than decoding the file.
+       The :class:`~torchcodec.decoders.VideoDecoder` performs a scan when using
+       ``seek_mode="exact"``, and doesn't scan when using
+       ``seek_mode="approximate"``.
 
     clips
         A clip is a sequence of frames, usually in :term:`pts` order. The frames
