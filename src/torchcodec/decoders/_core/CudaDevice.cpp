@@ -101,11 +101,11 @@ AVBufferRef* getFFMPEGContextFromExistingCudaContext(
     /* clang-format off */
     TORCH_CHECK(
         false,
-        "Failed to create specified HW device. This typically happens when your
-        installed FFmpeg doesn't support CUDA (see
-        https://github.com/pytorch/torchcodec#installing-cuda-enabled-torchcodec
-        ). FFmpeg error: ", getFFMPEGErrorStringFromErrorCode(err));
-    /* clang-format on*/
+        "Failed to create specified HW device. This typically happens when ",
+        "your installed FFmpeg doesn't support CUDA (see ",
+        "https://github.com/pytorch/torchcodec#installing-cuda-enabled-torchcodec",
+        "). FFmpeg error: ", getFFMPEGErrorStringFromErrorCode(err));
+    /* clang-format on */
   }
   return hw_device_ctx;
 }
