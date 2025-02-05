@@ -105,10 +105,10 @@ bench(VideoDecoder, source=long_video_path, seek_mode="approximate")
 #
 # Strictly speaking the ``seek_mode`` parameter only affects the performance of
 # the :class:`~torchcodec.decoders.VideoDecoder` creation. It does not have a
-# direct effect on frame decoding or sampling. **However**, because frame
-# decoding and sampling patterns typically involve the creation of the
-# :class:`~torchcodec.decoders.VideoDecoder` (one per video), ``seek_mode`` may
-# very well end up affecting the performance of decoding and samplers. For
+# direct effect on the performance of frame decoding or sampling.  **However**,
+# because frame decoding and sampling patterns typically involve the creation of
+# the :class:`~torchcodec.decoders.VideoDecoder` (one per video), ``seek_mode``
+# may very well end up affecting the performance of decoding and samplers. For
 # example:
 
 from torchcodec import samplers
@@ -163,7 +163,7 @@ print("Frame seeking is the same for this video!")
 # ----------------------------------
 #
 # With ``seek_mode="exact"``, the :class:`~torchcodec.decoders.VideoDecoder`
-# performs a :term:`scan` when it is instanciated. The scan doesn't involve
+# performs a :term:`scan` when it is instantiated. The scan doesn't involve
 # decoding, but processes an entire file to infer more accurate metadata (like
 # duration), and also builds an internal index of frames and key-frames. This
 # internal index is potentially more accurate than the one in the file's
