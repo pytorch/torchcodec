@@ -20,7 +20,7 @@ accuracy of the retreived frames (i.e. in approximate mode, requesting the
 # %%
 # First, a bit of boilerplate: we'll download a short video from the web, and
 # use the ffmpeg CLI to repeat it 100 times. We'll end up with two videos: a
-# short video of approximately 13s and a long one of about 1380s (~40 mins).
+# short video of approximately 13s and a long one of about 20 mins.
 # You can ignore that part and jump right below to :ref:`perf_creation`.
 
 
@@ -58,7 +58,7 @@ subprocess.run(ffmpeg_command, check=True, stdout=subprocess.PIPE, stderr=subpro
 
 from torchcodec.decoders import VideoDecoder
 print(f"Short video duration: {VideoDecoder(short_video_path).metadata.duration_seconds} seconds")
-print(f"Long video duration: {VideoDecoder(long_video_path).metadata.duration_seconds} seconds")
+print(f"Long video duration: {VideoDecoder(long_video_path).metadata.duration_seconds / 60} minutes")
 
 # %%
 # .. _perf_creation:
