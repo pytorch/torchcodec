@@ -22,7 +22,6 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 class VideoDecoder:
     """A single-stream video decoder.
 
-    This decoder always performs a :term:`scan` of the video.
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
@@ -51,9 +50,13 @@ class VideoDecoder:
             Default: 1.
         device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
         seek_mode (str, optional): Determines if frame access will be "exact" or
-            "approximate". Exact guarantees that requesting frame i will always return frame i,
-            but doing so requires an initial :term:`scan` of the file. Approximate is faster as it avoids scanning the
-            file, but less accurate as it uses the file's metadata to calculate where i probably is. Default: "exact".
+            "approximate". Exact guarantees that requesting frame i will always
+            return frame i, but doing so requires an initial :term:`scan` of the
+            file. Approximate is faster as it avoids scanning the file, but less
+            accurate as it uses the file's metadata to calculate where i
+            probably is. Default: "exact".
+            Read more about this parameter in:
+            :ref:`sphx_glr_generated_examples_approximate_mode.py`
 
 
     Attributes:
