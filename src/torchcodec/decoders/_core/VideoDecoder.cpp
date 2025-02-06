@@ -951,9 +951,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   outerLoopStart:
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
-    if (ffmpegStatus == AVERROR(EAGAIN)) {
-      printf("Yes\n");
-    }
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
