@@ -477,6 +477,7 @@ class VideoDecoder {
   // ATTRIBUTES
   // --------------------------------------------------------------------------
 
+  bool veryFirstCall_ = true;
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueAVFormatContext formatContext_;
