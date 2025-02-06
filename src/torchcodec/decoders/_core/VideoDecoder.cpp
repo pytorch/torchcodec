@@ -405,6 +405,58 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
   }
 }
 
+void print_codecContext(AVCodecContext* cc) {
+  printf("Codec ID: %d\n", cc->codec_id);
+  printf("Codec Type: %d\n", cc->codec_type);
+  printf("Codec Name: %s\n", cc->codec ? cc->codec->name : "unknown");
+  printf("Bit Rate: %ld\n", cc->bit_rate);
+  printf("Time Base: %d/%d\n", cc->time_base.num, cc->time_base.den);
+  printf("GOP Size: %d\n", cc->gop_size);
+  printf("Max B-Frames: %d\n", cc->max_b_frames);
+  if (cc->codec_type == AVMEDIA_TYPE_VIDEO) {
+    printf("Width: %d\n", cc->width);
+    printf("Height: %d\n", cc->height);
+    printf("Pixel Format: %s\n", av_get_pix_fmt_name(cc->pix_fmt));
+    printf("Frame Rate: %d/%d\n", cc->framerate.num, cc->framerate.den);
+  } else if (cc->codec_type == AVMEDIA_TYPE_AUDIO) {
+    printf("Sample Rate: %d\n", cc->sample_rate);
+    printf("Channels: %d\n", cc->channels);
+    printf("Channel Layout: %ld\n", cc->channel_layout);
+    printf("Sample Format: %s\n", av_get_sample_fmt_name(cc->sample_fmt));
+  }
+  printf("Profile: %d\n", cc->profile);
+  printf("Level: %d\n", cc->level);
+  printf("Flags: %d\n", cc->flags);
+  printf("Thread Count: %d\n", cc->thread_count);
+  // Additional attributes
+  printf("Skip Frame: %d\n", cc->skip_frame);
+  printf("Skip IDCT: %d\n", cc->skip_idct);
+  printf("Skip Loop Filter: %d\n", cc->skip_loop_filter);
+  printf("Error Recognition: %d\n", cc->err_recognition);
+  printf("Error Concealment: %d\n", cc->error_concealment);
+  printf("HW Device Context: %p\n", cc->hw_device_ctx);
+  printf("HW Accel: %p\n", cc->hwaccel);
+  printf("Pkt Timebase: %d/%d\n", cc->pkt_timebase.num, cc->pkt_timebase.den);
+  printf("Delay: %d\n", cc->delay);
+  printf("Extradata Size: %d\n", cc->extradata_size);
+  if (cc->extradata && cc->extradata_size > 0) {
+    printf("Extradata: ");
+    for (int i = 0; i < cc->extradata_size; i++) {
+      printf("%02X ", cc->extradata[i]);
+    }
+    printf("\n");
+  }
+  printf("RC Buffer Size: %d\n", cc->rc_buffer_size);
+  printf("RC Max Rate: %d\n", cc->rc_max_rate);
+  printf("RC Min Rate: %d\n", cc->rc_min_rate);
+  printf("Thread Type: %d\n", cc->thread_type);
+  printf("Ticks Per Frame: %d\n", cc->ticks_per_frame);
+  printf(
+      "Subtitle Char Encoding: %s\n",
+      cc->sub_charenc ? cc->sub_charenc : "N/A");
+  printf("\n");
+}
+
 void VideoDecoder::addVideoStreamDecoder(
     int preferredStreamIndex,
     const VideoStreamOptions& videoStreamOptions) {
@@ -456,6 +508,10 @@ void VideoDecoder::addVideoStreamDecoder(
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
   codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
+  if (!codecContext->channel_layout) {
+    codecContext->channel_layout =
+        av_get_default_channel_layout(codecContext->channels);
+  }
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
@@ -499,6 +555,8 @@ void VideoDecoder::addVideoStreamDecoder(
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
+
+  print_codecContext(streamInfo.codecContext.get());
 }
 
 void VideoDecoder::updateMetadataWithCodecContext(
@@ -926,6 +984,64 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 // LOW-LEVEL DECODING
 // --------------------------------------------------------------------------
 
+void print_packet(AVPacket* packet) {
+  printf(
+      "Packet PTS: %ld, DTS: %ld, Duration: %d, Size: %d, Stream Index: %d\n",
+      packet->pts,
+      packet->dts,
+      packet->duration,
+      packet->size,
+      packet->stream_index);
+  // Optional: Calculate a simple checksum or hash of the packet data
+  unsigned long checksum = 0;
+  for (int i = 0; i < packet->size; i++) {
+    checksum += packet->data[i];
+  }
+  printf("Packet Checksum: %lu\n\n", checksum);
+  fflush(stdout);
+}
+
+void print_avFrame(AVFrame* avFrame) {
+  printf("Format: %d\n", avFrame->format);
+  printf("Width: %d\n", avFrame->width);
+  printf("Height: %d\n", avFrame->height);
+  printf(
+      "Channels: %d\n",
+      av_get_channel_layout_nb_channels(avFrame->channel_layout));
+  printf("Channel Layout: %ld\n", avFrame->channel_layout);
+  printf("Number of Samples: %d\n", avFrame->nb_samples);
+  printf("PTS: %ld\n", avFrame->pts);
+  printf("Packet DTS: %ld\n", avFrame->pkt_dts);
+  printf("Packet Duration: %d\n", avFrame->pkt_duration);
+  printf("Packet Pos: %d\n", avFrame->pkt_pos);
+  for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
+    if (avFrame->data[i]) {
+      printf("Data[%d] Line Size: %d\n", i, avFrame->linesize[i]);
+    }
+  }
+  printf("Color Range: %d\n", avFrame->color_range);
+  printf("Color Primaries: %d\n", avFrame->color_primaries);
+  printf("Color Transfer Characteristic: %d\n", avFrame->color_trc);
+  printf("Color Space: %d\n", avFrame->colorspace);
+  printf("Chroma Location: %d\n", avFrame->chroma_location);
+  printf(
+      "Sample Aspect Ratio: %d/%d\n",
+      avFrame->sample_aspect_ratio.num,
+      avFrame->sample_aspect_ratio.den);
+  printf("Key Frame: %d\n", avFrame->key_frame);
+  printf("Picture Type: %d\n", avFrame->pict_type);
+  printf("Coded Picture Number: %d\n", avFrame->coded_picture_number);
+  printf("Display Picture Number: %d\n", avFrame->display_picture_number);
+
+  unsigned long checksum = 0;
+  for (int i = 0; i < 100; i++) {
+    checksum += avFrame->extended_data[0][i];
+  }
+  printf("Frame Checksum: %lu\n", checksum);
+  printf("\n");
+  fflush(stdout);
+}
+
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
   if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
@@ -942,7 +1058,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
   AutoAVPacket autoAVPacket;
   int ffmpegStatus = AVSUCCESS;
@@ -950,6 +1065,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   while (true) {
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
+    // printf("output of avcodec_receive_frame: %d\n", ffmpegStatus);
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
@@ -960,7 +1076,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     // Is this the kind of frame we're looking for?
     if (ffmpegStatus == AVSUCCESS && filterFunction(avFrame.get())) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
-      printf("%ld %ld\n", avFrame->pts, avFrame->duration);
+      // printf("%ld %ld\n", avFrame->pts, avFrame->duration);
 
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
@@ -1015,8 +1131,10 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
+    print_packet(packet.get());
     ffmpegStatus =
         avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+    print_packet(packet.get());
     if (ffmpegStatus < AVSUCCESS) {
       throw std::runtime_error(
           "Could not push packet to decoder: " +
@@ -1045,6 +1163,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   // the file and that will flush the decoder.
   streamInfo.currentPts = avFrame->pts;
   streamInfo.currentDuration = getDuration(avFrame);
+  print_avFrame(avFrame.get());
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
 }
@@ -1072,27 +1191,22 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
   auto sampleRate = avFrame->sample_rate;
   auto numChannels = avFrame->ch_layout.nb_channels;
 
-//   printf("numSamples: %d\n", numSamples);
-//   printf("sample rate: %d\n", sampleRate);
+  //   printf("numSamples: %d\n", numSamples);
+  //   printf("sample rate: %d\n", sampleRate);
 
-//   printf("numChannels: %d\n", numChannels);
+  //   printf("numChannels: %d\n", numChannels);
   int bytesPerSample =
       av_get_bytes_per_sample(streamInfo.codecContext->sample_fmt);
-//   printf("bytes per sample: %d\n", bytesPerSample);
+  //   printf("bytes per sample: %d\n", bytesPerSample);
 
-  // Assuming format is FLTP (float 32bits ???)
-
-  // This is slow, use accessor. or just memcpy?
   torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
   for (auto channel = 0; channel < numChannels; ++channel) {
-    // auto channelDataPtr = data[channel].data_ptr<uint8_t>();
-    // std::memcpy(channelDataPtr, avFrame->data[channel], numSamples *
-    // bytesPerSample);
     float* dataFloatPtr = (float*)(avFrame->data[channel]);
     for (auto sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex) {
       data[channel][sampleIndex] = dataFloatPtr[sampleIndex];
     }
   }
+
   frameOutput.data = data;
   return frameOutput;
 
