@@ -948,8 +948,12 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   while (true) {
+  outerLoopStart:
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
+    if (ffmpegStatus == AVERROR(EAGAIN)) {
+      printf("Yes\n");
+    }
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
@@ -979,36 +983,36 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     // We still haven't found the frame we're looking for. So let's read more
     // packets and send them to the decoder.
     ReferenceAVPacket packet(autoAVPacket);
-    ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
-    decodeStats_.numPacketsRead++;
+    bool foundPacketForStream = false;
+    while (!foundPacketForStream) {
+      ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
+      decodeStats_.numPacketsRead++;
 
-    if (ffmpegStatus == AVERROR_EOF) {
-      // End of file reached. We must drain the codec by sending a nullptr
-      // packet.
-      ffmpegStatus = avcodec_send_packet(
-          streamInfo.codecContext.get(),
-          /*avpkt=*/nullptr);
-      if (ffmpegStatus < AVSUCCESS) {
-        throw std::runtime_error(
-            "Could not flush decoder: " +
-            getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+      if (ffmpegStatus == AVERROR_EOF) {
+        // End of file reached. We must drain the codec by sending a nullptr
+        // packet.
+        ffmpegStatus = avcodec_send_packet(
+            streamInfo.codecContext.get(),
+            /*avpkt=*/nullptr);
+        if (ffmpegStatus < AVSUCCESS) {
+          throw std::runtime_error(
+              "Could not flush decoder: " +
+              getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        }
+
+        // We've reached the end of file so we can't read any more packets from
+        // it, but the decoder may still have frames to read in its buffer.
+        // Continue iterating to try reading frames.
+        reachedEOF = true;
+        goto outerLoopStart;
       }
 
-      // We've reached the end of file so we can't read any more packets from
-      // it, but the decoder may still have frames to read in its buffer.
-      // Continue iterating to try reading frames.
-      reachedEOF = true;
-      continue;
-    }
-
-    if (ffmpegStatus < AVSUCCESS) {
-      throw std::runtime_error(
-          "Could not read frame from input file: " +
-          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-    }
-
-    if (packet->stream_index != activeStreamIndex_) {
-      continue;
+      if (ffmpegStatus < AVSUCCESS) {
+        throw std::runtime_error(
+            "Could not read frame from input file: " +
+            getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+      }
+      foundPacketForStream = packet->stream_index == activeStreamIndex_;
     }
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
