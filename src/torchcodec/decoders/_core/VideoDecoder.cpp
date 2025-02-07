@@ -490,8 +490,8 @@ void VideoDecoder::addVideoStreamDecoder(
 
   // We will only need packets from the active stream, so we tell FFmpeg to
   // discard packets from the other streams. Note that av_read_frame() may still
-  // return some of those un-desired packet under some conditions, so it's still
-  // important to discard/demux correctly in the inner decoding loop.
+  // return some of those undesired packets under some conditions, so it's still
+  // important to discard/demux packets correctly in the inner decoding loop.
   for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
     if (i != static_cast<unsigned int>(activeStreamIndex_)) {
       formatContext_->streams[i]->discard = AVDISCARD_ALL;
