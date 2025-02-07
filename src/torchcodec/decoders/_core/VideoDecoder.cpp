@@ -1072,14 +1072,13 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       veryFirstCall_ = false;
       goto av_read_frame_call;
     }
-  begin_loop:
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
     printf("output of avcodec_receive_frame: %d\n", ffmpegStatus);
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
-    //   printf("Non-retriable error\n");
+      //   printf("Non-retriable error\n");
       break;
     }
 
@@ -1089,7 +1088,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       // Yes, this is the frame we'll return; break out of the decoding loop.
       // printf("%ld %ld\n", avFrame->pts, avFrame->duration);
 
-    //   printf("Found frame\n");
+      //   printf("Found frame\n");
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
       // No, but we received a valid frame - just not the kind we're looking
@@ -1097,22 +1096,21 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       // But since we did just receive a frame, we should skip reading more
       // packets and sending them to the decoder and just try to receive more
       // frames from the decoder.
-    //   printf("Got AVSUCCESS, continue\n");
+      //   printf("Got AVSUCCESS, continue\n");
       continue;
     }
 
     if (reachedEOF) {
-      // We don't have any more packets to send to the decoder. So keep on
-      // pulling frames from its internal buffers.
-    //   printf("Reached EOF, continue\n");
+      // We don't have any more packets to receive. So keep on pulling frames
+      // from its internal buffers.
       continue;
     }
 
+    // We still haven't found the frame we're looking for. So let's read more
+    // packets and send them to the decoder.
   av_read_frame_call:
     ReferenceAVPacket packet(autoAVPacket);
-    while (true) {
-      // We still haven't found the frame we're looking for. So let's read more
-      // packets and send them to the decoder.
+    do {
       ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
       decodeStats_.numPacketsRead++;
 
@@ -1128,12 +1126,8 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
               getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
         }
 
-        // We've reached the end of file so we can't read any more packets from
-        // it, but the decoder may still have frames to read in its buffer.
-        // Continue iterating to try reading frames.
         reachedEOF = true;
-        goto begin_loop;
-        //   continue;
+        break;
       }
 
       if (ffmpegStatus < AVSUCCESS) {
@@ -1141,13 +1135,12 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
             "Could not read frame from input file: " +
             getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
       }
+    } while (packet->stream_index != activeStreamIndex_);
 
-      if (packet->stream_index == activeStreamIndex_) {
-        // printf("found packet for stream\n");
-        break;
-      } else {
-        // printf("Not for stream, continue\n");
-      }
+    if (reachedEOF) {
+      // We don't have any more packets to send to the decoder. So keep on
+      // pulling frames from its internal buffers.
+      continue;
     }
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
