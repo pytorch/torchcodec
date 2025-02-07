@@ -20,6 +20,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
@@ -69,6 +70,8 @@ std::vector<std::string> splitStringWithDelimiters(
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
+  av_log_set_level(AV_LOG_QUIET);
+
   AVFormatContext* formatContext = nullptr;
   int open_ret = avformat_open_input(
       &formatContext, videoFilePath.c_str(), nullptr, nullptr);
@@ -88,6 +91,8 @@ VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
 VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+
+  av_log_set_level(AV_LOG_QUIET);
 
   AVInput input;
   input.formatContext.reset(avformat_alloc_context());
