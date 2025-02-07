@@ -222,6 +222,13 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
+  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
+    // We want to scan and update the metadata of all streams.
+    TORCH_CHECK(
+        formatContext_->streams[i]->discard != AVDISCARD_ALL,
+        "Did you add a stream before you called for a scan?");
+  }
+
   AutoAVPacket autoAVPacket;
   while (true) {
     ReferenceAVPacket packet(autoAVPacket);
@@ -480,6 +487,16 @@ void VideoDecoder::addVideoStreamDecoder(
   activeStreamIndex_ = streamIndex;
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.videoStreamOptions = videoStreamOptions;
+
+  // We will only need packets from the active stream, so we tell FFmpeg to
+  // discard packets from the other streams. Note that av_read_frame() may still
+  // return some of those un-desired packet under some conditions, so it's still
+  // important to discard/demux correctly in the inner decoding loop.
+  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
+    if (i != static_cast<unsigned int>(activeStreamIndex_)) {
+      formatContext_->streams[i]->discard = AVDISCARD_ALL;
+    }
+  }
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
