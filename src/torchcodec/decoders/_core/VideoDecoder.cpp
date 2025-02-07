@@ -948,7 +948,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   int ffmpegStatus = AVSUCCESS;
   bool reachedEOF = false;
   while (true) {
-  outerLoopStart:
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
 
@@ -972,16 +971,15 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     }
 
     if (reachedEOF) {
-      // We don't have any more packets to send to the decoder. So keep on
-      // pulling frames from its internal buffers.
+      // We don't have any more packets to receive. So keep on pulling frames
+      // from its internal buffers.
       continue;
     }
 
     // We still haven't found the frame we're looking for. So let's read more
     // packets and send them to the decoder.
     ReferenceAVPacket packet(autoAVPacket);
-    bool foundPacketForStream = false;
-    while (!foundPacketForStream) {
+    do {
       ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
       decodeStats_.numPacketsRead++;
 
@@ -997,11 +995,8 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
               getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
         }
 
-        // We've reached the end of file so we can't read any more packets from
-        // it, but the decoder may still have frames to read in its buffer.
-        // Continue iterating to try reading frames.
         reachedEOF = true;
-        goto outerLoopStart;
+        break;
       }
 
       if (ffmpegStatus < AVSUCCESS) {
@@ -1009,7 +1004,12 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
             "Could not read frame from input file: " +
             getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
       }
-      foundPacketForStream = packet->stream_index == activeStreamIndex_;
+    } while (packet->stream_index != activeStreamIndex_);
+
+    if (reachedEOF) {
+      // We don't have any more packets to send to the decoder. So keep on
+      // pulling frames from its internal buffers.
+      continue;
     }
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
