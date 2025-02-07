@@ -406,6 +406,7 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
 }
 
 void print_codecContext(AVCodecContext* cc) {
+  printf("AVCodecContext details:\n");
   printf("Codec ID: %d\n", cc->codec_id);
   printf("Codec Type: %d\n", cc->codec_type);
   printf("Codec Name: %s\n", cc->codec ? cc->codec->name : "unknown");
@@ -413,6 +414,10 @@ void print_codecContext(AVCodecContext* cc) {
   printf("Time Base: %d/%d\n", cc->time_base.num, cc->time_base.den);
   printf("GOP Size: %d\n", cc->gop_size);
   printf("Max B-Frames: %d\n", cc->max_b_frames);
+  printf("bit_rate: %d\n", cc->bit_rate);
+  printf("bit_rate_tolerance: %d\n", cc->bit_rate_tolerance);
+  printf("global_quality: %d\n", cc->global_quality);
+  printf("compression_level: %d\n", cc->compression_level);
   if (cc->codec_type == AVMEDIA_TYPE_VIDEO) {
     printf("Width: %d\n", cc->width);
     printf("Height: %d\n", cc->height);
@@ -1074,7 +1079,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
-      printf("Non-retriable error\n");
+    //   printf("Non-retriable error\n");
       break;
     }
 
@@ -1084,7 +1089,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       // Yes, this is the frame we'll return; break out of the decoding loop.
       // printf("%ld %ld\n", avFrame->pts, avFrame->duration);
 
-      printf("Found frame\n");
+    //   printf("Found frame\n");
       break;
     } else if (ffmpegStatus == AVSUCCESS) {
       // No, but we received a valid frame - just not the kind we're looking
@@ -1092,14 +1097,14 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       // But since we did just receive a frame, we should skip reading more
       // packets and sending them to the decoder and just try to receive more
       // frames from the decoder.
-      printf("Got AVSUCCESS, continue\n");
+    //   printf("Got AVSUCCESS, continue\n");
       continue;
     }
 
     if (reachedEOF) {
       // We don't have any more packets to send to the decoder. So keep on
       // pulling frames from its internal buffers.
-      printf("Reached EOF, continue\n");
+    //   printf("Reached EOF, continue\n");
       continue;
     }
 
@@ -1138,19 +1143,20 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       }
 
       if (packet->stream_index == activeStreamIndex_) {
-        printf("found packet for stream\n");
+        // printf("found packet for stream\n");
         break;
       } else {
-        printf("Not for stream, continue\n");
+        // printf("Not for stream, continue\n");
       }
     }
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
+    printf("Sending packet:\n");
     print_packet(packet.get());
     ffmpegStatus =
         avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    print_packet(packet.get());
+
     if (ffmpegStatus < AVSUCCESS) {
       throw std::runtime_error(
           "Could not push packet to decoder: " +
@@ -1179,6 +1185,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   // the file and that will flush the decoder.
   streamInfo.currentPts = avFrame->pts;
   streamInfo.currentDuration = getDuration(avFrame);
+  printf("Received avFrame:\n");
   print_avFrame(avFrame.get());
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
