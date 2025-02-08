@@ -20,6 +20,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
@@ -69,6 +70,8 @@ std::vector<std::string> splitStringWithDelimiters(
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
+  av_log_set_level(AV_LOG_QUIET);
+
   AVFormatContext* formatContext = nullptr;
   int open_ret = avformat_open_input(
       &formatContext, videoFilePath.c_str(), nullptr, nullptr);
@@ -88,6 +91,8 @@ VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
 VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
   TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+
+  av_log_set_level(AV_LOG_QUIET);
 
   AVInput input;
   input.formatContext.reset(avformat_alloc_context());
@@ -220,6 +225,13 @@ int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
 void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scannedAllStreams_) {
     return;
+  }
+
+  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
+    // We want to scan and update the metadata of all streams.
+    TORCH_CHECK(
+        formatContext_->streams[i]->discard != AVDISCARD_ALL,
+        "Did you add a stream before you called for a scan?");
   }
 
   AutoAVPacket autoAVPacket;
@@ -480,6 +492,16 @@ void VideoDecoder::addVideoStreamDecoder(
   activeStreamIndex_ = streamIndex;
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.videoStreamOptions = videoStreamOptions;
+
+  // We will only need packets from the active stream, so we tell FFmpeg to
+  // discard packets from the other streams. Note that av_read_frame() may still
+  // return some of those un-desired packet under some conditions, so it's still
+  // important to discard/demux correctly in the inner decoding loop.
+  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
+    if (i != static_cast<unsigned int>(activeStreamIndex_)) {
+      formatContext_->streams[i]->discard = AVDISCARD_ALL;
+    }
+  }
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
@@ -971,43 +993,44 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     }
 
     if (reachedEOF) {
-      // We don't have any more packets to send to the decoder. So keep on
-      // pulling frames from its internal buffers.
+      // We don't have any more packets to receive. So keep on pulling frames
+      // from its internal buffers.
       continue;
     }
 
     // We still haven't found the frame we're looking for. So let's read more
     // packets and send them to the decoder.
     ReferenceAVPacket packet(autoAVPacket);
-    ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
-    decodeStats_.numPacketsRead++;
+    do {
+      ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
+      decodeStats_.numPacketsRead++;
 
-    if (ffmpegStatus == AVERROR_EOF) {
-      // End of file reached. We must drain the codec by sending a nullptr
-      // packet.
-      ffmpegStatus = avcodec_send_packet(
-          streamInfo.codecContext.get(),
-          /*avpkt=*/nullptr);
-      if (ffmpegStatus < AVSUCCESS) {
-        throw std::runtime_error(
-            "Could not flush decoder: " +
-            getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+      if (ffmpegStatus == AVERROR_EOF) {
+        // End of file reached. We must drain the codec by sending a nullptr
+        // packet.
+        ffmpegStatus = avcodec_send_packet(
+            streamInfo.codecContext.get(),
+            /*avpkt=*/nullptr);
+        if (ffmpegStatus < AVSUCCESS) {
+          throw std::runtime_error(
+              "Could not flush decoder: " +
+              getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        }
+
+        reachedEOF = true;
+        break;
       }
 
-      // We've reached the end of file so we can't read any more packets from
-      // it, but the decoder may still have frames to read in its buffer.
-      // Continue iterating to try reading frames.
-      reachedEOF = true;
-      continue;
-    }
+      if (ffmpegStatus < AVSUCCESS) {
+        throw std::runtime_error(
+            "Could not read frame from input file: " +
+            getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+      }
+    } while (packet->stream_index != activeStreamIndex_);
 
-    if (ffmpegStatus < AVSUCCESS) {
-      throw std::runtime_error(
-          "Could not read frame from input file: " +
-          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
-    }
-
-    if (packet->stream_index != activeStreamIndex_) {
+    if (reachedEOF) {
+      // We don't have any more packets to send to the decoder. So keep on
+      // pulling frames from its internal buffers.
       continue;
     }
 
