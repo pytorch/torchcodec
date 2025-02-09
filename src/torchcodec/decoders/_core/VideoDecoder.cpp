@@ -419,7 +419,7 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
 }
 
 void VideoDecoder::addVideoStreamDecoder(
-    int preferredStreamIndex,
+    int streamIndex,
     const VideoStreamOptions& videoStreamOptions) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
@@ -427,26 +427,22 @@ void VideoDecoder::addVideoStreamDecoder(
   TORCH_CHECK(formatContext_.get() != nullptr);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
-  int streamIndex = av_find_best_stream(
-      formatContext_.get(),
-      AVMEDIA_TYPE_VIDEO,
-      preferredStreamIndex,
-      -1,
-      &avCodec,
-      0);
-  if (streamIndex < 0) {
+
+  activeStreamIndex_ = av_find_best_stream(
+      formatContext_.get(), AVMEDIA_TYPE_VIDEO, streamIndex, -1, &avCodec, 0);
+  if (activeStreamIndex_ < 0) {
     throw std::invalid_argument("No valid stream found in input file.");
   }
   TORCH_CHECK(avCodec != nullptr);
 
-  StreamInfo& streamInfo = streamInfos_[streamIndex];
-  streamInfo.streamIndex = streamIndex;
-  streamInfo.timeBase = formatContext_->streams[streamIndex]->time_base;
-  streamInfo.stream = formatContext_->streams[streamIndex];
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.streamIndex = activeStreamIndex_;
+  streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
+  streamInfo.stream = formatContext_->streams[activeStreamIndex_];
 
   if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
     throw std::invalid_argument(
-        "Stream with index " + std::to_string(streamIndex) +
+        "Stream with index " + std::to_string(activeStreamIndex_) +
         " is not a video stream.");
   }
 
@@ -458,11 +454,12 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   StreamMetadata& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   if (seekMode_ == SeekMode::approximate &&
       !streamMetadata.averageFps.has_value()) {
     throw std::runtime_error(
-        "Seek mode is approximate, but stream " + std::to_string(streamIndex) +
+        "Seek mode is approximate, but stream " +
+        std::to_string(activeStreamIndex_) +
         " does not have an average fps in its metadata.");
   }
 
@@ -483,6 +480,7 @@ void VideoDecoder::addVideoStreamDecoder(
     TORCH_CHECK(
         false, "Invalid device type: " + videoStreamOptions.device.str());
   }
+  streamInfo.videoStreamOptions = videoStreamOptions;
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
   if (retVal < AVSUCCESS) {
@@ -490,9 +488,14 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   codecContext->time_base = streamInfo.stream->time_base;
-  activeStreamIndex_ = streamIndex;
-  updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
-  streamInfo.videoStreamOptions = videoStreamOptions;
+
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
+      codecContext->width;
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
+      codecContext->height;
+  auto codedId = codecContext->codec_id;
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
+      std::string(avcodec_get_name(codedId));
 
   // We will only need packets from the active stream, so we tell FFmpeg to
   // discard packets from the other streams. Note that av_read_frame() may still
@@ -522,17 +525,6 @@ void VideoDecoder::addVideoStreamDecoder(
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
-}
-
-void VideoDecoder::updateMetadataWithCodecContext(
-    int streamIndex,
-    AVCodecContext* codecContext) {
-  containerMetadata_.allStreamMetadata[streamIndex].width = codecContext->width;
-  containerMetadata_.allStreamMetadata[streamIndex].height =
-      codecContext->height;
-  auto codedId = codecContext->codec_id;
-  containerMetadata_.allStreamMetadata[streamIndex].codecName =
-      std::string(avcodec_get_name(codedId));
 }
 
 // --------------------------------------------------------------------------

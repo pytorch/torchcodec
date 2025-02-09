@@ -208,7 +208,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   ourDecoder->addVideoStreamDecoder(bestVideoStreamIndex);
   // Frame with index 180 corresponds to timestamp 6.006.
-  auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
+  auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 3, 270, 480}));
 
@@ -232,7 +232,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
-  auto output = ourDecoder->getFramesAtIndices(bestVideoStreamIndex, {0, 180});
+  auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({2, 270, 480, 3}));
 
@@ -397,8 +397,8 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
-  auto output = ourDecoder->getFrameAtIndexInternal(
-      bestVideoStreamIndex, 0, preAllocatedOutputTensor);
+  auto output =
+      ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 
@@ -414,8 +414,8 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
   ourDecoder->addVideoStreamDecoder(
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
-  auto output = ourDecoder->getFrameAtIndexInternal(
-      bestVideoStreamIndex, 0, preAllocatedOutputTensor);
+  auto output =
+      ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 

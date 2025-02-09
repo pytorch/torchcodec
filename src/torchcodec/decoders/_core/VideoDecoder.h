@@ -357,10 +357,6 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
 
   void initializeDecoder();
-  void updateMetadataWithCodecContext(
-      int streamIndex,
-      AVCodecContext* codecContext);
-
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
