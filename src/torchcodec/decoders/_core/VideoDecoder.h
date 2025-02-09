@@ -171,13 +171,13 @@ class VideoDecoder {
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
-  // Calling getNextFrameNoDemux() will return the first frame at
+  // Calling getNextFrame() will return the first frame at
   // or after this position.
   void setCursorPtsInSeconds(double seconds);
 
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  FrameOutput getNextFrameNoDemux();
+  FrameOutput getNextFrame();
 
   FrameOutput getFrameAtIndex(int64_t frameIndex);
 
@@ -196,7 +196,7 @@ class VideoDecoder {
   // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
-  FrameOutput getFramePlayedAtNoDemux(double seconds);
+  FrameOutput getFramePlayedAt(double seconds);
 
   FrameBatchOutput getFramesPlayedAt(const std::vector<double>& timestamps);
 
@@ -367,7 +367,7 @@ class VideoDecoder {
 
   AVFrameStream decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
 
-  FrameOutput getNextFrameNoDemuxInternal(
+  FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);

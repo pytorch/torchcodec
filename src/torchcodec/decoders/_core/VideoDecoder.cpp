@@ -531,13 +531,13 @@ void VideoDecoder::addVideoStreamDecoder(
 // HIGH-LEVEL DECODING ENTRY-POINTS
 // --------------------------------------------------------------------------
 
-VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
-  auto output = getNextFrameNoDemuxInternal();
+VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
+  auto output = getNextFrameInternal();
   output.data = maybePermuteHWC2CHW(output.data);
   return output;
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
+VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
     StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
@@ -564,7 +564,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
 
   int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
   setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
-  return getNextFrameNoDemuxInternal(preAllocatedOutputTensor);
+  return getNextFrameInternal(preAllocatedOutputTensor);
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
@@ -658,7 +658,7 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(
     double seconds) {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     double frameStartTime =
