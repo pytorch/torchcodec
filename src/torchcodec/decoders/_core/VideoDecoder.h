@@ -99,7 +99,7 @@ class VideoDecoder {
 
   // Returns the key frame indices as a tensor. The tensor is 1D and contains
   // int64 values, where each value is the frame index for a key frame.
-  torch::Tensor getKeyFrameIndices(int streamIndex);
+  torch::Tensor getKeyFrameIndices();
 
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
@@ -179,19 +179,16 @@ class VideoDecoder {
   // the cursor to the next frame.
   FrameOutput getNextFrameNoDemux();
 
-  FrameOutput getFrameAtIndex(int streamIndex, int64_t frameIndex);
+  FrameOutput getFrameAtIndex(int64_t frameIndex);
 
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
-  FrameBatchOutput getFramesAtIndices(
-      int streamIndex,
-      const std::vector<int64_t>& frameIndices);
+  FrameBatchOutput getFramesAtIndices(const std::vector<int64_t>& frameIndices);
 
   // Returns frames within a given range. The range is defined by [start, stop).
   // The values retrieved from the range are: [start, start+step,
   // start+(2*step), start+(3*step), ..., stop). The default for step is 1.
-  FrameBatchOutput
-  getFramesInRange(int streamIndex, int64_t start, int64_t stop, int64_t step);
+  FrameBatchOutput getFramesInRange(int64_t start, int64_t stop, int64_t step);
 
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
@@ -201,9 +198,7 @@ class VideoDecoder {
   // seconds=5.999, etc.
   FrameOutput getFramePlayedAtNoDemux(double seconds);
 
-  FrameBatchOutput getFramesPlayedAt(
-      int streamIndex,
-      const std::vector<double>& timestamps);
+  FrameBatchOutput getFramesPlayedAt(const std::vector<double>& timestamps);
 
   // Returns frames within a given pts range. The range is defined by
   // [startSeconds, stopSeconds) with respect to the pts values for frames. The
@@ -223,7 +218,6 @@ class VideoDecoder {
   //
   //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
   FrameBatchOutput getFramesPlayedInRange(
-      int streamIndex,
       double startSeconds,
       double stopSeconds);
 
@@ -259,13 +253,12 @@ class VideoDecoder {
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
   // can move it back to private.
   FrameOutput getFrameAtIndexInternal(
-      int streamIndex,
       int64_t frameIndex,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   // Exposed for _test_frame_pts_equality, which is used to test non-regression
   // of pts resolution (64 to 32 bit floats)
-  double getPtsSecondsForFrame(int streamIndex, int64_t frameIndex);
+  double getPtsSecondsForFrame(int64_t frameIndex);
 
   // Exposed for performance testing.
   struct DecodeStats {
@@ -372,10 +365,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeekingForStream(
-      const StreamInfo& stream,
-      int64_t currentPts,
-      int64_t targetPts) const;
+  bool canWeAvoidSeekingForStream(int64_t currentPts, int64_t targetPts);
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -384,7 +374,7 @@ class VideoDecoder {
   FrameOutput getNextFrameNoDemuxInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  torch::Tensor maybePermuteHWC2CHW(int streamIndex, torch::Tensor& hwcTensor);
+  torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
 
   FrameOutput convertAVFrameToFrameOutput(
       AVFrameStream& avFrameStream,
@@ -395,12 +385,9 @@ class VideoDecoder {
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      int streamIndex,
-      const AVFrame* avFrame);
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
-      int streamIndex,
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
@@ -422,14 +409,14 @@ class VideoDecoder {
   // PTS <-> INDEX CONVERSIONS
   // --------------------------------------------------------------------------
 
-  int getKeyFrameIndexForPts(const StreamInfo& stream, int64_t pts) const;
+  int getKeyFrameIndexForPts(int64_t pts);
 
   // Returns the key frame index of the presentation timestamp using our index.
   // We build this index by scanning the file in
   // scanFileAndUpdateMetadataAndIndex
   int getKeyFrameIndexForPtsUsingScannedIndex(
       const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-      int64_t pts) const;
+      int64_t pts);
 
   int64_t secondsToIndexLowerBound(
       double seconds,

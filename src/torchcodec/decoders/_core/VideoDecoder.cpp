@@ -348,11 +348,12 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
 
-torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
+torch::Tensor VideoDecoder::getKeyFrameIndices() {
   validateActiveStream();
   validateScannedAllStreams("getKeyFrameIndices");
 
-  const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
+  const std::vector<FrameInfo>& keyFrames =
+      streamInfos_[activeStreamIndex_].keyFrames;
   torch::Tensor keyFrameIndices =
       torch::empty({static_cast<int64_t>(keyFrames.size())}, {torch::kInt64});
   for (size_t i = 0; i < keyFrames.size(); ++i) {
@@ -540,7 +541,7 @@ void VideoDecoder::updateMetadataWithCodecContext(
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemux() {
   auto output = getNextFrameNoDemuxInternal();
-  output.data = maybePermuteHWC2CHW(output.streamIndex, output.data);
+  output.data = maybePermuteHWC2CHW(output.data);
   return output;
 }
 
@@ -553,23 +554,20 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameNoDemuxInternal(
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(
-    int streamIndex,
-    int64_t frameIndex) {
-  auto frameOutput = getFrameAtIndexInternal(streamIndex, frameIndex);
-  frameOutput.data = maybePermuteHWC2CHW(streamIndex, frameOutput.data);
+VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
+  auto frameOutput = getFrameAtIndexInternal(frameIndex);
+  frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
   return frameOutput;
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
-    int streamIndex,
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
 
-  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   validateFrameIndex(streamMetadata, frameIndex);
 
   int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
@@ -578,7 +576,6 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
-    int streamIndex,
     const std::vector<int64_t>& frameIndices) {
   validateActiveStream();
 
@@ -602,8 +599,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
   }
 
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
   FrameBatchOutput frameBatchOutput(
       frameIndices.size(), videoStreamOptions, streamMetadata);
@@ -626,28 +623,24 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
           frameBatchOutput.durationSeconds[previousIndexInOutput];
     } else {
       FrameOutput frameOutput = getFrameAtIndexInternal(
-          streamIndex, indexInVideo, frameBatchOutput.data[indexInOutput]);
+          indexInVideo, frameBatchOutput.data[indexInOutput]);
       frameBatchOutput.ptsSeconds[indexInOutput] = frameOutput.ptsSeconds;
       frameBatchOutput.durationSeconds[indexInOutput] =
           frameOutput.durationSeconds;
     }
     previousIndexInVideo = indexInVideo;
   }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
-    int streamIndex,
-    int64_t start,
-    int64_t stop,
-    int64_t step) {
+VideoDecoder::FrameBatchOutput
+VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
   validateActiveStream();
 
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   int64_t numFrames = getNumFrames(streamMetadata);
   TORCH_CHECK(
       start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
@@ -665,12 +658,11 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput frameOutput =
-        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+        getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
   return frameBatchOutput;
 }
 
@@ -712,19 +704,17 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
 
   // Convert the frame to tensor.
   FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
-  frameOutput.data =
-      maybePermuteHWC2CHW(frameOutput.streamIndex, frameOutput.data);
+  frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
   return frameOutput;
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
-    int streamIndex,
     const std::vector<double>& timestamps) {
   validateActiveStream();
 
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
-  const auto& streamInfo = streamInfos_[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   double minSeconds = getMinSeconds(streamMetadata);
   double maxSeconds = getMaxSeconds(streamMetadata);
@@ -747,24 +737,23 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
         secondsToIndexLowerBound(frameSeconds, streamInfo, streamMetadata);
   }
 
-  return getFramesAtIndices(streamIndex, frameIndices);
+  return getFramesAtIndices(frameIndices);
 }
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
-    int streamIndex,
     double startSeconds,
     double stopSeconds) {
   validateActiveStream();
 
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
           ") must be less than or equal to stop seconds (" +
           std::to_string(stopSeconds) + ".");
 
-  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
 
   // Special case needed to implement a half-open range. At first glance, this
@@ -786,8 +775,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   // need this special case below.
   if (startSeconds == stopSeconds) {
     FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
-    frameBatchOutput.data =
-        maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+    frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
     return frameBatchOutput;
   }
 
@@ -827,12 +815,11 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
       numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
-        getFrameAtIndexInternal(streamIndex, i, frameBatchOutput.data[f]);
+        getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
-  frameBatchOutput.data =
-      maybePermuteHWC2CHW(streamIndex, frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
 
   return frameBatchOutput;
 }
@@ -871,9 +858,8 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
 bool VideoDecoder::canWeAvoidSeekingForStream(
-    const StreamInfo& streamInfo,
     int64_t currentPts,
-    int64_t targetPts) const {
+    int64_t targetPts) {
   if (targetPts < currentPts) {
     // We can never skip a seek if we are seeking backwards.
     return false;
@@ -888,8 +874,8 @@ bool VideoDecoder::canWeAvoidSeekingForStream(
   // We are seeking forwards.
   // We can only skip a seek if both currentPts and targetPts share the same
   // keyframe.
-  int currentKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, currentPts);
-  int targetKeyFrameIndex = getKeyFrameIndexForPts(streamInfo, targetPts);
+  int currentKeyFrameIndex = getKeyFrameIndexForPts(currentPts);
+  int targetKeyFrameIndex = getKeyFrameIndexForPts(targetPts);
   return currentKeyFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
       currentKeyFrameIndex == targetKeyFrameIndex;
 }
@@ -906,8 +892,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   decodeStats_.numSeeksAttempted++;
 
   int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeekingForStream(
-          streamInfo, streamInfo.currentPts, desiredPtsForStream)) {
+  if (canWeAvoidSeekingForStream(streamInfo.currentPts, desiredPtsForStream)) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
@@ -948,7 +933,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
-    validateActiveStream();
+  validateActiveStream();
 
   resetDecodeStats();
 
@@ -1116,9 +1101,8 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameStream& avFrameStream,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  int streamIndex = avFrameStream.streamIndex;
   AVFrame* avFrame = avFrameStream.avFrame.get();
-  auto& streamInfo = streamInfos_[streamIndex];
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
       streamInfo.videoStreamOptions, *avFrame);
@@ -1164,7 +1148,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       streamInfo.prevFrameContext = frameContext;
     }
     int resultHeight =
-        convertAVFrameToTensorUsingSwsScale(streamIndex, avFrame, outputTensor);
+        convertAVFrameToTensorUsingSwsScale(avFrame, outputTensor);
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?
@@ -1184,7 +1168,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
       streamInfo.prevFrameContext = frameContext;
     }
-    outputTensor = convertAVFrameToTensorUsingFilterGraph(streamIndex, avFrame);
+    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -1215,10 +1199,9 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
 }
 
 int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
-    int streamIndex,
     const AVFrame* avFrame,
     torch::Tensor& outputTensor) {
-  StreamInfo& activeStreamInfo = streamInfos_[streamIndex];
+  StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
   SwsContext* swsContext = activeStreamInfo.swsContext.get();
   uint8_t* pointers[4] = {
       outputTensor.data_ptr<uint8_t>(), nullptr, nullptr, nullptr};
@@ -1236,10 +1219,9 @@ int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
 }
 
 torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
-    int streamIndex,
     const AVFrame* avFrame) {
   FilterGraphContext& filterGraphContext =
-      streamInfos_[streamIndex].filterGraphContext;
+      streamInfos_[activeStreamIndex_].filterGraphContext;
   int ffmpegStatus =
       av_buffersrc_write_frame(filterGraphContext.sourceContext, avFrame);
   if (ffmpegStatus < AVSUCCESS) {
@@ -1308,10 +1290,9 @@ torch::Tensor allocateEmptyHWCTensor(
 // or 4D.
 // Calling permute() is guaranteed to return a view as per the docs:
 // https://pytorch.org/docs/stable/generated/torch.permute.html
-torch::Tensor VideoDecoder::maybePermuteHWC2CHW(
-    int streamIndex,
-    torch::Tensor& hwcTensor) {
-  if (streamInfos_[streamIndex].videoStreamOptions.dimensionOrder == "NHWC") {
+torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
+  if (streamInfos_[activeStreamIndex_].videoStreamOptions.dimensionOrder ==
+      "NHWC") {
     return hwcTensor;
   }
   auto numDimensions = hwcTensor.dim();
@@ -1503,9 +1484,8 @@ void VideoDecoder::createSwsContext(
 // PTS <-> INDEX CONVERSIONS
 // --------------------------------------------------------------------------
 
-int VideoDecoder::getKeyFrameIndexForPts(
-    const StreamInfo& streamInfo,
-    int64_t pts) const {
+int VideoDecoder::getKeyFrameIndexForPts(int64_t pts) {
+  const StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   if (streamInfo.keyFrames.empty()) {
     return av_index_search_timestamp(
         streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
@@ -1516,7 +1496,7 @@ int VideoDecoder::getKeyFrameIndexForPts(
 
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
     const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-    int64_t pts) const {
+    int64_t pts) {
   auto upperBound = std::upper_bound(
       keyFrames.begin(),
       keyFrames.end(),
@@ -1692,15 +1672,13 @@ void VideoDecoder::resetDecodeStats() {
   decodeStats_ = DecodeStats{};
 }
 
-double VideoDecoder::getPtsSecondsForFrame(
-    int streamIndex,
-    int64_t frameIndex) {
+double VideoDecoder::getPtsSecondsForFrame(int64_t frameIndex) {
   validateActiveStream();
   validateScannedAllStreams("getPtsSecondsForFrame");
 
-  const auto& streamInfo = streamInfos_[streamIndex];
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[streamIndex];
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   validateFrameIndex(streamMetadata, frameIndex);
 
   return ptsToSeconds(
