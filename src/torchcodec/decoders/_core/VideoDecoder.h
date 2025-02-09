@@ -467,7 +467,7 @@ class VideoDecoder {
   // VALIDATION UTILS
   // --------------------------------------------------------------------------
 
-  void validateUserProvidedStreamIndex(int streamIndex);
+  void validateActiveStream();
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
       const StreamMetadata& streamMetadata,

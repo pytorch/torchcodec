@@ -349,7 +349,7 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
 }
 
 torch::Tensor VideoDecoder::getKeyFrameIndices(int streamIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
   validateScannedAllStreams("getKeyFrameIndices");
 
   const std::vector<FrameInfo>& keyFrames = streamInfos_[streamIndex].keyFrames;
@@ -565,7 +565,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
     int streamIndex,
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
 
   const auto& streamInfo = streamInfos_[streamIndex];
   const auto& streamMetadata =
@@ -580,7 +580,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     int streamIndex,
     const std::vector<int64_t>& frameIndices) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
 
   auto indicesAreSorted =
       std::is_sorted(frameIndices.begin(), frameIndices.end());
@@ -643,7 +643,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesInRange(
     int64_t start,
     int64_t stop,
     int64_t step) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[streamIndex];
@@ -720,7 +720,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAtNoDemux(
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
     int streamIndex,
     const std::vector<double>& timestamps) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[streamIndex];
@@ -754,7 +754,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     int streamIndex,
     double startSeconds,
     double stopSeconds) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[streamIndex];
@@ -898,9 +898,7 @@ bool VideoDecoder::canWeAvoidSeekingForStream(
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
-  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
-    return;
-  }
+  validateActiveStream();
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.discardFramesBeforePts =
       secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
@@ -950,9 +948,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
-  if (activeStreamIndex_ == NO_ACTIVE_STREAM) {
-    throw std::runtime_error("No active streams configured.");
-  }
+    validateActiveStream();
 
   resetDecodeStats();
 
@@ -1636,18 +1632,20 @@ double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
 // VALIDATION UTILS
 // --------------------------------------------------------------------------
 
-void VideoDecoder::validateUserProvidedStreamIndex(int streamIndex) {
-  int streamsSize =
+void VideoDecoder::validateActiveStream() {
+  auto errorMsg =
+      "Provided stream index=" + std::to_string(activeStreamIndex_) +
+      " was not previously added.";
+  TORCH_CHECK(activeStreamIndex_ != NO_ACTIVE_STREAM, errorMsg);
+  TORCH_CHECK(streamInfos_.count(activeStreamIndex_) > 0, errorMsg);
+
+  int allStreamMetadataSize =
       static_cast<int>(containerMetadata_.allStreamMetadata.size());
   TORCH_CHECK(
-      streamIndex >= 0 && streamIndex < streamsSize,
-      "Invalid stream index=" + std::to_string(streamIndex) +
+      activeStreamIndex_ >= 0 && activeStreamIndex_ < allStreamMetadataSize,
+      "Invalid stream index=" + std::to_string(activeStreamIndex_) +
           "; valid indices are in the range [0, " +
-          std::to_string(streamsSize) + ").");
-  TORCH_CHECK(
-      streamInfos_.count(streamIndex) > 0,
-      "Provided stream index=" + std::to_string(streamIndex) +
-          " was not previously added.");
+          std::to_string(allStreamMetadataSize) + ").");
 }
 
 void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
@@ -1697,7 +1695,7 @@ void VideoDecoder::resetDecodeStats() {
 double VideoDecoder::getPtsSecondsForFrame(
     int streamIndex,
     int64_t frameIndex) {
-  validateUserProvidedStreamIndex(streamIndex);
+  validateActiveStream();
   validateScannedAllStreams("getPtsSecondsForFrame");
 
   const auto& streamInfo = streamInfos_[streamIndex];
