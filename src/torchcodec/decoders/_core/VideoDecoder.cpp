@@ -478,13 +478,16 @@ void VideoDecoder::addVideoStreamDecoder(
   TORCH_CHECK(formatContext_.get() != nullptr);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
-  int streamIndex = av_find_best_stream(
-      formatContext_.get(),
-      AVMEDIA_TYPE_AUDIO,
-      preferredStreamIndex,
-      -1,
-      &avCodec,
-      0);
+//   int streamIndex = av_find_best_stream(
+//       formatContext_.get(),
+//       AVMEDIA_TYPE_AUDIO,
+//       preferredStreamIndex,
+//       -1,
+//       &avCodec,
+//       0);
+  int streamIndex = preferredStreamIndex;
+  avCodec = avcodec_find_decoder(formatContext_->streams[streamIndex]->codecpar->codec_id);
+
   if (streamIndex < 0) {
     throw std::invalid_argument("No valid stream found in input file.");
   }
@@ -519,11 +522,7 @@ void VideoDecoder::addVideoStreamDecoder(
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
-  if (!codecContext->channel_layout) {
-    codecContext->channel_layout =
-        av_get_default_channel_layout(codecContext->channels);
-  }
+//   codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
@@ -539,23 +538,34 @@ void VideoDecoder::addVideoStreamDecoder(
         false, "Invalid device type: " + videoStreamOptions.device.str());
   }
 
+  if (!streamInfo.codecContext->channel_layout) {
+    streamInfo.codecContext->channel_layout =
+        av_get_default_channel_layout(streamInfo.codecContext->channels);
+  }
+
+  AVDictionary* opt = nullptr;
+      av_dict_set(&opt, "threads", "1", 0);
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
   if (retVal < AVSUCCESS) {
     throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
   }
 
-  codecContext->time_base = streamInfo.stream->time_base;
+//   codecContext->time_base = streamInfo.stream->time_base;
+//   AVRational tb{0, 1};
+//   codecContext->time_base = tb;
   activeStreamIndex_ = streamIndex;
   updateMetadataWithCodecContext(streamInfo.streamIndex, codecContext);
   streamInfo.videoStreamOptions = videoStreamOptions;
 
   // We will only need packets from the active stream, so we tell FFmpeg to
   // discard packets from the other streams. Note that av_read_frame() may still
-  // return some of those undesired packets under some conditions, so it's still
-  // important to discard/demux packets correctly in the inner decoding loop.
+  // return some of those un-desired packet under some conditions, so it's still
+  // important to discard/demux correctly in the inner decoding loop.
   for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
     if (i != static_cast<unsigned int>(activeStreamIndex_)) {
       formatContext_->streams[i]->discard = AVDISCARD_ALL;
+    } else {
+      formatContext_->streams[i]->discard = AVDISCARD_DEFAULT;
     }
   }
 
@@ -898,7 +908,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 // --------------------------------------------------------------------------
 // SEEKING APIs
 // --------------------------------------------------------------------------
-
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   desiredPtsSeconds_ = seconds;
 }
@@ -986,6 +995,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
+  printf("Seeking to PTS = %ld\n", desiredPts);
+
   int ffmepgStatus = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
@@ -999,6 +1010,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
         getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
   }
   decodeStats_.numFlushes++;
+
+  printf("Flushing\n");
   avcodec_flush_buffers(streamInfo.codecContext.get());
 }
 
@@ -1232,13 +1245,19 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
       av_get_bytes_per_sample(streamInfo.codecContext->sample_fmt);
   //   printf("bytes per sample: %d\n", bytesPerSample);
 
-  torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
-  for (auto channel = 0; channel < numChannels; ++channel) {
-    float* dataFloatPtr = (float*)(avFrame->data[channel]);
-    for (auto sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex) {
-      data[channel][sampleIndex] = dataFloatPtr[sampleIndex];
-    }
-  }
+  // float32 Planar 
+//   torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+//   for (auto channel = 0; channel < numChannels; ++channel) {
+//     float* dataFloatPtr = (float*)(avFrame->data[channel]);
+//     for (auto sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex) {
+//       data[channel][sampleIndex] = dataFloatPtr[sampleIndex];
+//     }
+//   }
+  // float32 non-Planar 
+   torch::Tensor data = torch::empty({numSamples, numChannels}, torch::kFloat32);
+   uint8_t* pData = static_cast<uint8_t*>(data.data_ptr());
+   memcpy(pData, avFrame->extended_data[0], numSamples * numChannels * bytesPerSample);
+   data = data.permute({1, 0});
 
   frameOutput.data = data;
   return frameOutput;
