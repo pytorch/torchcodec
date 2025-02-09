@@ -658,20 +658,16 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
   return frameBatchOutput;
 }
 
-VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(
-    double seconds) {
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    double frameStartTime =
-        ptsToSeconds(streamInfo.currentPts, streamInfo.timeBase);
-    double frameEndTime = ptsToSeconds(
-        streamInfo.currentPts + streamInfo.currentDuration,
-        streamInfo.timeBase);
-    if (seconds >= frameStartTime && seconds < frameEndTime) {
-      // We are in the same frame as the one we just returned. However, since we
-      // don't cache it locally, we have to rewind back.
-      seconds = frameStartTime;
-      break;
-    }
+VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+  double frameStartTime =
+      ptsToSeconds(streamInfo.currentPts, streamInfo.timeBase);
+  double frameEndTime = ptsToSeconds(
+      streamInfo.currentPts + streamInfo.currentDuration, streamInfo.timeBase);
+  if (seconds >= frameStartTime && seconds < frameEndTime) {
+    // We are in the same frame as the one we just returned. However, since we
+    // don't cache it locally, we have to rewind back.
+    seconds = frameStartTime;
   }
 
   setCursorPtsInSeconds(seconds);

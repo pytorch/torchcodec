@@ -285,8 +285,7 @@ TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
       kPtsOfLastFrameInVideoStream + kDurationOfLastFrameInVideoStream;
   // Sanity check: make sure duration is strictly positive.
   EXPECT_GT(kPtsPlusDurationOfLastFrame, kPtsOfLastFrameInVideoStream);
-  output =
-      ourDecoder->getFramePlayedAt(kPtsPlusDurationOfLastFrame - 1e-6);
+  output = ourDecoder->getFramePlayedAt(kPtsPlusDurationOfLastFrame - 1e-6);
   EXPECT_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
 }
 
