@@ -361,7 +361,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeekingForStream(int64_t currentPts, int64_t targetPts);
+  bool canWeAvoidSeeking(int64_t currentPts, int64_t targetPts) const;
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -405,14 +405,14 @@ class VideoDecoder {
   // PTS <-> INDEX CONVERSIONS
   // --------------------------------------------------------------------------
 
-  int getKeyFrameIndexForPts(int64_t pts);
+  int getKeyFrameIndexForPts(int64_t pts) const;
 
   // Returns the key frame index of the presentation timestamp using our index.
   // We build this index by scanning the file in
   // scanFileAndUpdateMetadataAndIndex
   int getKeyFrameIndexForPtsUsingScannedIndex(
       const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-      int64_t pts);
+      int64_t pts) const;
 
   int64_t secondsToIndexLowerBound(
       double seconds,

@@ -845,9 +845,8 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
-bool VideoDecoder::canWeAvoidSeekingForStream(
-    int64_t currentPts,
-    int64_t targetPts) {
+bool VideoDecoder::canWeAvoidSeeking(int64_t currentPts, int64_t targetPts)
+    const {
   if (targetPts < currentPts) {
     // We can never skip a seek if we are seeking backwards.
     return false;
@@ -880,7 +879,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   decodeStats_.numSeeksAttempted++;
 
   int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeekingForStream(streamInfo.currentPts, desiredPtsForStream)) {
+  if (canWeAvoidSeeking(streamInfo.currentPts, desiredPtsForStream)) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
@@ -1472,8 +1471,8 @@ void VideoDecoder::createSwsContext(
 // PTS <-> INDEX CONVERSIONS
 // --------------------------------------------------------------------------
 
-int VideoDecoder::getKeyFrameIndexForPts(int64_t pts) {
-  const StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+int VideoDecoder::getKeyFrameIndexForPts(int64_t pts) const {
+  const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   if (streamInfo.keyFrames.empty()) {
     return av_index_search_timestamp(
         streamInfo.stream, pts, AVSEEK_FLAG_BACKWARD);
@@ -1484,7 +1483,7 @@ int VideoDecoder::getKeyFrameIndexForPts(int64_t pts) {
 
 int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
     const std::vector<VideoDecoder::FrameInfo>& keyFrames,
-    int64_t pts) {
+    int64_t pts) const {
   auto upperBound = std::upper_bound(
       keyFrames.begin(),
       keyFrames.end(),
