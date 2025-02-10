@@ -425,6 +425,9 @@ void VideoDecoder::addStream(
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
+  TORCH_CHECK(
+      mediaType == AVMEDIA_TYPE_VIDEO || mediaType == AVMEDIA_TYPE_AUDIO,
+      "Can only add video or audio streams.");
   TORCH_CHECK(formatContext_.get() != nullptr);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
@@ -448,9 +451,10 @@ void VideoDecoder::addStream(
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
-    streamInfo.stream->codecpar->codec_type == mediaType,
-    "FFmpeg found stream with index ", activeStreamIndex_, " which is of the wrong media type.");
-
+      streamInfo.stream->codecpar->codec_type == mediaType,
+      "FFmpeg found stream with index ",
+      activeStreamIndex_,
+      " which is of the wrong media type.");
 
   if (mediaType == AVMEDIA_TYPE_VIDEO &&
       videoStreamOptions.device.type() == torch::kCUDA) {
@@ -1076,8 +1080,10 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
-  // TODO: we should fold preAllocatedOutputTensor into AVFrameStream.
-  if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
+    // TODO: handle preAllocatedTensor for audio
+    convertAudioAVFrameToFrameOutputOnCPU(avFrameStream, frameOutput);
+  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
         avFrameStream, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
@@ -1253,6 +1259,39 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
       filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
+void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
+    VideoDecoder::AVFrameStream& avFrameStream,
+    FrameOutput& frameOutput) {
+  AVFrame* avFrame = avFrameStream.avFrame.get();
+
+  auto numSamples = avFrame->nb_samples; // per channel
+  auto numChannels =
+      avFrame->ch_layout.nb_channels; // TODO handle other ffmpeg versions
+
+  // TODO: dtype should be format-dependent
+  torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+
+  AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
+  // TODO Implement all formats
+  switch (format) {
+    case AV_SAMPLE_FMT_FLTP: {
+      uint8_t* pData = static_cast<uint8_t*>(data.data_ptr());
+      for (auto channel = 0; channel < numChannels; ++channel) {
+        auto numBytesToCopy = numSamples * av_get_bytes_per_sample(format);
+        memcpy(pData, avFrame->extended_data[channel], numBytesToCopy);
+        pData += numBytesToCopy;
+      }
+      break;
+    }
+    default:
+      TORCH_CHECK(
+          false,
+          "Unsupported audio format (yet!): ",
+          av_get_sample_fmt_name(format));
+  }
+  frameOutput.data = data;
+}
+
 // --------------------------------------------------------------------------
 // OUTPUT ALLOCATION AND SHAPE CONVERSION
 // --------------------------------------------------------------------------
@@ -1298,6 +1337,10 @@ torch::Tensor allocateEmptyHWCTensor(
 // Calling permute() is guaranteed to return a view as per the docs:
 // https://pytorch.org/docs/stable/generated/torch.permute.html
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
+  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
+    // TODO: Is this really how we want to handle audio?
+    return hwcTensor;
+  }
   if (streamInfos_[activeStreamIndex_].videoStreamOptions.dimensionOrder ==
       "NHWC") {
     return hwcTensor;
