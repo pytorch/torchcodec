@@ -19,6 +19,7 @@ import torch
 from torchcodec.decoders._core import (
     _add_video_stream,
     _test_frame_pts_equality,
+    add_audio_stream,
     add_video_stream,
     create_from_bytes,
     create_from_file,
@@ -63,6 +64,31 @@ class ReferenceDecoder:
 
 
 class TestOps:
+    def test_add_stream(self):
+        valid_video_stream, valid_audio_stream = 0, 1
+
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, stream_index=valid_video_stream)
+        with pytest.raises(RuntimeError, match="Can only add one single stream"):
+            add_video_stream(decoder, stream_index=valid_video_stream)
+
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_audio_stream(decoder, stream_index=valid_audio_stream)
+        with pytest.raises(RuntimeError, match="Can only add one single stream"):
+            add_audio_stream(decoder, stream_index=valid_audio_stream)
+
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        with pytest.raises(
+            ValueError, match=f"Is {valid_audio_stream} of the desired media type"
+        ):
+            add_video_stream(decoder, stream_index=valid_audio_stream)
+
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        with pytest.raises(
+            ValueError, match=f"Is {valid_video_stream} of the desired media type"
+        ):
+            add_audio_stream(decoder, stream_index=valid_video_stream)
+
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))

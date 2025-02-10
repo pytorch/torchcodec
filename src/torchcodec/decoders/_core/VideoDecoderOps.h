@@ -55,6 +55,10 @@ void _add_video_stream(
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt);
 
+void add_audio_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> stream_index = std::nullopt);
+
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
 

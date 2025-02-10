@@ -34,6 +34,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
   m.def(
       "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
+  m.def(
+      "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -220,8 +222,14 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(
-      stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
+}
+
+void add_audio_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> stream_index) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  videoDecoder->addAudioStream(stream_index.value_or(-1));
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
@@ -533,6 +541,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
   m.impl("_add_video_stream", &_add_video_stream);
+  m.impl("add_audio_stream", &add_audio_stream);
   m.impl("get_next_frame", &get_next_frame);
   m.impl("_get_key_frame_indices", &_get_key_frame_indices);
   m.impl("get_json_metadata", &get_json_metadata);

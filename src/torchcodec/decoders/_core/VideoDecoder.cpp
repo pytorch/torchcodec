@@ -418,8 +418,9 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
   }
 }
 
-void VideoDecoder::addVideoStreamDecoder(
+void VideoDecoder::addStream(
     int streamIndex,
+    AVMediaType mediaType,
     const VideoStreamOptions& videoStreamOptions) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
@@ -429,30 +430,37 @@ void VideoDecoder::addVideoStreamDecoder(
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
 
   activeStreamIndex_ = av_find_best_stream(
-      formatContext_.get(), AVMEDIA_TYPE_VIDEO, streamIndex, -1, &avCodec, 0);
+      formatContext_.get(), mediaType, streamIndex, -1, &avCodec, 0);
+
   if (activeStreamIndex_ < 0) {
-    throw std::invalid_argument("No valid stream found in input file.");
+    throw std::invalid_argument(
+        "No valid stream found in input file. Is " +
+        std::to_string(streamIndex) + " of the desired media type?");
   }
+
   TORCH_CHECK(avCodec != nullptr);
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.streamIndex = activeStreamIndex_;
   streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
+  streamInfo.avMediaType = mediaType;
 
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
-    throw std::invalid_argument(
-        "Stream with index " + std::to_string(activeStreamIndex_) +
-        " is not a video stream.");
-  }
+  // This should never happen, checking just to be safe.
+  TORCH_CHECK(
+    streamInfo.stream->codecpar->codec_type == mediaType,
+    "FFmpeg found stream with index ", activeStreamIndex_, " which is of the wrong media type.");
 
-  if (videoStreamOptions.device.type() == torch::kCUDA) {
+
+  if (mediaType == AVMEDIA_TYPE_VIDEO &&
+      videoStreamOptions.device.type() == torch::kCUDA) {
     avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
         findCudaCodec(
             videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
             .value_or(avCodec));
   }
 
+  // TODO figure out whether this should be VIDEO only
   StreamMetadata& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   if (seekMode_ == SeekMode::approximate &&
@@ -465,22 +473,25 @@ void VideoDecoder::addVideoStreamDecoder(
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
+  codecContext->thread_count =
+      videoStreamOptions.ffmpegThreadCount.value_or(0); // TODO VIDEO ONLY?
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
-  if (videoStreamOptions.device.type() == torch::kCPU) {
-    // No more initialization needed for CPU.
-  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
-    initializeContextOnCuda(videoStreamOptions.device, codecContext);
-  } else {
-    TORCH_CHECK(
-        false, "Invalid device type: " + videoStreamOptions.device.str());
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (videoStreamOptions.device.type() == torch::kCPU) {
+      // No more initialization needed for CPU.
+    } else if (videoStreamOptions.device.type() == torch::kCUDA) {
+      initializeContextOnCuda(videoStreamOptions.device, codecContext);
+    } else {
+      TORCH_CHECK(
+          false, "Invalid device type: " + videoStreamOptions.device.str());
+    }
+    streamInfo.videoStreamOptions = videoStreamOptions;
   }
-  streamInfo.videoStreamOptions = videoStreamOptions;
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
   if (retVal < AVSUCCESS) {
@@ -488,14 +499,8 @@ void VideoDecoder::addVideoStreamDecoder(
   }
 
   codecContext->time_base = streamInfo.stream->time_base;
-
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
-      codecContext->width;
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
-      codecContext->height;
-  auto codedId = codecContext->codec_id;
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
-      std::string(avcodec_get_name(codedId));
+      std::string(avcodec_get_name(codecContext->codec_id));
 
   // We will only need packets from the active stream, so we tell FFmpeg to
   // discard packets from the other streams. Note that av_read_frame() may still
@@ -506,6 +511,18 @@ void VideoDecoder::addVideoStreamDecoder(
       formatContext_->streams[i]->discard = AVDISCARD_ALL;
     }
   }
+}
+
+void VideoDecoder::addVideoStream(
+    int streamIndex,
+    const VideoStreamOptions& videoStreamOptions) {
+  addStream(streamIndex, AVMEDIA_TYPE_VIDEO, videoStreamOptions);
+
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
+      streamInfo.codecContext->width;
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
+      streamInfo.codecContext->height;
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
@@ -514,7 +531,7 @@ void VideoDecoder::addVideoStreamDecoder(
   // swscale's width requirements to be violated. We don't expose the ability to
   // choose color conversion library publicly; we only use this ability
   // internally.
-  int width = videoStreamOptions.width.value_or(codecContext->width);
+  int width = videoStreamOptions.width.value_or(streamInfo.codecContext->width);
 
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
@@ -525,6 +542,10 @@ void VideoDecoder::addVideoStreamDecoder(
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
+}
+
+void VideoDecoder::addAudioStream(int streamIndex) {
+  addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 }
 
 // --------------------------------------------------------------------------
@@ -1051,7 +1072,6 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
   AVFrame* avFrame = avFrameStream.avFrame.get();
   frameOutput.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
-  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
   frameOutput.ptsSeconds = ptsToSeconds(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
