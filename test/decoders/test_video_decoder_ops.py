@@ -146,11 +146,11 @@ class TestOps:
     def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
-        frame0, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=0)
+        frame0, _, _ = get_frame_at_index(decoder, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
         # The frame that is played at 6 seconds is frame 180 from a 0-based index.
-        frame6, _, _ = get_frame_at_index(decoder, stream_index=3, frame_index=180)
+        frame6, _, _ = get_frame_at_index(decoder, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
@@ -160,9 +160,7 @@ class TestOps:
     def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
-        frame6, pts, duration = get_frame_at_index(
-            decoder, stream_index=3, frame_index=180
-        )
+        frame6, pts, duration = get_frame_at_index(decoder, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
         )
@@ -174,9 +172,7 @@ class TestOps:
     def test_get_frames_at_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
-        frames0and180, *_ = get_frames_at_indices(
-            decoder, stream_index=3, frame_indices=[0, 180]
-        )
+        frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
@@ -188,20 +184,16 @@ class TestOps:
     def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
-        stream_index = 3
 
         frame_indices = [2, 0, 1, 0, 2]
 
         expected_frames = [
-            get_frame_at_index(
-                decoder, stream_index=stream_index, frame_index=frame_index
-            )[0]
+            get_frame_at_index(decoder, frame_index=frame_index)[0]
             for frame_index in frame_indices
         ]
 
         frames, *_ = get_frames_at_indices(
             decoder,
-            stream_index=stream_index,
             frame_indices=frame_indices,
         )
         for frame, expected_frame in zip(frames, expected_frames):
@@ -219,7 +211,6 @@ class TestOps:
     def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
-        stream_index = 3
 
         # Note: 13.01 should give the last video frame for the NASA video
         timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
@@ -230,7 +221,6 @@ class TestOps:
 
         frames, *_ = get_frames_by_pts(
             decoder,
-            stream_index=stream_index,
             timestamps=timestamps,
         )
         for frame, expected_frame in zip(frames, expected_frames):
@@ -259,12 +249,9 @@ class TestOps:
         num_frames = metadata_dict["numFrames"]
         assert num_frames == 390
 
-        stream_index = 3
         _, all_pts_seconds_ref, _ = zip(
             *[
-                get_frame_at_index(
-                    decoder, stream_index=stream_index, frame_index=frame_index
-                )
+                get_frame_at_index(decoder, frame_index=frame_index)
                 for frame_index in range(num_frames)
             ]
         )
@@ -280,7 +267,6 @@ class TestOps:
 
         _, pts_seconds, _ = get_frames_by_pts_in_range(
             decoder,
-            stream_index=stream_index,
             start_seconds=0,
             stop_seconds=all_pts_seconds_ref[-1] + 1e-4,
         )
@@ -290,7 +276,6 @@ class TestOps:
             *[
                 get_frames_by_pts_in_range(
                     decoder,
-                    stream_index=stream_index,
                     start_seconds=pts,
                     stop_seconds=pts + 1e-4,
                 )
@@ -301,7 +286,7 @@ class TestOps:
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
         _, pts_seconds, _ = get_frames_by_pts(
-            decoder, stream_index=stream_index, timestamps=all_pts_seconds_ref.tolist()
+            decoder, timestamps=all_pts_seconds_ref.tolist()
         )
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
@@ -312,47 +297,37 @@ class TestOps:
 
         # ensure that the degenerate case of a range of size 1 works
         ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
-        bulk_frame0, *_ = get_frames_in_range(decoder, stream_index=3, start=0, stop=1)
+        bulk_frame0, *_ = get_frames_in_range(decoder, start=0, stop=1)
         assert_frames_equal(bulk_frame0, ref_frame0.to(device))
 
         ref_frame1 = NASA_VIDEO.get_frame_data_by_range(1, 2)
-        bulk_frame1, *_ = get_frames_in_range(decoder, stream_index=3, start=1, stop=2)
+        bulk_frame1, *_ = get_frames_in_range(decoder, start=1, stop=2)
         assert_frames_equal(bulk_frame1, ref_frame1.to(device))
 
         ref_frame389 = NASA_VIDEO.get_frame_data_by_range(389, 390)
-        bulk_frame389, *_ = get_frames_in_range(
-            decoder, stream_index=3, start=389, stop=390
-        )
+        bulk_frame389, *_ = get_frames_in_range(decoder, start=389, stop=390)
         assert_frames_equal(bulk_frame389, ref_frame389.to(device))
 
         # contiguous ranges
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
-        bulk_frames0_9, *_ = get_frames_in_range(
-            decoder, stream_index=3, start=0, stop=9
-        )
+        bulk_frames0_9, *_ = get_frames_in_range(decoder, start=0, stop=9)
         assert_frames_equal(bulk_frames0_9, ref_frames0_9.to(device))
 
         ref_frames4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8)
-        bulk_frames4_8, *_ = get_frames_in_range(
-            decoder, stream_index=3, start=4, stop=8
-        )
+        bulk_frames4_8, *_ = get_frames_in_range(decoder, start=4, stop=8)
         assert_frames_equal(bulk_frames4_8, ref_frames4_8.to(device))
 
         # ranges with a stride
         ref_frames15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5)
-        bulk_frames15_35, *_ = get_frames_in_range(
-            decoder, stream_index=3, start=15, stop=36, step=5
-        )
+        bulk_frames15_35, *_ = get_frames_in_range(decoder, start=15, stop=36, step=5)
         assert_frames_equal(bulk_frames15_35, ref_frames15_35.to(device))
 
         ref_frames0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2)
-        bulk_frames0_9_2, *_ = get_frames_in_range(
-            decoder, stream_index=3, start=0, stop=9, step=2
-        )
+        bulk_frames0_9_2, *_ = get_frames_in_range(decoder, start=0, stop=9, step=2)
         assert_frames_equal(bulk_frames0_9_2, ref_frames0_9_2.to(device))
 
         # an empty range is valid!
-        empty_frame, *_ = get_frames_in_range(decoder, stream_index=3, start=5, stop=5)
+        empty_frame, *_ = get_frames_in_range(decoder, start=5, stop=5)
         assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
@@ -507,9 +482,9 @@ class TestOps:
         # If this fails, there's a good chance that we accidentally truncated a 64-bit
         # floating point value to a 32-bit floating value.
         for i in range(390):
-            frame, pts, _ = get_frame_at_index(decoder, stream_index=3, frame_index=i)
+            frame, pts, _ = get_frame_at_index(decoder, frame_index=i)
             pts_is_equal = _test_frame_pts_equality(
-                decoder, stream_index=3, frame_index=i, pts_seconds_to_test=pts.item()
+                decoder, frame_index=i, pts_seconds_to_test=pts.item()
             )
             assert pts_is_equal
 
@@ -590,10 +565,7 @@ class TestOps:
             frame0_ref = frame0_ref.permute(1, 2, 0)
         expected_shape = frame0_ref.shape
 
-        stream_index = 3
-        frame0, *_ = get_frame_at_index(
-            decoder, stream_index=stream_index, frame_index=0
-        )
+        frame0, *_ = get_frame_at_index(decoder, frame_index=0)
         assert frame0.shape == expected_shape
         assert_frames_equal(frame0, frame0_ref)
 
@@ -601,21 +573,17 @@ class TestOps:
         assert frame0.shape == expected_shape
         assert_frames_equal(frame0, frame0_ref)
 
-        frames, *_ = get_frames_in_range(
-            decoder, stream_index=stream_index, start=0, stop=3
-        )
+        frames, *_ = get_frames_in_range(decoder, start=0, stop=3)
         assert frames.shape[1:] == expected_shape
         assert_frames_equal(frames[0], frame0_ref)
 
         frames, *_ = get_frames_by_pts_in_range(
-            decoder, stream_index=stream_index, start_seconds=0, stop_seconds=1
+            decoder, start_seconds=0, stop_seconds=1
         )
         assert frames.shape[1:] == expected_shape
         assert_frames_equal(frames[0], frame0_ref)
 
-        frames, *_ = get_frames_at_indices(
-            decoder, stream_index=stream_index, frame_indices=[0, 1, 3, 4]
-        )
+        frames, *_ = get_frames_at_indices(decoder, frame_indices=[0, 1, 3, 4])
         assert frames.shape[1:] == expected_shape
         assert_frames_equal(frames[0], frame0_ref)
 
