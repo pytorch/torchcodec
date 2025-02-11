@@ -152,9 +152,7 @@ class VideoDecoder:
                 f"Index {key} is out of bounds; length is {self._num_frames}"
             )
 
-        frame_data, *_ = core.get_frame_at_index(
-            self._decoder, frame_index=key, stream_index=self.stream_index
-        )
+        frame_data, *_ = core.get_frame_at_index(self._decoder, frame_index=key)
         return frame_data
 
     def _getitem_slice(self, key: slice) -> Tensor:
@@ -163,7 +161,6 @@ class VideoDecoder:
         start, stop, step = key.indices(len(self))
         frame_data, *_ = core.get_frames_in_range(
             self._decoder,
-            stream_index=self.stream_index,
             start=start,
             stop=stop,
             step=step,
@@ -189,9 +186,7 @@ class VideoDecoder:
         )
 
     def _get_key_frame_indices(self) -> list[int]:
-        return core._get_key_frame_indices(
-            self._decoder, stream_index=self.stream_index
-        )
+        return core._get_key_frame_indices(self._decoder)
 
     def get_frame_at(self, index: int) -> Frame:
         """Return a single frame at the given index.
@@ -208,7 +203,7 @@ class VideoDecoder:
                 f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
             )
         data, pts_seconds, duration_seconds = core.get_frame_at_index(
-            self._decoder, frame_index=index, stream_index=self.stream_index
+            self._decoder, frame_index=index
         )
         return Frame(
             data=data,
@@ -234,7 +229,7 @@ class VideoDecoder:
         """
 
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
-            self._decoder, stream_index=self.stream_index, frame_indices=indices
+            self._decoder, frame_indices=indices
         )
         return FrameBatch(
             data=data,
@@ -268,7 +263,6 @@ class VideoDecoder:
             raise IndexError(f"Step ({step}) must be greater than 0.")
         frames = core.get_frames_in_range(
             self._decoder,
-            stream_index=self.stream_index,
             start=start,
             stop=stop,
             step=step,
@@ -316,7 +310,7 @@ class VideoDecoder:
             FrameBatch: The frames that are played at ``seconds``.
         """
         data, pts_seconds, duration_seconds = core.get_frames_by_pts(
-            self._decoder, timestamps=seconds, stream_index=self.stream_index
+            self._decoder, timestamps=seconds
         )
         return FrameBatch(
             data=data,
@@ -359,7 +353,6 @@ class VideoDecoder:
             )
         frames = core.get_frames_by_pts_in_range(
             self._decoder,
-            stream_index=self.stream_index,
             start_seconds=start_seconds,
             stop_seconds=stop_seconds,
         )
