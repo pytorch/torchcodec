@@ -219,8 +219,7 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(
-      stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
@@ -235,11 +234,6 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
     result = videoDecoder->getNextFrame();
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
-  }
-  if (result.data.sizes().size() != 3) {
-    throw std::runtime_error(
-        "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.data.sizes().size()));
   }
   return makeOpsFrameOutput(result);
 }
