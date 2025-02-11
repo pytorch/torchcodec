@@ -136,7 +136,7 @@ class VideoDecoder {
 
   struct AudioStreamOptions {};
 
-  void addVideoStreamDecoder(
+  void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
   void addAudioStreamDecoder(
