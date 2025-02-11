@@ -220,7 +220,7 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(
+  videoDecoder->addVideoStream(
       stream_index.value_or(-1), videoStreamOptions);
 }
 

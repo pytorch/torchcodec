@@ -148,7 +148,7 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = 100;
   videoStreamOptions.height = 120;
-  decoder->addVideoStreamDecoder(-1, videoStreamOptions);
+  decoder->addVideoStream(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrame().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
@@ -158,7 +158,7 @@ TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::unique_ptr<VideoDecoder> decoder = std::make_unique<VideoDecoder>(path);
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
-  decoder->addVideoStreamDecoder(-1, videoStreamOptions);
+  decoder->addVideoStream(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrame().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
@@ -167,7 +167,7 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStreamDecoder(-1);
+  ourDecoder->addVideoStream(-1);
   auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor0FromOurDecoder = output.data;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
@@ -206,7 +206,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStreamDecoder(bestVideoStreamIndex);
+  ourDecoder->addVideoStream(bestVideoStreamIndex);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
@@ -228,7 +228,7 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStreamDecoder(
+  ourDecoder->addVideoStream(
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
   // Frame with index 180 corresponds to timestamp 6.006.
@@ -250,7 +250,7 @@ TEST_P(VideoDecoderTest, SeeksCloseToEof) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStreamDecoder(-1);
+  ourDecoder->addVideoStream(-1);
   ourDecoder->setCursorPtsInSeconds(388388. / 30'000);
   auto output = ourDecoder->getNextFrame();
   EXPECT_EQ(output.ptsSeconds, 388'388. / 30'000);
@@ -263,7 +263,7 @@ TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStreamDecoder(-1);
+  ourDecoder->addVideoStream(-1);
   auto output = ourDecoder->getFramePlayedAt(6.006);
   EXPECT_EQ(output.ptsSeconds, 6.006);
   // The frame's duration is 0.033367 according to ffprobe,
@@ -293,7 +293,7 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<VideoDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStreamDecoder(-1);
+  ourDecoder->addVideoStream(-1);
   ourDecoder->setCursorPtsInSeconds(6.0);
   auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor6FromOurDecoder = output.data;
@@ -393,7 +393,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStreamDecoder(
+  ourDecoder->addVideoStream(
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
   auto output =
@@ -410,7 +410,7 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStreamDecoder(
+  ourDecoder->addVideoStream(
       bestVideoStreamIndex,
       VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
   auto output =

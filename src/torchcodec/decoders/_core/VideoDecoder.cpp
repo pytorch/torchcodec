@@ -418,7 +418,7 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
   }
 }
 
-void VideoDecoder::addVideoStreamDecoder(
+void VideoDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions) {
   TORCH_CHECK(
