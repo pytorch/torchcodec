@@ -1262,11 +1262,10 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameStream& avFrameStream,
     FrameOutput& frameOutput) {
-  AVFrame* avFrame = avFrameStream.avFrame.get();
+  const AVFrame* avFrame = avFrameStream.avFrame.get();
 
   auto numSamples = avFrame->nb_samples; // per channel
-  auto numChannels =
-      avFrame->ch_layout.nb_channels; // TODO handle other ffmpeg versions
+  auto numChannels = getNumChannels(avFrame);
 
   // TODO: dtype should be format-dependent
   torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
