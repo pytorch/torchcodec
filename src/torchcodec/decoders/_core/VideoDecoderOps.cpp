@@ -220,8 +220,7 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
