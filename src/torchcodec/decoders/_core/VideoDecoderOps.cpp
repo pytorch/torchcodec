@@ -237,11 +237,6 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
-  if (result.data.sizes().size() != 3) {
-    throw std::runtime_error(
-        "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.data.sizes().size()));
-  }
   return makeOpsFrameOutput(result);
 }
 
