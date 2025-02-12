@@ -1274,11 +1274,14 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   // TODO Implement all formats
   switch (format) {
     case AV_SAMPLE_FMT_FLTP: {
-      uint8_t* pData = static_cast<uint8_t*>(data.data_ptr());
-      for (auto channel = 0; channel < numChannels; ++channel) {
-        auto numBytesToCopy = numSamples * av_get_bytes_per_sample(format);
-        memcpy(pData, avFrame->extended_data[channel], numBytesToCopy);
-        pData += numBytesToCopy;
+      uint8_t* outputChannelData = static_cast<uint8_t*>(data.data_ptr());
+      auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
+      for (auto channel = 0; channel < numChannels;
+           ++channel, outputChannelData += numBytesPerChannel) {
+        memcpy(
+            outputChannelData,
+            avFrame->extended_data[channel],
+            numBytesPerChannel);
       }
       break;
     }
