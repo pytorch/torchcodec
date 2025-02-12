@@ -39,24 +39,23 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frame_at_pts(Tensor(a!) decoder, float seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frame_at_index(Tensor(a!) decoder, *, int stream_index, int frame_index) -> (Tensor, Tensor, Tensor)");
+      "get_frame_at_index(Tensor(a!) decoder, *, int frame_index) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_at_indices(Tensor(a!) decoder, *, int stream_index, int[] frame_indices) -> (Tensor, Tensor, Tensor)");
+      "get_frames_at_indices(Tensor(a!) decoder, *, int[] frame_indices) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_in_range(Tensor(a!) decoder, *, int stream_index, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
+      "get_frames_in_range(Tensor(a!) decoder, *, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_by_pts_in_range(Tensor(a!) decoder, *, int stream_index, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
+      "get_frames_by_pts_in_range(Tensor(a!) decoder, *, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_by_pts(Tensor(a!) decoder, *, int stream_index, float[] timestamps) -> (Tensor, Tensor, Tensor)");
-  m.def(
-      "_get_key_frame_indices(Tensor(a!) decoder, int stream_index) -> Tensor");
+      "get_frames_by_pts(Tensor(a!) decoder, *, float[] timestamps) -> (Tensor, Tensor, Tensor)");
+  m.def("_get_key_frame_indices(Tensor(a!) decoder) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
   m.def("get_container_json_metadata(Tensor(a!) decoder) -> str");
   m.def(
       "get_stream_json_metadata(Tensor(a!) decoder, int stream_index) -> str");
   m.def("_get_json_ffmpeg_library_versions() -> str");
   m.def(
-      "_test_frame_pts_equality(Tensor(a!) decoder, *, int stream_index, int frame_index, float pts_seconds_to_test) -> bool");
+      "_test_frame_pts_equality(Tensor(a!) decoder, *, int frame_index, float pts_seconds_to_test) -> bool");
   m.def("scan_all_streams_to_update_metadata(Tensor(a!) decoder) -> ()");
 }
 
@@ -220,8 +219,7 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStreamDecoder(
-      stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
@@ -237,11 +235,6 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   } catch (const VideoDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
-  if (result.data.sizes().size() != 3) {
-    throw std::runtime_error(
-        "image_size is unexpected. Expected 3, got: " +
-        std::to_string(result.data.sizes().size()));
-  }
   return makeOpsFrameOutput(result);
 }
 
@@ -251,10 +244,7 @@ OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   return makeOpsFrameOutput(result);
 }
 
-OpsFrameOutput get_frame_at_index(
-    at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
-    int64_t frame_index) {
+OpsFrameOutput get_frame_at_index(at::Tensor& decoder, int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(frame_index);
   return makeOpsFrameOutput(result);
@@ -262,7 +252,6 @@ OpsFrameOutput get_frame_at_index(
 
 OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
     at::IntArrayRef frame_indices) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<int64_t> frameIndicesVec(
@@ -273,7 +262,6 @@ OpsFrameBatchOutput get_frames_at_indices(
 
 OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
     int64_t start,
     int64_t stop,
     std::optional<int64_t> step) {
@@ -284,7 +272,6 @@ OpsFrameBatchOutput get_frames_in_range(
 
 OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
     at::ArrayRef<double> timestamps) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   std::vector<double> timestampsVec(timestamps.begin(), timestamps.end());
@@ -294,7 +281,6 @@ OpsFrameBatchOutput get_frames_by_pts(
 
 OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
     double start_seconds,
     double stop_seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
@@ -327,7 +313,6 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
 
 bool _test_frame_pts_equality(
     at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index,
     int64_t frame_index,
     double pts_seconds_to_test) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
@@ -335,9 +320,7 @@ bool _test_frame_pts_equality(
       videoDecoder->getPtsSecondsForFrame(frame_index);
 }
 
-torch::Tensor _get_key_frame_indices(
-    at::Tensor& decoder,
-    [[maybe_unused]] int64_t stream_index) {
+torch::Tensor _get_key_frame_indices(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   return videoDecoder->getKeyFrameIndices();
 }

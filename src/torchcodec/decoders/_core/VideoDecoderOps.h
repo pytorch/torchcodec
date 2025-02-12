@@ -85,14 +85,10 @@ OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds);
 // Return the frames at given ptss for a given stream
 OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
-    int64_t stream_index,
     at::ArrayRef<double> timestamps);
 
 // Return the frame that is visible at a given index in the video.
-OpsFrameOutput get_frame_at_index(
-    at::Tensor& decoder,
-    int64_t stream_index,
-    int64_t frame_index);
+OpsFrameOutput get_frame_at_index(at::Tensor& decoder, int64_t frame_index);
 
 // Get the next frame from the video as a tuple that has the frame data, pts and
 // duration as tensors.
@@ -101,14 +97,12 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder);
 // Return the frames at given indices for a given stream
 OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
-    int64_t stream_index,
     at::IntArrayRef frame_indices);
 
 // Return the frames inside a range as a single stacked Tensor. The range is
 // defined as [start, stop).
 OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
-    int64_t stream_index,
     int64_t start,
     int64_t stop,
     std::optional<int64_t> step = std::nullopt);
@@ -118,7 +112,6 @@ OpsFrameBatchOutput get_frames_in_range(
 // order.
 OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
-    int64_t stream_index,
     double start_seconds,
     double stop_seconds);
 
@@ -128,16 +121,15 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
 // We want to make sure that the value is preserved exactly, bit-for-bit, during
 // this process.
 //
-// Returns true if for the given decoder, in the stream stream_index, the pts
+// Returns true if for the given decoder, the pts
 // value when converted to seconds as a double is exactly pts_seconds_to_test.
 // Returns false otherwise.
 bool _test_frame_pts_equality(
     at::Tensor& decoder,
-    int64_t stream_index,
     int64_t frame_index,
     double pts_seconds_to_test);
 
-torch::Tensor _get_key_frame_indices(at::Tensor& decoder, int64_t stream_index);
+torch::Tensor _get_key_frame_indices(at::Tensor& decoder);
 
 // Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder);
