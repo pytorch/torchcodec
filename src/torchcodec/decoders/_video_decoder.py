@@ -75,6 +75,7 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
+        audio_stream: bool = False,  # TODO remove, debug only
     ):
         allowed_seek_modes = ("exact", "approximate")
         if seek_mode not in allowed_seek_modes:
@@ -107,13 +108,21 @@ class VideoDecoder:
         if num_ffmpeg_threads is None:
             raise ValueError(f"{num_ffmpeg_threads = } should be an int.")
 
-        core.add_video_stream(
-            self._decoder,
-            stream_index=stream_index,
-            dimension_order=dimension_order,
-            num_threads=num_ffmpeg_threads,
-            device=device,
-        )
+
+        # TODO REMOVE THIS
+        if audio_stream:
+            core.add_audio_stream(
+                self._decoder,
+                stream_index=stream_index,
+            )
+        else:
+            core.add_video_stream(
+                self._decoder,
+                stream_index=stream_index,
+                dimension_order=dimension_order,
+                num_threads=num_ffmpeg_threads,
+                device=device,
+            )
 
         self.metadata, self.stream_index = _get_and_validate_stream_metadata(
             self._decoder, stream_index

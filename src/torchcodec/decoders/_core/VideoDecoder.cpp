@@ -64,6 +64,67 @@ std::vector<std::string> splitStringWithDelimiters(
 
 } // namespace
 
+void print_packet(AVPacket* packet) {
+  unsigned long checksum = 0;
+  for (int i = 0; i < packet->size; i++) {
+    checksum += packet->data[i];
+  }
+  printf(
+      "PTS: %ld, DTS: %ld, Duration: %d, Size: %d, Stream Index: %d, Checksum: %lu\n",
+      packet->pts,
+      packet->dts,
+      packet->duration,
+      packet->size,
+      packet->stream_index,
+      checksum);
+  fflush(stdout);
+}
+
+void print_avFrame(AVFrame* avFrame) {
+//   printf("Format: %d\n", avFrame->format);
+//   printf("Width: %d\n", avFrame->width);
+//   printf("Height: %d\n", avFrame->height);
+//   printf(
+//       "Channels: %d\n",
+//       av_get_channel_layout_nb_channels(avFrame->channel_layout));
+//   printf("Channel Layout: %ld\n", avFrame->channel_layout);
+//   printf("Number of Samples: %d\n", avFrame->nb_samples);
+//   printf("PTS: %ld\n", avFrame->pts);
+//   printf("Packet DTS: %ld\n", avFrame->pkt_dts);
+//   printf("Packet Duration: %d\n", avFrame->pkt_duration);
+//   printf("Packet Pos: %d\n", avFrame->pkt_pos);
+//   for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
+//     if (avFrame->data[i]) {
+//       printf("Data[%d] Line Size: %d\n", i, avFrame->linesize[i]);
+//     }
+//   }
+//   printf("Color Range: %d\n", avFrame->color_range);
+//   printf("Color Primaries: %d\n", avFrame->color_primaries);
+//   printf("Color Transfer Characteristic: %d\n", avFrame->color_trc);
+//   printf("Color Space: %d\n", avFrame->colorspace);
+//   printf("Chroma Location: %d\n", avFrame->chroma_location);
+//   printf(
+//       "Sample Aspect Ratio: %d/%d\n",
+//       avFrame->sample_aspect_ratio.num,
+//       avFrame->sample_aspect_ratio.den);
+//   printf("Key Frame: %d\n", avFrame->key_frame);
+//   printf("Picture Type: %d\n", avFrame->pict_type);
+//   printf("Coded Picture Number: %d\n", avFrame->coded_picture_number);
+//   printf("Display Picture Number: %d\n", avFrame->display_picture_number);
+
+  unsigned long checksum = 0;
+  // TODO this is only for planar data
+  for (int c = 0; c < av_get_channel_layout_nb_channels(avFrame->channel_layout); ++c){
+    for (int i = 0; i < avFrame->nb_samples; i++) {
+        checksum += avFrame->extended_data[c][i];
+    }
+  }
+//   printf("Frame Checksum: %lu\n", checksum);
+//   printf("\n");
+  printf("PTS: %ld, NumSamples: %d, Checksum: %lu\n", avFrame->pts, avFrame->nb_samples, checksum);
+  fflush(stdout);
+}
+
 // --------------------------------------------------------------------------
 // CONSTRUCTORS, INITIALIZATION, DESTRUCTORS
 // --------------------------------------------------------------------------
@@ -299,6 +360,7 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   }
 
   // Reset the seek-cursor back to the beginning.
+  printf("Seeking to 0 with flag 0\n");
   int ffmepgStatus =
       avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
   if (ffmepgStatus < 0) {
@@ -923,19 +985,30 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
+//   int flag = AVSEEK_FLAG_BACKWARD;
+  int flag = 0;
+  printf("Seeking to %ld with flag %d\n", desiredPts, flag);
   int ffmepgStatus = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
       INT64_MIN,
-      desiredPts,
-      desiredPts,
-      0);
+      desiredPts - 1,
+      desiredPts - 1,
+      flag);
+
+//   int ffmepgStatus = av_seek_frame(
+//       formatContext_.get(),
+//       streamInfo.streamIndex,
+//       desiredPts,
+//       flag
+//   );
   if (ffmepgStatus < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
         getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
   }
   decodeStats_.numFlushes++;
+  printf("calling avcodec_flush_buffers\n");
   avcodec_flush_buffers(streamInfo.codecContext.get());
 }
 
@@ -965,6 +1038,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   while (true) {
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
+    printf("output of avcodec_receive_frame: %d\n", ffmpegStatus);
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
@@ -999,6 +1073,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       decodeStats_.numPacketsRead++;
 
       if (ffmpegStatus == AVERROR_EOF) {
+        printf("Sending packet: null\n");
         // End of file reached. We must drain the codec by sending a nullptr
         // packet.
         ffmpegStatus = avcodec_send_packet(
@@ -1029,6 +1104,8 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
+    printf("Sending packet: ");
+    print_packet(packet.get());
     ffmpegStatus =
         avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
     if (ffmpegStatus < AVSUCCESS) {
@@ -1059,6 +1136,8 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   // the file and that will flush the decoder.
   streamInfo.currentPts = avFrame->pts;
   streamInfo.currentDuration = getDuration(avFrame);
+  printf("Received avFrame: ");
+  print_avFrame(avFrame.get());
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
 }
