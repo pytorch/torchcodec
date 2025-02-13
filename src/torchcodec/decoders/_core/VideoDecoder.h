@@ -361,7 +361,9 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeeking(int64_t targetPts) const;
+  //   bool canWeAvoidSeeking(int64_t targetPts) const;
+  bool canWeAvoidSeekingVideo(int64_t targetPts) const;
+  bool canWeAvoidSeekingAudio(double desiredPtsSeconds) const;
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -421,7 +423,7 @@ class VideoDecoder {
   int64_t secondsToIndexLowerBound(
       double seconds,
       const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata);
+      const StreamMetadata& streamMetadata) const;
 
   int64_t secondsToIndexUpperBound(
       double seconds,

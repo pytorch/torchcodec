@@ -914,6 +914,48 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   desiredPtsSeconds_ = seconds;
 }
 
+// bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
+//   switch (streamInfos_.at(activeStreamIndex_).avMediaType) {
+//     case AVMEDIA_TYPE_AUDIO: {
+//       return canWeAvoidSeekingAudio(targetPts);
+//     }
+//     case AVMEDIA_TYPE_VIDEO: {
+//       return canWeAvoidSeekingVideo(targetPts);
+//     }
+//     default: {
+//       TORCH_CHECK(false, "Should never happen.");
+//     }
+//   }
+// }
+
+bool VideoDecoder::canWeAvoidSeekingAudio(
+    [[maybe_unused]] double desiredPtsSeconds) const {
+  const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
+  int64_t targetPts = *desiredPtsSeconds_ * streamInfo.timeBase.den;
+
+  int64_t lastDecodedAvFramePts = streamInfo.lastDecodedAvFramePts;
+  if (targetPts < lastDecodedAvFramePts) {
+    // We can never skip a seek if we are seeking backwards.
+    return false;
+  }
+  if (lastDecodedAvFramePts == targetPts) {
+    // We are seeking to the exact same frame as we are currently at. Without
+    // caching we have to rewind back and decode the frame again.
+    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // implement caching.
+    return false;
+  }
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  
+  double lastDecodedAvFramePtsSeconds = ptsToSeconds(lastDecodedAvFramePts, streamInfo.timeBase);
+  int64_t lastDecodedAvFrameIndex = secondsToIndexLowerBound(
+      lastDecodedAvFramePtsSeconds, streamInfo, streamMetadata);
+  int64_t targetFrameIndex = secondsToIndexLowerBound(
+      desiredPtsSeconds, streamInfo, streamMetadata);
+  return (lastDecodedAvFrameIndex + 1 == targetFrameIndex);
+}
+
 /*
 Videos have I frames and non-I frames (P and B frames). Non-I frames need data
 from the previous I frame to be decoded.
@@ -939,7 +981,7 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
-bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
+bool VideoDecoder::canWeAvoidSeekingVideo(int64_t targetPts) const {
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
   if (targetPts < lastDecodedAvFramePts) {
@@ -974,7 +1016,16 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   decodeStats_.numSeeksAttempted++;
 
   int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeeking(desiredPtsForStream)) {
+
+  // TODO update this crap
+  bool can = false;
+  if (streamInfos_.at(activeStreamIndex_).avMediaType == AVMEDIA_TYPE_AUDIO) {
+    can = canWeAvoidSeekingAudio(*desiredPtsSeconds_);
+  } else {
+    can = canWeAvoidSeekingVideo(desiredPtsForStream);
+  }
+
+  if (can) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
@@ -1000,8 +1051,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
       formatContext_.get(),
       streamInfo.streamIndex,
       INT64_MIN,
-      desiredPts - 1,
-      desiredPts - 1,
+      desiredPts,
+      desiredPts,
       flag);
 
   //   int ffmepgStatus = av_seek_frame(
@@ -1652,7 +1703,7 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
 int64_t VideoDecoder::secondsToIndexLowerBound(
     double seconds,
     const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
+    const StreamMetadata& streamMetadata) const {
   switch (seekMode_) {
     case SeekMode::exact: {
       auto frame = std::lower_bound(
