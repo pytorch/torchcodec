@@ -416,15 +416,9 @@ class VideoDecoder {
 
   int64_t secondsToIndexLowerBound(double seconds);
 
-  int64_t secondsToIndexUpperBound(
-      double seconds,
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata);
+  int64_t secondsToIndexUpperBound(double seconds);
 
-  int64_t getPts(
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
+  int64_t getPts(int64_t frameIndex);
 
   // --------------------------------------------------------------------------
   // STREAM AND METADATA APIS
