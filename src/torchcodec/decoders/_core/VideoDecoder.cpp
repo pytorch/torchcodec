@@ -703,7 +703,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   double minSeconds = getMinSeconds(streamMetadata);
   double maxSeconds = getMaxSeconds(streamMetadata);
@@ -723,7 +722,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
             std::to_string(maxSeconds) + ").");
 
     frameIndices[i] =
-        secondsToIndexLowerBound(frameSeconds, streamInfo, streamMetadata);
+        secondsToIndexLowerBound(frameSeconds);
   }
 
   return getFramesAtIndices(frameIndices);
@@ -795,7 +794,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   //   frame's pts, but before the next frames's pts.
 
   int64_t startFrameIndex =
-      secondsToIndexLowerBound(startSeconds, streamInfo, streamMetadata);
+      secondsToIndexLowerBound(startSeconds);
   int64_t stopFrameIndex =
       secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
@@ -1499,10 +1498,8 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
   return upperBound - 1 - keyFrames.begin();
 }
 
-int64_t VideoDecoder::secondsToIndexLowerBound(
-    double seconds,
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
+int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) {
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
     case SeekMode::exact: {
       auto frame = std::lower_bound(
@@ -1515,8 +1512,10 @@ int64_t VideoDecoder::secondsToIndexLowerBound(
 
       return frame - streamInfo.allFrames.begin();
     }
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      auto& streamMetadata = containerMetadata_.allStreamMetadata[activeStreamIndex_];
       return std::floor(seconds * streamMetadata.averageFps.value());
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }

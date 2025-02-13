@@ -414,10 +414,7 @@ class VideoDecoder {
       const std::vector<VideoDecoder::FrameInfo>& keyFrames,
       int64_t pts) const;
 
-  int64_t secondsToIndexLowerBound(
-      double seconds,
-      const StreamInfo& streamInfo,
-      const StreamMetadata& streamMetadata);
+  int64_t secondsToIndexLowerBound(double seconds);
 
   int64_t secondsToIndexUpperBound(
       double seconds,
