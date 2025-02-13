@@ -473,6 +473,7 @@ class VideoDecoder {
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  bool mustSkipSeeking_ = false;
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.

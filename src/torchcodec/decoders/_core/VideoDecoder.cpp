@@ -653,7 +653,10 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
+    // We know the frames are consecutive, there's no need to seek
+    mustSkipSeeking_ = (step == 1);
   }
+  mustSkipSeeking_ = false; // reset to original value
   frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
   return frameBatchOutput;
 }
@@ -807,7 +810,10 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
+    // We know the frames are consecutive, there's no need to seek
+    mustSkipSeeking_ = true;
   }
+  mustSkipSeeking_ = false; // reset to original value
   frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
 
   return frameBatchOutput;
@@ -847,6 +853,9 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
 bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
+  if (mustSkipSeeking_) {
+    return true;
+  }
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
   if (targetPts < lastDecodedAvFramePts) {
