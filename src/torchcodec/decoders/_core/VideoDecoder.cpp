@@ -947,12 +947,13 @@ bool VideoDecoder::canWeAvoidSeekingAudio(
   }
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  
-  double lastDecodedAvFramePtsSeconds = ptsToSeconds(lastDecodedAvFramePts, streamInfo.timeBase);
+
+  double lastDecodedAvFramePtsSeconds =
+      ptsToSeconds(lastDecodedAvFramePts, streamInfo.timeBase);
   int64_t lastDecodedAvFrameIndex = secondsToIndexLowerBound(
       lastDecodedAvFramePtsSeconds, streamInfo, streamMetadata);
-  int64_t targetFrameIndex = secondsToIndexLowerBound(
-      desiredPtsSeconds, streamInfo, streamMetadata);
+  int64_t targetFrameIndex =
+      secondsToIndexLowerBound(desiredPtsSeconds, streamInfo, streamMetadata);
   return (lastDecodedAvFrameIndex + 1 == targetFrameIndex);
 }
 
@@ -1019,7 +1020,8 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
   // TODO update this crap
   bool can = false;
-  if (streamInfos_.at(activeStreamIndex_).avMediaType == AVMEDIA_TYPE_AUDIO) {
+  auto avMediaType = streamInfos_.at(activeStreamIndex_).avMediaType;
+  if (avMediaType == AVMEDIA_TYPE_AUDIO) {
     can = canWeAvoidSeekingAudio(*desiredPtsSeconds_);
   } else {
     can = canWeAvoidSeekingVideo(desiredPtsForStream);
@@ -1037,30 +1039,28 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   // the key frame that we want to seek to.
   // See https://github.com/pytorch/torchcodec/issues/179 for more details.
   // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
-  if (!streamInfo.keyFrames.empty()) {
+  if (avMediaType == AVMEDIA_TYPE_VIDEO && !streamInfo.keyFrames.empty()) {
     int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
         streamInfo.keyFrames, desiredPts);
     desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
-  //   int flag = AVSEEK_FLAG_BACKWARD;
-  int flag = 0;
-  printf("Seeking to %ld with flag %d\n", desiredPts, flag);
+  printf("Seeking to %ld with flag 0\n", desiredPts);
+
+  // TODO explain this nasty hack
+  // This probably only works if the desired pts corresponds exactly to a frame
+  // start.
+  int64_t offset = avMediaType == AVMEDIA_TYPE_VIDEO ? 0 : -1;
+
   int ffmepgStatus = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
       INT64_MIN,
-      desiredPts,
-      desiredPts,
-      flag);
+      desiredPts + offset,
+      desiredPts + offset,
+      0);
 
-  //   int ffmepgStatus = av_seek_frame(
-  //       formatContext_.get(),
-  //       streamInfo.streamIndex,
-  //       desiredPts,
-  //       flag
-  //   );
   if (ffmepgStatus < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
