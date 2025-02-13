@@ -60,6 +60,14 @@ int64_t getDuration(const AVFrame* frame) {
 #endif
 }
 
+int getNumChannels(const AVFrame* avFrame) {
+#if LIBAVFILTER_VERSION_MAJOR >= 8 && LIBAVFILTER_VERSION_MINOR >= 44
+  return avFrame->ch_layout.nb_channels;
+#else
+  return av_get_channel_layout_nb_channels(avFrame->channel_layout);
+#endif
+}
+
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
     size_t data_size,

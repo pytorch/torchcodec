@@ -69,6 +69,7 @@ create_from_tensor = torch._dynamo.disallow_in_graph(
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
 _add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
+add_audio_stream = torch.ops.torchcodec_ns.add_audio_stream.default
 seek_to_pts = torch.ops.torchcodec_ns.seek_to_pts.default
 get_next_frame = torch.ops.torchcodec_ns.get_next_frame.default
 get_frame_at_pts = torch.ops.torchcodec_ns.get_frame_at_pts.default
@@ -146,6 +147,15 @@ def add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+) -> None:
+    return
+
+
+@register_fake("torchcodec_ns::add_audio_stream")
+def add_audio_stream_abstract(
+    decoder: torch.Tensor,
+    *,
+    stream_index: Optional[int] = None,
 ) -> None:
     return
 

@@ -139,9 +139,7 @@ class VideoDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStreamDecoder(
-      int streamIndex,
-      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
+  void addAudioStream(int streamIndex);
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -322,6 +320,8 @@ class VideoDecoder {
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
+    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
 
@@ -381,6 +381,10 @@ class VideoDecoder {
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  void convertAudioAVFrameToFrameOutputOnCPU(
+      AVFrameStream& avFrameStream,
+      FrameOutput& frameOutput);
+
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
@@ -432,6 +436,11 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
+
+  void addStream(
+      int streamIndex,
+      AVMediaType mediaType,
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
