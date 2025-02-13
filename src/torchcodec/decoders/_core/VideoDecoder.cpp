@@ -81,47 +81,53 @@ void print_packet(AVPacket* packet) {
 }
 
 void print_avFrame(AVFrame* avFrame) {
-//   printf("Format: %d\n", avFrame->format);
-//   printf("Width: %d\n", avFrame->width);
-//   printf("Height: %d\n", avFrame->height);
-//   printf(
-//       "Channels: %d\n",
-//       av_get_channel_layout_nb_channels(avFrame->channel_layout));
-//   printf("Channel Layout: %ld\n", avFrame->channel_layout);
-//   printf("Number of Samples: %d\n", avFrame->nb_samples);
-//   printf("PTS: %ld\n", avFrame->pts);
-//   printf("Packet DTS: %ld\n", avFrame->pkt_dts);
-//   printf("Packet Duration: %d\n", avFrame->pkt_duration);
-//   printf("Packet Pos: %d\n", avFrame->pkt_pos);
-//   for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
-//     if (avFrame->data[i]) {
-//       printf("Data[%d] Line Size: %d\n", i, avFrame->linesize[i]);
-//     }
-//   }
-//   printf("Color Range: %d\n", avFrame->color_range);
-//   printf("Color Primaries: %d\n", avFrame->color_primaries);
-//   printf("Color Transfer Characteristic: %d\n", avFrame->color_trc);
-//   printf("Color Space: %d\n", avFrame->colorspace);
-//   printf("Chroma Location: %d\n", avFrame->chroma_location);
-//   printf(
-//       "Sample Aspect Ratio: %d/%d\n",
-//       avFrame->sample_aspect_ratio.num,
-//       avFrame->sample_aspect_ratio.den);
-//   printf("Key Frame: %d\n", avFrame->key_frame);
-//   printf("Picture Type: %d\n", avFrame->pict_type);
-//   printf("Coded Picture Number: %d\n", avFrame->coded_picture_number);
-//   printf("Display Picture Number: %d\n", avFrame->display_picture_number);
+  //   printf("Format: %d\n", avFrame->format);
+  //   printf("Width: %d\n", avFrame->width);
+  //   printf("Height: %d\n", avFrame->height);
+  //   printf(
+  //       "Channels: %d\n",
+  //       av_get_channel_layout_nb_channels(avFrame->channel_layout));
+  //   printf("Channel Layout: %ld\n", avFrame->channel_layout);
+  //   printf("Number of Samples: %d\n", avFrame->nb_samples);
+  //   printf("PTS: %ld\n", avFrame->pts);
+  //   printf("Packet DTS: %ld\n", avFrame->pkt_dts);
+  //   printf("Packet Duration: %d\n", avFrame->pkt_duration);
+  //   printf("Packet Pos: %d\n", avFrame->pkt_pos);
+  //   for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
+  //     if (avFrame->data[i]) {
+  //       printf("Data[%d] Line Size: %d\n", i, avFrame->linesize[i]);
+  //     }
+  //   }
+  //   printf("Color Range: %d\n", avFrame->color_range);
+  //   printf("Color Primaries: %d\n", avFrame->color_primaries);
+  //   printf("Color Transfer Characteristic: %d\n", avFrame->color_trc);
+  //   printf("Color Space: %d\n", avFrame->colorspace);
+  //   printf("Chroma Location: %d\n", avFrame->chroma_location);
+  //   printf(
+  //       "Sample Aspect Ratio: %d/%d\n",
+  //       avFrame->sample_aspect_ratio.num,
+  //       avFrame->sample_aspect_ratio.den);
+  //   printf("Key Frame: %d\n", avFrame->key_frame);
+  //   printf("Picture Type: %d\n", avFrame->pict_type);
+  //   printf("Coded Picture Number: %d\n", avFrame->coded_picture_number);
+  //   printf("Display Picture Number: %d\n", avFrame->display_picture_number);
 
   unsigned long checksum = 0;
   // TODO this is only for planar data
-  for (int c = 0; c < av_get_channel_layout_nb_channels(avFrame->channel_layout); ++c){
+  for (int c = 0;
+       c < av_get_channel_layout_nb_channels(avFrame->channel_layout);
+       ++c) {
     for (int i = 0; i < avFrame->nb_samples; i++) {
-        checksum += avFrame->extended_data[c][i];
+      checksum += avFrame->extended_data[c][i];
     }
   }
-//   printf("Frame Checksum: %lu\n", checksum);
-//   printf("\n");
-  printf("PTS: %ld, NumSamples: %d, Checksum: %lu\n", avFrame->pts, avFrame->nb_samples, checksum);
+  //   printf("Frame Checksum: %lu\n", checksum);
+  //   printf("\n");
+  printf(
+      "PTS: %ld, NumSamples: %d, Checksum: %lu\n",
+      avFrame->pts,
+      avFrame->nb_samples,
+      checksum);
   fflush(stdout);
 }
 
@@ -987,7 +993,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
-//   int flag = AVSEEK_FLAG_BACKWARD;
+  //   int flag = AVSEEK_FLAG_BACKWARD;
   int flag = 0;
   printf("Seeking to %ld with flag %d\n", desiredPts, flag);
   int ffmepgStatus = avformat_seek_file(
@@ -998,12 +1004,12 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
       desiredPts - 1,
       flag);
 
-//   int ffmepgStatus = av_seek_frame(
-//       formatContext_.get(),
-//       streamInfo.streamIndex,
-//       desiredPts,
-//       flag
-//   );
+  //   int ffmepgStatus = av_seek_frame(
+  //       formatContext_.get(),
+  //       streamInfo.streamIndex,
+  //       desiredPts,
+  //       flag
+  //   );
   if (ffmepgStatus < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +

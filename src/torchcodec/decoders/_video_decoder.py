@@ -108,7 +108,6 @@ class VideoDecoder:
         if num_ffmpeg_threads is None:
             raise ValueError(f"{num_ffmpeg_threads = } should be an int.")
 
-
         # TODO REMOVE THIS
         if audio_stream:
             core.add_audio_stream(
