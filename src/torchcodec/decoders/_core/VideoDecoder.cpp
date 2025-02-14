@@ -617,6 +617,14 @@ void VideoDecoder::addVideoStream(
 
 void VideoDecoder::addAudioStream(int streamIndex) {
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
+
+  // TODO address this, this is currently super limitting. The main thing we'll
+  // need to handle is the pre-allocation of the output tensor in batch APIs. We
+  // probably won't be able to pre-allocate anything.
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  TORCH_CHECK(
+      streamInfo.codecContext->frame_size > 0,
+      "No support for variable framerate yet.");
 }
 
 // --------------------------------------------------------------------------
@@ -736,9 +744,18 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
       step > 0, "Step must be greater than 0; is " + std::to_string(step));
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput frameBatchOutput(
-      numOutputFrames, videoStreamOptions, streamMetadata);
+
+  FrameBatchOutput frameBatchOutput;
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
+    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+    frameBatchOutput =
+        FrameBatchOutput(numOutputFrames, videoStreamOptions, streamMetadata);
+  } else {
+    int64_t numSamples = streamInfo.codecContext->frame_size;
+    int64_t numChannels = getNumChannels(streamInfo.codecContext);
+    frameBatchOutput =
+        FrameBatchOutput(numOutputFrames, numChannels, numSamples);
+  }
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput frameOutput =
@@ -1200,8 +1217,8 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: handle preAllocatedTensor for audio
-    convertAudioAVFrameToFrameOutputOnCPU(avFrameStream, frameOutput);
+    convertAudioAVFrameToFrameOutputOnCPU(
+        avFrameStream, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
         avFrameStream, frameOutput, preAllocatedOutputTensor);
@@ -1380,14 +1397,21 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 
 void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameStream& avFrameStream,
-    FrameOutput& frameOutput) {
+    FrameOutput& frameOutput,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
   const AVFrame* avFrame = avFrameStream.avFrame.get();
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
 
   // TODO: dtype should be format-dependent
-  torch::Tensor data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+  // TODO rename data to something else
+  torch::Tensor data;
+  if (preAllocatedOutputTensor.has_value()) {
+    data = preAllocatedOutputTensor.value();
+  } else {
+    data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+  }
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   // TODO Implement all formats
@@ -1431,6 +1455,20 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       height, width, videoStreamOptions.device, numFrames);
 }
 
+VideoDecoder::FrameBatchOutput::FrameBatchOutput(
+    int64_t numFrames,
+    int64_t numChannels,
+    int64_t numSamples)
+    : ptsSeconds(torch::empty({numSamples}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numSamples}, {torch::kFloat64})) {
+  // TODO handle dtypes other than float
+  auto tensorOptions = torch::TensorOptions()
+                           .dtype(torch::kFloat32)
+                           .layout(torch::kStrided)
+                           .device(torch::kCPU);
+  data = torch::empty({numFrames, numChannels, numSamples}, tensorOptions);
+}
+
 torch::Tensor allocateEmptyHWCTensor(
     int height,
     int width,
@@ -1459,8 +1497,13 @@ torch::Tensor allocateEmptyHWCTensor(
 // https://pytorch.org/docs/stable/generated/torch.permute.html
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
   if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: Is this really how we want to handle audio?
-    return hwcTensor;
+    // TODO: Do something better
+    auto shape = hwcTensor.sizes();
+    auto numFrames = shape[0];
+    auto numChannels = shape[1];
+    auto numSamples = shape[2];
+    return hwcTensor.permute({1, 0, 2}).reshape(
+        {numChannels, numSamples * numFrames});
   }
   if (streamInfos_[activeStreamIndex_].videoStreamOptions.dimensionOrder ==
       "NHWC") {

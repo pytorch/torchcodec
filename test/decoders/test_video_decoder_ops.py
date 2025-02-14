@@ -350,45 +350,51 @@ class TestOps:
         )
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
+    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_in_range(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder, device=device)
+    def test_get_frames_in_range(self, test_ref, device):
+        if device == "cuda" and test_ref is NASA_AUDIO:
+            pytest.skip(reason="CUDA decoding not supported for audio")
+        decoder = create_from_file(str(test_ref.path))
+        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
 
         # ensure that the degenerate case of a range of size 1 works
-        ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
+        ref_frame0 = test_ref.get_frame_data_by_range(0, 1)
         bulk_frame0, *_ = get_frames_in_range(decoder, start=0, stop=1)
         assert_frames_equal(bulk_frame0, ref_frame0.to(device))
 
-        ref_frame1 = NASA_VIDEO.get_frame_data_by_range(1, 2)
+        ref_frame1 = test_ref.get_frame_data_by_range(1, 2)
         bulk_frame1, *_ = get_frames_in_range(decoder, start=1, stop=2)
         assert_frames_equal(bulk_frame1, ref_frame1.to(device))
 
-        ref_frame389 = NASA_VIDEO.get_frame_data_by_range(389, 390)
-        bulk_frame389, *_ = get_frames_in_range(decoder, start=389, stop=390)
+        last_index = 389 if test_ref is NASA_VIDEO else 203  # TODO ew
+        ref_frame389 = test_ref.get_frame_data_by_range(last_index, last_index + 1)
+        bulk_frame389, *_ = get_frames_in_range(
+            decoder, start=last_index, stop=last_index + 1
+        )
         assert_frames_equal(bulk_frame389, ref_frame389.to(device))
 
         # contiguous ranges
-        ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
+        ref_frames0_9 = test_ref.get_frame_data_by_range(0, 9)
         bulk_frames0_9, *_ = get_frames_in_range(decoder, start=0, stop=9)
         assert_frames_equal(bulk_frames0_9, ref_frames0_9.to(device))
 
-        ref_frames4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8)
+        ref_frames4_8 = test_ref.get_frame_data_by_range(4, 8)
         bulk_frames4_8, *_ = get_frames_in_range(decoder, start=4, stop=8)
         assert_frames_equal(bulk_frames4_8, ref_frames4_8.to(device))
 
         # ranges with a stride
-        ref_frames15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5)
+        ref_frames15_35 = test_ref.get_frame_data_by_range(15, 36, 5)
         bulk_frames15_35, *_ = get_frames_in_range(decoder, start=15, stop=36, step=5)
         assert_frames_equal(bulk_frames15_35, ref_frames15_35.to(device))
 
-        ref_frames0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2)
+        ref_frames0_9_2 = test_ref.get_frame_data_by_range(0, 9, 2)
         bulk_frames0_9_2, *_ = get_frames_in_range(decoder, start=0, stop=9, step=2)
         assert_frames_equal(bulk_frames0_9_2, ref_frames0_9_2.to(device))
 
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, start=5, stop=5)
-        assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
+        assert_frames_equal(empty_frame, test_ref.empty_chw_tensor.to(device))
 
     @pytest.mark.parametrize(
         "test_ref, last_frame_index", ((NASA_VIDEO, 289), (NASA_AUDIO, 203))

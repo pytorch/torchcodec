@@ -119,11 +119,7 @@ class TestContainerFile:
         *,
         stream_index: Optional[int] = None,
     ) -> torch.Tensor:
-        tensors = [
-            self.get_frame_data_by_index(i, stream_index=stream_index)
-            for i in range(start, stop, step)
-        ]
-        return torch.stack(tensors)
+        raise NotImplementedError("Override in child classes")
 
     def get_pts_seconds_by_range(
         self,
@@ -196,6 +192,20 @@ class TestVideo(TestContainerFile):
             f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
         )
         return torch.load(file_path, weights_only=True).permute(2, 0, 1)
+
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.stack(tensors)
 
     @property
     def width(self) -> int:
@@ -336,6 +346,25 @@ class TestAudio(TestContainerFile):
             )
 
         return self._reference_frames[idx]
+
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.cat(tensors, dim=1)
+
+    # TODO: this shouldn't be named chw
+    @property
+    def empty_chw_tensor(self) -> torch.Tensor:
+        return torch.empty([2, 0], dtype=torch.float32)
 
 
 NASA_AUDIO = TestAudio(

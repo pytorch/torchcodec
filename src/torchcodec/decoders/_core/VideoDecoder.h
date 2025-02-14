@@ -162,10 +162,15 @@ class VideoDecoder {
     torch::Tensor ptsSeconds; // 1D of shape (N,)
     torch::Tensor durationSeconds; // 1D of shape (N,)
 
+    FrameBatchOutput(){};
     explicit FrameBatchOutput(
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
+    explicit FrameBatchOutput(
+        int64_t numFrames,
+        int64_t numChannels,
+        int64_t numSamples);
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
@@ -385,7 +390,8 @@ class VideoDecoder {
 
   void convertAudioAVFrameToFrameOutputOnCPU(
       AVFrameStream& avFrameStream,
-      FrameOutput& frameOutput);
+      FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
 

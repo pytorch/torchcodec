@@ -69,6 +69,16 @@ int getNumChannels(const AVFrame* avFrame) {
 #endif
 }
 
+int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
+// TODO not sure about the bounds of the versions here
+#if LIBAVFILTER_VERSION_MAJOR > 8 || \
+    (IBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
+  return av_get_channel_layout_nb_channels(avCodecContext->channel_layout);
+#else
+  return avCodecContext->channels;
+#endif
+}
+
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
     size_t data_size,
