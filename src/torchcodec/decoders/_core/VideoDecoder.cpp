@@ -859,10 +859,10 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
   // We are seeking forwards.
   // We can only skip a seek if both lastDecodedAvFramePts and targetPts share
   // the same keyframe.
-  int currentKeyFrameIndex = getKeyFrameIndexForPts(lastDecodedAvFramePts);
+  int lastDecodedAvFrameIndex = getKeyFrameIndexForPts(lastDecodedAvFramePts);
   int targetKeyFrameIndex = getKeyFrameIndexForPts(targetPts);
-  return currentKeyFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
-      currentKeyFrameIndex == targetKeyFrameIndex;
+  return lastDecodedAvFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
+      lastDecodedAvFrameIndex == targetKeyFrameIndex;
 }
 
 // This method looks at currentPts and desiredPts and seeks in the
@@ -871,18 +871,16 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   validateActiveStream();
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  streamInfo.discardFramesBeforePts =
+
+  int64_t desiredPts =
       secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
+  streamInfo.discardFramesBeforePts = desiredPts;
 
   decodeStats_.numSeeksAttempted++;
-
-  int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeeking(desiredPtsForStream)) {
+  if (canWeAvoidSeeking(desiredPts)) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
-  int64_t desiredPts =
-      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
