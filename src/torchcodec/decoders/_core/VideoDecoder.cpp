@@ -923,26 +923,19 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
 //   }
 // }
 
-bool VideoDecoder::canWeAvoidSeekingAudio(
-    [[maybe_unused]] double desiredPtsSeconds) const {
+bool VideoDecoder::canWeAvoidSeekingAudio(double desiredPtsSeconds) const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   int64_t targetPts = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-
   int64_t lastDecodedAvFramePts = streamInfo.lastDecodedAvFramePts;
-  if (targetPts < lastDecodedAvFramePts) {
-    // We can never skip a seek if we are seeking backwards.
+
+  if (targetPts <= lastDecodedAvFramePts) {
     return false;
   }
-  if (lastDecodedAvFramePts == targetPts) {
-    // We are seeking to the exact same frame as we are currently at. Without
-    // caching we have to rewind back and decode the frame again.
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
-    // implement caching.
-    return false;
-  }
+
   double lastDecodedAvFramePtsSeconds =
       ptsToSeconds(lastDecodedAvFramePts, streamInfo.timeBase);
-  int64_t lastDecodedAvFrameIndex = secondsToIndexLowerBound(lastDecodedAvFramePtsSeconds);
+  int64_t lastDecodedAvFrameIndex =
+      secondsToIndexLowerBound(lastDecodedAvFramePtsSeconds);
   int64_t targetFrameIndex = secondsToIndexLowerBound(desiredPtsSeconds);
   return (lastDecodedAvFrameIndex + 1 == targetFrameIndex);
 }
@@ -1688,7 +1681,7 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
   return upperBound - 1 - keyFrames.begin();
 }
 
-int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) const{
+int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) const {
   auto& streamInfo = streamInfos_.at(activeStreamIndex_);
   switch (seekMode_) {
     case SeekMode::exact: {
