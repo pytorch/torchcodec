@@ -303,7 +303,7 @@ class TestAudioStreamInfo:
 class TestAudio(TestContainerFile):
 
     stream_infos: Dict[int, TestAudioStreamInfo]
-    _reference_frames: list[torch.Tensor] = field(default_factory=lambda: [])
+    _reference_frames: tuple[torch.Tensor] = field(default_factory=lambda: [])
 
     # Storing each individual frame is too expensive for audio, because there's
     # a massive overhead in the binary format saved by pytorch. Saving all the
@@ -318,17 +318,18 @@ class TestAudio(TestContainerFile):
         )
         t = torch.load(file_path, weights_only=True)
 
-        # These are hard-coded value assuming stream 4 of nasa_13013.mp4
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
+        # of the 204 frames contains 1024 samples.
         # TODO make this more generic
-        assert t.shape == (2, 208896)
-        self._reference_frames = list(torch.chunk(t, 1024))
+        assert t.shape == (2, 204 * 1024)
+        self._reference_frames = torch.chunk(t, chunks=204, dim=1)
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
         if stream_index is not None and stream_index != self.default_stream_index:
             # TODO address this, the fix should be to let _reference_frames be a
-            # dict[list[torch.Tensor]] where keys are stream indices, and load
+            # dict[tuple[torch.Tensor]] where keys are stream indices, and load
             # all of those indices in __post_init__.
             raise ValueError(
                 "Can only use default stream index with TestAudio for now."
