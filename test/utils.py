@@ -3,7 +3,7 @@ import os
 import pathlib
 import sys
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import numpy as np
@@ -83,11 +83,6 @@ def _get_file_path(filename: str) -> pathlib.Path:
         return pathlib.Path(__file__).parent / "resources" / filename
 
 
-def _load_tensor_from_file(filename: str) -> torch.Tensor:
-    file_path = _get_file_path(filename)
-    return torch.load(file_path, weights_only=True).permute(2, 0, 1)
-
-
 @dataclass
 class TestFrameInfo:
     pts_seconds: float
@@ -114,12 +109,7 @@ class TestContainerFile:
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
-        if stream_index is None:
-            stream_index = self.default_stream_index
-
-        return _load_tensor_from_file(
-            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
-        )
+        raise NotImplementedError("Override in child classes")
 
     def get_frame_data_by_range(
         self,
@@ -195,6 +185,17 @@ class TestVideoStreamInfo:
 @dataclass
 class TestVideo(TestContainerFile):
     stream_infos: Dict[int, TestVideoStreamInfo]
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        file_path = _get_file_path(
+            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
+        )
+        return torch.load(file_path, weights_only=True).permute(2, 0, 1)
 
     @property
     def width(self) -> int:
@@ -292,10 +293,55 @@ NASA_VIDEO = TestVideo(
     },
 )
 
-# When we start actually decoding audio-only files, we'll probably need to define
-# a TestAudio class with audio specific values. Until then, we only need a filename.
-NASA_AUDIO = TestContainerFile(
-    filename="nasa_13013.mp4.audio.mp3", default_stream_index=0, frames={}
+
+@dataclass
+class TestAudioStreamInfo:
+    frame_rate: float
+
+
+@dataclass
+class TestAudio(TestContainerFile):
+
+    stream_infos: Dict[int, TestAudioStreamInfo]
+    _reference_frames: list[torch.Tensor] = field(default_factory=lambda: [])
+
+    # Storing each individual frame is too expensive for audio, because there's
+    # a massive overhead in the binary format saved by pytorch. Saving all the
+    # frames in a single file uses 1.6MB while saving all frames in individual
+    # files uses 302MB (yes).
+    # So we store the reference frames in a single file, and load/cache those
+    # when the TestAudio instance is created.
+    def __post_init__(self):
+        # We hard-code the default stream index, see TODO below.
+        file_path = _get_file_path(
+            f"{self.filename}.stream{self.default_stream_index}.all_frames.pt"
+        )
+        t = torch.load(file_path, weights_only=True)
+
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4
+        # TODO make this more generic
+        assert t.shape == (2, 208896)
+        self._reference_frames = list(torch.chunk(t, 1024))
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is not None and stream_index != self.default_stream_index:
+            # TODO address this, the fix should be to let _reference_frames be a
+            # dict[list[torch.Tensor]] where keys are stream indices, and load
+            # all of those indices in __post_init__.
+            raise ValueError(
+                "Can only use default stream index with TestAudio for now."
+            )
+
+        return self._reference_frames[idx]
+
+
+NASA_AUDIO = TestAudio(
+    filename="nasa_13013.mp4",
+    default_stream_index=4,
+    frames={},  # TODO
+    stream_infos={4: TestAudioStreamInfo(frame_rate=16_000)},
 )
 
 H265_VIDEO = TestVideo(

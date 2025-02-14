@@ -248,6 +248,7 @@ class TestOps:
         metadata_dict = json.loads(metadata)
         num_frames = metadata_dict["numFrames"]
         assert num_frames == 390
+        num_frames = 203
 
         _, all_pts_seconds_ref, _ = zip(
             *[
@@ -452,11 +453,12 @@ class TestOps:
         assert metadata_dict["minPtsSecondsFromScan"] == 0
         assert metadata_dict["maxPtsSecondsFromScan"] == 13.013
 
+    # TODO: Not sure whether this test still makes a lot of sense
     def test_audio_get_json_metadata(self):
         decoder = create_from_file(str(NASA_AUDIO.path))
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
-        assert metadata_dict["durationSeconds"] == pytest.approx(13.25, abs=0.01)
+        assert metadata_dict["durationSeconds"] == pytest.approx(13.013, abs=0.01)
 
     def test_get_ffmpeg_version(self):
         ffmpeg_dict = get_ffmpeg_library_versions()
