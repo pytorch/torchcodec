@@ -332,8 +332,8 @@ class VideoDecoder {
 
     // The current position of the cursor in the stream, and associated frame
     // duration.
-    int64_t currentPts = 0;
-    int64_t currentDuration = 0;
+    int64_t lastDecodedAvFramePts = 0;
+    int64_t lastDecodedAvFrameDuration = 0;
     // The desired position of the cursor in the stream. We send frames >=
     // this pts to the user when they request a frame.
     // We update this field if the user requested a seek. This typically
@@ -361,7 +361,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeeking(int64_t currentPts, int64_t targetPts) const;
+  bool canWeAvoidSeeking(int64_t targetPts) const;
 
   void maybeSeekToBeforeDesiredPts();
 
