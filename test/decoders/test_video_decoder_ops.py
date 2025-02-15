@@ -238,7 +238,9 @@ class TestOps:
         reference_frame0 = test_ref.get_frame_data_by_index(0)
         reference_frame180 = test_ref.get_frame_data_by_index(180)
         if test_ref is NASA_AUDIO:
-            frames0and180 = contiguous_to_stacked_audio_frames(frames0and180, num_frames=2)
+            frames0and180 = contiguous_to_stacked_audio_frames(
+                frames0and180, num_frames=2
+            )
 
         assert_frames_equal(frames0and180[0], reference_frame0.to(device))
         assert_frames_equal(frames0and180[1], reference_frame180.to(device))
@@ -264,7 +266,9 @@ class TestOps:
             frame_indices=frame_indices,
         )
         if test_ref is NASA_AUDIO:
-            frames = contiguous_to_stacked_audio_frames(frames, num_frames=len(frame_indices))
+            frames = contiguous_to_stacked_audio_frames(
+                frames, num_frames=len(frame_indices)
+            )
         for frame, expected_frame in zip(frames, expected_frames):
             assert_frames_equal(frame, expected_frame)
 
@@ -322,7 +326,6 @@ class TestOps:
         assert num_frames == 390
         if test_ref is NASA_AUDIO:
             num_frames = 204
-
 
         _, all_pts_seconds_ref, _ = zip(
             *[
@@ -771,6 +774,77 @@ class TestOps:
         torch.testing.assert_close(
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
         )
+
+    def test_get_same_frame_twice(self):
+        def make_decoder():
+            decoder = create_from_file(str(NASA_AUDIO.path))
+            add_audio_stream(decoder)
+            return decoder
+
+        for frame_index in (0, 10, 15):
+            decoder = make_decoder()
+            a = get_frame_at_index(decoder, frame_index=frame_index)
+            b = get_frame_at_index(decoder, frame_index=frame_index)
+            torch.testing.assert_close(a, b)
+
+            decoder = make_decoder()
+            a = get_frames_at_indices(decoder, frame_indices=[frame_index])
+            b = get_frames_at_indices(decoder, frame_indices=[frame_index])
+            torch.testing.assert_close(a, b)
+
+            decoder = make_decoder()
+            a = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
+            b = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
+            torch.testing.assert_close(a, b)
+
+        pts_at_frame_start = 0
+        pts_not_at_frame_start = 2  # second 2 is in the middle of a frame
+        for pts in (pts_at_frame_start, pts_not_at_frame_start):
+            decoder = make_decoder()
+            a = get_frames_by_pts(decoder, timestamps=[pts])
+            b = get_frames_by_pts(decoder, timestamps=[pts])
+            torch.testing.assert_close(a, b)
+
+            decoder = make_decoder()
+            a = get_frames_by_pts_in_range(
+                decoder, start_seconds=pts, stop_seconds=pts + 1e-4
+            )
+            b = get_frames_by_pts_in_range(
+                decoder, start_seconds=pts, stop_seconds=pts + 1e-4
+            )
+            torch.testing.assert_close(a, b)
+
+        decoder = make_decoder()
+        a = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
+        b = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
+        torch.testing.assert_close(a, b)
+
+        decoder = make_decoder()
+        a_frame, a_pts, a_duration = get_frame_at_pts(
+            decoder, seconds=pts_not_at_frame_start
+        )
+        b_frame, b_pts, b_duration = get_frame_at_pts(
+            decoder, seconds=pts_not_at_frame_start
+        )
+        torch.testing.assert_close(a_pts, b_pts)
+        torch.testing.assert_close(a_duration, b_duration)
+        with pytest.raises(AssertionError):
+            torch.testing.assert_close(a_frame, b_frame)
+
+        decoder = make_decoder()
+        seek_to_pts(decoder, pts_at_frame_start)
+        a = get_next_frame(decoder)
+        seek_to_pts(decoder, pts_at_frame_start)
+        b = get_next_frame(decoder)
+        torch.testing.assert_close(a, b)
+
+        # TODO: Wait WTFFF, this should not pass
+        decoder = make_decoder()
+        seek_to_pts(decoder, seconds=pts_not_at_frame_start)
+        a = get_next_frame(decoder)
+        seek_to_pts(decoder, seconds=pts_not_at_frame_start)
+        b = get_next_frame(decoder)
+        torch.testing.assert_close(a, b)
 
 
 if __name__ == "__main__":

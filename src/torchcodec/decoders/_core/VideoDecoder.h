@@ -366,7 +366,6 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  //   bool canWeAvoidSeeking(int64_t targetPts) const;
   bool canWeAvoidSeekingVideo(int64_t targetPts) const;
   bool canWeAvoidSeekingAudio(double desiredPtsSeconds) const;
 

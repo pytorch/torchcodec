@@ -64,72 +64,6 @@ std::vector<std::string> splitStringWithDelimiters(
 
 } // namespace
 
-// void print_packet(AVPacket* packet) {
-//   unsigned long checksum = 0;
-//   for (int i = 0; i < packet->size; i++) {
-//     checksum += packet->data[i];
-//   }
-//   printf(
-//       "PTS: %ld, DTS: %ld, Duration: %d, Size: %d, Stream Index: %d,
-//       Checksum: %lu\n", packet->pts, packet->dts, packet->duration,
-//       packet->size,
-//       packet->stream_index,
-//       checksum);
-//   fflush(stdout);
-// }
-
-// void print_avFrame(AVFrame* avFrame) {
-//   //   printf("Format: %d\n", avFrame->format);
-//   //   printf("Width: %d\n", avFrame->width);
-//   //   printf("Height: %d\n", avFrame->height);
-//   //   printf(
-//   //       "Channels: %d\n",
-//   //       av_get_channel_layout_nb_channels(avFrame->channel_layout));
-//   //   printf("Channel Layout: %ld\n", avFrame->channel_layout);
-//   //   printf("Number of Samples: %d\n", avFrame->nb_samples);
-//   //   printf("PTS: %ld\n", avFrame->pts);
-//   //   printf("Packet DTS: %ld\n", avFrame->pkt_dts);
-//   //   printf("Packet Duration: %d\n", avFrame->pkt_duration);
-//   //   printf("Packet Pos: %d\n", avFrame->pkt_pos);
-//   //   for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
-//   //     if (avFrame->data[i]) {
-//   //       printf("Data[%d] Line Size: %d\n", i, avFrame->linesize[i]);
-//   //     }
-//   //   }
-//   //   printf("Color Range: %d\n", avFrame->color_range);
-//   //   printf("Color Primaries: %d\n", avFrame->color_primaries);
-//   //   printf("Color Transfer Characteristic: %d\n", avFrame->color_trc);
-//   //   printf("Color Space: %d\n", avFrame->colorspace);
-//   //   printf("Chroma Location: %d\n", avFrame->chroma_location);
-//   //   printf(
-//   //       "Sample Aspect Ratio: %d/%d\n",
-//   //       avFrame->sample_aspect_ratio.num,
-//   //       avFrame->sample_aspect_ratio.den);
-//   //   printf("Key Frame: %d\n", avFrame->key_frame);
-//   //   printf("Picture Type: %d\n", avFrame->pict_type);
-//   //   printf("Coded Picture Number: %d\n", avFrame->coded_picture_number);
-//   //   printf("Display Picture Number: %d\n",
-//   avFrame->display_picture_number);
-
-//   unsigned long checksum = 0;
-//   // TODO this is only for planar data
-//   for (int c = 0;
-//        c < av_get_channel_layout_nb_channels(avFrame->channel_layout);
-//        ++c) {
-//     for (int i = 0; i < avFrame->nb_samples; i++) {
-//       checksum += avFrame->extended_data[c][i];
-//     }
-//   }
-//   //   printf("Frame Checksum: %lu\n", checksum);
-//   //   printf("\n");
-//   printf(
-//       "PTS: %ld, NumSamples: %d, Checksum: %lu\n",
-//       avFrame->pts,
-//       avFrame->nb_samples,
-//       checksum);
-//   fflush(stdout);
-// }
-
 // --------------------------------------------------------------------------
 // CONSTRUCTORS, INITIALIZATION, DESTRUCTORS
 // --------------------------------------------------------------------------
@@ -365,7 +299,6 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   }
 
   // Reset the seek-cursor back to the beginning.
-  //   printf("Seeking to 0 with flag 0\n");
   int ffmepgStatus =
       avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
   if (ffmepgStatus < 0) {
@@ -523,6 +456,7 @@ void VideoDecoder::addStream(
       activeStreamIndex_,
       " which is of the wrong media type.");
 
+  // TODO_CODE_QUALITY this is meh to have that in the middle
   if (mediaType == AVMEDIA_TYPE_VIDEO &&
       videoStreamOptions.device.type() == torch::kCUDA) {
     avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
@@ -531,7 +465,7 @@ void VideoDecoder::addStream(
             .value_or(avCodec));
   }
 
-  // TODO figure out whether this should be VIDEO only
+  // TODO figure out audio metadata
   StreamMetadata& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   if (seekMode_ == SeekMode::approximate &&
@@ -552,6 +486,7 @@ void VideoDecoder::addStream(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
+  // TODO_CODE_QUALITY meh again
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
     if (videoStreamOptions.device.type() == torch::kCPU) {
       // No more initialization needed for CPU.
@@ -694,12 +629,14 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
 
+  // TODO_CODE_QUALITY Better allocation logic.
   FrameBatchOutput frameBatchOutput;
   if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
     const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-    frameBatchOutput =
-        FrameBatchOutput(frameIndices.size(), videoStreamOptions, streamMetadata);
+    frameBatchOutput = FrameBatchOutput(
+        frameIndices.size(), videoStreamOptions, streamMetadata);
   } else {
+    // TODO Handle case if frame_size is not known.
     int64_t numSamples = streamInfo.codecContext->frame_size;
     int64_t numChannels = getNumChannels(streamInfo.codecContext);
     frameBatchOutput =
@@ -754,12 +691,14 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
 
+  // TODO_CODE_QUALITY Better allocation logic.
   FrameBatchOutput frameBatchOutput;
   if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
     const auto& videoStreamOptions = streamInfo.videoStreamOptions;
     frameBatchOutput =
         FrameBatchOutput(numOutputFrames, videoStreamOptions, streamMetadata);
   } else {
+    // TODO Handle case if frame_size is not known.
     int64_t numSamples = streamInfo.codecContext->frame_size;
     int64_t numChannels = getNumChannels(streamInfo.codecContext);
     frameBatchOutput =
@@ -879,6 +818,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
+    // TODO handle audio here
     FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
     frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
     return frameBatchOutput;
@@ -914,16 +854,17 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   int64_t stopFrameIndex = secondsToIndexUpperBound(stopSeconds);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
+  // TODO_CODE_QUALITY Better allocation logic.
   FrameBatchOutput frameBatchOutput;
   if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
     const auto& videoStreamOptions = streamInfo.videoStreamOptions;
     frameBatchOutput =
         FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
   } else {
+    // TODO Handle case if frame_size is not known.
     int64_t numSamples = streamInfo.codecContext->frame_size;
     int64_t numChannels = getNumChannels(streamInfo.codecContext);
-    frameBatchOutput =
-        FrameBatchOutput(numFrames, numChannels, numSamples);
+    frameBatchOutput = FrameBatchOutput(numFrames, numChannels, numSamples);
   }
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
@@ -943,20 +884,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   desiredPtsSeconds_ = seconds;
 }
-
-// bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
-//   switch (streamInfos_.at(activeStreamIndex_).avMediaType) {
-//     case AVMEDIA_TYPE_AUDIO: {
-//       return canWeAvoidSeekingAudio(targetPts);
-//     }
-//     case AVMEDIA_TYPE_VIDEO: {
-//       return canWeAvoidSeekingVideo(targetPts);
-//     }
-//     default: {
-//       TORCH_CHECK(false, "Should never happen.");
-//     }
-//   }
-// }
 
 bool VideoDecoder::canWeAvoidSeekingAudio(double desiredPtsSeconds) const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
@@ -1036,16 +963,16 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
   decodeStats_.numSeeksAttempted++;
 
-  // TODO update this crap
-  bool can = false;
+  // TODO_CODE_QUALITY The different signature is unfortunate
+  bool canAvoidSeeking = false;
   auto avMediaType = streamInfos_.at(activeStreamIndex_).avMediaType;
   if (avMediaType == AVMEDIA_TYPE_AUDIO) {
-    can = canWeAvoidSeekingAudio(*desiredPtsSeconds_);
+    canAvoidSeeking = canWeAvoidSeekingAudio(*desiredPtsSeconds_);
   } else {
-    can = canWeAvoidSeekingVideo(desiredPts);
+    canAvoidSeeking = canWeAvoidSeekingVideo(desiredPts);
   }
 
-  if (can) {
+  if (canAvoidSeeking) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
@@ -1061,8 +988,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
-
-  //   printf("Seeking to %ld with flag 0\n", desiredPts);
 
   // TODO explain this nasty hack
   // This probably only works if the desired pts corresponds exactly to a frame
@@ -1083,7 +1008,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
         getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
   }
   decodeStats_.numFlushes++;
-  //   printf("calling avcodec_flush_buffers\n");
   avcodec_flush_buffers(streamInfo.codecContext.get());
 }
 
@@ -1113,7 +1037,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   while (true) {
     ffmpegStatus =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
-    // printf("output of avcodec_receive_frame: %d\n", ffmpegStatus);
 
     if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
       // Non-retriable error
@@ -1148,7 +1071,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       decodeStats_.numPacketsRead++;
 
       if (ffmpegStatus == AVERROR_EOF) {
-        // printf("Sending packet: null\n");
         // End of file reached. We must drain the codec by sending a nullptr
         // packet.
         ffmpegStatus = avcodec_send_packet(
@@ -1179,8 +1101,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
-    // printf("Sending packet: ");
-    // print_packet(packet.get());
     ffmpegStatus =
         avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
     if (ffmpegStatus < AVSUCCESS) {
@@ -1211,8 +1131,6 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   // the file and that will flush the decoder.
   streamInfo.lastDecodedAvFramePts = avFrame->pts;
   streamInfo.lastDecodedAvFrameDuration = getDuration(avFrame);
-  //   printf("Received avFrame: ");
-  //   print_avFrame(avFrame.get());
 
   return AVFrameStream(std::move(avFrame), activeStreamIndex_);
 }
@@ -1423,7 +1341,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   auto numChannels = getNumChannels(avFrame);
 
   // TODO: dtype should be format-dependent
-  // TODO rename data to something else
+  // TODO_CODE_QUALITY rename data to something else
   torch::Tensor data;
   if (preAllocatedOutputTensor.has_value()) {
     data = preAllocatedOutputTensor.value();
@@ -1473,8 +1391,7 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       height, width, videoStreamOptions.device, numFrames);
 }
 
-VideoDecoder::FrameBatchOutput
-::FrameBatchOutput(
+VideoDecoder::FrameBatchOutput ::FrameBatchOutput(
     int64_t numFrames,
     int64_t numChannels,
     int64_t numSamples)
@@ -1485,6 +1402,10 @@ VideoDecoder::FrameBatchOutput
                            .dtype(torch::kFloat32)
                            .layout(torch::kStrided)
                            .device(torch::kCPU);
+  // Note that we allocate a 3D shape. We'll eventually return a 3D shape
+  // (numChannels, numSamples * numFrames) where each frame is concatenated
+  // along the 2nd dimension. Allocating tensors this way makes it much easier
+  // to use the same code paths for audio and video for batch APIs.
   data = torch::empty({numFrames, numChannels, numSamples}, tensorOptions);
 }
 
@@ -1516,9 +1437,9 @@ torch::Tensor allocateEmptyHWCTensor(
 // https://pytorch.org/docs/stable/generated/torch.permute.html
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
   if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: Do something better for handling audio
-    if (hwcTensor.dim() == 2){
-        return hwcTensor;
+    // TODO_CODE_QUALITY: Do something cleaner for handling audio
+    if (hwcTensor.dim() == 2) {
+      return hwcTensor;
     }
     auto shape = hwcTensor.sizes();
     auto numFrames = shape[0];
