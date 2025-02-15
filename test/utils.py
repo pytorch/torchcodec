@@ -23,15 +23,6 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
-def contiguous_to_stacked_audio_frames(frames, *, num_frames):
-    # (num_channels, num_samples * num_frames) --> (num_frames, num_channels, num_samples)
-    # Shape conversion util for audio frame. This makes it easier to index
-    # individual frames so we can use the same code paths when checking equality
-    # of video frames and audio frames.
-    num_channels = frames.shape[0]
-    return frames.reshape(num_channels, num_frames, -1).permute(1, 0, 2)
-
-
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
@@ -128,7 +119,11 @@ class TestContainerFile:
         *,
         stream_index: Optional[int] = None,
     ) -> torch.Tensor:
-        raise NotImplementedError("Override in child classes")
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.stack(tensors)
 
     def get_pts_seconds_by_range(
         self,
@@ -201,20 +196,6 @@ class TestVideo(TestContainerFile):
             f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
         )
         return torch.load(file_path, weights_only=True).permute(2, 0, 1)
-
-    def get_frame_data_by_range(
-        self,
-        start: int,
-        stop: int,
-        step: int = 1,
-        *,
-        stream_index: Optional[int] = None,
-    ) -> torch.Tensor:
-        tensors = [
-            self.get_frame_data_by_index(i, stream_index=stream_index)
-            for i in range(start, stop, step)
-        ]
-        return torch.stack(tensors)
 
     @property
     def width(self) -> int:
@@ -356,24 +337,10 @@ class TestAudio(TestContainerFile):
 
         return self._reference_frames[idx]
 
-    def get_frame_data_by_range(
-        self,
-        start: int,
-        stop: int,
-        step: int = 1,
-        *,
-        stream_index: Optional[int] = None,
-    ) -> torch.Tensor:
-        tensors = [
-            self.get_frame_data_by_index(i, stream_index=stream_index)
-            for i in range(start, stop, step)
-        ]
-        return torch.cat(tensors, dim=1)
-
-    # TODO: this shouldn't be named chw
+    # TODO: this shouldn't be named chw. Also values are hard-coded
     @property
     def empty_chw_tensor(self) -> torch.Tensor:
-        return torch.empty([2, 0], dtype=torch.float32)
+        return torch.empty([0, 2, 1024], dtype=torch.float32)
 
 
 NASA_AUDIO = TestAudio(

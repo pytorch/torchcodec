@@ -38,7 +38,6 @@ from torchcodec.decoders._core import (
 
 from ..utils import (
     assert_frames_equal,
-    contiguous_to_stacked_audio_frames,
     cpu_and_cuda,
     NASA_AUDIO,
     NASA_VIDEO,
@@ -237,10 +236,6 @@ class TestOps:
         frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
         reference_frame0 = test_ref.get_frame_data_by_index(0)
         reference_frame180 = test_ref.get_frame_data_by_index(180)
-        if test_ref is NASA_AUDIO:
-            frames0and180 = contiguous_to_stacked_audio_frames(
-                frames0and180, num_frames=2
-            )
 
         assert_frames_equal(frames0and180[0], reference_frame0.to(device))
         assert_frames_equal(frames0and180[1], reference_frame180.to(device))
@@ -265,10 +260,6 @@ class TestOps:
             decoder,
             frame_indices=frame_indices,
         )
-        if test_ref is NASA_AUDIO:
-            frames = contiguous_to_stacked_audio_frames(
-                frames, num_frames=len(frame_indices)
-            )
         for frame, expected_frame in zip(frames, expected_frames):
             assert_frames_equal(frame, expected_frame)
 

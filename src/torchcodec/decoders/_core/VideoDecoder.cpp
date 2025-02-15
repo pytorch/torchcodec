@@ -1402,10 +1402,6 @@ VideoDecoder::FrameBatchOutput ::FrameBatchOutput(
                            .dtype(torch::kFloat32)
                            .layout(torch::kStrided)
                            .device(torch::kCPU);
-  // Note that we allocate a 3D shape. We'll eventually return a 2D shape
-  // (numChannels, numSamples * numFrames) where each frame is concatenated
-  // along the 2nd dimension. Allocating tensors this way makes it much easier
-  // to use the same code paths for audio and video for batch APIs.
   data = torch::empty({numFrames, numChannels, numSamples}, tensorOptions);
 }
 
@@ -1438,15 +1434,7 @@ torch::Tensor allocateEmptyHWCTensor(
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
   if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
     // TODO_CODE_QUALITY: Do something cleaner for handling audio
-    if (hwcTensor.dim() == 2) {
-      return hwcTensor;
-    }
-    auto shape = hwcTensor.sizes();
-    auto numFrames = shape[0];
-    auto numChannels = shape[1];
-    auto numSamples = shape[2];
-    return hwcTensor.permute({1, 0, 2}).reshape(
-        {numChannels, numSamples * numFrames});
+    return hwcTensor;
   }
   if (streamInfos_[activeStreamIndex_].videoStreamOptions.dimensionOrder ==
       "NHWC") {
