@@ -7,20 +7,19 @@ def test_frame_unpacking():
     data, pts_seconds, duration_seconds = Frame(torch.rand(3, 4, 5), 2, 3)  # noqa
 
 
-# TODO: put back
-# def test_frame_error():
-#     with pytest.raises(ValueError, match="data must be 3-dimensional"):
-#         Frame(
-#             data=torch.rand(1, 2),
-#             pts_seconds=1,
-#             duration_seconds=1,
-#         )
-#     with pytest.raises(ValueError, match="data must be 3-dimensional"):
-#         Frame(
-#             data=torch.rand(1, 2, 3, 4),
-#             pts_seconds=1,
-#             duration_seconds=1,
-#         )
+def test_frame_error():
+    with pytest.raises(ValueError, match="data must be 3-dimensional"):
+        Frame(
+            data=torch.rand(1, 2),
+            pts_seconds=1,
+            duration_seconds=1,
+        )
+    with pytest.raises(ValueError, match="data must be 3-dimensional"):
+        Frame(
+            data=torch.rand(1, 2, 3, 4),
+            pts_seconds=1,
+            duration_seconds=1,
+        )
 
 
 def test_framebatch_error():
