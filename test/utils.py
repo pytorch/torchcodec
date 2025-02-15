@@ -23,6 +23,15 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
+def contiguous_to_stacked_audio_frames(frames, *, num_frames):
+    # (num_channels, num_samples * num_frames) --> (num_frames, num_channels, num_samples)
+    # Shape conversion util for audio frame. This makes it easier to index
+    # individual frames so we can use the same code paths when checking equality
+    # of video frames and audio frames.
+    num_channels = frames.shape[0]
+    return frames.reshape(num_channels, num_frames, -1).permute(1, 0, 2)
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does

@@ -693,9 +693,18 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-  FrameBatchOutput frameBatchOutput(
-      frameIndices.size(), videoStreamOptions, streamMetadata);
+
+  FrameBatchOutput frameBatchOutput;
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
+    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+    frameBatchOutput =
+        FrameBatchOutput(frameIndices.size(), videoStreamOptions, streamMetadata);
+  } else {
+    int64_t numSamples = streamInfo.codecContext->frame_size;
+    int64_t numChannels = getNumChannels(streamInfo.codecContext);
+    frameBatchOutput =
+        FrameBatchOutput(frameIndices.size(), numChannels, numSamples);
+  }
 
   auto previousIndexInVideo = -1;
   for (size_t f = 0; f < frameIndices.size(); ++f) {
@@ -905,8 +914,17 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   int64_t stopFrameIndex = secondsToIndexUpperBound(stopSeconds);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
-  FrameBatchOutput frameBatchOutput(
-      numFrames, videoStreamOptions, streamMetadata);
+  FrameBatchOutput frameBatchOutput;
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
+    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+    frameBatchOutput =
+        FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
+  } else {
+    int64_t numSamples = streamInfo.codecContext->frame_size;
+    int64_t numChannels = getNumChannels(streamInfo.codecContext);
+    frameBatchOutput =
+        FrameBatchOutput(numFrames, numChannels, numSamples);
+  }
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
@@ -1455,12 +1473,13 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       height, width, videoStreamOptions.device, numFrames);
 }
 
-VideoDecoder::FrameBatchOutput::FrameBatchOutput(
+VideoDecoder::FrameBatchOutput
+::FrameBatchOutput(
     int64_t numFrames,
     int64_t numChannels,
     int64_t numSamples)
-    : ptsSeconds(torch::empty({numSamples}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numSamples}, {torch::kFloat64})) {
+    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
+      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
   // TODO handle dtypes other than float
   auto tensorOptions = torch::TensorOptions()
                            .dtype(torch::kFloat32)
@@ -1497,7 +1516,10 @@ torch::Tensor allocateEmptyHWCTensor(
 // https://pytorch.org/docs/stable/generated/torch.permute.html
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
   if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
-    // TODO: Do something better
+    // TODO: Do something better for handling audio
+    if (hwcTensor.dim() == 2){
+        return hwcTensor;
+    }
     auto shape = hwcTensor.sizes();
     auto numFrames = shape[0];
     auto numChannels = shape[1];
