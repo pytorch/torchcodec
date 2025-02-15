@@ -562,7 +562,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   validateFrameIndex(streamMetadata, frameIndex);
 
-  int64_t pts = getPts(streamInfo, streamMetadata, frameIndex);
+  int64_t pts = getPts(frameIndex);
   setCursorPtsInSeconds(ptsToSeconds(pts, streamInfo.timeBase));
   return getNextFrameInternal(preAllocatedOutputTensor);
 }
@@ -703,7 +703,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   double minSeconds = getMinSeconds(streamMetadata);
   double maxSeconds = getMaxSeconds(streamMetadata);
@@ -722,8 +721,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
             "; must be in range [" + std::to_string(minSeconds) + ", " +
             std::to_string(maxSeconds) + ").");
 
-    frameIndices[i] =
-        secondsToIndexLowerBound(frameSeconds, streamInfo, streamMetadata);
+    frameIndices[i] = secondsToIndexLowerBound(frameSeconds);
   }
 
   return getFramesAtIndices(frameIndices);
@@ -794,10 +792,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   //   particular frame, we need to figure out if it is ordered after the
   //   frame's pts, but before the next frames's pts.
 
-  int64_t startFrameIndex =
-      secondsToIndexLowerBound(startSeconds, streamInfo, streamMetadata);
-  int64_t stopFrameIndex =
-      secondsToIndexUpperBound(stopSeconds, streamInfo, streamMetadata);
+  int64_t startFrameIndex = secondsToIndexLowerBound(startSeconds);
+  int64_t stopFrameIndex = secondsToIndexUpperBound(stopSeconds);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
   FrameBatchOutput frameBatchOutput(
@@ -863,10 +859,10 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
   // We are seeking forwards.
   // We can only skip a seek if both lastDecodedAvFramePts and targetPts share
   // the same keyframe.
-  int currentKeyFrameIndex = getKeyFrameIndexForPts(lastDecodedAvFramePts);
+  int lastDecodedAvFrameIndex = getKeyFrameIndexForPts(lastDecodedAvFramePts);
   int targetKeyFrameIndex = getKeyFrameIndexForPts(targetPts);
-  return currentKeyFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
-      currentKeyFrameIndex == targetKeyFrameIndex;
+  return lastDecodedAvFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
+      lastDecodedAvFrameIndex == targetKeyFrameIndex;
 }
 
 // This method looks at currentPts and desiredPts and seeks in the
@@ -875,18 +871,16 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   validateActiveStream();
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  streamInfo.discardFramesBeforePts =
+
+  int64_t desiredPts =
       secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
+  streamInfo.discardFramesBeforePts = desiredPts;
 
   decodeStats_.numSeeksAttempted++;
-
-  int64_t desiredPtsForStream = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  if (canWeAvoidSeeking(desiredPtsForStream)) {
+  if (canWeAvoidSeeking(desiredPts)) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
-  int64_t desiredPts =
-      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -1499,10 +1493,8 @@ int VideoDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
   return upperBound - 1 - keyFrames.begin();
 }
 
-int64_t VideoDecoder::secondsToIndexLowerBound(
-    double seconds,
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
+int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) {
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
     case SeekMode::exact: {
       auto frame = std::lower_bound(
@@ -1515,17 +1507,18 @@ int64_t VideoDecoder::secondsToIndexLowerBound(
 
       return frame - streamInfo.allFrames.begin();
     }
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      auto& streamMetadata =
+          containerMetadata_.allStreamMetadata[activeStreamIndex_];
       return std::floor(seconds * streamMetadata.averageFps.value());
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
 }
 
-int64_t VideoDecoder::secondsToIndexUpperBound(
-    double seconds,
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata) {
+int64_t VideoDecoder::secondsToIndexUpperBound(double seconds) {
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
     case SeekMode::exact: {
       auto frame = std::upper_bound(
@@ -1538,23 +1531,27 @@ int64_t VideoDecoder::secondsToIndexUpperBound(
 
       return frame - streamInfo.allFrames.begin();
     }
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      auto& streamMetadata =
+          containerMetadata_.allStreamMetadata[activeStreamIndex_];
       return std::ceil(seconds * streamMetadata.averageFps.value());
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
 }
 
-int64_t VideoDecoder::getPts(
-    const StreamInfo& streamInfo,
-    const StreamMetadata& streamMetadata,
-    int64_t frameIndex) {
+int64_t VideoDecoder::getPts(int64_t frameIndex) {
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
     case SeekMode::exact:
       return streamInfo.allFrames[frameIndex].pts;
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      auto& streamMetadata =
+          containerMetadata_.allStreamMetadata[activeStreamIndex_];
       return secondsToClosestPts(
           frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
