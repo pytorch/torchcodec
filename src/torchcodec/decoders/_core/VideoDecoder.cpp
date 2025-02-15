@@ -1402,7 +1402,7 @@ VideoDecoder::FrameBatchOutput ::FrameBatchOutput(
                            .dtype(torch::kFloat32)
                            .layout(torch::kStrided)
                            .device(torch::kCPU);
-  // Note that we allocate a 3D shape. We'll eventually return a 3D shape
+  // Note that we allocate a 3D shape. We'll eventually return a 2D shape
   // (numChannels, numSamples * numFrames) where each frame is concatenated
   // along the 2nd dimension. Allocating tensors this way makes it much easier
   // to use the same code paths for audio and video for batch APIs.
