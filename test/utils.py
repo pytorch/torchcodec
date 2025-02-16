@@ -3,7 +3,7 @@ import os
 import pathlib
 import sys
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 import numpy as np
@@ -303,7 +303,7 @@ class TestAudioStreamInfo:
 class TestAudio(TestContainerFile):
 
     stream_infos: Dict[int, TestAudioStreamInfo]
-    _reference_frames: tuple[torch.Tensor] = field(default_factory=lambda: [])
+    _reference_frames: tuple[torch.Tensor] = tuple()
 
     # Storing each individual frame is too expensive for audio, because there's
     # a massive overhead in the binary format saved by pytorch. Saving all the
