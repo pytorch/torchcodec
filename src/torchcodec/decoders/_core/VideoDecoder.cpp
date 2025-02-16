@@ -568,7 +568,7 @@ void VideoDecoder::addAudioStream(int streamIndex) {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
   auto output = getNextFrameInternal();
-  output.data = maybePermuteHWC2CHW(output.data);
+  output.data = maybePermuteOutputTensor(output.data);
   return output;
 }
 
@@ -583,7 +583,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
 
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
   auto frameOutput = getFrameAtIndexInternal(frameIndex);
-  frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
+  frameOutput.data = maybePermuteOutputTensor(frameOutput.data);
   return frameOutput;
 }
 
@@ -668,7 +668,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     }
     previousIndexInVideo = indexInVideo;
   }
-  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
   return frameBatchOutput;
 }
 
@@ -711,7 +711,7 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
-  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
   return frameBatchOutput;
 }
 
@@ -750,7 +750,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
 
   // Convert the frame to tensor.
   FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
-  frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
+  frameOutput.data = maybePermuteOutputTensor(frameOutput.data);
   return frameOutput;
 }
 
@@ -820,7 +820,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   if (startSeconds == stopSeconds) {
     // TODO handle audio here
     FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
-    frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
+    frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
     return frameBatchOutput;
   }
 
@@ -872,7 +872,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
-  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
 
   return frameBatchOutput;
 }
@@ -1426,16 +1426,23 @@ torch::Tensor allocateEmptyHWCTensor(
   }
 }
 
+torch::Tensor VideoDecoder::maybePermuteOutputTensor(
+    torch::Tensor& outputTensor) {
+  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO) {
+    return maybePermuteHWC2CHW(outputTensor);
+  } else {
+    // No need to do anything for audio. We always return (numChannels,
+    // numSamples) or (numFrames, numChannels, numSamples)
+    return outputTensor;
+  }
+}
+
 // Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
 // The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
 // or 4D.
 // Calling permute() is guaranteed to return a view as per the docs:
 // https://pytorch.org/docs/stable/generated/torch.permute.html
 torch::Tensor VideoDecoder::maybePermuteHWC2CHW(torch::Tensor& hwcTensor) {
-  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_AUDIO) {
-    // TODO_CODE_QUALITY: Do something cleaner for handling audio
-    return hwcTensor;
-  }
   if (streamInfos_[activeStreamIndex_].videoStreamOptions.dimensionOrder ==
       "NHWC") {
     return hwcTensor;
