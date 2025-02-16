@@ -109,10 +109,13 @@ class TestOps:
         ),
     )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_seek_and_next(self, test_ref, index_of_frame_after_seeking_at_6, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_seek_and_next(
+        self, test_ref, index_of_frame_after_seeking_at_6, device, seek_mode
+    ):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = test_ref.get_frame_data_by_index(0)
@@ -129,11 +132,12 @@ class TestOps:
 
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_seek_to_negative_pts(self, test_ref, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_seek_to_negative_pts(self, test_ref, device, seek_mode):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
 
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = test_ref.get_frame_data_by_index(0)
@@ -144,9 +148,10 @@ class TestOps:
         assert_frames_equal(frame0, reference_frame0.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_at_pts_video(self, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at_pts_video(self, device, seek_mode):
 
-        decoder = create_from_file(str(NASA_VIDEO.path))
+        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
         add_video_stream(decoder=decoder, device=device)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
@@ -168,8 +173,9 @@ class TestOps:
             with pytest.raises(AssertionError):
                 assert_frames_equal(next_frame, reference_frame6.to(device))
 
-    def test_get_frame_at_pts_audio(self):
-        decoder = create_from_file(str(NASA_AUDIO.path))
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at_pts_audio(self, seek_mode):
+        decoder = create_from_file(str(NASA_AUDIO.path), seek_mode=seek_mode)
         add_audio_stream(decoder=decoder)
         # This frame has pts=6.016 and duration=0.064 , so it should be played
         # at timestamps in the range [6.016, 6.08) (not including the last timestamp).
@@ -191,11 +197,12 @@ class TestOps:
 
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frame_at_index(self, test_ref, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at_index(self, test_ref, device, seek_mode):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
 
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         frame0, _, _ = get_frame_at_index(decoder, frame_index=0)
         reference_frame0 = test_ref.get_frame_data_by_index(0)
@@ -213,12 +220,13 @@ class TestOps:
         ),
     )
     @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_get_frame_with_info_at_index(
-        self, test_ref, expected_pts, expected_duration, device
+        self, test_ref, expected_pts, expected_duration, device, seek_mode
     ):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         frame6, pts, duration = get_frame_at_index(decoder, frame_index=180)
         reference_frame6 = test_ref.get_frame_data_by_index(180)
@@ -228,10 +236,11 @@ class TestOps:
 
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_at_indices(self, test_ref, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_at_indices(self, test_ref, device, seek_mode):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
         reference_frame0 = test_ref.get_frame_data_by_index(0)
@@ -242,11 +251,12 @@ class TestOps:
 
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_at_indices_unsorted_indices(self, test_ref, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_at_indices_unsorted_indices(self, test_ref, device, seek_mode):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
 
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
 
         frame_indices = [2, 0, 1, 0, 2]
@@ -272,8 +282,9 @@ class TestOps:
             assert_frames_equal(frames[0], frames[-1])
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_by_pts(self, device):
-        decoder = create_from_file(str(NASA_VIDEO.path))
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_by_pts(self, device, seek_mode):
+        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
         _add_video_stream(decoder=decoder, device=device)
 
         # Note: 13.01 should give the last video frame for the NASA video
@@ -361,10 +372,11 @@ class TestOps:
 
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_get_frames_in_range(self, test_ref, device):
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range(self, test_ref, device, seek_mode):
         if device == "cuda" and test_ref is NASA_AUDIO:
             pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
+        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
         _add_stream(decoder=decoder, test_ref=test_ref, device=device)
 
         # ensure that the degenerate case of a range of size 1 works

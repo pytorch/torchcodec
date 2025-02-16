@@ -156,6 +156,9 @@ void VideoDecoder::initializeDecoder() {
         "Our stream index, " + std::to_string(i) +
             ", does not match AVStream's index, " +
             std::to_string(avStream->index) + ".");
+
+    // TODO figure out audio metadata
+
     streamMetadata.streamIndex = i;
     streamMetadata.mediaType = avStream->codecpar->codec_type;
     streamMetadata.codecName = avcodec_get_name(avStream->codecpar->codec_id);
@@ -171,12 +174,22 @@ void VideoDecoder::initializeDecoder() {
           av_q2d(avStream->time_base) * avStream->duration;
     }
 
-    double fps = av_q2d(avStream->r_frame_rate);
-    if (fps > 0) {
-      streamMetadata.averageFps = fps;
-    }
-
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      double fps = av_q2d(avStream->r_frame_rate);
+      if (fps > 0) {
+        streamMetadata.averageFps = fps;
+      }
+    } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+      int numSamplesPerFrame = avStream->codecpar->frame_size;
+      int sampleRate = avStream->codecpar->sample_rate;
+      if (numSamplesPerFrame > 0 && sampleRate > 0) {
+        // This should allow the approximate mode to do its magic.
+        // fps is numFrames / duration where
+        // - duration = numSamplesTotal / sampleRate and
+        // - numSamplesTotal = numSamplesPerFrame * numFrames
+        streamMetadata.averageFps =
+            static_cast<double>(sampleRate) / numSamplesPerFrame;
+      }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       containerMetadata_.numAudioStreams++;
@@ -465,15 +478,27 @@ void VideoDecoder::addStream(
             .value_or(avCodec));
   }
 
-  // TODO figure out audio metadata
+  // TODO: For audio, we raise if seek_mode="approximate" and if the number of
+  // samples per frame is unknown (frame_size field of codec params). But that's
+  // quite limitting. Ultimately, the most common type of call will be to decode
+  // an entire file from start to end (possibly with some offsets for start and
+  // end). And for that, we shouldn't [need to] force the user to scan, because
+  // all this entails is a single call to seek(start) (if at all) and then just
+  // a bunch of consecutive calls to getNextFrame(). Maybe there should be a
+  // third seek mode for audio, e.g. seek_mode="contiguous" where we don't scan,
+  // and only allow calls to getFramesPlayedAt().
   StreamMetadata& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   if (seekMode_ == SeekMode::approximate &&
       !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " +
-        std::to_string(activeStreamIndex_) +
-        " does not have an average fps in its metadata.");
+    std::string errMsg = "Seek mode is approximate, but stream " +
+        std::to_string(activeStreamIndex_) + "does not have ";
+    if (mediaType == AVMEDIA_TYPE_VIDEO) {
+      errMsg += "an average fps in its metadata.";
+    } else {
+      errMsg += "a constant number of samples per frame.";
+    }
+    throw std::runtime_error(errMsg);
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
