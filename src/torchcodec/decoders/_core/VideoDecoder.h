@@ -162,7 +162,6 @@ class VideoDecoder {
     torch::Tensor ptsSeconds; // 1D of shape (N,)
     torch::Tensor durationSeconds; // 1D of shape (N,)
 
-    FrameBatchOutput(){};
     explicit FrameBatchOutput(
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
@@ -398,6 +397,8 @@ class VideoDecoder {
   int convertAVFrameToTensorUsingSwsScale(
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
+
+  FrameBatchOutput makeFrameBatchOutput(int64_t numFrames);
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION

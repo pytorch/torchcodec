@@ -553,9 +553,7 @@ void VideoDecoder::addVideoStream(
 void VideoDecoder::addAudioStream(int streamIndex) {
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 
-  // TODO address this, this is currently super limitting. The main thing we'll
-  // need to handle is the pre-allocation of the output tensor in batch APIs. We
-  // probably won't be able to pre-allocate anything.
+  // See correspodning TODO in makeFrameBatchOutput
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   TORCH_CHECK(
       streamInfo.codecContext->frame_size > 0,
@@ -627,21 +625,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
 
-  // TODO_CODE_QUALITY Better allocation logic.
-  FrameBatchOutput frameBatchOutput;
-  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
-    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-    frameBatchOutput = FrameBatchOutput(
-        frameIndices.size(), videoStreamOptions, streamMetadata);
-  } else {
-    // TODO Handle case if frame_size is not known.
-    int64_t numSamples = streamInfo.codecContext->frame_size;
-    int64_t numChannels = getNumChannels(streamInfo.codecContext);
-    frameBatchOutput =
-        FrameBatchOutput(frameIndices.size(), numChannels, numSamples);
-  }
+  FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(frameIndices.size());
 
   auto previousIndexInVideo = -1;
   for (size_t f = 0; f < frameIndices.size(); ++f) {
@@ -678,7 +663,6 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
   int64_t numFrames = getNumFrames(streamMetadata);
   TORCH_CHECK(
       start >= 0, "Range start, " + std::to_string(start) + " is less than 0.");
@@ -691,19 +675,7 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
 
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
 
-  // TODO_CODE_QUALITY Better allocation logic.
-  FrameBatchOutput frameBatchOutput;
-  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
-    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-    frameBatchOutput =
-        FrameBatchOutput(numOutputFrames, videoStreamOptions, streamMetadata);
-  } else {
-    // TODO Handle case if frame_size is not known.
-    int64_t numSamples = streamInfo.codecContext->frame_size;
-    int64_t numChannels = getNumChannels(streamInfo.codecContext);
-    frameBatchOutput =
-        FrameBatchOutput(numOutputFrames, numChannels, numSamples);
-  }
+  FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(numOutputFrames);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput frameOutput =
@@ -789,16 +761,11 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     double stopSeconds) {
   validateActiveStream();
 
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
           ") must be less than or equal to stop seconds (" +
           std::to_string(stopSeconds) + ".");
-
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
-  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
 
   // Special case needed to implement a half-open range. At first glance, this
   // may seem unnecessary, as our search for stopFrame can return the end, and
@@ -818,12 +785,13 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
-    // TODO handle audio here
-    FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
+    FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(0);
     frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
     return frameBatchOutput;
   }
 
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   double minSeconds = getMinSeconds(streamMetadata);
   double maxSeconds = getMaxSeconds(streamMetadata);
   TORCH_CHECK(
@@ -854,18 +822,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   int64_t stopFrameIndex = secondsToIndexUpperBound(stopSeconds);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
-  // TODO_CODE_QUALITY Better allocation logic.
-  FrameBatchOutput frameBatchOutput;
-  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
-    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-    frameBatchOutput =
-        FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
-  } else {
-    // TODO Handle case if frame_size is not known.
-    int64_t numSamples = streamInfo.codecContext->frame_size;
-    int64_t numChannels = getNumChannels(streamInfo.codecContext);
-    frameBatchOutput = FrameBatchOutput(numFrames, numChannels, numSamples);
-  }
+  FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(numFrames);
+
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
@@ -1391,7 +1349,7 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       height, width, videoStreamOptions.device, numFrames);
 }
 
-VideoDecoder::FrameBatchOutput ::FrameBatchOutput(
+VideoDecoder::FrameBatchOutput::FrameBatchOutput(
     int64_t numFrames,
     int64_t numChannels,
     int64_t numSamples)
@@ -1403,6 +1361,26 @@ VideoDecoder::FrameBatchOutput ::FrameBatchOutput(
                            .layout(torch::kStrided)
                            .device(torch::kCPU);
   data = torch::empty({numFrames, numChannels, numSamples}, tensorOptions);
+}
+
+VideoDecoder::FrameBatchOutput VideoDecoder::makeFrameBatchOutput(
+    int64_t numFrames) {
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
+    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
+    const auto& streamMetadata =
+        containerMetadata_.allStreamMetadata[activeStreamIndex_];
+    return FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
+  } else {
+    // We asserted that frame_size is non-zero when we added the stream, but it
+    // may not always be the case.
+    // When it's 0, we can't pre-allocate the output tensor as we don't know the
+    // number of samples per channel, and it may be non-constant.
+    // TODO: handle this.
+    int64_t numSamples = streamInfo.codecContext->frame_size;
+    int64_t numChannels = getNumChannels(streamInfo.codecContext);
+    return FrameBatchOutput(numFrames, numChannels, numSamples);
+  }
 }
 
 torch::Tensor allocateEmptyHWCTensor(
