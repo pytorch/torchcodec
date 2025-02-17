@@ -195,6 +195,29 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(next_frame, reference_frame6)
 
+    def test_get_frame_at_pts_audio_bad(self):
+        decoder = create_from_file(str(NASA_AUDIO.path))
+        add_audio_stream(decoder=decoder)
+
+        reference_frame6 = NASA_AUDIO.get_frame_data_by_index(
+            INDEX_OF_AUDIO_FRAME_AFTER_SEEKING_AT_6
+        )
+        frame6, _, _ = get_frame_at_pts(decoder, 6.05)
+        # See Note [Seek offset for audio].
+        # The frame played at 6.05 should be the reference frame, but because
+        # 6.05 isn't exactly the beginning of that frame, the samples are
+        # decoded incorrectly.
+        # TODO Fix this.
+        with pytest.raises(AssertionError):
+            assert_frames_equal(frame6, reference_frame6)
+
+        # And yet another quirk: if we try to decode it again, we actually end
+        # up with the samples being correctly decoded. This is because we have a
+        # custom logic within getFramePlayedAt() that resets desiredPts to the
+        # pts of the beginning of the frame in some very specific cases.
+        frame6, _, _ = get_frame_at_pts(decoder, 6.05)
+        assert_frames_equal(frame6, reference_frame6)
+
     @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
@@ -779,34 +802,48 @@ class TestOps:
         )
 
     def test_get_same_frame_twice(self):
+        # Non-regression tests that were useful while developing audio support.
         def make_decoder():
             decoder = create_from_file(str(NASA_AUDIO.path))
             add_audio_stream(decoder)
             return decoder
 
         for frame_index in (0, 10, 15):
+            ref = NASA_AUDIO.get_frame_data_by_index(frame_index)
+
             decoder = make_decoder()
             a = get_frame_at_index(decoder, frame_index=frame_index)
             b = get_frame_at_index(decoder, frame_index=frame_index)
             torch.testing.assert_close(a, b)
+            torch.testing.assert_close(a[0], ref)
 
             decoder = make_decoder()
             a = get_frames_at_indices(decoder, frame_indices=[frame_index])
             b = get_frames_at_indices(decoder, frame_indices=[frame_index])
             torch.testing.assert_close(a, b)
+            torch.testing.assert_close(a[0][0], ref)
 
             decoder = make_decoder()
             a = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
             b = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
             torch.testing.assert_close(a, b)
+            torch.testing.assert_close(a[0][0], ref)
 
-        pts_at_frame_start = 0
+        pts_at_frame_start = 0  # 0 corresponds exactly to a frame start
+        index_of_frame_at_0 = 0
         pts_not_at_frame_start = 2  # second 2 is in the middle of a frame
-        for pts in (pts_at_frame_start, pts_not_at_frame_start):
+        index_of_frame_at_2 = 31
+        for pts, frame_index in (
+            (pts_at_frame_start, index_of_frame_at_0),
+            (pts_not_at_frame_start, index_of_frame_at_2),
+        ):
+            ref = NASA_AUDIO.get_frame_data_by_index(frame_index)
+
             decoder = make_decoder()
             a = get_frames_by_pts(decoder, timestamps=[pts])
             b = get_frames_by_pts(decoder, timestamps=[pts])
             torch.testing.assert_close(a, b)
+            torch.testing.assert_close(a[0][0], ref)
 
             decoder = make_decoder()
             a = get_frames_by_pts_in_range(
@@ -816,11 +853,15 @@ class TestOps:
                 decoder, start_seconds=pts, stop_seconds=pts + 1e-4
             )
             torch.testing.assert_close(a, b)
+            torch.testing.assert_close(a[0][0], ref)
 
         decoder = make_decoder()
         a = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
         b = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
         torch.testing.assert_close(a, b)
+        torch.testing.assert_close(
+            a[0], NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_0)
+        )
 
         decoder = make_decoder()
         a_frame, a_pts, a_duration = get_frame_at_pts(
@@ -831,8 +872,17 @@ class TestOps:
         )
         torch.testing.assert_close(a_pts, b_pts)
         torch.testing.assert_close(a_duration, b_duration)
+        # TODO fix this. These checks should pass
         with pytest.raises(AssertionError):
             torch.testing.assert_close(a_frame, b_frame)
+        with pytest.raises(AssertionError):
+            torch.testing.assert_close(
+                a_frame, NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2)
+            )
+        # But second time works ¯\_(ツ)_/¯A (see also test_get_frame_at_pts_audio_bad())
+        torch.testing.assert_close(
+            b_frame, NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2)
+        )
 
         decoder = make_decoder()
         seek_to_pts(decoder, pts_at_frame_start)
@@ -841,13 +891,15 @@ class TestOps:
         b = get_next_frame(decoder)
         torch.testing.assert_close(a, b)
 
-        # TODO: Wait WTFFF, this should not pass
         decoder = make_decoder()
         seek_to_pts(decoder, seconds=pts_not_at_frame_start)
         a = get_next_frame(decoder)
         seek_to_pts(decoder, seconds=pts_not_at_frame_start)
         b = get_next_frame(decoder)
         torch.testing.assert_close(a, b)
+        torch.testing.assert_close(
+            a[0], NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2 + 1)
+        )
 
 
 if __name__ == "__main__":
