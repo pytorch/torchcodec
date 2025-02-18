@@ -1017,7 +1017,10 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     //   exactly at a frame start either.
     // - When calling `getFramePlayedAt(pts)`, regardless of the mode, if `pts`
     //   doesn't land exactly at a frame's start. We have tests that currently
-    //   exhibit this behavior: test_get_frame_at_pts_audio_bad().
+    //   exhibit this behavior: test_get_frame_at_pts_audio_bad(). The "obvious"
+    //   fix for this is to let `getFramePlayedAt` convert the pts to an index,
+    //   just like the rest of the APIs.
+    //
     // TODO HOW DO WE FIX THIS??
 
     // A few notes:
