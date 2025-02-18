@@ -25,7 +25,7 @@ def cpu_and_cuda():
 
 def assert_frames_equal(*args, **kwargs):
     frame = args[0]
-    # This heuristic will work until we start returningu int8 audio frames...
+    # This heuristic will work until we start returning uint8 audio frames...
     if frame.dtype == torch.uint8:
         return assert_video_frames_equal(*args, **kwargs)
     else:

@@ -188,6 +188,7 @@ void VideoDecoder::initializeDecoder() {
         // fps is numFrames / duration where
         // - duration = numSamplesTotal / sampleRate and
         // - numSamplesTotal = numSamplesPerFrame * numFrames
+        // so fps = numFrames * sampleRate / (numSamplesPerFrame * numFrames)
         streamMetadata.averageFps =
             static_cast<double>(sampleRate) / numSamplesPerFrame;
       }
@@ -477,7 +478,8 @@ void VideoDecoder::addStream(
             .value_or(avCodec));
   }
 
-  // TODO: For audio, we raise if seek_mode="approximate" and if the number of
+  // TODO_FRAME_SIZE_APPROXIMATE_MODE
+  // For audio, we raise if seek_mode="approximate" and if the number of
   // samples per frame is unknown (frame_size field of codec params). But that's
   // quite limitting. Ultimately, the most common type of call will be to decode
   // an entire file from start to end (possibly with some offsets for start and
@@ -577,7 +579,7 @@ void VideoDecoder::addVideoStream(
 void VideoDecoder::addAudioStream(int streamIndex) {
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 
-  // See correspodning TODO in makeFrameBatchOutput
+  // See TODO_FRAME_SIZE_BATCH_TENSOR_ALLOCATION
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   TORCH_CHECK(
       streamInfo.codecContext->frame_size > 0,
@@ -1020,9 +1022,9 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     //   fix for this is to let `getFramePlayedAt` convert the pts to an index,
     //   just like the rest of the APIs.
     //
-    // TODO HOW DO WE FIX THIS??
-
-    // A few notes:
+    // TODO HOW DO WE ADDRESS THIS??
+    //
+    // A few more notes:
     // - This offset trick does work for the first frame at pts=0: we'll seek to
     //   -1, and this leads to a first packet with pts=-1024 to be sent to the
     //   decoder (on our test data), leading to frame 0 to be correctly decoded.
@@ -1057,7 +1059,6 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
       desiredPts,
       desiredPts,
       0);
-
   if (ffmepgStatus < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
@@ -1470,11 +1471,12 @@ VideoDecoder::FrameBatchOutput VideoDecoder::makeFrameBatchOutput(
         containerMetadata_.allStreamMetadata[activeStreamIndex_];
     return FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
   } else {
+    // TODO_FRAME_SIZE_BATCH_TENSOR_ALLOCATION
     // We asserted that frame_size is non-zero when we added the stream, but it
     // may not always be the case.
     // When it's 0, we can't pre-allocate the output tensor as we don't know the
-    // number of samples per channel, and it may be non-constant.
-    // TODO: handle this.
+    // number of samples per channel, and it may be non-constant. We'll have to
+    // find a way to make the batch-APIs work without pre-allocation.
     int64_t numSamples = streamInfo.codecContext->frame_size;
     int64_t numChannels = getNumChannels(streamInfo.codecContext);
     return FrameBatchOutput(numFrames, numChannels, numSamples);
