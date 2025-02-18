@@ -179,6 +179,7 @@ void VideoDecoder::initializeDecoder() {
       if (fps > 0) {
         streamMetadata.averageFps = fps;
       }
+      containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       int numSamplesPerFrame = avStream->codecpar->frame_size;
       int sampleRate = avStream->codecpar->sample_rate;
@@ -190,8 +191,6 @@ void VideoDecoder::initializeDecoder() {
         streamMetadata.averageFps =
             static_cast<double>(sampleRate) / numSamplesPerFrame;
       }
-      containerMetadata_.numVideoStreams++;
-    } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       containerMetadata_.numAudioStreams++;
     }
 
