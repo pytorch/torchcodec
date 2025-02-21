@@ -25,6 +25,10 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
+def get_ffmpeg_major_version():
+    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
@@ -33,11 +37,8 @@ def cpu_and_cuda():
 def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
-            ffmpeg_major_version = int(
-                get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0]
-            )
             atol = 2
-            if in_fbcode() or ffmpeg_major_version == 4:
+            if get_ffmpeg_major_version() == 4:
                 assert_tensor_close_on_at_least(
                     args[0], args[1], percentage=95, atol=atol
                 )

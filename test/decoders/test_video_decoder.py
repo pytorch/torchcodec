@@ -15,8 +15,8 @@ from ..utils import (
     assert_frames_equal,
     AV1_VIDEO,
     cpu_and_cuda,
+    get_ffmpeg_major_version,
     H265_VIDEO,
-    in_fbcode,
     NASA_VIDEO,
 )
 
@@ -249,7 +249,7 @@ class TestVideoDecoder:
             ]
         )
         for sliced, ref in zip(all_frames, decoder):
-            if not (in_fbcode() and device == "cuda"):
+            if not (device == "cuda" and get_ffmpeg_major_version() == 4):
                 # TODO: remove the "if".
                 # See https://github.com/pytorch/torchcodec/issues/428
                 assert_frames_equal(sliced, ref)
@@ -428,7 +428,7 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_av1(self, device):
-        if in_fbcode() and device == "cuda":
+        if device == "cuda" and get_ffmpeg_major_version() == 4:
             return
 
         decoder = VideoDecoder(AV1_VIDEO.path, device=device)
