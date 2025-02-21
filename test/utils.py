@@ -11,6 +11,8 @@ import pytest
 
 import torch
 
+from torchcodec.decoders._core import get_ffmpeg_library_versions
+
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
 # effectively marked to be skipped in pytest_collection_modifyitems() of
@@ -31,8 +33,11 @@ def cpu_and_cuda():
 def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
+            ffmpeg_major_version = int(
+                get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0]
+            )
             atol = 2
-            if in_fbcode():
+            if in_fbcode() or ffmpeg_major_version == 4:
                 assert_tensor_close_on_at_least(
                     args[0], args[1], percentage=95, atol=atol
                 )
