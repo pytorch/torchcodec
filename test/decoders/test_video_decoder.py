@@ -351,6 +351,14 @@ class TestVideoDecoder:
         assert_frames_equal(ref_frame9, frame9.data)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frame_at_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
+
+        with pytest.raises(IndexError, match="out of bounds"):
+            decoder.get_frame_at(1000)  # noqa
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_tuple_unpacking(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
 
