@@ -309,7 +309,6 @@ class TestOps:
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
 
-
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
         reference_last_frame = NASA_VIDEO.get_frame_data_by_index(289)
