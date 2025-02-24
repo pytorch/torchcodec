@@ -11,6 +11,8 @@ import pytest
 
 import torch
 
+from torchcodec.decoders._core import get_ffmpeg_library_versions
+
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
 # effectively marked to be skipped in pytest_collection_modifyitems() of
@@ -23,6 +25,10 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
+def get_ffmpeg_major_version():
+    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
@@ -32,7 +38,7 @@ def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             atol = 2
-            if in_fbcode():
+            if get_ffmpeg_major_version() == 4:
                 assert_tensor_close_on_at_least(
                     args[0], args[1], percentage=95, atol=atol
                 )

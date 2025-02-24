@@ -68,7 +68,11 @@ jobs:
         python-version: ['3.9']
         cuda-version: ['11.8', '12.4', '12.6']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['6', '7']
+        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+        exclude:
+        - cuda-version: '12.4'  # TODO put this back it fails with infra issue.
+          ffmpeg-version-for-tests: '4.4.2'
+
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
       options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
@@ -141,7 +145,7 @@ jobs:
           ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -vvv
+          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -v --tb=short
       - name: Run Python benchmark
         run: |
           ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
