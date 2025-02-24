@@ -23,12 +23,25 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
+def assert_frames_equal(*args, **kwargs):
+    frame = args[0]
+    # This heuristic will work until we start returning uint8 audio frames...
+    if frame.dtype == torch.uint8:
+        return assert_video_frames_equal(*args, **kwargs)
+    else:
+        return assert_audio_frames_equal(*args, **kwargs)
+
+
+def assert_audio_frames_equal(*args, **kwargs):
+    torch.testing.assert_close(*args, **kwargs)
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_frames_equal(*args, **kwargs):
+def assert_video_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             atol = 2
@@ -83,11 +96,6 @@ def _get_file_path(filename: str) -> pathlib.Path:
         return pathlib.Path(__file__).parent / "resources" / filename
 
 
-def _load_tensor_from_file(filename: str) -> torch.Tensor:
-    file_path = _get_file_path(filename)
-    return torch.load(file_path, weights_only=True).permute(2, 0, 1)
-
-
 @dataclass
 class TestFrameInfo:
     pts_seconds: float
@@ -114,12 +122,7 @@ class TestContainerFile:
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
-        if stream_index is None:
-            stream_index = self.default_stream_index
-
-        return _load_tensor_from_file(
-            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
-        )
+        raise NotImplementedError("Override in child classes")
 
     def get_frame_data_by_range(
         self,
@@ -195,6 +198,17 @@ class TestVideoStreamInfo:
 @dataclass
 class TestVideo(TestContainerFile):
     stream_infos: Dict[int, TestVideoStreamInfo]
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        file_path = _get_file_path(
+            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
+        )
+        return torch.load(file_path, weights_only=True).permute(2, 0, 1)
 
     @property
     def width(self) -> int:
@@ -292,10 +306,61 @@ NASA_VIDEO = TestVideo(
     },
 )
 
-# When we start actually decoding audio-only files, we'll probably need to define
-# a TestAudio class with audio specific values. Until then, we only need a filename.
-NASA_AUDIO = TestContainerFile(
-    filename="nasa_13013.mp4.audio.mp3", default_stream_index=0, frames={}
+
+@dataclass
+class TestAudioStreamInfo:
+    frame_rate: float
+
+
+@dataclass
+class TestAudio(TestContainerFile):
+
+    stream_infos: Dict[int, TestAudioStreamInfo]
+    _reference_frames: tuple[torch.Tensor] = tuple()
+
+    # Storing each individual frame is too expensive for audio, because there's
+    # a massive overhead in the binary format saved by pytorch. Saving all the
+    # frames in a single file uses 1.6MB while saving all frames in individual
+    # files uses 302MB (yes).
+    # So we store the reference frames in a single file, and load/cache those
+    # when the TestAudio instance is created.
+    def __post_init__(self):
+        # We hard-code the default stream index, see TODO below.
+        file_path = _get_file_path(
+            f"{self.filename}.stream{self.default_stream_index}.all_frames.pt"
+        )
+        t = torch.load(file_path, weights_only=True)
+
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
+        # of the 204 frames contains 1024 samples.
+        # TODO make this more generic
+        assert t.shape == (2, 204 * 1024)
+        self._reference_frames = torch.chunk(t, chunks=204, dim=1)
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is not None and stream_index != self.default_stream_index:
+            # TODO address this, the fix should be to let _reference_frames be a
+            # dict[tuple[torch.Tensor]] where keys are stream indices, and load
+            # all of those indices in __post_init__.
+            raise ValueError(
+                "Can only use default stream index with TestAudio for now."
+            )
+
+        return self._reference_frames[idx]
+
+    # TODO: this shouldn't be named chw. Also values are hard-coded
+    @property
+    def empty_chw_tensor(self) -> torch.Tensor:
+        return torch.empty([0, 2, 1024], dtype=torch.float32)
+
+
+NASA_AUDIO = TestAudio(
+    filename="nasa_13013.mp4",
+    default_stream_index=4,
+    frames={},  # TODO
+    stream_infos={4: TestAudioStreamInfo(frame_rate=16_000)},
 )
 
 H265_VIDEO = TestVideo(
