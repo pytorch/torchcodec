@@ -61,12 +61,11 @@ function(make_torchcodec_libraries
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
         VideoDecoder.cpp
+        DeviceInterface.cpp
     )
 
     if(ENABLE_CUDA)
         list(APPEND decoder_sources CudaDevice.cpp)
-    else()
-        list(APPEND decoder_sources CPUOnlyDevice.cpp)
     endif()
 
     set(decoder_library_dependencies
