@@ -308,12 +308,16 @@ class TestOps:
     def test_throws_exception_at_eof(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
         reference_last_frame = NASA_VIDEO.get_frame_data_by_index(289)
         assert_frames_equal(last_frame, reference_last_frame.to(device))
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
+
+        with pytest.raises(IndexError, match="no more frames"):
+            get_frame_at_pts(decoder, seconds=1000.0)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_throws_exception_if_seek_too_far(self, device):
