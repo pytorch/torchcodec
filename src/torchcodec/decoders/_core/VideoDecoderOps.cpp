@@ -28,6 +28,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec.decoders._core.video_decoder_ops",
       "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
+  m.def("create_encoder(Tensor wf) -> Tensor");
+  m.def("encode(Tensor(a!) encoder) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def(
@@ -72,11 +74,29 @@ at::Tensor wrapDecoderPointerToTensor(
   return tensor;
 }
 
+at::Tensor wrapEncoderPointerToTensor(std::unique_ptr<Encoder> uniqueEncoder) {
+  Encoder* encoder = uniqueEncoder.release();
+
+  auto deleter = [encoder](void*) { delete encoder; };
+  at::Tensor tensor =
+      at::from_blob(encoder, {sizeof(Encoder)}, deleter, {at::kLong});
+  auto encoder_ = static_cast<Encoder*>(tensor.mutable_data_ptr());
+  TORCH_CHECK_EQ(encoder_, encoder) << "Encoder=" << encoder_;
+  return tensor;
+}
+
 VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
   void* buffer = tensor.mutable_data_ptr();
   VideoDecoder* decoder = static_cast<VideoDecoder*>(buffer);
   return decoder;
+}
+
+Encoder* unwrapTensorToGetEncoder(at::Tensor& tensor) {
+  TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
+  void* buffer = tensor.mutable_data_ptr();
+  Encoder* encoder = static_cast<Encoder*>(buffer);
+  return encoder;
 }
 
 OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
@@ -121,6 +141,16 @@ at::Tensor create_from_file(
       std::make_unique<VideoDecoder>(filenameStr, realSeek);
 
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
+}
+
+at::Tensor create_encoder(torch::Tensor& wf) {
+  std::unique_ptr<Encoder> uniqueEncoder = std::make_unique<Encoder>(wf);
+  return wrapEncoderPointerToTensor(std::move(uniqueEncoder));
+}
+
+at::Tensor encode(at::Tensor& encoder) {
+  auto encoder_ = unwrapTensorToGetEncoder(encoder);
+  return encoder_->encode();
 }
 
 at::Tensor create_from_tensor(
@@ -512,12 +542,14 @@ void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
+  m.impl("create_encoder", &create_encoder);
   m.impl("create_from_tensor", &create_from_tensor);
   m.impl(
       "_get_json_ffmpeg_library_versions", &_get_json_ffmpeg_library_versions);
 }
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
+  m.impl("encode", &encode);
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
   m.impl("_add_video_stream", &_add_video_stream);

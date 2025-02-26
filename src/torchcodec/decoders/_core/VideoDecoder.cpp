@@ -1695,4 +1695,131 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
       videoStreamOptions.width.value_or(avFrame.width));
 }
 
+Encoder::~Encoder() {
+  fclose(f_);
+}
+
+Encoder::Encoder(torch::Tensor& wf) : wf_(wf) {
+  f_ = fopen("./coutput", "wb");
+  TORCH_CHECK(f_, "Could not open file");
+  const AVCodec* avCodec = avcodec_find_encoder(AV_CODEC_ID_MP3);
+  TORCH_CHECK(avCodec != nullptr, "Codec not found");
+
+  AVCodecContext* avCodecContext = avcodec_alloc_context3(avCodec);
+  TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
+  avCodecContext_.reset(avCodecContext);
+
+  avCodecContext_->bit_rate = 0; // TODO
+  avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP; // TODO
+  avCodecContext_->sample_rate = 16000; // TODO
+  AVChannelLayout channel_layout;
+  av_channel_layout_default(&channel_layout, 2);
+  avCodecContext_->ch_layout = channel_layout;
+
+  auto ffmpegRet = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+  AVFrame* avFrame = av_frame_alloc();
+  TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
+  avFrame_.reset(avFrame);
+  avFrame_->nb_samples = avCodecContext_->frame_size;
+  avFrame_->format = avCodecContext_->sample_fmt;
+  avFrame_->sample_rate = avCodecContext_->sample_rate;
+
+  ffmpegRet =
+      av_channel_layout_copy(&avFrame_->ch_layout, &avCodecContext_->ch_layout);
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS,
+      "Couldn't copy channel layout to avFrame: ",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+  ffmpegRet = av_frame_get_buffer(avFrame_.get(), 0);
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS,
+      "Couldn't allocate avFrame's buffers: ",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+}
+
+torch::Tensor Encoder::encode() {
+  AVPacket* pkt = av_packet_alloc();
+  if (!pkt) {
+    fprintf(stderr, "Could not allocate audio packet\n");
+    exit(1);
+  }
+
+  auto MAX_NUM_BYTES = 10000000; // 10Mb. TODO find a way not to pre-allocate.
+  int numEncodedBytes = 0;
+  torch::Tensor outputTensor = torch::empty({MAX_NUM_BYTES}, torch::kUInt8);
+  uint8_t* pOutputTensor =
+      static_cast<uint8_t*>(outputTensor.data_ptr<uint8_t>());
+
+  uint8_t* pWf = static_cast<uint8_t*>(wf_.data_ptr());
+  auto numBytesWeWroteFromWF = 0;
+  auto numBytesPerSample = wf_.element_size();
+  auto numBytesPerChannel = wf_.sizes()[1] * numBytesPerSample;
+
+  // TODO need simpler/cleaner while loop condition.
+  while (numBytesWeWroteFromWF < numBytesPerChannel) {
+    auto ffmpegRet = av_frame_make_writable(avFrame_.get());
+    TORCH_CHECK(
+        ffmpegRet == AVSUCCESS,
+        "Couldn't make AVFrame writable: ",
+        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+    auto numBytesToWrite = numBytesPerSample * avCodecContext_->frame_size;
+    if (numBytesWeWroteFromWF + numBytesToWrite > numBytesPerChannel) {
+      numBytesToWrite = numBytesPerChannel - numBytesWeWroteFromWF;
+    }
+    for (int ch = 0; ch < 2; ch++) {
+      memcpy(
+          avFrame_->data[ch], pWf + ch * numBytesPerChannel, numBytesToWrite);
+    }
+    pWf += numBytesToWrite;
+    numBytesWeWroteFromWF += numBytesToWrite;
+    encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, false);
+  }
+  encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, true);
+
+  return outputTensor.narrow(
+      /*dim=*/0, /*start=*/0, /*length=*/numEncodedBytes);
+  //   return outputTensor;
+}
+
+void Encoder::encode_inner_loop(
+    AVPacket* pkt,
+    uint8_t* pOutputTensor,
+    int* numEncodedBytes,
+    bool flush) {
+  int ffmpegRet = 0;
+
+  // TODO ewwww
+  if (flush) {
+    ffmpegRet = avcodec_send_frame(avCodecContext_.get(), nullptr);
+  } else {
+    ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame_.get());
+  }
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS,
+      "Error while sending frame: ",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+  while ((ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), pkt)) >=
+         0) {
+    if (ffmpegRet == AVERROR(EAGAIN) || ffmpegRet == AVERROR_EOF) {
+      return;
+    }
+    TORCH_CHECK(
+        ffmpegRet >= 0,
+        "Error receiving packet: ",
+        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+    fwrite(pkt->data, 1, pkt->size, f_);
+
+    memcpy(pOutputTensor + *numEncodedBytes, pkt->data, pkt->size);
+    *numEncodedBytes += pkt->size;
+
+    av_packet_unref(pkt);
+  }
+}
+
 } // namespace facebook::torchcodec

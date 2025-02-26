@@ -64,6 +64,10 @@ load_torchcodec_extension()
 create_from_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_file.default
 )
+create_encoder = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns.create_encoder.default
+)
+encode = torch._dynamo.disallow_in_graph(torch.ops.torchcodec_ns.encode.default)
 create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
 )
@@ -111,6 +115,16 @@ def create_from_bytes(
 # ==============================
 @register_fake("torchcodec_ns::create_from_file")
 def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::create_encoder")
+def create_encoder_abstract(wf: torch.Tensor) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::encode")
+def encode_abstract(encoder: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 

@@ -545,4 +545,24 @@ std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats);
 
+class Encoder {
+ public:
+  ~Encoder();
+
+  explicit Encoder(torch::Tensor& wf);
+  torch::Tensor encode();
+
+ private:
+  void encode_inner_loop(
+      AVPacket* pkt,
+      uint8_t* pOutputTensor,
+      int* numEncodedBytes,
+      bool flush);
+
+  torch::Tensor wf_;
+  UniqueAVCodecContext avCodecContext_;
+  UniqueAVFrame avFrame_;
+  FILE* f_;
+};
+
 } // namespace facebook::torchcodec
