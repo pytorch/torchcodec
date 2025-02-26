@@ -16,6 +16,7 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
+class DeviceInterface;
 
 // The SingleStreamDecoder class can be used to decode video frames to Tensors.
 // Note that SingleStreamDecoder is not thread-safe.
@@ -138,7 +139,7 @@ class SingleStreamDecoder {
     std::optional<int> height;
     std::optional<ColorConversionLibrary> colorConversionLibrary;
     // By default we use CPU for decoding for both C++ and python users.
-    torch::Device device = torch::kCPU;
+    std::shared_ptr<DeviceInterface> device;
   };
 
   struct AudioStreamOptions {
@@ -459,7 +460,7 @@ class SingleStreamDecoder {
   void addStream(
       int streamIndex,
       AVMediaType mediaType,
-      const torch::Device& device = torch::kCPU,
+      DeviceInterface* device = nullptr,
       std::optional<int> ffmpegThreadCount = std::nullopt);
 
   // Returns the "best" stream index for a given media type. The "best" is
