@@ -34,6 +34,15 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 endif()
 
+if(ENABLE_CUDA)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_CUDA")
+endif()
+if(ENABLE_XPU)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(L0 REQUIRED IMPORTED_TARGET level-zero)
+    pkg_check_modules(LIBVA REQUIRED IMPORTED_TARGET libva)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_XPU")
+endif()
 
 function(make_torchcodec_sublibrary
     library_name
@@ -109,7 +118,11 @@ function(make_torchcodec_libraries
     )
 
     if(ENABLE_CUDA)
-	    list(APPEND core_sources CudaDeviceInterface.cpp)
+        list(APPEND core_sources CudaDeviceInterface.cpp)
+    endif()
+
+    if(ENABLE_XPU)
+        list(APPEND core_sources XpuDeviceInterface.cpp)
     endif()
 
     set(core_library_dependencies
@@ -122,6 +135,11 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
+    endif()
+
+    if(ENABLE_XPU)
+        list(APPEND core_library_dependencies
+            PkgConfig::L0 PkgConfig::LIBVA)
     endif()
 
     make_torchcodec_sublibrary(

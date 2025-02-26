@@ -23,8 +23,19 @@ def needs_cuda(test_item):
     return pytest.mark.needs_cuda(test_item)
 
 
+# Decorator for skipping XPU tests when XPU isn't available. The tests are
+# effectively marked to be skipped in pytest_collection_modifyitems() of
+# conftest.py
+def needs_xpu(test_item):
+    return pytest.mark.needs_xpu(test_item)
+
+
 def all_supported_devices():
-    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
+    return (
+        "cpu",
+        pytest.param("cuda", marks=pytest.mark.needs_cuda),
+        pytest.param("xpu", marks=pytest.mark.needs_xpu),
+    )
 
 
 def get_ffmpeg_major_version():
@@ -77,6 +88,13 @@ def assert_frames_equal(*args, **kwargs):
                 )
             else:
                 torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
+        elif args[0].device.type == "xpu":
+            if not torch.allclose(*args, atol=0, rtol=0):
+                from torcheval.metrics import PeakSignalNoiseRatio
+
+                metric = PeakSignalNoiseRatio()
+                metric.update(args[0], args[1])
+                assert metric.compute() >= 40
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:
