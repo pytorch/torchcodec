@@ -146,14 +146,12 @@ First, make sure you have a GPU that has NVDEC hardware that can decode the
 format you want. Refer to Nvidia's GPU support matrix for more details
 [here](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new).
 
-1. Install CUDA Toolkit. Pytorch and TorchCodec supports CUDA Toolkit
-   versions 11.8, 12.1 or 12.4. In particular TorchCodec depends on
-   CUDA libraries libnpp and libnvrtc (which are part of CUDA Toolkit).
+1. Install Pytorch corresponding to your CUDA Toolkit using the
+   [official instructions](https://pytorch.org/get-started/locally/). You'll
+   need the `libnpp` and `libnvrtc` CUDA libraries, which are usually part of
+   the CUDA Toolkit.
 
-2. Install Pytorch that corresponds to your CUDA Toolkit version using the
-   [official instructions](https://pytorch.org/get-started/locally/).
-
-3. Install or compile FFmpeg with NVDEC support.
+2. Install or compile FFmpeg with NVDEC support.
    TorchCodec with CUDA should work with FFmpeg versions in [5, 7].
 
    If FFmpeg is not already installed, or you need a more recent version, an
@@ -184,13 +182,13 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i test/resources/nasa_13013.mp4 -f null -
    ```
 
-4. Install TorchCodec by passing in an `--index-url` parameter that corresponds
+3. Install TorchCodec by passing in an `--index-url` parameter that corresponds
    to your CUDA Toolkit version, example:
 
    ```bash
-   # This corresponds to CUDA Toolkit version 12.4. It should be the same one
+   # This corresponds to CUDA Toolkit version 12.6. It should be the same one
    # you used when you installed PyTorch (If you installed PyTorch with pip).
-   pip install torchcodec --index-url=https://download.pytorch.org/whl/cu124
+   pip install torchcodec --index-url=https://download.pytorch.org/whl/cu126
    ```
 
    Note that without passing in the `--index-url` parameter, `pip` installs
