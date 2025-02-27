@@ -1697,28 +1697,72 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
 
 Encoder::~Encoder() {
   fclose(f_);
+  // TODO NEED TO CALL THIS
+  //   avformat_free_context(avFormatContext_.get());
 }
 
-Encoder::Encoder(torch::Tensor& wf) : wf_(wf) {
+Encoder::Encoder(int sampleRate, std::string_view fileName)
+    : sampleRate_(sampleRate) {
   f_ = fopen("./coutput", "wb");
   TORCH_CHECK(f_, "Could not open file");
-  const AVCodec* avCodec = avcodec_find_encoder(AV_CODEC_ID_MP3);
+
+  AVFormatContext* avFormatContext = nullptr;
+  avformat_alloc_output_context2(&avFormatContext, NULL, NULL, fileName.data());
+  TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
+  avFormatContext_.reset(avFormatContext);
+
+  TORCH_CHECK(
+      !(avFormatContext->oformat->flags & AVFMT_NOFILE),
+      "AVFMT_NOFILE is set. We only support writing to a file.");
+  auto ffmpegRet =
+      avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
+  TORCH_CHECK(
+      ffmpegRet >= 0,
+      "avio_open failed: ",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+  // We use the AVFormatContext's default codec for that
+  // specificavcodec_parameters_from_context format/container.
+  const AVCodec* avCodec =
+      avcodec_find_encoder(avFormatContext_->oformat->audio_codec);
   TORCH_CHECK(avCodec != nullptr, "Codec not found");
 
   AVCodecContext* avCodecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  avCodecContext_->bit_rate = 0; // TODO
-  avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP; // TODO
-  avCodecContext_->sample_rate = 16000; // TODO
+  // I think this will use the default. TODO Should let user choose for
+  // compressed formats like mp3.
+  avCodecContext_->bit_rate = 0;
+
+  // TODO A given encoder only supports a finite set of output sample rates.
+  // FFmpeg raises informative error message. Are we happy with that, or do we
+  // run our own checks by checking against avCodec->supported_samplerates?
+  avCodecContext_->sample_rate = sampleRate_;
+
+  // Note: This is the format of the **input** waveform. This doesn't determine
+  // the output. TODO check contiguity of the input wf to ensure that it is
+  // indeed planar.
+  // TODO What if the encoder doesn't support FLTP? Like flac?
+  avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
+
   AVChannelLayout channel_layout;
   av_channel_layout_default(&channel_layout, 2);
   avCodecContext_->ch_layout = channel_layout;
 
-  auto ffmpegRet = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
+  ffmpegRet = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+  TORCH_CHECK(
+      avCodecContext_->frame_size > 0,
+      "frame_size is ",
+      avCodecContext_->frame_size,
+      ". Cannot encode. This should probably never happen?");
+
+  avStream_ = avformat_new_stream(avFormatContext_.get(), NULL);
+  TORCH_CHECK(avStream_ != nullptr, "Couldn't create new stream.");
+  avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
 
   AVFrame* avFrame = av_frame_alloc();
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
@@ -1726,13 +1770,14 @@ Encoder::Encoder(torch::Tensor& wf) : wf_(wf) {
   avFrame_->nb_samples = avCodecContext_->frame_size;
   avFrame_->format = avCodecContext_->sample_fmt;
   avFrame_->sample_rate = avCodecContext_->sample_rate;
-
+  avFrame_->pts = 0;
   ffmpegRet =
       av_channel_layout_copy(&avFrame_->ch_layout, &avCodecContext_->ch_layout);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Couldn't copy channel layout to avFrame: ",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
   ffmpegRet = av_frame_get_buffer(avFrame_.get(), 0);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
@@ -1740,7 +1785,7 @@ Encoder::Encoder(torch::Tensor& wf) : wf_(wf) {
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 }
 
-torch::Tensor Encoder::encode() {
+torch::Tensor Encoder::encode(const torch::Tensor& wf) {
   AVPacket* pkt = av_packet_alloc();
   if (!pkt) {
     fprintf(stderr, "Could not allocate audio packet\n");
@@ -1753,14 +1798,31 @@ torch::Tensor Encoder::encode() {
   uint8_t* pOutputTensor =
       static_cast<uint8_t*>(outputTensor.data_ptr<uint8_t>());
 
-  uint8_t* pWf = static_cast<uint8_t*>(wf_.data_ptr());
+  uint8_t* pWf = static_cast<uint8_t*>(wf.data_ptr());
   auto numBytesWeWroteFromWF = 0;
-  auto numBytesPerSample = wf_.element_size();
-  auto numBytesPerChannel = wf_.sizes()[1] * numBytesPerSample;
+  auto numBytesPerSample = wf.element_size();
+  auto numBytesPerChannel = wf.sizes()[1] * numBytesPerSample;
+  auto numChannels = wf.sizes()[0];
+
+  TORCH_CHECK(
+      // TODO is this even true / needed? We can probably support more with
+      // non-planar data?
+      numChannels <= AV_NUM_DATA_POINTERS,
+      "Trying to encode ",
+      numChannels,
+      " channels, but FFmpeg only supports ",
+      AV_NUM_DATA_POINTERS,
+      " channels per frame.");
+
+  auto ffmpegRet = avformat_write_header(avFormatContext_.get(), NULL);
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS,
+      "Error in avformat_write_header: ",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
   // TODO need simpler/cleaner while loop condition.
   while (numBytesWeWroteFromWF < numBytesPerChannel) {
-    auto ffmpegRet = av_frame_make_writable(avFrame_.get());
+    ffmpegRet = av_frame_make_writable(avFrame_.get());
     TORCH_CHECK(
         ffmpegRet == AVSUCCESS,
         "Couldn't make AVFrame writable: ",
@@ -1770,15 +1832,23 @@ torch::Tensor Encoder::encode() {
     if (numBytesWeWroteFromWF + numBytesToWrite > numBytesPerChannel) {
       numBytesToWrite = numBytesPerChannel - numBytesWeWroteFromWF;
     }
-    for (int ch = 0; ch < 2; ch++) {
+
+    for (int ch = 0; ch < numChannels; ch++) {
       memcpy(
           avFrame_->data[ch], pWf + ch * numBytesPerChannel, numBytesToWrite);
     }
     pWf += numBytesToWrite;
     numBytesWeWroteFromWF += numBytesToWrite;
     encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, false);
+    avFrame_->pts += avFrame_->nb_samples;
   }
   encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, true);
+
+  ffmpegRet = av_write_trailer(avFormatContext_.get());
+  TORCH_CHECK(
+      ffmpegRet == AVSUCCESS,
+      "Error in : av_write_trailer",
+      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
   return outputTensor.narrow(
       /*dim=*/0, /*start=*/0, /*length=*/numEncodedBytes);
@@ -1806,11 +1876,31 @@ void Encoder::encode_inner_loop(
   while ((ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), pkt)) >=
          0) {
     if (ffmpegRet == AVERROR(EAGAIN) || ffmpegRet == AVERROR_EOF) {
+      // TODO this is from TorchAudio, probably needed, but not sure.
+      //   if (ffmpegRet == AVERROR_EOF) {
+      //     ffmpegRet = av_interleaved_write_frame(avFormatContext_.get(),
+      //     nullptr); TORCH_CHECK(
+      //         ffmpegRet == AVSUCCESS,
+      //         "Failed to flush packet ",
+      //         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      //   }
       return;
     }
     TORCH_CHECK(
         ffmpegRet >= 0,
         "Error receiving packet: ",
+        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+
+    // TODO why are these 2 lines needed??
+    // av_packet_rescale_ts(pkt, avCodecContext_->time_base,
+    // avStream_->time_base);
+    pkt->stream_index = avStream_->index;
+    printf("PACKET PTS %d\n", pkt->pts);
+
+    ffmpegRet = av_interleaved_write_frame(avFormatContext_.get(), pkt);
+    TORCH_CHECK(
+        ffmpegRet == AVSUCCESS,
+        "Error in av_interleaved_write_frame: ",
         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
     fwrite(pkt->data, 1, pkt->size, f_);

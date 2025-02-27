@@ -119,12 +119,12 @@ def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.
 
 
 @register_fake("torchcodec_ns::create_encoder")
-def create_encoder_abstract(wf: torch.Tensor) -> torch.Tensor:
+def create_encoder_abstract(sample_rate: int, filename: str) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
 @register_fake("torchcodec_ns::encode")
-def encode_abstract(encoder: torch.Tensor) -> torch.Tensor:
+def encode_abstract(encoder: torch.Tensor, wf: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
