@@ -61,8 +61,12 @@ def main() -> None:
 
     decoder_dict = {}
     decoder_dict["torchcodec"] = TorchCodecPublic()
+    decoder_dict["torchcodec[approx]"] = TorchCodecPublic(seek_mode="approximate")
     if torch.cuda.is_available():
         decoder_dict["torchcodec[cuda]"] = TorchCodecPublic(device="cuda")
+        decoder_dict["torchcodec[cuda,approx]"] = TorchCodecPublic(
+            device="cuda", seek_mode="approximate"
+        )
     decoder_dict["torchvision[video_reader]"] = TorchVision("video_reader")
     decoder_dict["torchaudio"] = TorchAudioDecoder()
 

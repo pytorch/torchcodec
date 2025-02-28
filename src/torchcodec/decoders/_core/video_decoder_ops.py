@@ -195,7 +195,6 @@ def get_frame_at_pts_abstract(
 def get_frames_by_pts_abstract(
     decoder: torch.Tensor,
     *,
-    stream_index: int,
     timestamps: List[float],
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
@@ -208,7 +207,7 @@ def get_frames_by_pts_abstract(
 
 @register_fake("torchcodec_ns::get_frame_at_index")
 def get_frame_at_index_abstract(
-    decoder: torch.Tensor, *, stream_index: int, frame_index: int
+    decoder: torch.Tensor, *, frame_index: int
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(3)]
     return (
@@ -222,7 +221,6 @@ def get_frame_at_index_abstract(
 def get_frames_at_indices_abstract(
     decoder: torch.Tensor,
     *,
-    stream_index: int,
     frame_indices: List[int],
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
@@ -237,7 +235,6 @@ def get_frames_at_indices_abstract(
 def get_frames_in_range_abstract(
     decoder: torch.Tensor,
     *,
-    stream_index: int,
     start: int,
     stop: int,
     step: Optional[int] = None,
@@ -254,7 +251,6 @@ def get_frames_in_range_abstract(
 def get_frames_by_pts_in_range_abstract(
     decoder: torch.Tensor,
     *,
-    stream_index: int,
     start_seconds: float,
     stop_seconds: float,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -267,9 +263,7 @@ def get_frames_by_pts_in_range_abstract(
 
 
 @register_fake("torchcodec_ns::_get_key_frame_indices")
-def get_key_frame_indices_abstract(
-    decoder: torch.Tensor, *, stream_index: int
-) -> torch.Tensor:
+def get_key_frame_indices_abstract(decoder: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.int)
 
 
@@ -292,7 +286,6 @@ def get_stream_json_metadata_abstract(decoder: torch.Tensor, stream_idx: int) ->
 def _test_frame_pts_equality_abstract(
     decoder: torch.Tensor,
     *,
-    stream_index: int,
     frame_index: int,
     pts_seconds_to_test: float,
 ) -> bool:

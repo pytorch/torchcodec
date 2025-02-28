@@ -249,7 +249,12 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
 
 OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  auto result = videoDecoder->getFramePlayedAt(seconds);
+  VideoDecoder::FrameOutput result;
+  try {
+    result = videoDecoder->getFramePlayedAt(seconds);
+  } catch (const VideoDecoder::EndOfFileException& e) {
+    C10_THROW_ERROR(IndexError, e.what());
+  }
   return makeOpsFrameOutput(result);
 }
 

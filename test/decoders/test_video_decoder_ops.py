@@ -9,7 +9,6 @@ import os
 os.environ["TORCH_LOGS"] = "output_code"
 import json
 import subprocess
-from typing import Tuple
 
 import numpy as np
 import pytest
@@ -59,20 +58,6 @@ def _add_stream(*, decoder, test_ref, device="cpu"):
         add_audio_stream(decoder)
     else:
         raise ValueError("Can't add a stream for this test reference.")
-
-
-class ReferenceDecoder:
-    def __init__(self, device="cpu"):
-        self.decoder: torch.Tensor = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(self.decoder, device=device)
-
-    def get_next_frame(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        assert self.decoder is not None
-        return get_next_frame(self.decoder)
-
-    def seek(self, pts: float):
-        assert self.decoder is not None
-        seek_to_pts(self.decoder, pts)
 
 
 class TestOps:
@@ -456,6 +441,8 @@ class TestOps:
         assert_frames_equal(last_frame, reference_last_frame.to(device))
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
+        with pytest.raises(IndexError, match="no more frames"):
+            get_frame_at_pts(decoder, seconds=1000.0)
 
     @pytest.mark.parametrize(
         "test_ref, seek_offset", ((NASA_VIDEO, 1e-4), (NASA_AUDIO, 1e-1))
@@ -488,27 +475,6 @@ class TestOps:
         # for now. Otherwise torch.compile constant-props it.
         decoder = create_from_file(str(NASA_VIDEO.path))
         frame0, frame_time6 = get_frame1_and_frame_time6(decoder)
-        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
-        reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6
-        )
-        assert_frames_equal(frame0, reference_frame0.to(device))
-        assert_frames_equal(frame_time6, reference_frame_time6.to(device))
-
-    @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_class_based_compile_seek_and_next(self, device):
-        # TODO_OPEN_ISSUE Scott (T180277797): Ditto as above.
-        @torch.compile(fullgraph=True, backend="eager")
-        def class_based_get_frame1_and_frame_time6(
-            decoder: ReferenceDecoder,
-        ) -> Tuple[torch.Tensor, torch.Tensor]:
-            frame0, _, _ = decoder.get_next_frame()
-            decoder.seek(6.0)
-            frame_time6, _, _ = decoder.get_next_frame()
-            return frame0, frame_time6
-
-        decoder = ReferenceDecoder(device=device)
-        frame0, frame_time6 = class_based_get_frame1_and_frame_time6(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6

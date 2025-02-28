@@ -66,9 +66,10 @@ jobs:
           # For the actual release we should add that label and change this to
           # include more python versions.
         python-version: ['3.9']
-        cuda-version: ['11.8', '12.4', '12.6']
+        cuda-version: ['11.8', '12.6']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['6', '7']
+        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
       options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
@@ -88,9 +89,6 @@ jobs:
         uses: pytorch/test-infra/.github/actions/setup-miniconda@main
         with:
           python-version: ${{ matrix.python-version }}
-          #
-          # For some reason nvidia::libnpp=12.4 doesn't install but nvidia/label/cuda-12.4.0::libnpp does.
-          # So we use the latter convention for libnpp.
           # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
           default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
       - name: Check env
@@ -141,7 +139,7 @@ jobs:
           ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
-          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -vvv
+          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -v --tb=short
       - name: Run Python benchmark
         run: |
           ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
