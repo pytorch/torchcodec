@@ -1696,16 +1696,12 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
 }
 
 Encoder::~Encoder() {
-  fclose(f_);
   // TODO NEED TO CALL THIS
   //   avformat_free_context(avFormatContext_.get());
 }
 
 Encoder::Encoder(int sampleRate, std::string_view fileName)
     : sampleRate_(sampleRate) {
-  f_ = fopen("./coutput", "wb");
-  TORCH_CHECK(f_, "Could not open file");
-
   AVFormatContext* avFormatContext = nullptr;
   avformat_alloc_output_context2(&avFormatContext, NULL, NULL, fileName.data());
   TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
@@ -1763,46 +1759,38 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   avStream_ = avformat_new_stream(avFormatContext_.get(), NULL);
   TORCH_CHECK(avStream_ != nullptr, "Couldn't create new stream.");
   avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
+}
 
-  AVFrame* avFrame = av_frame_alloc();
+torch::Tensor Encoder::encode(const torch::Tensor& wf) {
+  UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
-  avFrame_.reset(avFrame);
-  avFrame_->nb_samples = avCodecContext_->frame_size;
-  avFrame_->format = avCodecContext_->sample_fmt;
-  avFrame_->sample_rate = avCodecContext_->sample_rate;
-  avFrame_->pts = 0;
-  ffmpegRet =
-      av_channel_layout_copy(&avFrame_->ch_layout, &avCodecContext_->ch_layout);
+  avFrame->nb_samples = avCodecContext_->frame_size;
+  avFrame->format = avCodecContext_->sample_fmt;
+  avFrame->sample_rate = avCodecContext_->sample_rate;
+  avFrame->pts = 0;
+  auto ffmpegRet =
+      av_channel_layout_copy(&avFrame->ch_layout, &avCodecContext_->ch_layout);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Couldn't copy channel layout to avFrame: ",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-  ffmpegRet = av_frame_get_buffer(avFrame_.get(), 0);
+  ffmpegRet = av_frame_get_buffer(avFrame.get(), 0);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Couldn't allocate avFrame's buffers: ",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
-}
 
-torch::Tensor Encoder::encode(const torch::Tensor& wf) {
-  AVPacket* pkt = av_packet_alloc();
-  if (!pkt) {
-    fprintf(stderr, "Could not allocate audio packet\n");
-    exit(1);
-  }
-
-  auto MAX_NUM_BYTES = 10000000; // 10Mb. TODO find a way not to pre-allocate.
-  int numEncodedBytes = 0;
-  torch::Tensor outputTensor = torch::empty({MAX_NUM_BYTES}, torch::kUInt8);
-  uint8_t* pOutputTensor =
-      static_cast<uint8_t*>(outputTensor.data_ptr<uint8_t>());
+  AutoAVPacket autoAVPacket;
 
   uint8_t* pWf = static_cast<uint8_t*>(wf.data_ptr());
-  auto numBytesWeWroteFromWF = 0;
+  auto numChannels = wf.sizes()[0];
+  auto numSamples = wf.sizes()[1]; // per channel
+  auto numEncodedSamples = 0; // per channel
+  auto numSamplesPerFrame =
+      static_cast<long>(avCodecContext_->frame_size); // per channel
   auto numBytesPerSample = wf.element_size();
   auto numBytesPerChannel = wf.sizes()[1] * numBytesPerSample;
-  auto numChannels = wf.sizes()[0];
 
   TORCH_CHECK(
       // TODO is this even true / needed? We can probably support more with
@@ -1814,67 +1802,57 @@ torch::Tensor Encoder::encode(const torch::Tensor& wf) {
       AV_NUM_DATA_POINTERS,
       " channels per frame.");
 
-  auto ffmpegRet = avformat_write_header(avFormatContext_.get(), NULL);
+  ffmpegRet = avformat_write_header(avFormatContext_.get(), NULL);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Error in avformat_write_header: ",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-  // TODO need simpler/cleaner while loop condition.
-  while (numBytesWeWroteFromWF < numBytesPerChannel) {
-    ffmpegRet = av_frame_make_writable(avFrame_.get());
+  while (numEncodedSamples < numSamples) {
+    ffmpegRet = av_frame_make_writable(avFrame.get());
     TORCH_CHECK(
         ffmpegRet == AVSUCCESS,
         "Couldn't make AVFrame writable: ",
         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-    auto numBytesToWrite = numBytesPerSample * avCodecContext_->frame_size;
-    if (numBytesWeWroteFromWF + numBytesToWrite > numBytesPerChannel) {
-      numBytesToWrite = numBytesPerChannel - numBytesWeWroteFromWF;
-    }
+    auto numSamplesToEncode =
+        std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
+    auto numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
     for (int ch = 0; ch < numChannels; ch++) {
       memcpy(
-          avFrame_->data[ch], pWf + ch * numBytesPerChannel, numBytesToWrite);
+          avFrame->data[ch], pWf + ch * numBytesPerChannel, numBytesToEncode);
     }
-    pWf += numBytesToWrite;
-    numBytesWeWroteFromWF += numBytesToWrite;
-    encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, false);
-    avFrame_->pts += avFrame_->nb_samples;
+    pWf += numBytesToEncode;
+    encode_inner_loop(autoAVPacket, avFrame.get());
+
+    avFrame->pts += avFrame->nb_samples;
+    numEncodedSamples += numSamplesToEncode;
   }
-  encode_inner_loop(pkt, pOutputTensor, &numEncodedBytes, true);
+  encode_inner_loop(autoAVPacket, nullptr); // flush
+
+  TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 
   ffmpegRet = av_write_trailer(avFormatContext_.get());
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
-      "Error in : av_write_trailer",
+      "Error in: av_write_trailer",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-  return outputTensor.narrow(
-      /*dim=*/0, /*start=*/0, /*length=*/numEncodedBytes);
-  //   return outputTensor;
+  // TODO handle writing to output uint8 tensor with AVIO logic.
+  return torch::empty({10});
 }
 
-void Encoder::encode_inner_loop(
-    AVPacket* pkt,
-    uint8_t* pOutputTensor,
-    int* numEncodedBytes,
-    bool flush) {
-  int ffmpegRet = 0;
-
-  // TODO ewwww
-  if (flush) {
-    ffmpegRet = avcodec_send_frame(avCodecContext_.get(), nullptr);
-  } else {
-    ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame_.get());
-  }
+void Encoder::encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame) {
+  auto ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Error while sending frame: ",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-  while ((ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), pkt)) >=
-         0) {
+  while (ffmpegRet >= 0) {
+    ReferenceAVPacket packet(autoAVPacket);
+    ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), packet.get());
     if (ffmpegRet == AVERROR(EAGAIN) || ffmpegRet == AVERROR_EOF) {
       // TODO this is from TorchAudio, probably needed, but not sure.
       //   if (ffmpegRet == AVERROR_EOF) {
@@ -1892,23 +1870,16 @@ void Encoder::encode_inner_loop(
         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
     // TODO why are these 2 lines needed??
-    // av_packet_rescale_ts(pkt, avCodecContext_->time_base,
-    // avStream_->time_base);
-    pkt->stream_index = avStream_->index;
-    printf("PACKET PTS %d\n", pkt->pts);
+    av_packet_rescale_ts(
+        packet.get(), avCodecContext_->time_base, avStream_->time_base);
+    packet->stream_index = avStream_->index;
 
-    ffmpegRet = av_interleaved_write_frame(avFormatContext_.get(), pkt);
+    ffmpegRet =
+        av_interleaved_write_frame(avFormatContext_.get(), packet.get());
     TORCH_CHECK(
         ffmpegRet == AVSUCCESS,
         "Error in av_interleaved_write_frame: ",
         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
-
-    fwrite(pkt->data, 1, pkt->size, f_);
-
-    memcpy(pOutputTensor + *numEncodedBytes, pkt->data, pkt->size);
-    *numEncodedBytes += pkt->size;
-
-    av_packet_unref(pkt);
   }
 }
 

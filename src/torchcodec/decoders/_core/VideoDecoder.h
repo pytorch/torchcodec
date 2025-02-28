@@ -557,15 +557,10 @@ class Encoder {
   torch::Tensor encode(const torch::Tensor& wf);
 
  private:
-  void encode_inner_loop(
-      AVPacket* pkt,
-      uint8_t* pOutputTensor,
-      int* numEncodedBytes,
-      bool flush);
+  void encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame);
 
   UniqueAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
-  UniqueAVFrame avFrame_;
   AVStream* avStream_;
 
   // The *output* sample rate. We can't really decide for the user what it
@@ -576,7 +571,6 @@ class Encoder {
   // resample the waveform internally to match them, but that's not in scope for
   // an initial version (if at all).
   int sampleRate_;
-  FILE* f_;
 };
 
 } // namespace facebook::torchcodec
