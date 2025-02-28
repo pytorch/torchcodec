@@ -453,7 +453,7 @@ class VideoDecoder {
 
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
-  UniqueAVFormatContext formatContext_;
+  UniqueAVFormatContextForDecoding formatContext_;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
@@ -559,7 +559,7 @@ class Encoder {
  private:
   void encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame);
 
-  UniqueAVFormatContext avFormatContext_;
+  UniqueAVFormatContextForEncoding avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
   AVStream* avStream_;
 

@@ -41,7 +41,7 @@ int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
 }
 
 struct AVInput {
-  UniqueAVFormatContext formatContext;
+  UniqueAVFormatContextForDecoding formatContext;
   std::unique_ptr<AVIOBytesContext> ioBytesContext;
 };
 
@@ -1695,10 +1695,7 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
       videoStreamOptions.width.value_or(avFrame.width));
 }
 
-Encoder::~Encoder() {
-  // TODO NEED TO CALL THIS
-  //   avformat_free_context(avFormatContext_.get());
-}
+Encoder::~Encoder() {}
 
 Encoder::Encoder(int sampleRate, std::string_view fileName)
     : sampleRate_(sampleRate) {
@@ -1756,6 +1753,9 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
       avCodecContext_->frame_size,
       ". Cannot encode. This should probably never happen?");
 
+  // We're allocating the stream here. Streams are meant to be freed by
+  // avformat_free_context(avFormatContext), which we call in the
+  // avFormatContext_'s destructor.
   avStream_ = avformat_new_stream(avFormatContext_.get(), NULL);
   TORCH_CHECK(avStream_ != nullptr, "Couldn't create new stream.");
   avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
@@ -1829,9 +1829,9 @@ torch::Tensor Encoder::encode(const torch::Tensor& wf) {
     avFrame->pts += avFrame->nb_samples;
     numEncodedSamples += numSamplesToEncode;
   }
-  encode_inner_loop(autoAVPacket, nullptr); // flush
-
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
+
+  encode_inner_loop(autoAVPacket, nullptr); // flush
 
   ffmpegRet = av_write_trailer(avFormatContext_.get());
   TORCH_CHECK(
