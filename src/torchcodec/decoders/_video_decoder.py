@@ -26,7 +26,8 @@ class VideoDecoder:
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
 
-            - If ``str`` or ``Pathlib.path``: a path to a local video file.
+            - If ``str``: a local path or a URL to a video file.
+            - If ``Pathlib.path``: a path to a local video file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
         stream_index (int, optional): Specifies which stream in the video to decode frames from.
             Note that this index is absolute across all media types. If left unspecified, then
