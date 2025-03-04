@@ -93,8 +93,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
 }
 
 TEST(VideoDecoderTest, MissingVideoFileThrowsException) {
-  EXPECT_THROW(
-      VideoDecoder("/this/file/does/not/exist"), std::invalid_argument);
+  EXPECT_THROW(VideoDecoder("/this/file/does/not/exist"), c10::Error);
 }
 
 void dumpTensorToDisk(
