@@ -787,6 +787,22 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     double stopSeconds) {
   validateActiveStream();
 
+  // Because we currently never seek with audio streams, we prevent users from
+  // calling this method twice. We could allow multiple calls in the future.
+  // Assuming 2 consecutive calls:
+  // ```
+  // getFramesPlayedInRange(startSeconds1, stopSeconds1);
+  // getFramesPlayedInRange(startSeconds2, stopSeconds2);
+  // ```
+  // We would need to seek back to 0 iff startSeconds2 <= stopSeconds1. This
+  // logic is not implemented for now, so we just error.
+
+  TORCH_CHECK(
+      streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO ||
+          !alreadyCalledGetFramesPlayedInRange_,
+      "Can only decode once with audio stream. Re-create a decoder object if needed.")
+  alreadyCalledGetFramesPlayedInRange_ = true;
+
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
@@ -869,30 +885,6 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   desiredPtsSeconds_ = seconds;
 }
 
-bool VideoDecoder::canWeAvoidSeekingAudio(double desiredPtsSeconds) const {
-  const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
-  int64_t targetPts = *desiredPtsSeconds_ * streamInfo.timeBase.den;
-  int64_t lastDecodedAvFramePts = streamInfo.lastDecodedAvFramePts;
-
-  if (targetPts <= lastDecodedAvFramePts) {
-    return false;
-  }
-
-  // We can skip seeking if we want to decoder frame `i` and we just decoded
-  // frame `i - 1`. Note this involves a `log(numFrames)` complexity for each
-  // decoded frame.
-  // TODO we should bypass this log(numFrames) logic when calling range APIs
-  // where the step is 1, because we are sure in this case that all frames
-  // (except the first one) are consecutive. See a POC at
-  // https://github.com/pytorch/torchcodec/pull/514
-  double lastDecodedAvFramePtsSeconds =
-      ptsToSeconds(lastDecodedAvFramePts, streamInfo.timeBase);
-  int64_t lastDecodedAvFrameIndex =
-      secondsToIndexLowerBound(lastDecodedAvFramePtsSeconds);
-  int64_t targetFrameIndex = secondsToIndexLowerBound(desiredPtsSeconds);
-  return (lastDecodedAvFrameIndex + 1 == targetFrameIndex);
-}
-
 /*
 Videos have I frames and non-I frames (P and B frames). Non-I frames need data
 from the previous I frame to be decoded.
@@ -918,9 +910,13 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
-bool VideoDecoder::canWeAvoidSeekingVideo(int64_t targetPts) const {
-  int64_t lastDecodedAvFramePts =
-      streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
+bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
+  const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
+    return true;
+  }
+
+  int64_t lastDecodedAvFramePts = streamInfo.lastDecodedAvFramePts;
   if (targetPts < lastDecodedAvFramePts) {
     // We can never skip a seek if we are seeking backwards.
     return false;
@@ -954,16 +950,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
   decodeStats_.numSeeksAttempted++;
 
-  // TODO_CODE_QUALITY The different signature is unfortunate
-  bool canAvoidSeeking = false;
-  auto avMediaType = streamInfos_.at(activeStreamIndex_).avMediaType;
-  if (avMediaType == AVMEDIA_TYPE_AUDIO) {
-    canAvoidSeeking = canWeAvoidSeekingAudio(*desiredPtsSeconds_);
-  } else {
-    canAvoidSeeking = canWeAvoidSeekingVideo(desiredPts);
-  }
-
-  if (canAvoidSeeking) {
+  if (canWeAvoidSeeking(desiredPts)) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
@@ -973,83 +960,11 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   // the key frame that we want to seek to.
   // See https://github.com/pytorch/torchcodec/issues/179 for more details.
   // See https://trac.ffmpeg.org/ticket/11137 for the underlying ffmpeg bug.
-  if (avMediaType == AVMEDIA_TYPE_VIDEO && !streamInfo.keyFrames.empty()) {
+  if (!streamInfo.keyFrames.empty()) {
     int desiredKeyFrameIndex = getKeyFrameIndexForPtsUsingScannedIndex(
         streamInfo.keyFrames, desiredPts);
     desiredKeyFrameIndex = std::max(desiredKeyFrameIndex, 0);
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
-  }
-
-  if (avMediaType == AVMEDIA_TYPE_AUDIO) {
-    desiredPts -= 1;
-    // Note [Seek offset for audio]
-    //
-    // There is a strange FFmpeg behavior when decoding audio frames: seeking at
-    // a frame start and then flushing buffers with avcodec_flush_buffers (as is
-    // recommended by the FFmpeg docs) leads to the samples to be decoded
-    // incorrectly. It's difficult to really determine what's going on, but the
-    // fact is that there exist a data dependency between frames: for frame `i`
-    // to be correct, then the packet of frame `i-1` needs to be sent to the
-    // decoder, and there must be no flushing in-between. The naive (and
-    // incorrect) fix of just *not* flushing only works when we're decoding
-    // consecutive frames, but fails when decoding non-consecutive frames. We
-    // try to mitigate this issue via two different means:
-    // - A. We try to avoid seeking (and thus flushing) as much as possible.
-    //   Typically, we don't need to seek if we want frame `i` and we just
-    //   decoded frame `i - 1`: we just need to return the next frame. This
-    //   happens in the logic of `canWeAvoidSeekingAudio()`.
-    // - B. Instead of seeking to desiredPts, we seek to desiredPts - 1.
-    //   Effectively, this leads us to decode frame `i-1` before decoding frame
-    //   `i`. Our `filterFunction` logic in `decodeAVFrame()` ensures that we
-    //   are returning frame `i` (and not `i - 1`), and because we just decoded
-    //   frame `i-1`, frame `i` is correct.
-    //
-    // Strategy B works most of the time: in most decoding APIs, we first
-    // convert a frame's pts to an index, and then use that corresponding
-    // index's pts to decide where to seek. This means that `desiredPts` usually
-    // lands *exactly* where frame `i` starts, and `desiredPts - 1` is the last
-    // pts of frame `i-1`, so we do end up seeking (as desired) to frame `i-1`.
-    // But, there are cases where this offset trick won't work: if `desiredPts`
-    // isn't exactly at a frame's beginning. This corresponds to the following
-    // scenarios:
-    // - When calling any API in approximate mode *and* if the framerate isn't
-    //   constant. Because the framerate isn't constant, it's likely that the
-    //   index won't be correct, and that the index -> pts conversion won't land
-    //   exactly at a frame start either.
-    // - When calling `getFramePlayedAt(pts)`, regardless of the mode, if `pts`
-    //   doesn't land exactly at a frame's start. We have tests that currently
-    //   exhibit this behavior: test_get_frame_at_pts_audio_bad(). The "obvious"
-    //   fix for this is to let `getFramePlayedAt` convert the pts to an index,
-    //   just like the rest of the APIs.
-    //
-    // TODO HOW DO WE ADDRESS THIS??
-    //
-    // A few more notes:
-    // - This offset trick does work for the first frame at pts=0: we'll seek to
-    //   -1, and this leads to a first packet with pts=-1024 to be sent to the
-    //   decoder (on our test data), leading to frame 0 to be correctly decoded.
-    // - The data dependency / buffer flushing issue can be observed on
-    //   compressed formats like aac or mp3. It doesn't happen on uncompressed
-    //   formats like wav, where the decoder's buffers are likely unused. We
-    //   could skip this entire logic for such formats.
-    // - All this *seems* to be related to this 13yo+ issue:
-    //   https://stackoverflow.com/questions/7989623/ffmpeg-seeking-brings-audio-artifacts
-    //   But according to the thread, the problem there (which has been fixed)
-    //   seemed to be **lack** of flushing.
-    // - So far we have only observed a data-dependency of 1 frame: we need to
-    //   decode frame `i-1`  to decode `i`. It's possible that there exist
-    //   longer data dependencies of more than 1 frame on other videos /
-    //   formats. We just haven't observed those yet. If this happens to be the
-    //   case, then we have a much harder problem to solve.
-    // - This weird FFmpeg behavior is observable not just in Torchcodec, it
-    //   really seems to be an FFmpeg thing. Other decoders have the same
-    //   problem, like the ones in TorchVision. Those who do not exhibit this
-    //   behavior are solving it in inefficient ways: Decord effectively decodes
-    //   and caches the *entire* file when it is created, thus resolving the
-    //   data dependency. Similarly, TorchAudio effectively always decodes all
-    //   frames up to frame `i`, even after seeking to frame `i`, because it
-    //   sets the 'backwards' flag when it calls `av_seek_frame`: it actually
-    //   always seeks back to the beginning.
   }
 
   int ffmepgStatus = avformat_seek_file(
@@ -1130,6 +1045,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
       if (ffmpegStatus == AVERROR_EOF) {
         // End of file reached. We must drain the codec by sending a nullptr
         // packet.
+
         ffmpegStatus = avcodec_send_packet(
             streamInfo.codecContext.get(),
             /*avpkt=*/nullptr);

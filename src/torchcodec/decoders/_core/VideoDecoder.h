@@ -365,8 +365,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeekingVideo(int64_t targetPts) const;
-  bool canWeAvoidSeekingAudio(double desiredPtsSeconds) const;
+  bool canWeAvoidSeeking(int64_t targetPts) const;
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -487,6 +486,7 @@ class VideoDecoder {
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
+  bool alreadyCalledGetFramesPlayedInRange_ = false;
 };
 
 // --------------------------------------------------------------------------

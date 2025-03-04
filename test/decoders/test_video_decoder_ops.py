@@ -638,6 +638,94 @@ class TestOps:
         ):
             method(decoder)
 
+    @pytest.mark.parametrize(
+        "start_seconds, stop_seconds",
+        (
+            # Beginning to end
+            (0, 13.05),
+            # At frames boundaries. Frame duration is exactly 0.064 seconds for
+            # NASA_AUDIO. Need artifial -1e-5 for upper-bound to align the
+            # reference_frames with the frames returned by the decoder, where
+            # the interval is half-open.
+            (0.064 * 4, 0.064 * 20 - 1e-5),
+            # Not at frames boundaries
+            (2, 4),
+        ),
+    )
+    def test_audio_get_frames_by_pts_in_range(self, start_seconds, stop_seconds):
+        decoder = create_from_file(str(NASA_AUDIO.path))
+        add_audio_stream(decoder)
+
+        reference_frames = NASA_AUDIO.get_frame_data_by_range(
+            start=NASA_AUDIO.pts_to_frame_index(start_seconds),
+            stop=NASA_AUDIO.pts_to_frame_index(stop_seconds) + 1,
+        )
+        frames, _, _ = get_frames_by_pts_in_range(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+
+        assert_frames_equal(frames, reference_frames)
+
+    def test_audio_get_frames_by_pts_in_range_multiple_calls(self):
+        decoder = create_from_file(str(NASA_AUDIO.path))
+        add_audio_stream(decoder)
+
+        get_frames_by_pts_in_range(decoder, start_seconds=0, stop_seconds=1)
+        with pytest.raises(
+            RuntimeError, match="Can only decode once with audio stream"
+        ):
+            get_frames_by_pts_in_range(decoder, start_seconds=0, stop_seconds=1)
+
+    def test_audio_seek_and_next(self):
+        decoder = create_from_file(str(NASA_AUDIO.path))
+        add_audio_stream(decoder)
+
+        pts = 2
+        # Need +1 because we're not at frames boundaries
+        reference_frame = NASA_AUDIO.get_frame_data_by_index(
+            NASA_AUDIO.pts_to_frame_index(pts) + 1
+        )
+        seek_to_pts(decoder, pts)
+        frame, _, _ = get_next_frame(decoder)
+        assert_frames_equal(frame, reference_frame)
+
+        # Seeking forward is OK
+        pts = 4
+        reference_frame = NASA_AUDIO.get_frame_data_by_index(
+            NASA_AUDIO.pts_to_frame_index(pts) + 1
+        )
+        seek_to_pts(decoder, pts)
+        frame, _, _ = get_next_frame(decoder)
+        assert_frames_equal(frame, reference_frame)
+
+        # Seeking backwards doesn't error, but it's wrong. See TODO in
+        # `seek_to_pts` op.
+        prev_pts = pts
+        pts = 1
+        seek_to_pts(decoder, pts)
+        frame, _, _ = get_next_frame(decoder)
+        # the decoder actually didn't seek, so the frame we're getting is just
+        # the "next: one without seeking. This assertion exists to illutrate
+        # what currently hapens, but it's obviously *wrong*.
+        reference_frame = NASA_AUDIO.get_frame_data_by_index(
+            NASA_AUDIO.pts_to_frame_index(prev_pts) + 2
+        )
+        assert_frames_equal(frame, reference_frame)
+
+    # def test_audio_seek_and_next_backwards(self):
+    #     decoder = create_from_file(str(NASA_AUDIO.path))
+    #     add_audio_stream(decoder)
+
+    #     for pts in (4.5, 2):
+    #         # Need +1 because we're not at frames boundaries
+    #         reference_frame = NASA_AUDIO.get_frame_data_by_index(NASA_AUDIO.pts_to_frame_index(pts) + 1)
+    #         seek_to_pts(decoder, pts)
+    #         frame, _, _ = get_next_frame(decoder)
+    #         # assert_frames_equal(frame, reference_frame)
+
+    #     reference_frame = NASA_AUDIO.get_frame_data_by_index(NASA_AUDIO.pts_to_frame_index(4.5) + 2)
+    #     assert_frames_equal(frame, reference_frame)
+
 
 if __name__ == "__main__":
     pytest.main()

@@ -232,6 +232,13 @@ void add_audio_stream(
 }
 
 void seek_to_pts(at::Tensor& decoder, double seconds) {
+  // TODO we should prevent more than one call to this op for audio streams, for
+  // the same reasons we do so for getFramesPlayedInRange(). But we can't
+  // implement the logic here, because we don't know media type (audio vs
+  // video). We also can't do it within setCursorPtsInSeconds because it's used
+  // by all other decoding methods.
+  // This isn't un-doable, just not easy with the API we currently have.
+
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   videoDecoder->setCursorPtsInSeconds(seconds);
 }

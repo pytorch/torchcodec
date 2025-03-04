@@ -356,6 +356,13 @@ class TestAudio(TestContainerFile):
 
         return self._reference_frames[idx]
 
+    def pts_to_frame_index(self, pts_seconds: float) -> int:
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
+        # of the 204 frames contains 1024 samples.
+        # TODO make this more generic
+        frame_duration_seconds = 0.064
+        return int(pts_seconds // frame_duration_seconds)
+
     # TODO: this shouldn't be named chw. Also values are hard-coded
     @property
     def empty_chw_tensor(self) -> torch.Tensor:
