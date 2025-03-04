@@ -34,10 +34,10 @@ class VideoDecoder {
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // Creates a VideoDecoder from a given buffer. Note that the buffer is not
-  // owned by the VideoDecoder.
+  // Creates a VideoDecoder from a given buffer of data. Note that the data is
+  // not owned by the VideoDecoder.
   explicit VideoDecoder(
-      const void* buffer,
+      const void* data,
       size_t length,
       SeekMode seekMode = SeekMode::exact);
 
