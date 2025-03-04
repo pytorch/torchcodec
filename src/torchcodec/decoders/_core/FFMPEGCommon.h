@@ -155,7 +155,7 @@ struct AVIOBufferData {
 // memory buffer that is passed in.
 class AVIOBytesContext {
  public:
-  AVIOBytesContext(const void* data, size_t data_size, size_t tempBufferSize);
+  AVIOBytesContext(const void* data, size_t dataSize, size_t bufferSize);
   ~AVIOBytesContext();
 
   // Returns the AVIOContext that can be passed to FFMPEG.
