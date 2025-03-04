@@ -606,6 +606,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   auto frameOutput = getFrameAtIndexInternal(frameIndex);
   frameOutput.data = maybePermuteOutputTensor(frameOutput.data);
   return frameOutput;
@@ -614,8 +615,6 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateActiveStream();
-
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -628,7 +627,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     const std::vector<int64_t>& frameIndices) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   auto indicesAreSorted =
       std::is_sorted(frameIndices.begin(), frameIndices.end());
@@ -685,7 +684,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
 
 VideoDecoder::FrameBatchOutput
 VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -714,6 +713,7 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   double frameStartTime =
       ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
@@ -754,7 +754,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
     const std::vector<double>& timestamps) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -1845,7 +1845,8 @@ double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
 // VALIDATION UTILS
 // --------------------------------------------------------------------------
 
-void VideoDecoder::validateActiveStream() {
+void VideoDecoder::validateActiveStream(
+    std::optional<AVMediaType> avMediaType) {
   auto errorMsg =
       "Provided stream index=" + std::to_string(activeStreamIndex_) +
       " was not previously added.";
@@ -1859,6 +1860,12 @@ void VideoDecoder::validateActiveStream() {
       "Invalid stream index=" + std::to_string(activeStreamIndex_) +
           "; valid indices are in the range [0, " +
           std::to_string(allStreamMetadataSize) + ").");
+
+  if (avMediaType.has_value()) {
+    TORCH_CHECK(
+        streamInfos_[activeStreamIndex_].avMediaType == avMediaType.value(),
+        "The method you called doesn't support the media type (audio or video)");
+  }
 }
 
 void VideoDecoder::validateScannedAllStreams(const std::string& msg) {

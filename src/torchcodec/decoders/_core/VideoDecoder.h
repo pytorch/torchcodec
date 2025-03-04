@@ -459,7 +459,8 @@ class VideoDecoder {
   // VALIDATION UTILS
   // --------------------------------------------------------------------------
 
-  void validateActiveStream();
+  void validateActiveStream(
+      std::optional<AVMediaType> avMediaType = std::nullopt);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
       const StreamMetadata& streamMetadata,
