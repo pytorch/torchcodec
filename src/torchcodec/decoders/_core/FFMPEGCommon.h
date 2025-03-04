@@ -49,9 +49,12 @@ struct Deleter {
 };
 
 // Unique pointers for FFMPEG structures.
-using UniqueAVFormatContext = std::unique_ptr<
+using UniqueAVFormatContextForDecoding = std::unique_ptr<
     AVFormatContext,
     Deleterp<AVFormatContext, void, avformat_close_input>>;
+using UniqueAVFormatContextForEncoding = std::unique_ptr<
+    AVFormatContext,
+    Deleter<AVFormatContext, void, avformat_free_context>>;
 using UniqueAVCodecContext = std::unique_ptr<
     AVCodecContext,
     Deleterp<AVCodecContext, void, avcodec_free_context>>;
