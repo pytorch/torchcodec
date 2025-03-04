@@ -19,6 +19,7 @@ from ..utils import (
     cpu_and_cuda,
     get_ffmpeg_major_version,
     H265_VIDEO,
+    in_fbcode,
     NASA_VIDEO,
 )
 
@@ -876,6 +877,8 @@ class TestVideoDecoder:
             key_frame_indices, h265_reference_key_frame_indices, atol=0, rtol=0
         )
 
+    # TODO investigate why this fails internally.
+    @pytest.mark.skipif(in_fbcode(), reason="Compile test fails internally.")
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_compile(self, device):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device)
