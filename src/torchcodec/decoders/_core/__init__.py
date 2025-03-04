@@ -15,6 +15,7 @@ from .video_decoder_ops import (
     _add_video_stream,
     _get_key_frame_indices,
     _test_frame_pts_equality,
+    add_audio_stream,
     add_video_stream,
     create_from_bytes,
     create_from_file,

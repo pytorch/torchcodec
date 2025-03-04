@@ -139,9 +139,7 @@ class VideoDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStreamDecoder(
-      int streamIndex,
-      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
+  void addAudioStream(int streamIndex);
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -168,6 +166,10 @@ class VideoDecoder {
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
+    explicit FrameBatchOutput(
+        int64_t numFrames,
+        int64_t numChannels,
+        int64_t numSamples);
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
@@ -322,6 +324,8 @@ class VideoDecoder {
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
+    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
 
@@ -361,7 +365,8 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeeking(int64_t targetPts) const;
+  bool canWeAvoidSeekingVideo(int64_t targetPts) const;
+  bool canWeAvoidSeekingAudio(double desiredPtsSeconds) const;
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -370,6 +375,7 @@ class VideoDecoder {
   FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  torch::Tensor maybePermuteOutputTensor(torch::Tensor& outputTensor);
   torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
 
   FrameOutput convertAVFrameToFrameOutput(
@@ -381,11 +387,18 @@ class VideoDecoder {
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  void convertAudioAVFrameToFrameOutputOnCPU(
+      AVFrameStream& avFrameStream,
+      FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
+
+  FrameBatchOutput makeFrameBatchOutput(int64_t numFrames);
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
@@ -414,7 +427,7 @@ class VideoDecoder {
       const std::vector<VideoDecoder::FrameInfo>& keyFrames,
       int64_t pts) const;
 
-  int64_t secondsToIndexLowerBound(double seconds);
+  int64_t secondsToIndexLowerBound(double seconds) const;
 
   int64_t secondsToIndexUpperBound(double seconds);
 
@@ -423,6 +436,11 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
+
+  void addStream(
+      int streamIndex,
+      AVMediaType mediaType,
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
