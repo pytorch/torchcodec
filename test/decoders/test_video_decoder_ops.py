@@ -18,7 +18,6 @@ import torch
 from torchcodec.decoders._core import (
     _add_video_stream,
     _test_frame_pts_equality,
-    add_audio_stream,
     add_video_stream,
     create_from_bytes,
     create_from_file,
@@ -45,87 +44,33 @@ from ..utils import (
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
 
-# this is the index of the frame that gets decoded after we
-# seek to pts_seconds=6. This isn't the frame "played at" pts_seconds=6
-INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6 = 180
-INDEX_OF_AUDIO_FRAME_AFTER_SEEKING_AT_6 = 94
-
-
-def _add_stream(*, decoder, test_ref, device="cpu"):
-    if test_ref is NASA_VIDEO:
-        add_video_stream(decoder, device=device)
-    elif test_ref is NASA_AUDIO:
-        add_audio_stream(decoder)
-    else:
-        raise ValueError("Can't add a stream for this test reference.")
+INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
 class TestOps:
-    def test_add_stream(self):
-        valid_video_stream, valid_audio_stream = 0, 1
-
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        add_video_stream(decoder, stream_index=valid_video_stream)
-        with pytest.raises(RuntimeError, match="Can only add one single stream"):
-            add_video_stream(decoder, stream_index=valid_video_stream)
-
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        add_audio_stream(decoder, stream_index=valid_audio_stream)
-        with pytest.raises(RuntimeError, match="Can only add one single stream"):
-            add_audio_stream(decoder, stream_index=valid_audio_stream)
-
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        with pytest.raises(
-            ValueError, match=f"Is {valid_audio_stream} of the desired media type"
-        ):
-            add_video_stream(decoder, stream_index=valid_audio_stream)
-
-        decoder = create_from_file(str(NASA_VIDEO.path))
-        with pytest.raises(
-            ValueError, match=f"Is {valid_video_stream} of the desired media type"
-        ):
-            add_audio_stream(decoder, stream_index=valid_video_stream)
-
-    @pytest.mark.parametrize(
-        "test_ref, index_of_frame_after_seeking_at_6",
-        (
-            (NASA_VIDEO, INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6),
-            (NASA_AUDIO, INDEX_OF_AUDIO_FRAME_AFTER_SEEKING_AT_6),
-        ),
-    )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_seek_and_next(
-        self, test_ref, index_of_frame_after_seeking_at_6, device, seek_mode
-    ):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_seek_and_next(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)
-        reference_frame0 = test_ref.get_frame_data_by_index(0)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
-        reference_frame1 = test_ref.get_frame_data_by_index(1)
+        reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         frame1, _, _ = get_next_frame(decoder)
         assert_frames_equal(frame1, reference_frame1.to(device))
         seek_to_pts(decoder, 6.0)
         frame_time6, _, _ = get_next_frame(decoder)
-        reference_frame_time6 = test_ref.get_frame_data_by_index(
-            index_of_frame_after_seeking_at_6
+        reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_seek_to_negative_pts(self, test_ref, device, seek_mode):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_seek_to_negative_pts(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)
-        reference_frame0 = test_ref.get_frame_data_by_index(0)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
 
         seek_to_pts(decoder, -1e-4)
@@ -133,16 +78,14 @@ class TestOps:
         assert_frames_equal(frame0, reference_frame0.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frame_at_pts_video(self, device, seek_mode):
-
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
-        add_video_stream(decoder=decoder, device=device)
+    def test_get_frame_at_pts(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
         frame6, _, _ = get_frame_at_pts(decoder, 6.006)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6
+            INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame6, reference_frame6.to(device))
         frame6, _, _ = get_frame_at_pts(decoder, 6.02)
@@ -158,114 +101,48 @@ class TestOps:
             with pytest.raises(AssertionError):
                 assert_frames_equal(next_frame, reference_frame6.to(device))
 
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frame_at_pts_audio(self, seek_mode):
-        decoder = create_from_file(str(NASA_AUDIO.path), seek_mode=seek_mode)
-        add_audio_stream(decoder=decoder)
-        # This frame has pts=6.016 and duration=0.064 , so it should be played
-        # at timestamps in the range [6.016, 6.08) (not including the last timestamp).
-        frame6, _, _ = get_frame_at_pts(decoder, 6.016)
-        reference_frame6 = NASA_AUDIO.get_frame_data_by_index(
-            INDEX_OF_AUDIO_FRAME_AFTER_SEEKING_AT_6
-        )
-        assert_frames_equal(frame6, reference_frame6)
-        frame6, _, _ = get_frame_at_pts(decoder, 6.05)
-        assert_frames_equal(frame6, reference_frame6)
-        frame6, _, _ = get_frame_at_pts(decoder, 6.07999)
-        assert_frames_equal(frame6, reference_frame6)
-        # Note that this timestamp is exactly on a frame boundary, so it should
-        # return the next frame since the right boundary of the interval is
-        # open.
-        next_frame, _, _ = get_frame_at_pts(decoder, 6.08)
-        with pytest.raises(AssertionError):
-            assert_frames_equal(next_frame, reference_frame6)
-
-    def test_get_frame_at_pts_audio_bad(self):
-        decoder = create_from_file(str(NASA_AUDIO.path))
-        add_audio_stream(decoder=decoder)
-
-        reference_frame6 = NASA_AUDIO.get_frame_data_by_index(
-            INDEX_OF_AUDIO_FRAME_AFTER_SEEKING_AT_6
-        )
-        frame6, _, _ = get_frame_at_pts(decoder, 6.05)
-        # See Note [Seek offset for audio].
-        # The frame played at 6.05 should be the reference frame, but because
-        # 6.05 isn't exactly the beginning of that frame, the samples are
-        # decoded incorrectly.
-        # TODO Fix this.
-        with pytest.raises(AssertionError):
-            assert_frames_equal(frame6, reference_frame6)
-
-        # And yet another quirk: if we try to decode it again, we actually end
-        # up with the samples being correctly decoded. This is because we have a
-        # custom logic within getFramePlayedAt() that resets desiredPts to the
-        # pts of the beginning of the frame in some very specific cases.
-        frame6, _, _ = get_frame_at_pts(decoder, 6.05)
-        assert_frames_equal(frame6, reference_frame6)
-
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frame_at_index(self, test_ref, device, seek_mode):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_get_frame_at_index(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         frame0, _, _ = get_frame_at_index(decoder, frame_index=0)
-        reference_frame0 = test_ref.get_frame_data_by_index(0)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
         # The frame that is played at 6 seconds is frame 180 from a 0-based index.
         frame6, _, _ = get_frame_at_index(decoder, frame_index=180)
-        reference_frame6 = test_ref.get_frame_data_by_index(180)
+        reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
         assert_frames_equal(frame6, reference_frame6.to(device))
 
-    @pytest.mark.parametrize(
-        "test_ref, expected_pts, expected_duration",
-        (
-            (NASA_VIDEO, 6.006, 0.03337),
-            (NASA_AUDIO, 11.52, 0.064),
-        ),
-    )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frame_with_info_at_index(
-        self, test_ref, expected_pts, expected_duration, device, seek_mode
-    ):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_get_frame_with_info_at_index(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         frame6, pts, duration = get_frame_at_index(decoder, frame_index=180)
-        reference_frame6 = test_ref.get_frame_data_by_index(180)
+        reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
         assert_frames_equal(frame6, reference_frame6.to(device))
-        assert pts.item() == pytest.approx(expected_pts, rel=1e-3)
-        assert duration.item() == pytest.approx(expected_duration, rel=1e-3)
+        assert pts.item() == pytest.approx(6.006, rel=1e-3)
+        assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frames_at_indices(self, test_ref, device, seek_mode):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_get_frames_at_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
-        reference_frame0 = test_ref.get_frame_data_by_index(0)
-        reference_frame180 = test_ref.get_frame_data_by_index(180)
-
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
         assert_frames_equal(frames0and180[0], reference_frame0.to(device))
         assert_frames_equal(frames0and180[1], reference_frame180.to(device))
 
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frames_at_indices_unsorted_indices(self, test_ref, device, seek_mode):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_get_frames_at_indices_unsorted_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, device=device)
 
         frame_indices = [2, 0, 1, 0, 2]
 
@@ -290,10 +167,9 @@ class TestOps:
             assert_frames_equal(frames[0], frames[-1])
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frames_by_pts(self, device, seek_mode):
-        decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
-        _add_video_stream(decoder=decoder, device=device)
+    def test_get_frames_by_pts(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        _add_video_stream(decoder, device=device)
 
         # Note: 13.01 should give the last video frame for the NASA video
         timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
@@ -301,11 +177,11 @@ class TestOps:
         expected_frames = [
             get_frame_at_pts(decoder, seconds=pts)[0] for pts in timestamps
         ]
+
         frames, *_ = get_frames_by_pts(
             decoder,
             timestamps=timestamps,
         )
-
         for frame, expected_frame in zip(frames, expected_frames):
             assert_frames_equal(frame, expected_frame)
 
@@ -318,24 +194,19 @@ class TestOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
 
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_pts_apis_against_index_ref(self, test_ref, device):
+    def test_pts_apis_against_index_ref(self, device):
         # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
         # APIs exactly where those frames are supposed to start. We assert that
         # we get the expected frame.
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
 
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
         num_frames = metadata_dict["numFrames"]
         assert num_frames == 390
-        if test_ref is NASA_AUDIO:
-            num_frames = 204
 
         _, all_pts_seconds_ref, _ = zip(
             *[
@@ -378,83 +249,67 @@ class TestOps:
         )
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
-    @pytest.mark.parametrize("test_ref", (NASA_VIDEO, NASA_AUDIO))
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_get_frames_in_range(self, test_ref, device, seek_mode):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path), seek_mode=seek_mode)
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_get_frames_in_range(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
 
         # ensure that the degenerate case of a range of size 1 works
-        ref_frame0 = test_ref.get_frame_data_by_range(0, 1)
+        ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
         bulk_frame0, *_ = get_frames_in_range(decoder, start=0, stop=1)
         assert_frames_equal(bulk_frame0, ref_frame0.to(device))
 
-        ref_frame1 = test_ref.get_frame_data_by_range(1, 2)
+        ref_frame1 = NASA_VIDEO.get_frame_data_by_range(1, 2)
         bulk_frame1, *_ = get_frames_in_range(decoder, start=1, stop=2)
         assert_frames_equal(bulk_frame1, ref_frame1.to(device))
 
-        last_index = 389 if test_ref is NASA_VIDEO else 203  # TODO ew
-        ref_frame389 = test_ref.get_frame_data_by_range(last_index, last_index + 1)
-        bulk_frame389, *_ = get_frames_in_range(
-            decoder, start=last_index, stop=last_index + 1
-        )
+        ref_frame389 = NASA_VIDEO.get_frame_data_by_range(389, 390)
+        bulk_frame389, *_ = get_frames_in_range(decoder, start=389, stop=390)
         assert_frames_equal(bulk_frame389, ref_frame389.to(device))
 
         # contiguous ranges
-        ref_frames0_9 = test_ref.get_frame_data_by_range(0, 9)
+        ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
         bulk_frames0_9, *_ = get_frames_in_range(decoder, start=0, stop=9)
         assert_frames_equal(bulk_frames0_9, ref_frames0_9.to(device))
 
-        ref_frames4_8 = test_ref.get_frame_data_by_range(4, 8)
+        ref_frames4_8 = NASA_VIDEO.get_frame_data_by_range(4, 8)
         bulk_frames4_8, *_ = get_frames_in_range(decoder, start=4, stop=8)
         assert_frames_equal(bulk_frames4_8, ref_frames4_8.to(device))
 
         # ranges with a stride
-        ref_frames15_35 = test_ref.get_frame_data_by_range(15, 36, 5)
+        ref_frames15_35 = NASA_VIDEO.get_frame_data_by_range(15, 36, 5)
         bulk_frames15_35, *_ = get_frames_in_range(decoder, start=15, stop=36, step=5)
         assert_frames_equal(bulk_frames15_35, ref_frames15_35.to(device))
 
-        ref_frames0_9_2 = test_ref.get_frame_data_by_range(0, 9, 2)
+        ref_frames0_9_2 = NASA_VIDEO.get_frame_data_by_range(0, 9, 2)
         bulk_frames0_9_2, *_ = get_frames_in_range(decoder, start=0, stop=9, step=2)
         assert_frames_equal(bulk_frames0_9_2, ref_frames0_9_2.to(device))
 
         # an empty range is valid!
         empty_frame, *_ = get_frames_in_range(decoder, start=5, stop=5)
-        assert_frames_equal(empty_frame, test_ref.empty_chw_tensor.to(device))
+        assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
-    @pytest.mark.parametrize(
-        "test_ref, last_frame_index", ((NASA_VIDEO, 289), (NASA_AUDIO, 203))
-    )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_throws_exception_at_eof(self, test_ref, last_frame_index, device):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
+    def test_throws_exception_at_eof(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
 
-        decoder = create_from_file(str(test_ref.path))
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
-        reference_last_frame = test_ref.get_frame_data_by_index(last_frame_index)
+        reference_last_frame = NASA_VIDEO.get_frame_data_by_index(289)
         assert_frames_equal(last_frame, reference_last_frame.to(device))
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
+
         with pytest.raises(IndexError, match="no more frames"):
             get_frame_at_pts(decoder, seconds=1000.0)
 
-    @pytest.mark.parametrize(
-        "test_ref, seek_offset", ((NASA_VIDEO, 1e-4), (NASA_AUDIO, 1e-1))
-    )
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_throws_exception_if_seek_too_far(self, test_ref, seek_offset, device):
-        if device == "cuda" and test_ref is NASA_AUDIO:
-            pytest.skip(reason="CUDA decoding not supported for audio")
-        decoder = create_from_file(str(test_ref.path))
-        _add_stream(decoder=decoder, test_ref=test_ref, device=device)
+    def test_throws_exception_if_seek_too_far(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
         # pts=12.979633 is the last frame in the video.
-        seek_to_pts(decoder, 12.979633 + seek_offset)
+        seek_to_pts(decoder, 12.979633 + 1.0e-4)
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
@@ -477,7 +332,7 @@ class TestOps:
         frame0, frame_time6 = get_frame1_and_frame_time6(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6
+            INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame0, reference_frame0.to(device))
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
@@ -507,7 +362,7 @@ class TestOps:
         seek_to_pts(decoder, 6.0)
         frame_time6, _, _ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6
+            INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
@@ -539,7 +394,6 @@ class TestOps:
         assert metadata_dict["minPtsSecondsFromScan"] == 0
         assert metadata_dict["maxPtsSecondsFromScan"] == 13.013
 
-    # TODO: Not sure whether this test still makes a lot of sense
     def test_audio_get_json_metadata(self):
         decoder = create_from_file(str(NASA_AUDIO.path))
         metadata = get_json_metadata(decoder)
@@ -557,12 +411,9 @@ class TestOps:
         assert ffmpeg_dict["libavutil"][0] > 50
         assert "ffmpeg_version" in ffmpeg_dict
 
-    @pytest.mark.parametrize(
-        "test_ref, num_frames", ((NASA_VIDEO, 390), (NASA_AUDIO, 204))
-    )
-    def test_frame_pts_equality(self, test_ref, num_frames):
-        decoder = create_from_file(str(test_ref.path))
-        _add_stream(decoder=decoder, test_ref=test_ref)
+    def test_frame_pts_equality(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder)
 
         # Note that for all of these tests, we store the return value of
         # _test_frame_pts_equality() into a boolean variable, and then do the assertion
@@ -572,8 +423,8 @@ class TestOps:
 
         # If this fails, there's a good chance that we accidentally truncated a 64-bit
         # floating point value to a 32-bit floating value.
-        for i in range(num_frames):
-            _, pts, _ = get_frame_at_index(decoder, frame_index=i)
+        for i in range(390):
+            frame, pts, _ = get_frame_at_index(decoder, frame_index=i)
             pts_is_equal = _test_frame_pts_equality(
                 decoder, frame_index=i, pts_seconds_to_test=pts.item()
             )
@@ -592,7 +443,7 @@ class TestOps:
         seek_to_pts(decoder, 6.0)
         frame_time6, *_ = get_next_frame(decoder)
         reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
-            INDEX_OF_VIDEO_FRAME_AFTER_SEEKING_AT_6
+            INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame_time6, reference_frame_time6)
 
@@ -765,106 +616,6 @@ class TestOps:
         assert pts == torch.tensor([0])
         torch.testing.assert_close(
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
-        )
-
-    def test_get_same_frame_twice(self):
-        # Non-regression tests that were useful while developing audio support.
-        def make_decoder():
-            decoder = create_from_file(str(NASA_AUDIO.path))
-            add_audio_stream(decoder)
-            return decoder
-
-        for frame_index in (0, 10, 15):
-            ref = NASA_AUDIO.get_frame_data_by_index(frame_index)
-
-            decoder = make_decoder()
-            a = get_frame_at_index(decoder, frame_index=frame_index)
-            b = get_frame_at_index(decoder, frame_index=frame_index)
-            torch.testing.assert_close(a, b)
-            torch.testing.assert_close(a[0], ref)
-
-            decoder = make_decoder()
-            a = get_frames_at_indices(decoder, frame_indices=[frame_index])
-            b = get_frames_at_indices(decoder, frame_indices=[frame_index])
-            torch.testing.assert_close(a, b)
-            torch.testing.assert_close(a[0][0], ref)
-
-            decoder = make_decoder()
-            a = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
-            b = get_frames_in_range(decoder, start=frame_index, stop=frame_index + 1)
-            torch.testing.assert_close(a, b)
-            torch.testing.assert_close(a[0][0], ref)
-
-        pts_at_frame_start = 0  # 0 corresponds exactly to a frame start
-        index_of_frame_at_0 = 0
-        pts_not_at_frame_start = 2  # second 2 is in the middle of a frame
-        index_of_frame_at_2 = 31
-        for pts, frame_index in (
-            (pts_at_frame_start, index_of_frame_at_0),
-            (pts_not_at_frame_start, index_of_frame_at_2),
-        ):
-            ref = NASA_AUDIO.get_frame_data_by_index(frame_index)
-
-            decoder = make_decoder()
-            a = get_frames_by_pts(decoder, timestamps=[pts])
-            b = get_frames_by_pts(decoder, timestamps=[pts])
-            torch.testing.assert_close(a, b)
-            torch.testing.assert_close(a[0][0], ref)
-
-            decoder = make_decoder()
-            a = get_frames_by_pts_in_range(
-                decoder, start_seconds=pts, stop_seconds=pts + 1e-4
-            )
-            b = get_frames_by_pts_in_range(
-                decoder, start_seconds=pts, stop_seconds=pts + 1e-4
-            )
-            torch.testing.assert_close(a, b)
-            torch.testing.assert_close(a[0][0], ref)
-
-        decoder = make_decoder()
-        a = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
-        b = get_frame_at_pts(decoder, seconds=pts_at_frame_start)
-        torch.testing.assert_close(a, b)
-        torch.testing.assert_close(
-            a[0], NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_0)
-        )
-
-        decoder = make_decoder()
-        a_frame, a_pts, a_duration = get_frame_at_pts(
-            decoder, seconds=pts_not_at_frame_start
-        )
-        b_frame, b_pts, b_duration = get_frame_at_pts(
-            decoder, seconds=pts_not_at_frame_start
-        )
-        torch.testing.assert_close(a_pts, b_pts)
-        torch.testing.assert_close(a_duration, b_duration)
-        # TODO fix this. These checks should pass
-        with pytest.raises(AssertionError):
-            torch.testing.assert_close(a_frame, b_frame)
-        with pytest.raises(AssertionError):
-            torch.testing.assert_close(
-                a_frame, NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2)
-            )
-        # But second time works ¯\_(ツ)_/¯A (see also test_get_frame_at_pts_audio_bad())
-        torch.testing.assert_close(
-            b_frame, NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2)
-        )
-
-        decoder = make_decoder()
-        seek_to_pts(decoder, pts_at_frame_start)
-        a = get_next_frame(decoder)
-        seek_to_pts(decoder, pts_at_frame_start)
-        b = get_next_frame(decoder)
-        torch.testing.assert_close(a, b)
-
-        decoder = make_decoder()
-        seek_to_pts(decoder, seconds=pts_not_at_frame_start)
-        a = get_next_frame(decoder)
-        seek_to_pts(decoder, seconds=pts_not_at_frame_start)
-        b = get_next_frame(decoder)
-        torch.testing.assert_close(a, b)
-        torch.testing.assert_close(
-            a[0], NASA_AUDIO.get_frame_data_by_index(index_of_frame_at_2 + 1)
         )
 
 
