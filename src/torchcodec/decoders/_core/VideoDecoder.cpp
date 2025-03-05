@@ -494,16 +494,27 @@ void VideoDecoder::addVideoStream(
       videoStreamOptions.device.type() == torch::kCPU ||
           videoStreamOptions.device.type() == torch::kCUDA,
       "Invalid device type: " + videoStreamOptions.device.str());
+
   addStream(streamIndex, AVMEDIA_TYPE_VIDEO, videoStreamOptions.device);
 
+  auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " +
+        std::to_string(activeStreamIndex_) +
+        " does not have an average fps in its metadata.");
+  }
+
   auto& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.videoStreamOptions = videoStreamOptions;
   streamInfo.codecContext->thread_count =
       videoStreamOptions.ffmpegThreadCount.value_or(0);
 
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
-      streamInfo.codecContext->width;
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
-      streamInfo.codecContext->height;
+  streamMetadata.width = streamInfo.codecContext->width;
+  streamMetadata.height = streamInfo.codecContext->height;
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
