@@ -7,4 +7,6 @@
 from ._core import VideoStreamMetadata
 from ._video_decoder import VideoDecoder  # noqa
 
+# from ._audio_decoder import AudioDecoder  # Will be public when more stable
+
 SimpleVideoDecoder = VideoDecoder

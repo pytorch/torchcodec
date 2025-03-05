@@ -77,6 +77,9 @@ class VideoDecoder {
     // Video-only fields derived from the AVCodecContext.
     std::optional<int64_t> width;
     std::optional<int64_t> height;
+
+    // Audio-only fields
+    std::optional<int64_t> sampleRate;
   };
 
   struct ContainerMetadata {
@@ -139,9 +142,7 @@ class VideoDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStreamDecoder(
-      int streamIndex,
-      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
+  void addAudioStream(int streamIndex);
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -322,6 +323,8 @@ class VideoDecoder {
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
+    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
 
@@ -424,6 +427,11 @@ class VideoDecoder {
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
 
+  void addStream(
+      int streamIndex,
+      AVMediaType mediaType,
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
+
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
   // See
@@ -441,7 +449,8 @@ class VideoDecoder {
   // VALIDATION UTILS
   // --------------------------------------------------------------------------
 
-  void validateActiveStream();
+  void validateActiveStream(
+      std::optional<AVMediaType> avMediaType = std::nullopt);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
       const StreamMetadata& streamMetadata,
