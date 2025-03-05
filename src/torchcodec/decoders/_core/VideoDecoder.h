@@ -137,8 +137,6 @@ class VideoDecoder {
     torch::Device device = torch::kCPU;
   };
 
-  struct AudioStreamOptions {};
-
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
