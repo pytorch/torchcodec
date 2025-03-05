@@ -17,15 +17,6 @@ https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&te
 """
 
 
-def validate_seek_mode(seek_mode: str) -> None:
-    allowed_seek_modes = ("exact", "approximate")
-    if seek_mode not in allowed_seek_modes:
-        raise ValueError(
-            f"Invalid seek mode ({seek_mode}). "
-            f"Supported values are {', '.join(allowed_seek_modes)}."
-        )
-
-
 def create_decoder(
     *, source: Union[str, Path, bytes, Tensor], seek_mode: str
 ) -> Tensor:
@@ -49,7 +40,7 @@ def get_and_validate_stream_metadata(
     decoder: Tensor,
     stream_index: Optional[int] = None,
     media_type: str,
-) -> Tuple[core.VideoStreamMetadata, int]:
+) -> Tuple[core.VideoStreamMetadata, int, float, float]:
 
     if media_type not in ("video", "audio"):
         raise ValueError(f"Bad {media_type = }, should be audio or video")
@@ -75,12 +66,6 @@ def get_and_validate_stream_metadata(
 
     metadata = container_metadata.streams[stream_index]
 
-    if metadata.num_frames is None:
-        raise ValueError(
-            "The number of frames is unknown. " + ERROR_REPORTING_INSTRUCTIONS
-        )
-    num_frames = metadata.num_frames
-
     if metadata.begin_stream_seconds is None:
         raise ValueError(
             "The minimum pts value in seconds is unknown. "
@@ -97,7 +82,6 @@ def get_and_validate_stream_metadata(
     return (
         metadata,
         stream_index,
-        num_frames,
         begin_stream_seconds,
         end_stream_seconds,
     )

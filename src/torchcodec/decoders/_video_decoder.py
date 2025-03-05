@@ -14,8 +14,8 @@ from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import _core as core
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
+    ERROR_REPORTING_INSTRUCTIONS,
     get_and_validate_stream_metadata,
-    validate_seek_mode,
 )
 
 
@@ -76,7 +76,13 @@ class VideoDecoder:
         device: Optional[Union[str, device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
     ):
-        validate_seek_mode(seek_mode)
+        allowed_seek_modes = ("exact", "approximate")
+        if seek_mode not in allowed_seek_modes:
+            raise ValueError(
+                f"Invalid seek mode ({seek_mode}). "
+                f"Supported values are {', '.join(allowed_seek_modes)}."
+            )
+
         self._decoder = create_decoder(source=source, seek_mode=seek_mode)
 
         allowed_dimension_orders = ("NCHW", "NHWC")
@@ -100,12 +106,17 @@ class VideoDecoder:
         (
             self.metadata,
             self.stream_index,
-            self._num_frames,
             self._begin_stream_seconds,
             self._end_stream_seconds,
         ) = get_and_validate_stream_metadata(
             decoder=self._decoder, stream_index=stream_index, media_type="video"
         )
+
+        if self.metadata.num_frames is None:
+            raise ValueError(
+                "The number of frames is unknown. " + ERROR_REPORTING_INSTRUCTIONS
+            )
+        self._num_frames = self.metadata.num_frames
 
     def __len__(self) -> int:
         return self._num_frames

@@ -39,7 +39,7 @@ from torchcodec.decoders._core import (
 from ..utils import (
     assert_frames_equal,
     cpu_and_cuda,
-    NASA_AUDIO,
+    NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
 )
@@ -397,7 +397,7 @@ class TestOps:
         assert metadata_dict["maxPtsSecondsFromScan"] == 13.013
 
     def test_audio_get_json_metadata(self):
-        decoder = create_from_file(str(NASA_AUDIO.path))
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path))
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
         assert metadata_dict["durationSeconds"] == pytest.approx(13.248, abs=0.01)
@@ -632,10 +632,17 @@ class TestOps:
         ),
     )
     def test_audio_bad_method(self, method):
-        decoder = create_from_file(str(NASA_AUDIO.path))
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path), seek_mode="approximate")
         add_audio_stream(decoder)
         with pytest.raises(RuntimeError, match="The method you called isn't supported"):
             method(decoder)
+
+    def test_audio_bad_seek_mode(self):
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path), seek_mode="exact")
+        with pytest.raises(
+            RuntimeError, match="seek_mode must be 'approximate' for audio"
+        ):
+            add_audio_stream(decoder)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,13 @@ import pytest
 import torch
 from torchcodec import FrameBatch
 
-from torchcodec.decoders import _core, VideoDecoder
+from torchcodec.decoders import (
+    _core,
+    AudioStreamMetadata,
+    VideoDecoder,
+    VideoStreamMetadata,
+)
+from torchcodec.decoders._audio_decoder import AudioDecoder
 
 from ..utils import (
     assert_frames_equal,
@@ -20,49 +26,69 @@ from ..utils import (
     get_ffmpeg_major_version,
     H265_VIDEO,
     in_fbcode,
+    NASA_AUDIO_MP3,
     NASA_VIDEO,
 )
 
 
-class TestVideoDecoder:
+class TestDecoder:
+    @pytest.mark.parametrize(
+        "Decoder, asset",
+        (
+            (VideoDecoder, NASA_VIDEO),
+            (AudioDecoder, NASA_VIDEO),
+            (AudioDecoder, NASA_AUDIO_MP3),
+        ),
+    )
     @pytest.mark.parametrize("source_kind", ("str", "path", "tensor", "bytes"))
-    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    def test_create(self, source_kind, seek_mode):
+    def test_create(self, Decoder, asset, source_kind):
         if source_kind == "str":
-            source = str(NASA_VIDEO.path)
+            source = str(asset.path)
         elif source_kind == "path":
-            source = NASA_VIDEO.path
+            source = asset.path
         elif source_kind == "tensor":
-            source = NASA_VIDEO.to_tensor()
+            source = asset.to_tensor()
         elif source_kind == "bytes":
-            path = str(NASA_VIDEO.path)
+            path = str(asset.path)
             with open(path, "rb") as f:
                 source = f.read()
         else:
             raise ValueError("Oops, double check the parametrization of this test!")
 
-        decoder = VideoDecoder(source, seek_mode=seek_mode)
-        assert isinstance(decoder.metadata, _core.VideoStreamMetadata)
+        decoder = Decoder(source)
+        assert isinstance(decoder.metadata, _core._metadata.StreamMetadata)
+
+    @pytest.mark.parametrize("Decoder", (VideoDecoder, AudioDecoder))
+    def test_create_fails(self, Decoder):
+        with pytest.raises(TypeError, match="Unknown source type"):
+            Decoder(123)
+
+        # stream index that does not exist
+        with pytest.raises(ValueError, match="No valid stream found"):
+            Decoder(NASA_VIDEO.path, stream_index=40)
+
+        # stream index that does exist, but it's not audio or video
+        with pytest.raises(ValueError, match="No valid stream found"):
+            Decoder(NASA_VIDEO.path, stream_index=2)
+
+
+class TestVideoDecoder:
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_metadata(self, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, seek_mode=seek_mode)
+        assert isinstance(decoder.metadata, VideoStreamMetadata)
         assert len(decoder) == decoder._num_frames == 390
+
         assert decoder.stream_index == decoder.metadata.stream_index == 3
         assert decoder.metadata.duration_seconds == pytest.approx(13.013)
         assert decoder.metadata.average_fps == pytest.approx(29.970029)
         assert decoder.metadata.num_frames == 390
+        assert decoder.metadata.height == 270
+        assert decoder.metadata.width == 480
 
     def test_create_fails(self):
-        with pytest.raises(TypeError, match="Unknown source type"):
-            decoder = VideoDecoder(123)  # noqa
-
-        # stream index that does not exist
-        with pytest.raises(ValueError, match="No valid stream found"):
-            decoder = VideoDecoder(NASA_VIDEO.path, stream_index=40)  # noqa
-
-        # stream index that does exist, but it's not video
-        with pytest.raises(ValueError, match="No valid stream found"):
-            decoder = VideoDecoder(NASA_VIDEO.path, stream_index=1)  # noqa
-
         with pytest.raises(ValueError, match="Invalid seek mode"):
-            decoder = VideoDecoder(NASA_VIDEO.path, seek_mode="blah")  # noqa
+            VideoDecoder(NASA_VIDEO.path, seek_mode="blah")
 
     @pytest.mark.parametrize("num_ffmpeg_threads", (1, 4))
     @pytest.mark.parametrize("device", cpu_and_cuda())
@@ -914,3 +940,13 @@ class TestVideoDecoder:
             assert_frames_equal(ref_frame1, frames[0].data)
             assert_frames_equal(ref_frame3, frames[1].data)
             assert_frames_equal(ref_frame5, frames[2].data)
+
+
+class TestAudioDecoder:
+    def test_metadata(self):
+        decoder = AudioDecoder(NASA_VIDEO.path)
+        assert isinstance(decoder.metadata, AudioStreamMetadata)
+
+        assert decoder.stream_index == decoder.metadata.stream_index == 4
+        assert decoder.metadata.duration_seconds == pytest.approx(13.056)
+        assert decoder.metadata.sample_rate == 16_000
