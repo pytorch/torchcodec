@@ -40,7 +40,7 @@ def get_and_validate_stream_metadata(
     decoder: Tensor,
     stream_index: Optional[int] = None,
     media_type: str,
-) -> Tuple[core.VideoStreamMetadata, int, float, float]:
+) -> Tuple[core._metadata.StreamMetadata, int, float, float]:
 
     if media_type not in ("video", "audio"):
         raise ValueError(f"Bad {media_type = }, should be audio or video")
