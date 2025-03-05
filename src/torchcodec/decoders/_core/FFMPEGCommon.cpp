@@ -60,22 +60,15 @@ int64_t getDuration(const AVFrame* frame) {
 #endif
 }
 
-int getNumChannels(const AVFrame* avFrame) {
+int64_t getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (IBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
-  return avFrame->ch_layout.nb_channels;
+  int numChannels = avCodecContext->ch_layout.nb_channels;
 #else
-  return av_get_channel_layout_nb_channels(avFrame->channel_layout);
+  int numChannels = avCodecContext->channels;
 #endif
-}
 
-int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
-#if LIBAVFILTER_VERSION_MAJOR > 8 || \
-    (IBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
-  return avCodecContext->ch_layout.nb_channels;
-#else
-  return avCodecContext->channels;
-#endif
+  return static_cast<int64_t>(numChannels);
 }
 
 AVIOBytesContext::AVIOBytesContext(

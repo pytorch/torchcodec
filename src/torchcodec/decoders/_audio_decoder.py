@@ -17,7 +17,7 @@ from torchcodec.decoders._decoder_utils import (
 
 
 class AudioDecoder:
-    """TODO-audio docs"""
+    """TODO-AUDIO docs"""
 
     def __init__(
         self,

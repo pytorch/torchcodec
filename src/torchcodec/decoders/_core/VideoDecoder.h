@@ -80,6 +80,7 @@ class VideoDecoder {
 
     // Audio-only fields
     std::optional<int64_t> sampleRate;
+    std::optional<int64_t> numChannels;
   };
 
   struct ContainerMetadata {
@@ -428,7 +429,7 @@ class VideoDecoder {
   void addStream(
       int streamIndex,
       AVMediaType mediaType,
-      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
+      const torch::Device& device = torch::kCPU);
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.

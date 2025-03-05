@@ -169,17 +169,6 @@ void VideoDecoder::initializeDecoder() {
       }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-      int numSamplesPerFrame = avStream->codecpar->frame_size;
-      int sampleRate = avStream->codecpar->sample_rate;
-      if (numSamplesPerFrame > 0 && sampleRate > 0) {
-        // This should allow the approximate mode to do its magic.
-        // fps is numFrames / duration where
-        // - duration = numSamplesTotal / sampleRate and
-        // - numSamplesTotal = numSamplesPerFrame * numFrames
-        // so fps = numFrames * sampleRate / (numSamplesPerFrame * numFrames)
-        streamMetadata.averageFps =
-            static_cast<double>(sampleRate) / numSamplesPerFrame;
-      }
       containerMetadata_.numAudioStreams++;
     }
 
@@ -422,7 +411,7 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
 void VideoDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
-    const VideoStreamOptions& videoStreamOptions) {
+    const torch::Device& device) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
@@ -457,36 +446,25 @@ void VideoDecoder::addStream(
       activeStreamIndex_,
       " which is of the wrong media type.");
 
-  // TODO_CODE_QUALITY this is meh to have that in the middle
-  if (mediaType == AVMEDIA_TYPE_VIDEO &&
-      videoStreamOptions.device.type() == torch::kCUDA) {
+  // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
+  // addStream() which is supposed to be generic
+  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
     avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(
-            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
+        findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
             .value_or(avCodec));
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count =
-      videoStreamOptions.ffmpegThreadCount.value_or(0); // TODO VIDEO ONLY?
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
-  // TODO_CODE_QUALITY meh again
-  if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (videoStreamOptions.device.type() == torch::kCPU) {
-      // No more initialization needed for CPU.
-    } else if (videoStreamOptions.device.type() == torch::kCUDA) {
-      initializeContextOnCuda(videoStreamOptions.device, codecContext);
-    } else {
-      TORCH_CHECK(
-          false, "Invalid device type: " + videoStreamOptions.device.str());
-    }
-    streamInfo.videoStreamOptions = videoStreamOptions;
+  // TODO_CODE_QUALITY same as above.
+  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
+    initializeContextOnCuda(device, codecContext);
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
@@ -512,9 +490,16 @@ void VideoDecoder::addStream(
 void VideoDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions) {
-  addStream(streamIndex, AVMEDIA_TYPE_VIDEO, videoStreamOptions);
+  TORCH_CHECK(
+      videoStreamOptions.device.type() == torch::kCPU ||
+          videoStreamOptions.device.type() == torch::kCUDA,
+      "Invalid device type: " + videoStreamOptions.device.str());
+  addStream(streamIndex, AVMEDIA_TYPE_VIDEO, videoStreamOptions.device);
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.codecContext->thread_count =
+      videoStreamOptions.ffmpegThreadCount.value_or(0);
+
   containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
       streamInfo.codecContext->width;
   containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
@@ -547,8 +532,12 @@ void VideoDecoder::addAudioStream(int streamIndex) {
 
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].sampleRate =
-      streamInfo.codecContext->sample_rate;
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  streamMetadata.sampleRate =
+      static_cast<int64_t>(streamInfo.codecContext->sample_rate);
+  streamMetadata.numChannels = getNumChannels(streamInfo.codecContext);
 }
 
 // --------------------------------------------------------------------------

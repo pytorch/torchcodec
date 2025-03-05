@@ -488,6 +488,9 @@ std::string get_stream_json_metadata(
   if (streamMetadata.sampleRate.has_value()) {
     map["sampleRate"] = std::to_string(*streamMetadata.sampleRate);
   }
+  if (streamMetadata.numChannels.has_value()) {
+    map["numChannels"] = std::to_string(*streamMetadata.numChannels);
+  }
   if (streamMetadata.mediaType == AVMEDIA_TYPE_VIDEO) {
     map["mediaType"] = "\"video\"";
   } else if (streamMetadata.mediaType == AVMEDIA_TYPE_AUDIO) {

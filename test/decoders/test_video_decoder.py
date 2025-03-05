@@ -11,13 +11,9 @@ import pytest
 import torch
 from torchcodec import FrameBatch
 
-from torchcodec.decoders import (
-    _core,
-    AudioStreamMetadata,
-    VideoDecoder,
-    VideoStreamMetadata,
-)
+from torchcodec.decoders import _core, VideoDecoder, VideoStreamMetadata
 from torchcodec.decoders._audio_decoder import AudioDecoder
+from torchcodec.decoders._core._metadata import AudioStreamMetadata
 
 from ..utils import (
     assert_frames_equal,
@@ -950,3 +946,4 @@ class TestAudioDecoder:
         assert decoder.stream_index == decoder.metadata.stream_index == 4
         assert decoder.metadata.duration_seconds == pytest.approx(13.056)
         assert decoder.metadata.sample_rate == 16_000
+        assert decoder.metadata.num_channels == 2

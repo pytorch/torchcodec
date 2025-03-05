@@ -22,7 +22,7 @@ from torchcodec.decoders._core.video_decoder_ops import (
 SPACES = "  "
 
 
-# TODO-audio: docs below are mostly for video streams, we should edit them and /
+# TODO-AUDIO: docs below are mostly for video streams, we should edit them and /
 # or make sure they're OK for audio streams as well. Not sure how to best handle
 # docs for such class hierarchy.
 @dataclass
@@ -161,8 +161,9 @@ class VideoStreamMetadata(StreamMetadata):
 class AudioStreamMetadata(StreamMetadata):
     """Metadata of a single audio stream."""
 
-    # TODO-AUDIO Need sample rate and format and num_channels
+    # TODO-AUDIO Add sample format field
     sample_rate: Optional[int]
+    num_channels: Optional[int]
 
     def __repr__(self):
         return super().__repr__()
@@ -236,6 +237,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
             streams_metadata.append(
                 AudioStreamMetadata(
                     sample_rate=stream_dict.get("sampleRate"),
+                    num_channels=stream_dict.get("numChannels"),
                     **common_meta,
                 )
             )
