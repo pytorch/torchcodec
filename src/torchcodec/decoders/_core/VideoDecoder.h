@@ -77,6 +77,9 @@ class VideoDecoder {
     // Video-only fields derived from the AVCodecContext.
     std::optional<int64_t> width;
     std::optional<int64_t> height;
+
+    // Audio-only fields
+    std::optional<int64_t> sampleRate;
   };
 
   struct ContainerMetadata {

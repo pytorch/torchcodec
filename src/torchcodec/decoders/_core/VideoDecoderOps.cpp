@@ -492,6 +492,16 @@ std::string get_stream_json_metadata(
   if (streamMetadata.averageFps.has_value()) {
     map["averageFps"] = std::to_string(*streamMetadata.averageFps);
   }
+  if (streamMetadata.sampleRate.has_value()) {
+    map["sampleRate"] = std::to_string(*streamMetadata.sampleRate);
+  }
+  if (streamMetadata.mediaType == AVMEDIA_TYPE_VIDEO) {
+    map["mediaType"] = "\"video\"";
+  } else if (streamMetadata.mediaType == AVMEDIA_TYPE_AUDIO) {
+    map["mediaType"] = "\"audio\"";
+  } else {
+    map["mediaType"] = "\"other\"";
+  }
   return mapToJson(map);
 }
 

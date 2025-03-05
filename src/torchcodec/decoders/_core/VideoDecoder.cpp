@@ -584,6 +584,8 @@ void VideoDecoder::addAudioStream(int streamIndex) {
   TORCH_CHECK(
       streamInfo.codecContext->frame_size > 0,
       "No support for variable framerate yet.");
+  containerMetadata_.allStreamMetadata[activeStreamIndex_].sampleRate =
+      streamInfo.codecContext->sample_rate;
 }
 
 // --------------------------------------------------------------------------

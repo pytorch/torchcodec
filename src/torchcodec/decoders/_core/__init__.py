@@ -6,6 +6,7 @@
 
 
 from ._metadata import (
+    AudioStreamMetadata,
     get_video_metadata,
     get_video_metadata_from_header,
     VideoMetadata,
