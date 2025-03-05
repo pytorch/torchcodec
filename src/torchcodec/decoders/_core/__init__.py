@@ -7,9 +7,9 @@
 
 from ._metadata import (
     AudioStreamMetadata,
-    get_video_metadata,
-    get_video_metadata_from_header,
-    VideoMetadata,
+    ContainerMetadata,
+    get_container_metadata,
+    get_container_metadata_from_header,
     VideoStreamMetadata,
 )
 from .video_decoder_ops import (

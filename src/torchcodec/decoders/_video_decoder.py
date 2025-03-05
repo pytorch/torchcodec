@@ -6,22 +6,21 @@
 
 import numbers
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Union
 
 from torch import device, Tensor
 
 from torchcodec import Frame, FrameBatch
 from torchcodec.decoders import _core as core
-
-_ERROR_REPORTING_INSTRUCTIONS = """
-This should never happen. Please report an issue following the steps in
-https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=bug-report.yml.
-"""
+from torchcodec.decoders._decoder_utils import (
+    create_decoder,
+    get_and_validate_stream_metadata,
+    validate_seek_mode,
+)
 
 
 class VideoDecoder:
     """A single-stream video decoder.
-
 
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
@@ -77,26 +76,8 @@ class VideoDecoder:
         device: Optional[Union[str, device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
     ):
-        allowed_seek_modes = ("exact", "approximate")
-        if seek_mode not in allowed_seek_modes:
-            raise ValueError(
-                f"Invalid seek mode ({seek_mode}). "
-                f"Supported values are {', '.join(allowed_seek_modes)}."
-            )
-
-        if isinstance(source, str):
-            self._decoder = core.create_from_file(source, seek_mode)
-        elif isinstance(source, Path):
-            self._decoder = core.create_from_file(str(source), seek_mode)
-        elif isinstance(source, bytes):
-            self._decoder = core.create_from_bytes(source, seek_mode)
-        elif isinstance(source, Tensor):
-            self._decoder = core.create_from_tensor(source, seek_mode)
-        else:
-            raise TypeError(
-                f"Unknown source type: {type(source)}. "
-                "Supported types are str, Path, bytes and Tensor."
-            )
+        validate_seek_mode(seek_mode)
+        self._decoder = create_decoder(source=source, seek_mode=seek_mode)
 
         allowed_dimension_orders = ("NCHW", "NHWC")
         if dimension_order not in allowed_dimension_orders:
@@ -116,29 +97,15 @@ class VideoDecoder:
             device=device,
         )
 
-        self.metadata, self.stream_index = _get_and_validate_stream_metadata(
-            self._decoder, stream_index
+        (
+            self.metadata,
+            self.stream_index,
+            self._num_frames,
+            self._begin_stream_seconds,
+            self._end_stream_seconds,
+        ) = get_and_validate_stream_metadata(
+            decoder=self._decoder, stream_index=stream_index, media_type="video"
         )
-
-        if self.metadata.num_frames is None:
-            raise ValueError(
-                "The number of frames is unknown. " + _ERROR_REPORTING_INSTRUCTIONS
-            )
-        self._num_frames = self.metadata.num_frames
-
-        if self.metadata.begin_stream_seconds is None:
-            raise ValueError(
-                "The minimum pts value in seconds is unknown. "
-                + _ERROR_REPORTING_INSTRUCTIONS
-            )
-        self._begin_stream_seconds = self.metadata.begin_stream_seconds
-
-        if self.metadata.end_stream_seconds is None:
-            raise ValueError(
-                "The maximum pts value in seconds is unknown. "
-                + _ERROR_REPORTING_INSTRUCTIONS
-            )
-        self._end_stream_seconds = self.metadata.end_stream_seconds
 
     def __len__(self) -> int:
         return self._num_frames
@@ -358,26 +325,3 @@ class VideoDecoder:
             stop_seconds=stop_seconds,
         )
         return FrameBatch(*frames)
-
-
-def _get_and_validate_stream_metadata(
-    decoder: Tensor,
-    stream_index: Optional[int] = None,
-) -> Tuple[core.VideoStreamMetadata, int]:
-    video_metadata = core.get_video_metadata(decoder)
-
-    if stream_index is None:
-        best_stream_index = video_metadata.best_video_stream_index
-        if best_stream_index is None:
-            raise ValueError(
-                "The best video stream is unknown and there is no specified stream. "
-                + _ERROR_REPORTING_INSTRUCTIONS
-            )
-        stream_index = best_stream_index
-
-    # This should be logically true because of the above conditions, but type checker
-    # is not clever enough.
-    assert stream_index is not None
-
-    stream_metadata = video_metadata.streams[stream_index]
-    return (stream_metadata, stream_index)

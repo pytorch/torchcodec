@@ -10,26 +10,26 @@ import pytest
 
 from torchcodec.decoders._core import (
     create_from_file,
+    get_container_metadata,
+    get_container_metadata_from_header,
     get_ffmpeg_library_versions,
-    get_video_metadata,
-    get_video_metadata_from_header,
     VideoStreamMetadata,
 )
 
 from ..utils import NASA_VIDEO
 
 
-def _get_video_metadata(path, seek_mode):
+def _get_container_metadata(path, seek_mode):
     decoder = create_from_file(str(path), seek_mode=seek_mode)
-    return get_video_metadata(decoder)
+    return get_container_metadata(decoder)
 
 
 @pytest.mark.parametrize(
     "metadata_getter",
     (
-        get_video_metadata_from_header,
-        functools.partial(_get_video_metadata, seek_mode="approximate"),
-        functools.partial(_get_video_metadata, seek_mode="exact"),
+        get_container_metadata_from_header,
+        functools.partial(_get_container_metadata, seek_mode="approximate"),
+        functools.partial(_get_container_metadata, seek_mode="exact"),
     ),
 )
 def test_get_metadata(metadata_getter):
