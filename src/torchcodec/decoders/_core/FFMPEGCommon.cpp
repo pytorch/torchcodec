@@ -62,28 +62,26 @@ int64_t getDuration(const AVFrame* frame) {
 
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
-    size_t data_size,
-    size_t tempBufferSize) {
-  auto buffer = static_cast<uint8_t*>(av_malloc(tempBufferSize));
-  if (!buffer) {
-    throw std::runtime_error(
-        "Failed to allocate buffer of size " + std::to_string(tempBufferSize));
-  }
-  bufferData_.data = static_cast<const uint8_t*>(data);
-  bufferData_.size = data_size;
-  bufferData_.current = 0;
+    size_t dataSize,
+    size_t bufferSize)
+    : bufferData_{static_cast<const uint8_t*>(data), dataSize, 0} {
+  auto buffer = static_cast<uint8_t*>(av_malloc(bufferSize));
+  TORCH_CHECK(
+      buffer != nullptr,
+      "Failed to allocate buffer of size " + std::to_string(bufferSize));
 
   avioContext_.reset(avio_alloc_context(
       buffer,
-      tempBufferSize,
+      bufferSize,
       0,
       &bufferData_,
       &AVIOBytesContext::read,
       nullptr,
       &AVIOBytesContext::seek));
+
   if (!avioContext_) {
     av_freep(&buffer);
-    throw std::runtime_error("Failed to allocate AVIOContext");
+    TORCH_CHECK(false, "Failed to allocate AVIOContext");
   }
 }
 
@@ -99,14 +97,14 @@ AVIOContext* AVIOBytesContext::getAVIO() {
 
 // The signature of this function is defined by FFMPEG.
 int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
-  struct AVIOBufferData* bufferData =
-      static_cast<struct AVIOBufferData*>(opaque);
+  auto bufferData = static_cast<AVIOBufferData*>(opaque);
   TORCH_CHECK(
       bufferData->current <= bufferData->size,
       "Tried to read outside of the buffer: current=",
       bufferData->current,
       ", size=",
       bufferData->size);
+
   buf_size =
       FFMIN(buf_size, static_cast<int>(bufferData->size - bufferData->current));
   TORCH_CHECK(
@@ -117,6 +115,7 @@ int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
       bufferData->size,
       ", current=",
       bufferData->current);
+
   if (!buf_size) {
     return AVERROR_EOF;
   }
@@ -127,7 +126,7 @@ int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
 
 // The signature of this function is defined by FFMPEG.
 int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
-  AVIOBufferData* bufferData = (AVIOBufferData*)opaque;
+  auto bufferData = static_cast<AVIOBufferData*>(opaque);
   int64_t ret = -1;
 
   switch (whence) {
@@ -141,6 +140,7 @@ int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
     default:
       break;
   }
+
   return ret;
 }
 

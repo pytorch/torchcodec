@@ -40,11 +40,6 @@ int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
   return static_cast<int64_t>(std::round(seconds * timeBase.den));
 }
 
-struct AVInput {
-  UniqueAVFormatContext formatContext;
-  std::unique_ptr<AVIOBytesContext> ioBytesContext;
-};
-
 std::vector<std::string> splitStringWithDelimiters(
     const std::string& str,
     const std::string& delims) {
@@ -72,50 +67,46 @@ VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
   av_log_set_level(AV_LOG_QUIET);
 
-  AVFormatContext* formatContext = nullptr;
-  int open_ret = avformat_open_input(
-      &formatContext, videoFilePath.c_str(), nullptr, nullptr);
-  if (open_ret != 0) {
-    throw std::invalid_argument(
-        "Could not open input file: " + videoFilePath + " " +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  TORCH_CHECK(formatContext != nullptr);
-  AVInput input;
-  input.formatContext.reset(formatContext);
-  formatContext_ = std::move(input.formatContext);
+  AVFormatContext* rawContext = nullptr;
+  int status =
+      avformat_open_input(&rawContext, videoFilePath.c_str(), nullptr, nullptr);
+  TORCH_CHECK(
+      status == 0,
+      "Could not open input file: " + videoFilePath + " " +
+          getFFMPEGErrorStringFromErrorCode(status));
+  TORCH_CHECK(rawContext != nullptr);
+  formatContext_.reset(rawContext);
 
   initializeDecoder();
 }
 
-VideoDecoder::VideoDecoder(const void* buffer, size_t length, SeekMode seekMode)
+VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
-  TORCH_CHECK(buffer != nullptr, "Video buffer cannot be nullptr!");
+  TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
 
   av_log_set_level(AV_LOG_QUIET);
 
-  AVInput input;
-  input.formatContext.reset(avformat_alloc_context());
-  TORCH_CHECK(
-      input.formatContext.get() != nullptr, "Unable to alloc avformat context");
-  constexpr int kAVIOInternalTemporaryBufferSize = 64 * 1024;
-  input.ioBytesContext.reset(
-      new AVIOBytesContext(buffer, length, kAVIOInternalTemporaryBufferSize));
-  if (!input.ioBytesContext) {
-    throw std::runtime_error("Failed to create AVIOBytesContext");
+  constexpr int bufferSize = 64 * 1024;
+  ioBytesContext_.reset(new AVIOBytesContext(data, length, bufferSize));
+  TORCH_CHECK(ioBytesContext_, "Failed to create AVIOBytesContext");
+
+  // Because FFmpeg requires a reference to a pointer in the call to open, we
+  // can't use a unique pointer here. Note that means we must call free if open
+  // fails.
+  AVFormatContext* rawContext = avformat_alloc_context();
+  TORCH_CHECK(rawContext != nullptr, "Unable to alloc avformat context");
+
+  rawContext->pb = ioBytesContext_->getAVIO();
+  int status = avformat_open_input(&rawContext, nullptr, nullptr, nullptr);
+  if (status != 0) {
+    avformat_free_context(rawContext);
+    TORCH_CHECK(
+        false,
+        "Failed to open input buffer: " +
+            getFFMPEGErrorStringFromErrorCode(status));
   }
-  input.formatContext->pb = input.ioBytesContext->getAVIO();
-  AVFormatContext* tempFormatContext = input.formatContext.release();
-  int open_ret =
-      avformat_open_input(&tempFormatContext, nullptr, nullptr, nullptr);
-  input.formatContext.reset(tempFormatContext);
-  if (open_ret != 0) {
-    throw std::runtime_error(
-        std::string("Failed to open input buffer: ") +
-        getFFMPEGErrorStringFromErrorCode(open_ret));
-  }
-  formatContext_ = std::move(input.formatContext);
-  ioBytesContext_ = std::move(input.ioBytesContext);
+
+  formatContext_.reset(rawContext);
 
   initializeDecoder();
 }
@@ -140,11 +131,11 @@ void VideoDecoder::initializeDecoder() {
   // store enough info in the header, so we call avformat_find_stream_info()
   // which decodes a few frames to get missing info. For more, see:
   //   https://ffmpeg.org/doxygen/7.0/group__lavf__decoding.html
-  int ffmpegStatus = avformat_find_stream_info(formatContext_.get(), nullptr);
-  if (ffmpegStatus < 0) {
+  int status = avformat_find_stream_info(formatContext_.get(), nullptr);
+  if (status < 0) {
     throw std::runtime_error(
         "Failed to find stream info: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   for (unsigned int i = 0; i < formatContext_->nb_streams; i++) {
@@ -239,16 +230,16 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
     ReferenceAVPacket packet(autoAVPacket);
 
     // av_read_frame is a misleading name: it gets the next **packet**.
-    int ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
+    int status = av_read_frame(formatContext_.get(), packet.get());
 
-    if (ffmpegStatus == AVERROR_EOF) {
+    if (status == AVERROR_EOF) {
       break;
     }
 
-    if (ffmpegStatus != AVSUCCESS) {
+    if (status != AVSUCCESS) {
       throw std::runtime_error(
           "Failed to read frame from input file: " +
-          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+          getFFMPEGErrorStringFromErrorCode(status));
     }
 
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
@@ -931,23 +922,23 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
   AutoAVPacket autoAVPacket;
-  int ffmpegStatus = AVSUCCESS;
+  int status = AVSUCCESS;
   bool reachedEOF = false;
   while (true) {
-    ffmpegStatus =
+    status =
         avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
 
-    if (ffmpegStatus != AVSUCCESS && ffmpegStatus != AVERROR(EAGAIN)) {
+    if (status != AVSUCCESS && status != AVERROR(EAGAIN)) {
       // Non-retriable error
       break;
     }
 
     decodeStats_.numFramesReceivedByDecoder++;
     // Is this the kind of frame we're looking for?
-    if (ffmpegStatus == AVSUCCESS && filterFunction(avFrame.get())) {
+    if (status == AVSUCCESS && filterFunction(avFrame.get())) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
       break;
-    } else if (ffmpegStatus == AVSUCCESS) {
+    } else if (status == AVSUCCESS) {
       // No, but we received a valid frame - just not the kind we're looking
       // for. The logic below will read packets and send them to the decoder.
       // But since we did just receive a frame, we should skip reading more
@@ -966,29 +957,29 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     // packets and send them to the decoder.
     ReferenceAVPacket packet(autoAVPacket);
     do {
-      ffmpegStatus = av_read_frame(formatContext_.get(), packet.get());
+      status = av_read_frame(formatContext_.get(), packet.get());
       decodeStats_.numPacketsRead++;
 
-      if (ffmpegStatus == AVERROR_EOF) {
+      if (status == AVERROR_EOF) {
         // End of file reached. We must drain the codec by sending a nullptr
         // packet.
-        ffmpegStatus = avcodec_send_packet(
+        status = avcodec_send_packet(
             streamInfo.codecContext.get(),
             /*avpkt=*/nullptr);
-        if (ffmpegStatus < AVSUCCESS) {
+        if (status < AVSUCCESS) {
           throw std::runtime_error(
               "Could not flush decoder: " +
-              getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+              getFFMPEGErrorStringFromErrorCode(status));
         }
 
         reachedEOF = true;
         break;
       }
 
-      if (ffmpegStatus < AVSUCCESS) {
+      if (status < AVSUCCESS) {
         throw std::runtime_error(
             "Could not read frame from input file: " +
-            getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+            getFFMPEGErrorStringFromErrorCode(status));
       }
     } while (packet->stream_index != activeStreamIndex_);
 
@@ -1000,26 +991,25 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
-    ffmpegStatus =
-        avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    if (ffmpegStatus < AVSUCCESS) {
+    status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+    if (status < AVSUCCESS) {
       throw std::runtime_error(
           "Could not push packet to decoder: " +
-          getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+          getFFMPEGErrorStringFromErrorCode(status));
     }
 
     decodeStats_.numPacketsSentToDecoder++;
   }
 
-  if (ffmpegStatus < AVSUCCESS) {
-    if (reachedEOF || ffmpegStatus == AVERROR_EOF) {
+  if (status < AVSUCCESS) {
+    if (reachedEOF || status == AVERROR_EOF) {
       throw VideoDecoder::EndOfFileException(
           "Requested next frame while there are no more frames left to "
           "decode.");
     }
     throw std::runtime_error(
         "Could not receive frame from decoder: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   // Note that we don't flush the decoder when we reach EOF (even though that's
@@ -1205,14 +1195,14 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
     const AVFrame* avFrame) {
   FilterGraphContext& filterGraphContext =
       streamInfos_[activeStreamIndex_].filterGraphContext;
-  int ffmpegStatus =
+  int status =
       av_buffersrc_write_frame(filterGraphContext.sourceContext, avFrame);
-  if (ffmpegStatus < AVSUCCESS) {
+  if (status < AVSUCCESS) {
     throw std::runtime_error("Failed to add frame to buffer source context");
   }
 
   UniqueAVFrame filteredAVFrame(av_frame_alloc());
-  ffmpegStatus = av_buffersink_get_frame(
+  status = av_buffersink_get_frame(
       filterGraphContext.sinkContext, filteredAVFrame.get());
   TORCH_CHECK_EQ(filteredAVFrame->format, AV_PIX_FMT_RGB24);
 
@@ -1336,44 +1326,44 @@ void VideoDecoder::createFilterGraph(
   filterArgs << ":pixel_aspect=" << codecContext->sample_aspect_ratio.num << "/"
              << codecContext->sample_aspect_ratio.den;
 
-  int ffmpegStatus = avfilter_graph_create_filter(
+  int status = avfilter_graph_create_filter(
       &filterGraphContext.sourceContext,
       buffersrc,
       "in",
       filterArgs.str().c_str(),
       nullptr,
       filterGraphContext.filterGraph.get());
-  if (ffmpegStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         std::string("Failed to create filter graph: ") + filterArgs.str() +
-        ": " + getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        ": " + getFFMPEGErrorStringFromErrorCode(status));
   }
 
-  ffmpegStatus = avfilter_graph_create_filter(
+  status = avfilter_graph_create_filter(
       &filterGraphContext.sinkContext,
       buffersink,
       "out",
       nullptr,
       nullptr,
       filterGraphContext.filterGraph.get());
-  if (ffmpegStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         "Failed to create filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
 
-  ffmpegStatus = av_opt_set_int_list(
+  status = av_opt_set_int_list(
       filterGraphContext.sinkContext,
       "pix_fmts",
       pix_fmts,
       AV_PIX_FMT_NONE,
       AV_OPT_SEARCH_CHILDREN);
-  if (ffmpegStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         "Failed to set output pixel formats: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   UniqueAVFilterInOut outputs(avfilter_inout_alloc());
@@ -1394,7 +1384,7 @@ void VideoDecoder::createFilterGraph(
 
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
-  ffmpegStatus = avfilter_graph_parse_ptr(
+  status = avfilter_graph_parse_ptr(
       filterGraphContext.filterGraph.get(),
       description.str().c_str(),
       &inputsTmp,
@@ -1402,18 +1392,17 @@ void VideoDecoder::createFilterGraph(
       nullptr);
   outputs.reset(outputsTmp);
   inputs.reset(inputsTmp);
-  if (ffmpegStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         "Failed to parse filter description: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
-  ffmpegStatus =
-      avfilter_graph_config(filterGraphContext.filterGraph.get(), nullptr);
-  if (ffmpegStatus < 0) {
+  status = avfilter_graph_config(filterGraphContext.filterGraph.get(), nullptr);
+  if (status < 0) {
     throw std::runtime_error(
         "Failed to configure filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(ffmpegStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 }
 
