@@ -112,6 +112,8 @@ class VideoDecoder:
             decoder=self._decoder, stream_index=stream_index, media_type="video"
         )
 
+        assert isinstance(self.metadata, core.VideoStreamMetadata)  # mypy
+
         if self.metadata.num_frames is None:
             raise ValueError(
                 "The number of frames is unknown. " + ERROR_REPORTING_INSTRUCTIONS
