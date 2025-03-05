@@ -70,8 +70,6 @@ int getNumChannels(const AVFrame* avFrame) {
 }
 
 int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
-// Not sure about the exactness of the version bounds, but as long as this
-// compile we're fine.
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (IBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
   return avCodecContext->ch_layout.nb_channels;

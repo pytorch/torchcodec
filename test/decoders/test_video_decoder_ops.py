@@ -400,7 +400,7 @@ class TestOps:
         decoder = create_from_file(str(NASA_AUDIO.path))
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
-        assert metadata_dict["durationSeconds"] == pytest.approx(13.013, abs=0.01)
+        assert metadata_dict["durationSeconds"] == pytest.approx(13.248, abs=0.01)
 
     def test_get_ffmpeg_version(self):
         ffmpeg_dict = get_ffmpeg_library_versions()

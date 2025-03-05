@@ -19,7 +19,9 @@ from torchcodec.decoders._core.video_decoder_ops import (
 )
 
 
-# TODO-audio: docs below are mostly for video streams.
+# TODO-audio: docs below are mostly for video streams, we should edit them and /
+# or make sure they're OK for audio streams as well. Not sure how to best handle
+# docs for such class hierarchy.
 @dataclass
 class StreamMetadata:
     duration_seconds_from_header: Optional[float]
@@ -154,6 +156,8 @@ class VideoStreamMetadata(StreamMetadata):
 
 @dataclass
 class AudioStreamMetadata(StreamMetadata):
+    """Metadata of a single audio stream."""
+
     # TODO-AUDIO do we expose the notion of frame here, like in fps? It's technically
     # valid, but potentially is an FFmpeg-specific concept for audio
     # TODO-AUDIO Need sample rate and format and num_channels
