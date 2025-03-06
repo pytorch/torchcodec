@@ -429,7 +429,8 @@ class VideoDecoder {
   void addStream(
       int streamIndex,
       AVMediaType mediaType,
-      const torch::Device& device = torch::kCPU);
+      const torch::Device& device = torch::kCPU,
+      std::optional<int> ffmpegThreadCount = std::nullopt);
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.

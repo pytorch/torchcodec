@@ -411,7 +411,8 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
 void VideoDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
-    const torch::Device& device) {
+    const torch::Device& device,
+    std::optional<int> ffmpegThreadCount) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
@@ -462,6 +463,8 @@ void VideoDecoder::addStream(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
+  streamInfo.codecContext->thread_count = ffmpegThreadCount.value_or(0);
+
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
     initializeContextOnCuda(device, codecContext);
@@ -495,7 +498,11 @@ void VideoDecoder::addVideoStream(
           videoStreamOptions.device.type() == torch::kCUDA,
       "Invalid device type: " + videoStreamOptions.device.str());
 
-  addStream(streamIndex, AVMEDIA_TYPE_VIDEO, videoStreamOptions.device);
+  addStream(
+      streamIndex,
+      AVMEDIA_TYPE_VIDEO,
+      videoStreamOptions.device,
+      videoStreamOptions.ffmpegThreadCount);
 
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -510,8 +517,6 @@ void VideoDecoder::addVideoStream(
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.videoStreamOptions = videoStreamOptions;
-  streamInfo.codecContext->thread_count =
-      videoStreamOptions.ffmpegThreadCount.value_or(0);
 
   streamMetadata.width = streamInfo.codecContext->width;
   streamMetadata.height = streamInfo.codecContext->height;
