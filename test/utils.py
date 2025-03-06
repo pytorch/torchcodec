@@ -3,8 +3,8 @@ import os
 import pathlib
 import sys
 
-from dataclasses import dataclass
-from typing import Dict, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 import numpy as np
 import pytest
@@ -203,6 +203,8 @@ class TestVideoStreamInfo:
 
 @dataclass
 class TestVideo(TestContainerFile):
+    """Base class for the *video* streams of a video container"""
+
     stream_infos: Dict[int, TestVideoStreamInfo]
 
     def get_frame_data_by_index(
@@ -318,13 +320,16 @@ class TestAudioStreamInfo:
     sample_rate: int
     num_channels: int
     duration_seconds: float
+    num_frames: int
 
 
 @dataclass
 class TestAudio(TestContainerFile):
+    """Base class for the *audio* streams of a container (potentially a video),
+    or a pure audio file"""
 
     stream_infos: Dict[int, TestAudioStreamInfo]
-    _reference_frames: tuple[torch.Tensor] = tuple()
+    _reference_frames: Dict[int, List[torch.Tensor]] = field(default_factory=dict)
 
     # Storing each individual frame is too expensive for audio, because there's
     # a massive overhead in the binary format saved by pytorch. Saving all the
@@ -333,32 +338,22 @@ class TestAudio(TestContainerFile):
     # So we store the reference frames in a single file, and load/cache those
     # when the TestAudio instance is created.
     def __post_init__(self):
-        # We hard-code the default stream index, see TODO below.
-        file_path = _get_file_path(
-            f"{self.filename}.stream{self.default_stream_index}.all_frames.pt"
-        )
-        if not file_path.exists():
-            return  # TODO-audio
-        t = torch.load(file_path, weights_only=True)
+        for stream_index in self.stream_infos:
+            file_path = _get_file_path(
+                f"{self.filename}.stream{stream_index}.all_frames.pt"
+            )
 
-        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
-        # of the 204 frames contains 1024 samples.
-        # TODO make this more generic
-        assert t.shape == (2, 204 * 1024)
-        self._reference_frames = torch.chunk(t, chunks=204, dim=1)
+            self._reference_frames[stream_index] = torch.load(
+                file_path, weights_only=True
+            )
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
-        if stream_index is not None and stream_index != self.default_stream_index:
-            # TODO address this, the fix should be to let _reference_frames be a
-            # dict[tuple[torch.Tensor]] where keys are stream indices, and load
-            # all of those indices in __post_init__.
-            raise ValueError(
-                "Can only use default stream index with TestAudio for now."
-            )
+        if stream_index is None:
+            stream_index = self.default_stream_index
 
-        return self._reference_frames[idx]
+        return self._reference_frames[stream_index][idx]
 
     def pts_to_frame_index(self, pts_seconds: float) -> int:
         # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
@@ -379,10 +374,9 @@ class TestAudio(TestContainerFile):
     def duration_seconds(self) -> float:
         return self.stream_infos[self.default_stream_index].duration_seconds
 
-    # TODO: this shouldn't be named chw. Also values are hard-coded
     @property
-    def empty_chw_tensor(self) -> torch.Tensor:
-        return torch.empty([0, 2, 1024], dtype=torch.float32)
+    def num_frames(self) -> int:
+        return self.stream_infos[self.default_stream_index].num_frames
 
 
 NASA_AUDIO_MP3 = TestAudio(
@@ -391,7 +385,7 @@ NASA_AUDIO_MP3 = TestAudio(
     frames={},  # TODO
     stream_infos={
         0: TestAudioStreamInfo(
-            sample_rate=8_000, num_channels=2, duration_seconds=13.248
+            sample_rate=8_000, num_channels=2, duration_seconds=13.248, num_frames=183
         )
     },
 )
@@ -402,7 +396,7 @@ NASA_AUDIO = TestAudio(
     frames={},  # TODO
     stream_infos={
         4: TestAudioStreamInfo(
-            sample_rate=16_000, num_channels=2, duration_seconds=13.056
+            sample_rate=16_000, num_channels=2, duration_seconds=13.056, num_frames=204
         )
     },
 )

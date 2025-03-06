@@ -40,6 +40,7 @@ from ..utils import (
     assert_frames_equal,
     cpu_and_cuda,
     NASA_AUDIO,
+    NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
 )
@@ -636,6 +637,45 @@ class TestOps:
             RuntimeError, match="seek_mode must be 'approximate' for audio"
         ):
             add_audio_stream(decoder)
+
+    def test_audio_decode_all_samples_with_get_frames_by_pts_in_range(self):
+        decoder = create_from_file(str(NASA_AUDIO.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        reference_frames = [
+            NASA_AUDIO.get_frame_data_by_index(i) for i in range(NASA_AUDIO.num_frames)
+        ]
+        reference_frames = torch.stack(
+            reference_frames
+        )  # shape is (num_frames, C, num_samples_per_frame)
+
+        all_frames, *_ = get_frames_by_pts_in_range(
+            decoder, start_seconds=0, stop_seconds=NASA_AUDIO.duration_seconds
+        )
+        assert_frames_equal(all_frames, reference_frames)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_audio_decode_all_samples_with_next(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        reference_frames = [
+            asset.get_frame_data_by_index(i) for i in range(asset.num_frames)
+        ]
+
+        # shape is (C, num_frames * num_samples_per_frame) while preserving frame order and boundaries
+        reference_frames = torch.cat(reference_frames, dim=-1)
+
+        all_frames = []
+        while True:
+            try:
+                frame, *_ = get_next_frame(decoder)
+                all_frames.append(frame)
+            except IndexError:
+                break
+        all_frames = torch.cat(all_frames, axis=-1)
+
+        assert_frames_equal(all_frames, reference_frames)
 
     @pytest.mark.parametrize(
         "start_seconds, stop_seconds",

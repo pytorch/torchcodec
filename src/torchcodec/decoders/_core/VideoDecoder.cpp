@@ -575,7 +575,7 @@ void VideoDecoder::addAudioStream(int streamIndex) {
   // TODO-AUDIO
   TORCH_CHECK(
       streamMetadata.averageFps.has_value(),
-      "frame_size or sampl_rate aren't known. Cannot decode.");
+      "frame_size or sample_rate aren't known. Cannot decode.");
 
   streamMetadata.sampleRate =
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
@@ -1311,20 +1311,18 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
 
-  // TODO-AUDIO: dtype should be format-dependent
-  // TODO-AUDIO rename data to something else
-  torch::Tensor data;
+  torch::Tensor outputData;
   if (preAllocatedOutputTensor.has_value()) {
-    data = preAllocatedOutputTensor.value();
+    outputData = preAllocatedOutputTensor.value();
   } else {
-    data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+    outputData = torch::empty({numChannels, numSamples}, torch::kFloat32);
   }
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
-  // TODO Implement all formats
+  // TODO-AUDIO Implement all formats.
   switch (format) {
     case AV_SAMPLE_FMT_FLTP: {
-      uint8_t* outputChannelData = static_cast<uint8_t*>(data.data_ptr());
+      uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
       auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
       for (auto channel = 0; channel < numChannels;
            ++channel, outputChannelData += numBytesPerChannel) {
@@ -1341,7 +1339,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
           "Unsupported audio format (yet!): ",
           av_get_sample_fmt_name(format));
   }
-  frameOutput.data = data;
+  frameOutput.data = outputData;
 }
 
 // --------------------------------------------------------------------------
