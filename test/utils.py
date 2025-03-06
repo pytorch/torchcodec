@@ -25,8 +25,17 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
-def get_ffmpeg_major_version():
-    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+def assert_frames_equal(*args, **kwargs):
+    frame = args[0]
+    # This heuristic will work until we start returning uint8 audio frames...
+    if frame.dtype == torch.uint8:
+        return assert_video_frames_equal(*args, **kwargs)
+    else:
+        return assert_audio_frames_equal(*args, **kwargs)
+
+
+def assert_audio_frames_equal(*args, **kwargs):
+    torch.testing.assert_close(*args, **kwargs)
 
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
@@ -34,7 +43,7 @@ def get_ffmpeg_major_version():
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_frames_equal(*args, **kwargs):
+def assert_video_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             atol = 2
@@ -72,6 +81,10 @@ def assert_tensor_close_on_at_least(actual_tensor, ref_tensor, *, percentage, at
         )
 
 
+def get_ffmpeg_major_version():
+    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+
+
 def in_fbcode() -> bool:
     return os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
 
@@ -87,11 +100,6 @@ def _get_file_path(filename: str) -> pathlib.Path:
             return path
     else:
         return pathlib.Path(__file__).parent / "resources" / filename
-
-
-def _load_tensor_from_file(filename: str) -> torch.Tensor:
-    file_path = _get_file_path(filename)
-    return torch.load(file_path, weights_only=True).permute(2, 0, 1)
 
 
 @dataclass
@@ -120,12 +128,7 @@ class TestContainerFile:
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
-        if stream_index is None:
-            stream_index = self.default_stream_index
-
-        return _load_tensor_from_file(
-            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
-        )
+        raise NotImplementedError("Override in child classes")
 
     def get_frame_data_by_range(
         self,
@@ -201,6 +204,17 @@ class TestVideoStreamInfo:
 @dataclass
 class TestVideo(TestContainerFile):
     stream_infos: Dict[int, TestVideoStreamInfo]
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        file_path = _get_file_path(
+            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
+        )
+        return torch.load(file_path, weights_only=True).permute(2, 0, 1)
 
     @property
     def width(self) -> int:
@@ -298,10 +312,99 @@ NASA_VIDEO = TestVideo(
     },
 )
 
-# When we start actually decoding audio-only files, we'll probably need to define
-# a TestAudio class with audio specific values. Until then, we only need a filename.
-NASA_AUDIO_MP3 = TestContainerFile(
-    filename="nasa_13013.mp4.audio.mp3", default_stream_index=0, frames={}
+
+@dataclass
+class TestAudioStreamInfo:
+    sample_rate: int
+    num_channels: int
+    duration_seconds: float
+
+
+@dataclass
+class TestAudio(TestContainerFile):
+
+    stream_infos: Dict[int, TestAudioStreamInfo]
+    _reference_frames: tuple[torch.Tensor] = tuple()
+
+    # Storing each individual frame is too expensive for audio, because there's
+    # a massive overhead in the binary format saved by pytorch. Saving all the
+    # frames in a single file uses 1.6MB while saving all frames in individual
+    # files uses 302MB (yes).
+    # So we store the reference frames in a single file, and load/cache those
+    # when the TestAudio instance is created.
+    def __post_init__(self):
+        # We hard-code the default stream index, see TODO below.
+        file_path = _get_file_path(
+            f"{self.filename}.stream{self.default_stream_index}.all_frames.pt"
+        )
+        if not file_path.exists():
+            return  # TODO-audio
+        t = torch.load(file_path, weights_only=True)
+
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
+        # of the 204 frames contains 1024 samples.
+        # TODO make this more generic
+        assert t.shape == (2, 204 * 1024)
+        self._reference_frames = torch.chunk(t, chunks=204, dim=1)
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is not None and stream_index != self.default_stream_index:
+            # TODO address this, the fix should be to let _reference_frames be a
+            # dict[tuple[torch.Tensor]] where keys are stream indices, and load
+            # all of those indices in __post_init__.
+            raise ValueError(
+                "Can only use default stream index with TestAudio for now."
+            )
+
+        return self._reference_frames[idx]
+
+    def pts_to_frame_index(self, pts_seconds: float) -> int:
+        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
+        # of the 204 frames contains 1024 samples.
+        # TODO make this more generic
+        frame_duration_seconds = 0.064
+        return int(pts_seconds // frame_duration_seconds)
+
+    @property
+    def sample_rate(self) -> int:
+        return self.stream_infos[self.default_stream_index].sample_rate
+
+    @property
+    def num_channels(self) -> int:
+        return self.stream_infos[self.default_stream_index].num_channels
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.stream_infos[self.default_stream_index].duration_seconds
+
+    # TODO: this shouldn't be named chw. Also values are hard-coded
+    @property
+    def empty_chw_tensor(self) -> torch.Tensor:
+        return torch.empty([0, 2, 1024], dtype=torch.float32)
+
+
+NASA_AUDIO_MP3 = TestAudio(
+    filename="nasa_13013.mp4.audio.mp3",
+    default_stream_index=0,
+    frames={},  # TODO
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=8_000, num_channels=2, duration_seconds=13.248
+        )
+    },
+)
+
+NASA_AUDIO = TestAudio(
+    filename="nasa_13013.mp4",
+    default_stream_index=4,
+    frames={},  # TODO
+    stream_infos={
+        4: TestAudioStreamInfo(
+            sample_rate=16_000, num_channels=2, duration_seconds=13.056
+        )
+    },
 )
 
 H265_VIDEO = TestVideo(
