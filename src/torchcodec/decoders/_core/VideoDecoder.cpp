@@ -303,12 +303,11 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   }
 
   // Reset the seek-cursor back to the beginning.
-  int ffmepgStatus =
-      avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
-  if (ffmepgStatus < 0) {
+  int status = avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
+  if (status < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=0: " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   // Sort all frames by their pts.
@@ -967,17 +966,17 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
-  int ffmepgStatus = avformat_seek_file(
+  int status = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
       INT64_MIN,
       desiredPts,
       desiredPts,
       0);
-  if (ffmepgStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
@@ -1668,6 +1667,9 @@ int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return std::floor(seconds * streamMetadata.averageFps.value());
     }
     default:
@@ -1692,6 +1694,9 @@ int64_t VideoDecoder::secondsToIndexUpperBound(double seconds) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return std::ceil(seconds * streamMetadata.averageFps.value());
     }
     default:
@@ -1707,6 +1712,9 @@ int64_t VideoDecoder::getPts(int64_t frameIndex) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return secondsToClosestPts(
           frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
     }
@@ -1723,8 +1731,12 @@ int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
       return streamMetadata.numFramesFromScan.value();
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      TORCH_CHECK(
+          streamMetadata.numFrames.has_value(),
+          "Cannot use approximate mode since we couldn't find the number of frames from the metadata.");
       return streamMetadata.numFrames.value();
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
@@ -1745,8 +1757,12 @@ double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
       return streamMetadata.maxPtsSecondsFromScan.value();
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      TORCH_CHECK(
+          streamMetadata.durationSeconds.has_value(),
+          "Cannot use approximate mode since we couldn't find the duration from the metadata.");
       return streamMetadata.durationSeconds.value();
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
