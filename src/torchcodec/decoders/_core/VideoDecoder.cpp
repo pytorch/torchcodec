@@ -1536,6 +1536,9 @@ int64_t VideoDecoder::secondsToIndexLowerBound(double seconds) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return std::floor(seconds * streamMetadata.averageFps.value());
     }
     default:
@@ -1560,6 +1563,9 @@ int64_t VideoDecoder::secondsToIndexUpperBound(double seconds) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return std::ceil(seconds * streamMetadata.averageFps.value());
     }
     default:
@@ -1575,6 +1581,9 @@ int64_t VideoDecoder::getPts(int64_t frameIndex) {
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
+      TORCH_CHECK(
+          streamMetadata.averageFps.has_value(),
+          "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return secondsToClosestPts(
           frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
     }
@@ -1591,8 +1600,12 @@ int64_t VideoDecoder::getNumFrames(const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
       return streamMetadata.numFramesFromScan.value();
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      TORCH_CHECK(
+          streamMetadata.numFrames.has_value(),
+          "Cannot use approximate mode since we couldn't find the number of frames from the metadata.");
       return streamMetadata.numFrames.value();
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
@@ -1613,8 +1626,12 @@ double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
       return streamMetadata.maxPtsSecondsFromScan.value();
-    case SeekMode::approximate:
+    case SeekMode::approximate: {
+      TORCH_CHECK(
+          streamMetadata.durationSeconds.has_value(),
+          "Cannot use approximate mode since we couldn't find the duration from the metadata.");
       return streamMetadata.durationSeconds.value();
+    }
     default:
       throw std::runtime_error("Unknown SeekMode");
   }
