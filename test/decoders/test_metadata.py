@@ -9,27 +9,28 @@ import functools
 import pytest
 
 from torchcodec.decoders._core import (
+    AudioStreamMetadata,
     create_from_file,
+    get_container_metadata,
+    get_container_metadata_from_header,
     get_ffmpeg_library_versions,
-    get_video_metadata,
-    get_video_metadata_from_header,
     VideoStreamMetadata,
 )
 
-from ..utils import NASA_VIDEO
+from ..utils import NASA_AUDIO_MP3, NASA_VIDEO
 
 
-def _get_video_metadata(path, seek_mode):
+def _get_container_metadata(path, seek_mode):
     decoder = create_from_file(str(path), seek_mode=seek_mode)
-    return get_video_metadata(decoder)
+    return get_container_metadata(decoder)
 
 
 @pytest.mark.parametrize(
     "metadata_getter",
     (
-        get_video_metadata_from_header,
-        functools.partial(_get_video_metadata, seek_mode="approximate"),
-        functools.partial(_get_video_metadata, seek_mode="exact"),
+        get_container_metadata_from_header,
+        functools.partial(_get_container_metadata, seek_mode="approximate"),
+        functools.partial(_get_container_metadata, seek_mode="exact"),
     ),
 )
 def test_get_metadata(metadata_getter):
@@ -40,6 +41,7 @@ def test_get_metadata(metadata_getter):
     )
 
     metadata = metadata_getter(NASA_VIDEO.path)
+    # metadata = metadata_getter(NASA_VIDEO.path)
 
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
@@ -65,15 +67,48 @@ def test_get_metadata(metadata_getter):
     )
     assert metadata.bit_rate_from_header == expected_bit_rate_from_header
 
-    best_stream_metadata = metadata.streams[metadata.best_video_stream_index]
-    assert best_stream_metadata is metadata.best_video_stream
-    assert best_stream_metadata.duration_seconds == pytest.approx(13.013, abs=0.001)
-    assert best_stream_metadata.bit_rate == 128783
-    assert best_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
-    assert best_stream_metadata.codec == "h264"
-    assert best_stream_metadata.num_frames_from_content == (390 if with_scan else None)
-    assert best_stream_metadata.num_frames_from_header == 390
-    assert best_stream_metadata.num_frames == 390
+    best_video_stream_metadata = metadata.streams[metadata.best_video_stream_index]
+    assert isinstance(best_video_stream_metadata, VideoStreamMetadata)
+    assert best_video_stream_metadata is metadata.best_video_stream
+    assert best_video_stream_metadata.duration_seconds == pytest.approx(
+        13.013, abs=0.001
+    )
+    assert best_video_stream_metadata.bit_rate == 128783
+    assert best_video_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
+    assert best_video_stream_metadata.codec == "h264"
+    assert best_video_stream_metadata.num_frames_from_content == (
+        390 if with_scan else None
+    )
+    assert best_video_stream_metadata.num_frames_from_header == 390
+    assert best_video_stream_metadata.num_frames == 390
+
+    best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
+    assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
+    assert best_audio_stream_metadata is metadata.best_audio_stream
+    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
+        13.056, abs=0.001
+    )
+    assert best_audio_stream_metadata.bit_rate == 128837
+    assert best_audio_stream_metadata.codec == "aac"
+
+
+@pytest.mark.parametrize(
+    "metadata_getter",
+    (
+        get_container_metadata_from_header,
+        functools.partial(_get_container_metadata, seek_mode="approximate"),
+    ),
+)
+def test_get_metadata_audio_file(metadata_getter):
+    metadata = metadata_getter(NASA_AUDIO_MP3.path)
+    best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
+    assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
+    assert best_audio_stream_metadata is metadata.best_audio_stream
+    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
+        13.248, abs=0.001
+    )
+    assert best_audio_stream_metadata.bit_rate == 64000
+    assert best_audio_stream_metadata.codec == "mp3"
 
 
 @pytest.mark.parametrize(

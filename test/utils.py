@@ -300,7 +300,7 @@ NASA_VIDEO = TestVideo(
 
 # When we start actually decoding audio-only files, we'll probably need to define
 # a TestAudio class with audio specific values. Until then, we only need a filename.
-NASA_AUDIO = TestContainerFile(
+NASA_AUDIO_MP3 = TestContainerFile(
     filename="nasa_13013.mp4.audio.mp3", default_stream_index=0, frames={}
 )
 

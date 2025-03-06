@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
+from functools import partial
 
 os.environ["TORCH_LOGS"] = "output_code"
 import json
@@ -18,6 +19,7 @@ import torch
 from torchcodec.decoders._core import (
     _add_video_stream,
     _test_frame_pts_equality,
+    add_audio_stream,
     add_video_stream,
     create_from_bytes,
     create_from_file,
@@ -37,7 +39,7 @@ from torchcodec.decoders._core import (
 from ..utils import (
     assert_frames_equal,
     cpu_and_cuda,
-    NASA_AUDIO,
+    NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
 )
@@ -395,10 +397,10 @@ class TestOps:
         assert metadata_dict["maxPtsSecondsFromScan"] == 13.013
 
     def test_audio_get_json_metadata(self):
-        decoder = create_from_file(str(NASA_AUDIO.path))
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path))
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
-        assert metadata_dict["durationSeconds"] == pytest.approx(13.25, abs=0.01)
+        assert metadata_dict["durationSeconds"] == pytest.approx(13.248, abs=0.01)
 
     def test_get_ffmpeg_version(self):
         ffmpeg_dict = get_ffmpeg_library_versions()
@@ -617,6 +619,30 @@ class TestOps:
         torch.testing.assert_close(
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
         )
+
+    @pytest.mark.parametrize(
+        "method",
+        (
+            partial(get_frame_at_index, frame_index=4),
+            partial(get_frames_at_indices, frame_indices=[4, 5]),
+            partial(get_frames_in_range, start=4, stop=5),
+            partial(get_frame_at_pts, seconds=2),
+            partial(get_frames_by_pts, timestamps=[0, 1.5]),
+            partial(get_frames_by_pts_in_range, start_seconds=0, stop_seconds=1),
+        ),
+    )
+    def test_audio_bad_method(self, method):
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+        with pytest.raises(RuntimeError, match="The method you called isn't supported"):
+            method(decoder)
+
+    def test_audio_bad_seek_mode(self):
+        decoder = create_from_file(str(NASA_AUDIO_MP3.path), seek_mode="exact")
+        with pytest.raises(
+            RuntimeError, match="seek_mode must be 'approximate' for audio"
+        ):
+            add_audio_stream(decoder)
 
 
 if __name__ == "__main__":
