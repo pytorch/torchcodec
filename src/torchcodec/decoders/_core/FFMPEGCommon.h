@@ -139,6 +139,8 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 int64_t getDuration(const UniqueAVFrame& frame);
 int64_t getDuration(const AVFrame* frame);
 
+int64_t getNumChannels(const UniqueAVCodecContext& avCodecContext);
+
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
 

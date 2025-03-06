@@ -19,24 +19,19 @@ from torchcodec.decoders._core.video_decoder_ops import (
 )
 
 
-@dataclass
-class VideoStreamMetadata:
-    """Metadata of a single video stream."""
+SPACES = "  "
 
+
+# TODO-AUDIO: docs below are mostly for video streams, we should edit them and /
+# or make sure they're OK for audio streams as well. Not sure how to best handle
+# docs for such class hierarchy.
+@dataclass
+class StreamMetadata:
     duration_seconds_from_header: Optional[float]
     """Duration of the stream, in seconds, obtained from the header (float or
     None). This could be inaccurate."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
-    num_frames_from_header: Optional[int]
-    """Number of frames, from the stream's metadata. This is potentially
-    inaccurate. We recommend using the ``num_frames`` attribute instead.
-    (int or None)."""
-    num_frames_from_content: Optional[int]
-    """Number of frames computed by TorchCodec by scanning the stream's
-    content (the scan doesn't involve decoding). This is more accurate
-    than ``num_frames_from_header``. We recommend using the
-    ``num_frames`` attribute instead. (int or None)."""
     begin_stream_seconds_from_content: Optional[float]
     """Beginning of the stream, in seconds (float or None).
     Conceptually, this corresponds to the first frame's :term:`pts`. It is
@@ -54,26 +49,8 @@ class VideoStreamMetadata:
     """
     codec: Optional[str]
     """Codec (str or None)."""
-    width: Optional[int]
-    """Width of the frames (int or None)."""
-    height: Optional[int]
-    """Height of the frames (int or None)."""
-    average_fps_from_header: Optional[float]
-    """Averate fps of the stream, obtained from the header (float or None).
-    We recommend using the ``average_fps`` attribute instead."""
     stream_index: int
     """Index of the stream within the video (int)."""
-
-    @property
-    def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to
-        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
-        corresponds to ``num_frames_from_header``.
-        """
-        if self.num_frames_from_content is not None:
-            return self.num_frames_from_content
-        else:
-            return self.num_frames_from_header
 
     @property
     def duration_seconds(self) -> Optional[float]:
@@ -87,23 +64,6 @@ class VideoStreamMetadata:
         ):
             return self.duration_seconds_from_header
         return (
-            self.end_stream_seconds_from_content
-            - self.begin_stream_seconds_from_content
-        )
-
-    @property
-    def average_fps(self) -> Optional[float]:
-        """Average fps of the stream. If a :term:`scan` was perfomed, this is
-        computed from the number of frames and the duration of the stream.
-        Otherwise we fall back to ``average_fps_from_header``.
-        """
-        if (
-            self.end_stream_seconds_from_content is None
-            or self.begin_stream_seconds_from_content is None
-            or self.num_frames is None
-        ):
-            return self.average_fps_from_header
-        return self.num_frames / (
             self.end_stream_seconds_from_content
             - self.begin_stream_seconds_from_content
         )
@@ -135,23 +95,88 @@ class VideoStreamMetadata:
     def __repr__(self):
         # Overridden because properites are not printed by default.
         s = self.__class__.__name__ + ":\n"
-        spaces = "  "
-        s += f"{spaces}num_frames: {self.num_frames}\n"
-        s += f"{spaces}duration_seconds: {self.duration_seconds}\n"
-        s += f"{spaces}average_fps: {self.average_fps}\n"
+        s += f"{SPACES}duration_seconds: {self.duration_seconds}\n"
         for field in dataclasses.fields(self):
-            s += f"{spaces}{field.name}: {getattr(self, field.name)}\n"
+            s += f"{SPACES}{field.name}: {getattr(self, field.name)}\n"
         return s
 
 
 @dataclass
-class VideoMetadata:
+class VideoStreamMetadata(StreamMetadata):
+    """Metadata of a single video stream."""
+
+    width: Optional[int]
+    """Width of the frames (int or None)."""
+    height: Optional[int]
+    """Height of the frames (int or None)."""
+    num_frames_from_header: Optional[int]
+    """Number of frames, from the stream's metadata. This is potentially
+    inaccurate. We recommend using the ``num_frames`` attribute instead.
+    (int or None)."""
+    num_frames_from_content: Optional[int]
+    """Number of frames computed by TorchCodec by scanning the stream's
+    content (the scan doesn't involve decoding). This is more accurate
+    than ``num_frames_from_header``. We recommend using the
+    ``num_frames`` attribute instead. (int or None)."""
+    average_fps_from_header: Optional[float]
+    """Averate fps of the stream, obtained from the header (float or None).
+    We recommend using the ``average_fps`` attribute instead."""
+
+    @property
+    def num_frames(self) -> Optional[int]:
+        """Number of frames in the stream. This corresponds to
+        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
+        corresponds to ``num_frames_from_header``.
+        """
+        if self.num_frames_from_content is not None:
+            return self.num_frames_from_content
+        else:
+            return self.num_frames_from_header
+
+    @property
+    def average_fps(self) -> Optional[float]:
+        """Average fps of the stream. If a :term:`scan` was perfomed, this is
+        computed from the number of frames and the duration of the stream.
+        Otherwise we fall back to ``average_fps_from_header``.
+        """
+        if (
+            self.end_stream_seconds_from_content is None
+            or self.begin_stream_seconds_from_content is None
+            or self.num_frames is None
+        ):
+            return self.average_fps_from_header
+        return self.num_frames / (
+            self.end_stream_seconds_from_content
+            - self.begin_stream_seconds_from_content
+        )
+
+    def __repr__(self):
+        s = super().__repr__()
+        s += f"{SPACES}num_frames: {self.num_frames}\n"
+        s += f"{SPACES}average_fps: {self.average_fps}\n"
+        return s
+
+
+@dataclass
+class AudioStreamMetadata(StreamMetadata):
+    """Metadata of a single audio stream."""
+
+    # TODO-AUDIO Add sample format field
+    sample_rate: Optional[int]
+    num_channels: Optional[int]
+
+    def __repr__(self):
+        return super().__repr__()
+
+
+@dataclass
+class ContainerMetadata:
     duration_seconds_from_header: Optional[float]
     bit_rate_from_header: Optional[float]
     best_video_stream_index: Optional[int]
     best_audio_stream_index: Optional[int]
 
-    streams: List[VideoStreamMetadata]
+    streams: List[StreamMetadata]
 
     @property
     def duration_seconds(self) -> Optional[float]:
@@ -165,41 +190,66 @@ class VideoMetadata:
     def best_video_stream(self) -> VideoStreamMetadata:
         if self.best_video_stream_index is None:
             raise ValueError("The best video stream is unknown.")
-        return self.streams[self.best_video_stream_index]
+        metadata = self.streams[self.best_video_stream_index]
+        assert isinstance(metadata, VideoStreamMetadata)  # mypy <3
+        return metadata
+
+    @property
+    def best_audio_stream(self) -> AudioStreamMetadata:
+        if self.best_audio_stream_index is None:
+            raise ValueError("The best audio stream is unknown.")
+        metadata = self.streams[self.best_audio_stream_index]
+        assert isinstance(metadata, AudioStreamMetadata)  # mypy <3
+        return metadata
 
 
-def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
-    """Return video metadata from a video decoder.
+# TODO-AUDIO: This is user-facing. Should this just be `get_metadata`, without
+# the "container" name in it? Same below.
+def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
+    """Return container metadata from a decoder.
 
     The accuracy of the metadata and the availability of some returned fields
     depends on whether a full scan was performed by the decoder.
     """
 
     container_dict = json.loads(_get_container_json_metadata(decoder))
-    streams_metadata = []
+    streams_metadata: List[StreamMetadata] = []
     for stream_index in range(container_dict["numStreams"]):
         stream_dict = json.loads(_get_stream_json_metadata(decoder, stream_index))
-        streams_metadata.append(
-            VideoStreamMetadata(
-                duration_seconds_from_header=stream_dict.get("durationSeconds"),
-                bit_rate=stream_dict.get("bitRate"),
-                num_frames_from_header=stream_dict.get("numFrames"),
-                num_frames_from_content=stream_dict.get("numFramesFromScan"),
-                begin_stream_seconds_from_content=stream_dict.get(
-                    "minPtsSecondsFromScan"
-                ),
-                end_stream_seconds_from_content=stream_dict.get(
-                    "maxPtsSecondsFromScan"
-                ),
-                codec=stream_dict.get("codec"),
-                width=stream_dict.get("width"),
-                height=stream_dict.get("height"),
-                average_fps_from_header=stream_dict.get("averageFps"),
-                stream_index=stream_index,
-            )
+        common_meta = dict(
+            duration_seconds_from_header=stream_dict.get("durationSeconds"),
+            bit_rate=stream_dict.get("bitRate"),
+            begin_stream_seconds_from_content=stream_dict.get("minPtsSecondsFromScan"),
+            end_stream_seconds_from_content=stream_dict.get("maxPtsSecondsFromScan"),
+            codec=stream_dict.get("codec"),
+            stream_index=stream_index,
         )
+        if stream_dict["mediaType"] == "video":
+            streams_metadata.append(
+                VideoStreamMetadata(
+                    width=stream_dict.get("width"),
+                    height=stream_dict.get("height"),
+                    num_frames_from_header=stream_dict.get("numFrames"),
+                    num_frames_from_content=stream_dict.get("numFramesFromScan"),
+                    average_fps_from_header=stream_dict.get("averageFps"),
+                    **common_meta,
+                )
+            )
+        elif stream_dict["mediaType"] == "audio":
+            streams_metadata.append(
+                AudioStreamMetadata(
+                    sample_rate=stream_dict.get("sampleRate"),
+                    num_channels=stream_dict.get("numChannels"),
+                    **common_meta,
+                )
+            )
+        else:
+            # This is neither a video nor audio stream. Could be e.g. subtitles.
+            # We still need to add a dummy entry so that len(streams_metadata)
+            # is consistent with the number of streams.
+            streams_metadata.append(StreamMetadata(**common_meta))
 
-    return VideoMetadata(
+    return ContainerMetadata(
         duration_seconds_from_header=container_dict.get("durationSeconds"),
         bit_rate_from_header=container_dict.get("bitRate"),
         best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
@@ -208,5 +258,9 @@ def get_video_metadata(decoder: torch.Tensor) -> VideoMetadata:
     )
 
 
-def get_video_metadata_from_header(filename: Union[str, pathlib.Path]) -> VideoMetadata:
-    return get_video_metadata(create_from_file(str(filename), seek_mode="approximate"))
+def get_container_metadata_from_header(
+    filename: Union[str, pathlib.Path]
+) -> ContainerMetadata:
+    return get_container_metadata(
+        create_from_file(str(filename), seek_mode="approximate")
+    )

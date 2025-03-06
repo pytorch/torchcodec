@@ -6,15 +6,17 @@
 
 
 from ._metadata import (
-    get_video_metadata,
-    get_video_metadata_from_header,
-    VideoMetadata,
+    AudioStreamMetadata,
+    ContainerMetadata,
+    get_container_metadata,
+    get_container_metadata_from_header,
     VideoStreamMetadata,
 )
 from .video_decoder_ops import (
     _add_video_stream,
     _get_key_frame_indices,
     _test_frame_pts_equality,
+    add_audio_stream,
     add_video_stream,
     create_from_bytes,
     create_from_file,

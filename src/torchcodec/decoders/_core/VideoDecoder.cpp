@@ -162,12 +162,11 @@ void VideoDecoder::initializeDecoder() {
           av_q2d(avStream->time_base) * avStream->duration;
     }
 
-    double fps = av_q2d(avStream->r_frame_rate);
-    if (fps > 0) {
-      streamMetadata.averageFps = fps;
-    }
-
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      double fps = av_q2d(avStream->r_frame_rate);
+      if (fps > 0) {
+        streamMetadata.averageFps = fps;
+      }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       containerMetadata_.numAudioStreams++;
@@ -340,7 +339,7 @@ VideoDecoder::ContainerMetadata VideoDecoder::getContainerMetadata() const {
 }
 
 torch::Tensor VideoDecoder::getKeyFrameIndices() {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   validateScannedAllStreams("getKeyFrameIndices");
 
   const std::vector<FrameInfo>& keyFrames =
@@ -409,69 +408,67 @@ VideoDecoder::VideoStreamOptions::VideoStreamOptions(
   }
 }
 
-void VideoDecoder::addVideoStream(
+void VideoDecoder::addStream(
     int streamIndex,
-    const VideoStreamOptions& videoStreamOptions) {
+    AVMediaType mediaType,
+    const torch::Device& device,
+    std::optional<int> ffmpegThreadCount) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
+  TORCH_CHECK(
+      mediaType == AVMEDIA_TYPE_VIDEO || mediaType == AVMEDIA_TYPE_AUDIO,
+      "Can only add video or audio streams.");
   TORCH_CHECK(formatContext_.get() != nullptr);
 
   AVCodecOnlyUseForCallingAVFindBestStream avCodec = nullptr;
 
   activeStreamIndex_ = av_find_best_stream(
-      formatContext_.get(), AVMEDIA_TYPE_VIDEO, streamIndex, -1, &avCodec, 0);
+      formatContext_.get(), mediaType, streamIndex, -1, &avCodec, 0);
+
   if (activeStreamIndex_ < 0) {
-    throw std::invalid_argument("No valid stream found in input file.");
+    throw std::invalid_argument(
+        "No valid stream found in input file. Is " +
+        std::to_string(streamIndex) + " of the desired media type?");
   }
+
   TORCH_CHECK(avCodec != nullptr);
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.streamIndex = activeStreamIndex_;
   streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
+  streamInfo.avMediaType = mediaType;
 
-  if (streamInfo.stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
-    throw std::invalid_argument(
-        "Stream with index " + std::to_string(activeStreamIndex_) +
-        " is not a video stream.");
-  }
+  // This should never happen, checking just to be safe.
+  TORCH_CHECK(
+      streamInfo.stream->codecpar->codec_type == mediaType,
+      "FFmpeg found stream with index ",
+      activeStreamIndex_,
+      " which is of the wrong media type.");
 
-  if (videoStreamOptions.device.type() == torch::kCUDA) {
+  // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
+  // addStream() which is supposed to be generic
+  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
     avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(
-            videoStreamOptions.device, streamInfo.stream->codecpar->codec_id)
+        findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
             .value_or(avCodec));
-  }
-
-  StreamMetadata& streamMetadata =
-      containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " +
-        std::to_string(activeStreamIndex_) +
-        " does not have an average fps in its metadata.");
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(codecContext != nullptr);
-  codecContext->thread_count = videoStreamOptions.ffmpegThreadCount.value_or(0);
   streamInfo.codecContext.reset(codecContext);
 
   int retVal = avcodec_parameters_to_context(
       streamInfo.codecContext.get(), streamInfo.stream->codecpar);
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
-  if (videoStreamOptions.device.type() == torch::kCPU) {
-    // No more initialization needed for CPU.
-  } else if (videoStreamOptions.device.type() == torch::kCUDA) {
-    initializeContextOnCuda(videoStreamOptions.device, codecContext);
-  } else {
-    TORCH_CHECK(
-        false, "Invalid device type: " + videoStreamOptions.device.str());
+  streamInfo.codecContext->thread_count = ffmpegThreadCount.value_or(0);
+
+  // TODO_CODE_QUALITY same as above.
+  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
+    initializeContextOnCuda(device, codecContext);
   }
-  streamInfo.videoStreamOptions = videoStreamOptions;
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
   if (retVal < AVSUCCESS) {
@@ -479,14 +476,8 @@ void VideoDecoder::addVideoStream(
   }
 
   codecContext->time_base = streamInfo.stream->time_base;
-
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].width =
-      codecContext->width;
-  containerMetadata_.allStreamMetadata[activeStreamIndex_].height =
-      codecContext->height;
-  auto codedId = codecContext->codec_id;
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
-      std::string(avcodec_get_name(codedId));
+      std::string(avcodec_get_name(codecContext->codec_id));
 
   // We will only need packets from the active stream, so we tell FFmpeg to
   // discard packets from the other streams. Note that av_read_frame() may still
@@ -497,6 +488,38 @@ void VideoDecoder::addVideoStream(
       formatContext_->streams[i]->discard = AVDISCARD_ALL;
     }
   }
+}
+
+void VideoDecoder::addVideoStream(
+    int streamIndex,
+    const VideoStreamOptions& videoStreamOptions) {
+  TORCH_CHECK(
+      videoStreamOptions.device.type() == torch::kCPU ||
+          videoStreamOptions.device.type() == torch::kCUDA,
+      "Invalid device type: " + videoStreamOptions.device.str());
+
+  addStream(
+      streamIndex,
+      AVMEDIA_TYPE_VIDEO,
+      videoStreamOptions.device,
+      videoStreamOptions.ffmpegThreadCount);
+
+  auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+
+  if (seekMode_ == SeekMode::approximate &&
+      !streamMetadata.averageFps.has_value()) {
+    throw std::runtime_error(
+        "Seek mode is approximate, but stream " +
+        std::to_string(activeStreamIndex_) +
+        " does not have an average fps in its metadata.");
+  }
+
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.videoStreamOptions = videoStreamOptions;
+
+  streamMetadata.width = streamInfo.codecContext->width;
+  streamMetadata.height = streamInfo.codecContext->height;
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
@@ -505,7 +528,7 @@ void VideoDecoder::addVideoStream(
   // swscale's width requirements to be violated. We don't expose the ability to
   // choose color conversion library publicly; we only use this ability
   // internally.
-  int width = videoStreamOptions.width.value_or(codecContext->width);
+  int width = videoStreamOptions.width.value_or(streamInfo.codecContext->width);
 
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
@@ -516,6 +539,21 @@ void VideoDecoder::addVideoStream(
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
+}
+
+void VideoDecoder::addAudioStream(int streamIndex) {
+  TORCH_CHECK(
+      seekMode_ == SeekMode::approximate,
+      "seek_mode must be 'approximate' for audio streams.");
+
+  addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
+
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  streamMetadata.sampleRate =
+      static_cast<int64_t>(streamInfo.codecContext->sample_rate);
+  streamMetadata.numChannels = getNumChannels(streamInfo.codecContext);
 }
 
 // --------------------------------------------------------------------------
@@ -546,7 +584,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
@@ -560,7 +598,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
     const std::vector<int64_t>& frameIndices) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   auto indicesAreSorted =
       std::is_sorted(frameIndices.begin(), frameIndices.end());
@@ -619,7 +657,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesAtIndices(
 
 VideoDecoder::FrameBatchOutput
 VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -690,7 +728,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
 
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
     const std::vector<double>& timestamps) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -721,7 +759,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     double startSeconds,
     double stopSeconds) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -860,7 +898,7 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
   int64_t desiredPts =
@@ -907,7 +945,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   resetDecodeStats();
 
@@ -1587,7 +1625,8 @@ double VideoDecoder::getMaxSeconds(const StreamMetadata& streamMetadata) {
 // VALIDATION UTILS
 // --------------------------------------------------------------------------
 
-void VideoDecoder::validateActiveStream() {
+void VideoDecoder::validateActiveStream(
+    std::optional<AVMediaType> avMediaType) {
   auto errorMsg =
       "Provided stream index=" + std::to_string(activeStreamIndex_) +
       " was not previously added.";
@@ -1601,6 +1640,14 @@ void VideoDecoder::validateActiveStream() {
       "Invalid stream index=" + std::to_string(activeStreamIndex_) +
           "; valid indices are in the range [0, " +
           std::to_string(allStreamMetadataSize) + ").");
+
+  if (avMediaType.has_value()) {
+    TORCH_CHECK(
+        streamInfos_[activeStreamIndex_].avMediaType == avMediaType.value(),
+        "The method you called isn't supported. ",
+        "If you're seeing this error, you are probably trying to call an ",
+        "unsupported method on an audio stream.");
+  }
 }
 
 void VideoDecoder::validateScannedAllStreams(const std::string& msg) {
@@ -1648,7 +1695,7 @@ void VideoDecoder::resetDecodeStats() {
 }
 
 double VideoDecoder::getPtsSecondsForFrame(int64_t frameIndex) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   validateScannedAllStreams("getPtsSecondsForFrame");
 
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
