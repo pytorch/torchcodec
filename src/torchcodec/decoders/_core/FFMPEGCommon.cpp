@@ -62,7 +62,7 @@ int64_t getDuration(const AVFrame* frame) {
 
 int64_t getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
-    (IBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
+    (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
   int numChannels = avCodecContext->ch_layout.nb_channels;
 #else
   int numChannels = avCodecContext->channels;
