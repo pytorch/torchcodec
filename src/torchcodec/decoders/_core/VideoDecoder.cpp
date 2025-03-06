@@ -289,12 +289,11 @@ void VideoDecoder::scanFileAndUpdateMetadataAndIndex() {
   }
 
   // Reset the seek-cursor back to the beginning.
-  int ffmepgStatus =
-      avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
-  if (ffmepgStatus < 0) {
+  int status = avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
+  if (status < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=0: " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 
   // Sort all frames by their pts.
@@ -923,17 +922,17 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
-  int ffmepgStatus = avformat_seek_file(
+  int status = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
       INT64_MIN,
       desiredPts,
       desiredPts,
       0);
-  if (ffmepgStatus < 0) {
+  if (status < 0) {
     throw std::runtime_error(
         "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
-        getFFMPEGErrorStringFromErrorCode(ffmepgStatus));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
