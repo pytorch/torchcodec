@@ -203,6 +203,8 @@ class ContainerMetadata:
         return metadata
 
 
+# TODO-AUDIO: This is user-facing. Should this just be `get_metadata`, without
+# the "container" name in it? Same below.
 def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
     """Return container metadata from a decoder.
 
