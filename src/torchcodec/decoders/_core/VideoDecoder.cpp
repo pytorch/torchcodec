@@ -893,10 +893,20 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   setCursorPtsInSeconds(startSeconds);
 
+  // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
+  // cat(). This would save a copy. We know the duration of the output and the
+  // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> tensors;
 
   while (true) {
-    auto frameOutput = getNextFrameInternal();
+    AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
+      StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
+      return (avFrame->pts >= activeStreamInfo.discardFramesBeforePts) ||
+          (avFrame->pts < activeStreamInfo.discardFramesBeforePts &&
+           activeStreamInfo.discardFramesBeforePts <
+               avFrame->pts + avFrame->duration);
+    });
+    auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
     tensors.push_back(frameOutput.data);
 
     double lastFrameStartPts =
