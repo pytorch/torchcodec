@@ -30,6 +30,7 @@ from torchcodec.decoders._core import (
     get_frames_at_indices,
     get_frames_by_pts,
     get_frames_by_pts_in_range,
+    get_frames_by_pts_in_range_audio,
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,
@@ -638,20 +639,44 @@ class TestOps:
         ):
             add_audio_stream(decoder)
 
-    def test_audio_decode_all_samples_with_get_frames_by_pts_in_range(self):
-        decoder = create_from_file(str(NASA_AUDIO.path), seek_mode="approximate")
+    # TODO-audio: this fails with NASA_AUDIO_MP3 because numFrame isn't in the
+    # metadata
+    # @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    @pytest.mark.parametrize("asset", (NASA_AUDIO,))
+    def test_audio_decode_all_samples_with_get_frames_by_pts_in_range(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
         reference_frames = [
-            NASA_AUDIO.get_frame_data_by_index(i) for i in range(NASA_AUDIO.num_frames)
+            asset.get_frame_data_by_index(i) for i in range(asset.num_frames)
         ]
-        reference_frames = torch.stack(
-            reference_frames
-        )  # shape is (num_frames, C, num_samples_per_frame)
+        # shape is (C, num_frames * num_samples_per_frame) while preserving frame order and boundaries
+        reference_frames = torch.cat(reference_frames, dim=-1)
 
         all_frames, *_ = get_frames_by_pts_in_range(
-            decoder, start_seconds=0, stop_seconds=NASA_AUDIO.duration_seconds
+            decoder, start_seconds=0, stop_seconds=asset.duration_seconds
         )
+        all_frames = torch.cat(all_frames.unbind(0), dim=-1)
+
+        assert_frames_equal(all_frames, reference_frames)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_audio_decode_all_samples_with_get_frames_by_pts_in_range_audio(
+        self, asset
+    ):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        reference_frames = [
+            asset.get_frame_data_by_index(i) for i in range(asset.num_frames)
+        ]
+        # shape is (C, num_frames * num_samples_per_frame) while preserving frame order and boundaries
+        reference_frames = torch.cat(reference_frames, dim=-1)
+
+        all_frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=asset.duration_seconds
+        )
+
         assert_frames_equal(all_frames, reference_frames)
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
@@ -663,7 +688,6 @@ class TestOps:
             asset.get_frame_data_by_index(i) for i in range(asset.num_frames)
         ]
 
-        # shape is (C, num_frames * num_samples_per_frame) while preserving frame order and boundaries
         reference_frames = torch.cat(reference_frames, dim=-1)
 
         all_frames = []
@@ -673,7 +697,7 @@ class TestOps:
                 all_frames.append(frame)
             except IndexError:
                 break
-        all_frames = torch.cat(all_frames, axis=-1)
+        all_frames = torch.cat(all_frames, dim=-1)
 
         assert_frames_equal(all_frames, reference_frames)
 
@@ -696,8 +720,8 @@ class TestOps:
         add_audio_stream(decoder)
 
         reference_frames = NASA_AUDIO.get_frame_data_by_range(
-            start=NASA_AUDIO.pts_to_frame_index(start_seconds),
-            stop=NASA_AUDIO.pts_to_frame_index(stop_seconds) + 1,
+            start=NASA_AUDIO.get_frame_index(pts_seconds=start_seconds),
+            stop=NASA_AUDIO.get_frame_index(pts_seconds=stop_seconds) + 1,
         )
         frames, _, _ = get_frames_by_pts_in_range(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
@@ -722,7 +746,7 @@ class TestOps:
         pts = 2
         # Need +1 because we're not at frames boundaries
         reference_frame = NASA_AUDIO.get_frame_data_by_index(
-            NASA_AUDIO.pts_to_frame_index(pts) + 1
+            NASA_AUDIO.get_frame_index(pts_seconds=pts) + 1
         )
         seek_to_pts(decoder, pts)
         frame, _, _ = get_next_frame(decoder)
@@ -731,7 +755,7 @@ class TestOps:
         # Seeking forward is OK
         pts = 4
         reference_frame = NASA_AUDIO.get_frame_data_by_index(
-            NASA_AUDIO.pts_to_frame_index(pts) + 1
+            NASA_AUDIO.get_frame_index(pts_seconds=pts) + 1
         )
         seek_to_pts(decoder, pts)
         frame, _, _ = get_next_frame(decoder)
@@ -747,7 +771,7 @@ class TestOps:
         # the "next: one without seeking. This assertion exists to illutrate
         # what currently hapens, but it's obviously *wrong*.
         reference_frame = NASA_AUDIO.get_frame_data_by_index(
-            NASA_AUDIO.pts_to_frame_index(prev_pts) + 2
+            NASA_AUDIO.get_frame_index(pts_seconds=prev_pts) + 2
         )
         assert_frames_equal(frame, reference_frame)
 

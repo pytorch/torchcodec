@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import pathlib
 import sys
@@ -329,6 +330,7 @@ class TestAudio(TestContainerFile):
     or a pure audio file"""
 
     stream_infos: Dict[int, TestAudioStreamInfo]
+    # stream_index -> list of 2D frame tensors of shape (num_channels, num_samples_in_that_frame)
     _reference_frames: Dict[int, List[torch.Tensor]] = field(default_factory=dict)
 
     # Storing each individual frame is too expensive for audio, because there's
@@ -339,13 +341,29 @@ class TestAudio(TestContainerFile):
     # when the TestAudio instance is created.
     def __post_init__(self):
         for stream_index in self.stream_infos:
-            file_path = _get_file_path(
+            frames_data_path = _get_file_path(
                 f"{self.filename}.stream{stream_index}.all_frames.pt"
             )
 
             self._reference_frames[stream_index] = torch.load(
-                file_path, weights_only=True
+                frames_data_path, weights_only=True
             )
+
+            # These frame info files are dumped with (e.g. for tthe first audio stream):
+            # ffprobe -v error -hide_banner -select_streams a:0 -show_frames -of json $AUDIO_FILE
+            frames_info_path = _get_file_path(
+                f"{self.filename}.stream{stream_index}.all_frames_info.json"
+            )
+
+            with open(frames_info_path, "r") as f:
+                frames_info = json.loads(f.read())["frames"]
+            self.frames[stream_index] = {
+                frame_index: TestFrameInfo(
+                    pts_seconds=float(frame_info["pts_time"]),
+                    duration_seconds=float(frame_info["duration_time"]),
+                )
+                for frame_index, frame_info in enumerate(frames_info)
+            }
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
@@ -355,12 +373,19 @@ class TestAudio(TestContainerFile):
 
         return self._reference_frames[stream_index][idx]
 
-    def pts_to_frame_index(self, pts_seconds: float) -> int:
-        # These are hard-coded value assuming stream 4 of nasa_13013.mp4. Each
-        # of the 204 frames contains 1024 samples.
-        # TODO make this more generic
-        frame_duration_seconds = 0.064
-        return int(pts_seconds // frame_duration_seconds)
+    def get_frame_index(
+        self, *, pts_seconds: float, stream_index: Optional[int] = None
+    ) -> int:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+        out = next(
+            frame_index
+            for (frame_index, frame_info) in self.frames[stream_index].items()
+            if frame_info.pts_seconds
+            <= pts_seconds
+            < frame_info.pts_seconds + frame_info.duration_seconds
+        )
+        return out
 
     @property
     def sample_rate(self) -> int:
@@ -382,7 +407,7 @@ class TestAudio(TestContainerFile):
 NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
     default_stream_index=0,
-    frames={},  # TODO
+    frames={},
     stream_infos={
         0: TestAudioStreamInfo(
             sample_rate=8_000, num_channels=2, duration_seconds=13.248, num_frames=183
@@ -393,7 +418,7 @@ NASA_AUDIO_MP3 = TestAudio(
 NASA_AUDIO = TestAudio(
     filename="nasa_13013.mp4",
     default_stream_index=4,
-    frames={},  # TODO
+    frames={},
     stream_infos={
         4: TestAudioStreamInfo(
             sample_rate=16_000, num_channels=2, duration_seconds=13.056, num_frames=204

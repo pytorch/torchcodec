@@ -877,6 +877,42 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   return frameBatchOutput;
 }
 
+torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
+    double startSeconds,
+    double stopSeconds) {
+  validateActiveStream(AVMEDIA_TYPE_AUDIO);
+
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+  double frameStartTime =
+      ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
+  double frameEndTime = ptsToSeconds(
+      streamInfo.lastDecodedAvFramePts + streamInfo.lastDecodedAvFrameDuration,
+      streamInfo.timeBase);
+
+  TORCH_CHECK(startSeconds > frameEndTime, "OSKOOOOOUUUUUUURRRRRR");
+
+  setCursorPtsInSeconds(startSeconds);
+
+  std::vector<torch::Tensor> tensors;
+
+  while (true) {
+    auto frameOutput = getNextFrameInternal();
+    tensors.push_back(frameOutput.data);
+
+    double lastFrameStartPts =
+        ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
+    double lastFrameEndPts = ptsToSeconds(
+        streamInfo.lastDecodedAvFramePts +
+            streamInfo.lastDecodedAvFrameDuration,
+        streamInfo.timeBase);
+
+    if (lastFrameStartPts <= stopSeconds and stopSeconds <= lastFrameEndPts) {
+      break;
+    }
+  }
+  return torch::cat(tensors, 1);
+}
+
 // --------------------------------------------------------------------------
 // SEEKING APIs
 // --------------------------------------------------------------------------

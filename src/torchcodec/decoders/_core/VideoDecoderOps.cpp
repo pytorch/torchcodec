@@ -49,6 +49,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
+      "get_frames_by_pts_in_range_audio(Tensor(a!) decoder, *, float start_seconds, float stop_seconds) -> Tensor");
+  m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, float[] timestamps) -> (Tensor, Tensor, Tensor)");
   m.def("_get_key_frame_indices(Tensor(a!) decoder) -> Tensor");
   m.def("get_json_metadata(Tensor(a!) decoder) -> str");
@@ -309,6 +311,14 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
   return makeOpsFrameBatchOutput(result);
 }
 
+torch::Tensor get_frames_by_pts_in_range_audio(
+    at::Tensor& decoder,
+    double start_seconds,
+    double stop_seconds) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  return videoDecoder->getFramesPlayedInRangeAudio(start_seconds, stop_seconds);
+}
+
 std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
@@ -560,6 +570,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
+  m.impl("get_frames_by_pts_in_range_audio", &get_frames_by_pts_in_range_audio);
   m.impl("get_frames_by_pts", &get_frames_by_pts);
   m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);
   m.impl(

@@ -78,6 +78,9 @@ get_frames_at_indices = torch.ops.torchcodec_ns.get_frames_at_indices.default
 get_frames_by_pts = torch.ops.torchcodec_ns.get_frames_by_pts.default
 get_frames_in_range = torch.ops.torchcodec_ns.get_frames_in_range.default
 get_frames_by_pts_in_range = torch.ops.torchcodec_ns.get_frames_by_pts_in_range.default
+get_frames_by_pts_in_range_audio = (
+    torch.ops.torchcodec_ns.get_frames_by_pts_in_range_audio.default
+)
 get_json_metadata = torch.ops.torchcodec_ns.get_json_metadata.default
 _test_frame_pts_equality = torch.ops.torchcodec_ns._test_frame_pts_equality.default
 _get_container_json_metadata = (
@@ -260,6 +263,17 @@ def get_frames_by_pts_in_range_abstract(
         torch.empty([], dtype=torch.float),
         torch.empty([], dtype=torch.float),
     )
+
+
+@register_fake("torchcodec_ns::get_frames_by_pts_in_range_audio")
+def get_frames_by_pts_in_range_audio_abstract(
+    decoder: torch.Tensor,
+    *,
+    start_seconds: float,
+    stop_seconds: float,
+) -> torch.Tensor:
+    image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
+    return torch.empty(image_size)
 
 
 @register_fake("torchcodec_ns::_get_key_frame_indices")
