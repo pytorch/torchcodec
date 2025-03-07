@@ -169,20 +169,6 @@ void VideoDecoder::initializeDecoder() {
       }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-      // TODO-AUDIO Remove this, we shouldn't need it. We should probably write
-      // a pts-based "getFramesPlayedInRange" from scratch without going back to
-      // indices.
-      int numSamplesPerFrame = avStream->codecpar->frame_size;
-      int sampleRate = avStream->codecpar->sample_rate;
-      if (numSamplesPerFrame > 0 && sampleRate > 0) {
-        // This should allow the approximate mode to do its magic.
-        // fps is numFrames / duration where
-        // - duration = numSamplesTotal / sampleRate and
-        // - numSamplesTotal = numSamplesPerFrame * numFrames
-        // so fps = numFrames * sampleRate / (numSamplesPerFrame * numFrames)
-        streamMetadata.averageFps =
-            static_cast<double>(sampleRate) / numSamplesPerFrame;
-      }
       containerMetadata_.numAudioStreams++;
     }
 
@@ -562,19 +548,8 @@ void VideoDecoder::addAudioStream(int streamIndex) {
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
-
-  // TODO-AUDIO
-  TORCH_CHECK(
-      streamInfo.codecContext->frame_size > 0,
-      "No support for audio variable framerate yet.");
-
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-
-  // TODO-AUDIO
-  TORCH_CHECK(
-      streamMetadata.averageFps.has_value(),
-      "frame_size or sample_rate aren't known. Cannot decode.");
 
   streamMetadata.sampleRate =
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
@@ -786,28 +761,17 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedAt(
 VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     double startSeconds,
     double stopSeconds) {
-  validateActiveStream();
-  // Because we currently never seek with audio streams, we prevent users from
-  // calling this method twice. We could allow multiple calls in the future.
-  // Assuming 2 consecutive calls:
-  // ```
-  // getFramesPlayedInRange(startSeconds1, stopSeconds1);
-  // getFramesPlayedInRange(startSeconds2, stopSeconds2);
-  // ```
-  // We would need to seek back to 0 iff startSeconds2 <= stopSeconds1. This
-  // logic is not implemented for now, so we just error.
-
-  TORCH_CHECK(
-      streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO ||
-          !alreadyCalledGetFramesPlayedInRange_,
-      "Can only decode once with audio stream. Re-create a decoder object if needed.")
-  alreadyCalledGetFramesPlayedInRange_ = true;
-
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
           ") must be less than or equal to stop seconds (" +
           std::to_string(stopSeconds) + ".");
+
+  const auto& streamInfo = streamInfos_[activeStreamIndex_];
+  const auto& videoStreamOptions = streamInfo.videoStreamOptions;
 
   // Special case needed to implement a half-open range. At first glance, this
   // may seem unnecessary, as our search for stopFrame can return the end, and
@@ -827,13 +791,10 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   // values of the intervals will map to the same frame indices below. Hence, we
   // need this special case below.
   if (startSeconds == stopSeconds) {
-    FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(0);
-    frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
+    FrameBatchOutput frameBatchOutput(0, videoStreamOptions, streamMetadata);
+    frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
     return frameBatchOutput;
   }
-
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[activeStreamIndex_];
 
   double minSeconds = getMinSeconds(streamMetadata);
   double maxSeconds = getMaxSeconds(streamMetadata);
@@ -865,14 +826,15 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   int64_t stopFrameIndex = secondsToIndexUpperBound(stopSeconds);
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
-  FrameBatchOutput frameBatchOutput = makeFrameBatchOutput(numFrames);
+  FrameBatchOutput frameBatchOutput(
+      numFrames, videoStreamOptions, streamMetadata);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);
     frameBatchOutput.ptsSeconds[f] = frameOutput.ptsSeconds;
     frameBatchOutput.durationSeconds[f] = frameOutput.durationSeconds;
   }
-  frameBatchOutput.data = maybePermuteOutputTensor(frameBatchOutput.data);
+  frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
 
   return frameBatchOutput;
 }
@@ -1403,41 +1365,6 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
   int width = frameDims.width;
   data = allocateEmptyHWCTensor(
       height, width, videoStreamOptions.device, numFrames);
-}
-
-VideoDecoder::FrameBatchOutput::FrameBatchOutput(
-    int64_t numFrames,
-    int64_t numChannels,
-    int64_t numSamples)
-    : ptsSeconds(torch::empty({numFrames}, {torch::kFloat64})),
-      durationSeconds(torch::empty({numFrames}, {torch::kFloat64})) {
-  // TODO handle dtypes other than float
-  auto tensorOptions = torch::TensorOptions()
-                           .dtype(torch::kFloat32)
-                           .layout(torch::kStrided)
-                           .device(torch::kCPU);
-  data = torch::empty({numFrames, numChannels, numSamples}, tensorOptions);
-}
-
-VideoDecoder::FrameBatchOutput VideoDecoder::makeFrameBatchOutput(
-    int64_t numFrames) {
-  const auto& streamInfo = streamInfos_[activeStreamIndex_];
-  if (streamInfo.avMediaType == AVMEDIA_TYPE_VIDEO) {
-    const auto& videoStreamOptions = streamInfo.videoStreamOptions;
-    const auto& streamMetadata =
-        containerMetadata_.allStreamMetadata[activeStreamIndex_];
-    return FrameBatchOutput(numFrames, videoStreamOptions, streamMetadata);
-  } else {
-    // TODO-AUDIO
-    // We asserted that frame_size is non-zero when we added the stream, but it
-    // may not always be the case.
-    // When it's 0, we can't pre-allocate the output tensor as we don't know the
-    // number of samples per channel, and it may be non-constant. We'll have to
-    // find a way to make the batch-APIs work without pre-allocation.
-    int64_t numSamples = streamInfo.codecContext->frame_size;
-    int64_t numChannels = getNumChannels(streamInfo.codecContext);
-    return FrameBatchOutput(numFrames, numChannels, numSamples);
-  }
 }
 
 torch::Tensor allocateEmptyHWCTensor(

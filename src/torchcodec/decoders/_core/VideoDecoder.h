@@ -168,10 +168,6 @@ class VideoDecoder {
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
-    explicit FrameBatchOutput(
-        int64_t numFrames,
-        int64_t numChannels,
-        int64_t numSamples);
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
@@ -492,7 +488,6 @@ class VideoDecoder {
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
-  bool alreadyCalledGetFramesPlayedInRange_ = false;
 };
 
 // --------------------------------------------------------------------------
