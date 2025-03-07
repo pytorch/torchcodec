@@ -190,11 +190,7 @@ class TestContainerFile:
         *,
         stream_index: Optional[int] = None,
     ) -> torch.Tensor:
-        tensors = [
-            self.get_frame_data_by_index(i, stream_index=stream_index)
-            for i in range(start, stop, step)
-        ]
-        return torch.stack(tensors)
+        raise NotImplementedError("Override in child classes")
 
     def get_pts_seconds_by_range(
         self,
@@ -260,6 +256,20 @@ class TestVideo(TestContainerFile):
             f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
         )
         return torch.load(file_path, weights_only=True).permute(2, 0, 1)
+
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.stack(tensors)
 
     @property
     def width(self) -> int:
@@ -327,6 +337,7 @@ class TestAudio(TestContainerFile):
 
     stream_infos: Dict[int, TestAudioStreamInfo]
     # stream_index -> list of 2D frame tensors of shape (num_channels, num_samples_in_that_frame)
+    # num_samples_in_that_frame isn't necessarily constant for a given stream.
     _reference_frames: Dict[int, List[torch.Tensor]] = field(default_factory=dict)
 
     # Storing each individual frame is too expensive for audio, because there's
@@ -354,19 +365,40 @@ class TestAudio(TestContainerFile):
 
         return self._reference_frames[stream_index][idx]
 
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.cat(tensors, dim=-1)
+
     def get_frame_index(
         self, *, pts_seconds: float, stream_index: Optional[int] = None
     ) -> int:
         if stream_index is None:
             stream_index = self.default_stream_index
-        out = next(
-            frame_index
-            for (frame_index, frame_info) in self.frames[stream_index].items()
-            if frame_info.pts_seconds
-            <= pts_seconds
-            < frame_info.pts_seconds + frame_info.duration_seconds
-        )
-        return out
+
+        if pts_seconds <= self.frames[stream_index][0].pts_seconds:
+            # Special case for e.g. NASA_AUDIO_MP3 whose first frame's pts is
+            # 0.13~, not 0.
+            return 0
+        try:
+            return next(
+                frame_index
+                for (frame_index, frame_info) in self.frames[stream_index].items()
+                if frame_info.pts_seconds
+                <= pts_seconds
+                < frame_info.pts_seconds + frame_info.duration_seconds
+            )
+        except StopIteration:
+            return len(self.frames[stream_index]) - 1
 
     @property
     def sample_rate(self) -> int:

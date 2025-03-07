@@ -51,7 +51,7 @@ torch._dynamo.config.capture_dynamic_output_shape_ops = True
 INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
-class TestOps:
+class TestVideoOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -616,6 +616,8 @@ class TestOps:
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
         )
 
+
+class TestAudioOps:
     @pytest.mark.parametrize(
         "method",
         (
@@ -664,19 +666,15 @@ class TestOps:
     @pytest.mark.parametrize(
         "range", ("begin_to_end", "at_frame_boundaries", "not_at_frame_boundaries")
     )
-    # @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
-    @pytest.mark.parametrize("asset", (NASA_AUDIO,))
-    def test_audio_get_frames_by_pts_in_range_audio(self, range, asset):
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_get_frames_by_pts_in_range_audio(self, range, asset):
         if range == "begin_to_end":
             start_seconds, stop_seconds = 0, asset.duration_seconds
         elif range == "at_frame_boundaries":
             start_seconds = asset.frames[asset.default_stream_index][10].pts_seconds
-            # need -1e-5 because the upper bound in open. If we don't do this
-            # then our test util returns one frame too much.
-            stop_seconds = (
-                asset.frames[asset.default_stream_index][40].pts_seconds - 1e-5
-            )
+            stop_seconds = asset.frames[asset.default_stream_index][40].pts_seconds
         else:
+            assert range == "not_at_frame_boundaries"
             start_frame_info = asset.frames[asset.default_stream_index][10]
             stop_frame_info = asset.frames[asset.default_stream_index][40]
             start_seconds = start_frame_info.pts_seconds + (
@@ -689,11 +687,11 @@ class TestOps:
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
+        stop_offset = 0 if range == "at_frame_boundaries" else 1
         reference_frames = asset.get_frame_data_by_range(
             start=asset.get_frame_index(pts_seconds=start_seconds),
-            stop=asset.get_frame_index(pts_seconds=stop_seconds) + 1,
+            stop=asset.get_frame_index(pts_seconds=stop_seconds) + stop_offset,
         )
-        reference_frames = torch.cat(reference_frames.unbind(), dim=-1)
 
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
@@ -701,8 +699,20 @@ class TestOps:
 
         assert_frames_equal(frames, reference_frames)
 
+    @pytest.mark.parametrize(
+        "asset, expected_shape", ((NASA_AUDIO, (2, 1024)), (NASA_AUDIO_MP3, (2, 576)))
+    )
+    def test_decode_epsilon_range(self, asset, expected_shape):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=5, stop_seconds=5 + 1e-5
+        )
+        assert frames.shape == expected_shape
+
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
-    def test_audio_seek_and_next(self, asset):
+    def test_seek_and_next_audio(self, asset):
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
