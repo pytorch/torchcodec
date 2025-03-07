@@ -5,7 +5,7 @@ import pathlib
 import sys
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pytest
@@ -110,13 +110,64 @@ class TestFrameInfo:
 
 
 @dataclass
+class TestVideoStreamInfo:
+    width: int
+    height: int
+    num_color_channels: int
+
+
+@dataclass
+class TestAudioStreamInfo:
+    sample_rate: int
+    num_channels: int
+    duration_seconds: float
+    num_frames: int
+
+
+@dataclass
 class TestContainerFile:
     filename: str
 
-    # {stream_index -> {frame_index -> frame_info}}
+    default_stream_index: int
+    stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
 
-    default_stream_index: int
+    def __post_init__(self):
+        # We load the .frames attribute from the checked-in json files, if needed.
+        # These frame info files are dumped with ffprobe, e.g.:
+        # ```
+        # ffprobe -v error -hide_banner -select_streams v:1 -show_frames -of json test/resources/nasa_13013.mp4 | jq '[.frames[] | {duration_time, pts_time}]'
+        # ```
+        # This will output the metadata for the frames of the second video
+        # stream (v:1). First audio stream would be a:0.
+        # Note that we are using the absolute stream index in the file. But
+        # ffprobe uses a relative stream for that media type.
+        for stream_index in self.stream_infos:
+            if stream_index in self.frames:
+                # .frames may be manually set: for some streams, we don't need
+                # the info for all frames. We don't need to load anything in
+                # this case
+                continue
+
+            frames_info_path = _get_file_path(
+                f"{self.filename}.stream{stream_index}.all_frames_info.json"
+            )
+
+            if not frames_info_path.exists():
+                raise ValueError(
+                    f"Couldn't find {frames_info_path} for {self.filename}. "
+                    "You need to submit this file, or specify the `frames` field manually."
+                )
+
+            with open(frames_info_path, "r") as f:
+                frames_info = json.loads(f.read())
+            self.frames[stream_index] = {
+                frame_index: TestFrameInfo(
+                    pts_seconds=float(frame_info["pts_time"]),
+                    duration_seconds=float(frame_info["duration_time"]),
+                )
+                for frame_index, frame_info in enumerate(frames_info)
+            }
 
     @property
     def path(self) -> pathlib.Path:
@@ -196,17 +247,8 @@ class TestContainerFile:
 
 
 @dataclass
-class TestVideoStreamInfo:
-    width: int
-    height: int
-    num_color_channels: int
-
-
-@dataclass
 class TestVideo(TestContainerFile):
     """Base class for the *video* streams of a video container"""
-
-    stream_infos: Dict[int, TestVideoStreamInfo]
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
@@ -270,58 +312,12 @@ class TestVideo(TestContainerFile):
 NASA_VIDEO = TestVideo(
     filename="nasa_13013.mp4",
     default_stream_index=3,
-    # This metadata is extracted manually.
-    #  for stream index 0:
-    #    $ ffprobe -v error -hide_banner -select_streams v:0 -show_frames -of json test/resources/nasa_13013.mp4 > out.json
-    #
-    #  for stream index 3:
-    #    $ ffprobe -v error -hide_banner -select_streams v:1 -show_frames -of json test/resources/nasa_13013.mp4 > out.json
-    #
-    # Note that we are using the absolute stream index in the file. But ffprobe uses a relative stream
-    # for that media type.
     stream_infos={
         0: TestVideoStreamInfo(width=320, height=180, num_color_channels=3),
         3: TestVideoStreamInfo(width=480, height=270, num_color_channels=3),
     },
-    frames={
-        0: {
-            0: TestFrameInfo(pts_seconds=0.0, duration_seconds=0.040000),
-            1: TestFrameInfo(pts_seconds=0.040000, duration_seconds=0.040000),
-            2: TestFrameInfo(pts_seconds=0.080000, duration_seconds=0.040000),
-            3: TestFrameInfo(pts_seconds=0.120000, duration_seconds=0.040000),
-            4: TestFrameInfo(pts_seconds=0.160000, duration_seconds=0.040000),
-            5: TestFrameInfo(pts_seconds=0.200000, duration_seconds=0.040000),
-            6: TestFrameInfo(pts_seconds=0.240000, duration_seconds=0.040000),
-            7: TestFrameInfo(pts_seconds=0.280000, duration_seconds=0.040000),
-            8: TestFrameInfo(pts_seconds=0.320000, duration_seconds=0.040000),
-            9: TestFrameInfo(pts_seconds=0.360000, duration_seconds=0.040000),
-            10: TestFrameInfo(pts_seconds=0.400000, duration_seconds=0.040000),
-        },
-        3: {
-            0: TestFrameInfo(pts_seconds=0.0, duration_seconds=0.033367),
-            1: TestFrameInfo(pts_seconds=0.033367, duration_seconds=0.033367),
-            2: TestFrameInfo(pts_seconds=0.066733, duration_seconds=0.033367),
-            3: TestFrameInfo(pts_seconds=0.100100, duration_seconds=0.033367),
-            4: TestFrameInfo(pts_seconds=0.133467, duration_seconds=0.033367),
-            5: TestFrameInfo(pts_seconds=0.166833, duration_seconds=0.033367),
-            6: TestFrameInfo(pts_seconds=0.200200, duration_seconds=0.033367),
-            7: TestFrameInfo(pts_seconds=0.233567, duration_seconds=0.033367),
-            8: TestFrameInfo(pts_seconds=0.266933, duration_seconds=0.033367),
-            9: TestFrameInfo(pts_seconds=0.300300, duration_seconds=0.033367),
-            10: TestFrameInfo(pts_seconds=0.333667, duration_seconds=0.033367),
-            25: TestFrameInfo(pts_seconds=0.8342, duration_seconds=0.033367),
-            35: TestFrameInfo(pts_seconds=1.1678, duration_seconds=0.033367),
-        },
-    },
+    frames={},  # Automatically loaded from json file
 )
-
-
-@dataclass
-class TestAudioStreamInfo:
-    sample_rate: int
-    num_channels: int
-    duration_seconds: float
-    num_frames: int
 
 
 @dataclass
@@ -340,6 +336,7 @@ class TestAudio(TestContainerFile):
     # So we store the reference frames in a single file, and load/cache those
     # when the TestAudio instance is created.
     def __post_init__(self):
+        super().__post_init__()
         for stream_index in self.stream_infos:
             frames_data_path = _get_file_path(
                 f"{self.filename}.stream{stream_index}.all_frames.pt"
@@ -348,22 +345,6 @@ class TestAudio(TestContainerFile):
             self._reference_frames[stream_index] = torch.load(
                 frames_data_path, weights_only=True
             )
-
-            # These frame info files are dumped with (e.g. for tthe first audio stream):
-            # ffprobe -v error -hide_banner -select_streams a:0 -show_frames -of json $AUDIO_FILE
-            frames_info_path = _get_file_path(
-                f"{self.filename}.stream{stream_index}.all_frames_info.json"
-            )
-
-            with open(frames_info_path, "r") as f:
-                frames_info = json.loads(f.read())["frames"]
-            self.frames[stream_index] = {
-                frame_index: TestFrameInfo(
-                    pts_seconds=float(frame_info["pts_time"]),
-                    duration_seconds=float(frame_info["duration_time"]),
-                )
-                for frame_index, frame_info in enumerate(frames_info)
-            }
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
@@ -407,7 +388,7 @@ class TestAudio(TestContainerFile):
 NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
     default_stream_index=0,
-    frames={},
+    frames={},  # Automatically loaded from json file
     stream_infos={
         0: TestAudioStreamInfo(
             sample_rate=8_000, num_channels=2, duration_seconds=13.248, num_frames=183
@@ -418,7 +399,7 @@ NASA_AUDIO_MP3 = TestAudio(
 NASA_AUDIO = TestAudio(
     filename="nasa_13013.mp4",
     default_stream_index=4,
-    frames={},
+    frames={},  # Automatically loaded from json file
     stream_infos={
         4: TestAudioStreamInfo(
             sample_rate=16_000, num_channels=2, duration_seconds=13.056, num_frames=204
