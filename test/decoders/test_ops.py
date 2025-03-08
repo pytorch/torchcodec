@@ -695,7 +695,7 @@ class TestAudioOps:
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
 
-        assert_frames_equal(frames, reference_frames)
+        torch.testing.assert_close(frames, reference_frames)
 
     @pytest.mark.parametrize(
         "asset, expected_shape", ((NASA_AUDIO, (2, 1024)), (NASA_AUDIO_MP3, (2, 576)))
@@ -722,6 +722,46 @@ class TestAudioOps:
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         assert frames.shape == expected_shape
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_multiple_calls(self, asset):
+
+        def decode_stateless(start_seconds, stop_seconds):
+            decoder = create_from_file(str(asset.path), seek_mode="approximate")
+            add_audio_stream(decoder)
+
+            return get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+            )
+
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        start_seconds, stop_seconds = 0, 2
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, decode_stateless(start_seconds, stop_seconds)
+        )
+
+        start_seconds, stop_seconds = 3, 4
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, decode_stateless(start_seconds, stop_seconds)
+        )
+
+        # TODO-AUDIO
+        start_seconds, stop_seconds = 0, 2
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        with pytest.raises(AssertionError):
+            torch.testing.assert_close(
+                frames, decode_stateless(start_seconds, stop_seconds)
+            )
 
 
 if __name__ == "__main__":

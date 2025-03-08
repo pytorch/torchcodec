@@ -1324,7 +1324,8 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
-  torch::Tensor outputData = torch::empty({numChannels, numSamples}, torch::kFloat32);
+  torch::Tensor outputData =
+      torch::empty({numChannels, numSamples}, torch::kFloat32);
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   // TODO-AUDIO Implement all formats.

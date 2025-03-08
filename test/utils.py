@@ -26,17 +26,8 @@ def cpu_and_cuda():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
-def assert_frames_equal(*args, **kwargs):
-    frame = args[0]
-    # This heuristic will work until we start returning uint8 audio frames...
-    if frame.dtype == torch.uint8:
-        return assert_video_frames_equal(*args, **kwargs)
-    else:
-        return assert_audio_frames_equal(*args, **kwargs)
-
-
-def assert_audio_frames_equal(*args, **kwargs):
-    torch.testing.assert_close(*args, **kwargs)
+def get_ffmpeg_major_version():
+    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
 
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
@@ -44,7 +35,7 @@ def assert_audio_frames_equal(*args, **kwargs):
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_video_frames_equal(*args, **kwargs):
+def assert_frames_equal(*args, **kwargs):
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             atol = 2
@@ -81,9 +72,6 @@ def assert_tensor_close_on_at_least(actual_tensor, ref_tensor, *, percentage, at
             f"but only {valid_percentage}% were."
         )
 
-
-def get_ffmpeg_major_version():
-    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
 
 
 def in_fbcode() -> bool:
