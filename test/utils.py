@@ -73,7 +73,6 @@ def assert_tensor_close_on_at_least(actual_tensor, ref_tensor, *, percentage, at
         )
 
 
-
 def in_fbcode() -> bool:
     return os.environ.get("IN_FBCODE_TORCHCODEC") == "1"
 

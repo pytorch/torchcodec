@@ -854,14 +854,25 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  auto lastDecodedFrameIsPlayedAtStopSeconds =
-      [this, &streamInfo, stopSeconds]() {
-        auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
-        return (
-            streamInfo.lastDecodedAvFramePts <= stopPts and
-            stopPts <= streamInfo.lastDecodedAvFramePts +
-                    streamInfo.lastDecodedAvFrameDuration);
-      };
+  auto lastDecodedFrameIsPlayedAt = [this, &streamInfo](double seconds) {
+    auto pts = secondsToClosestPts(seconds, streamInfo.timeBase);
+    return (
+        streamInfo.lastDecodedAvFramePts <= pts and
+        pts <= streamInfo.lastDecodedAvFramePts +
+                streamInfo.lastDecodedAvFrameDuration);
+  };
+
+  // TODO-AUDIO This essentially enforce that we don't need to seek (backwards).
+  // We should remove it and seek back to the stream's beginning when needed.
+  // See test_multiple_calls
+  TORCH_CHECK(
+      (streamInfo.lastDecodedAvFramePts == 0 &&
+       streamInfo.lastDecodedAvFrameDuration == 0) ||
+          (streamInfo.lastDecodedAvFramePts +
+               streamInfo.lastDecodedAvFrameDuration <=
+           secondsToClosestPts(startSeconds, streamInfo.timeBase)) ||
+          !lastDecodedFrameIsPlayedAt(startSeconds),
+      "The previous call's stop_seconds is larger than the current calls's start_seconds (roughly)");
 
   setCursorPtsInSeconds(startSeconds);
 
@@ -871,7 +882,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   std::vector<torch::Tensor> tensors;
 
   bool reachedEOF = false;
-  while (!lastDecodedFrameIsPlayedAtStopSeconds() && !reachedEOF) {
+  while (!lastDecodedFrameIsPlayedAt(stopSeconds) && !reachedEOF) {
     try {
       AVFrameStream avFrameStream =
           decodeAVFrame([&streamInfo](AVFrame* avFrame) {

@@ -725,8 +725,13 @@ class TestAudioOps:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
+        # Ensure that multiple calls are OK as long as we're decoding
+        # "sequentially", i.e. we don't require a backwards seek.
+        # And ensure a proper error is raised in such case.
+        # TODO-AUDIO We shouldn't error, we should just implement the seeking
+        # back to the beginning of the stream.
 
-        def decode_stateless(start_seconds, stop_seconds):
+        def get_reference_frames(start_seconds, stop_seconds):
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder)
 
@@ -742,7 +747,7 @@ class TestAudioOps:
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         torch.testing.assert_close(
-            frames, decode_stateless(start_seconds, stop_seconds)
+            frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
         start_seconds, stop_seconds = 3, 4
@@ -750,17 +755,48 @@ class TestAudioOps:
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         torch.testing.assert_close(
-            frames, decode_stateless(start_seconds, stop_seconds)
+            frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
-        # TODO-AUDIO
+        # Starting at the frame immediately after the previous one is OK
+        index_of_frame_at_4 = asset.get_frame_index(pts_seconds=4)
+        start_seconds, stop_seconds = (
+            asset.frames[asset.default_stream_index][
+                index_of_frame_at_4 + 1
+            ].pts_seconds,
+            5,
+        )
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
+
+        # But starting immediately on the same frame isn't OK
+        with pytest.raises(
+            RuntimeError,
+            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
+        ):
+            get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=stop_seconds, stop_seconds=6
+            )
+
+        with pytest.raises(
+            RuntimeError,
+            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
+        ):
+            get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
+            )
+
         start_seconds, stop_seconds = 0, 2
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         with pytest.raises(AssertionError):
             torch.testing.assert_close(
-                frames, decode_stateless(start_seconds, stop_seconds)
+                frames, get_reference_frames(start_seconds, stop_seconds)
             )
 
 
