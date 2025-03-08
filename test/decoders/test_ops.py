@@ -661,12 +661,12 @@ class TestAudioOps:
         elif range == "begin_to_beyond_end":
             start_seconds, stop_seconds = 0, asset.duration_seconds + 10
         elif range == "at_frame_boundaries":
-            start_seconds = asset.frames[asset.default_stream_index][10].pts_seconds
-            stop_seconds = asset.frames[asset.default_stream_index][40].pts_seconds
+            start_seconds = asset.get_frame_info(idx=10).pts_seconds
+            stop_seconds = asset.get_frame_info(idx=40).pts_seconds
         else:
             assert range == "not_at_frame_boundaries"
-            start_frame_info = asset.frames[asset.default_stream_index][10]
-            stop_frame_info = asset.frames[asset.default_stream_index][40]
+            start_frame_info = asset.get_frame_info(idx=10)
+            stop_frame_info = asset.get_frame_info(idx=40)
             start_seconds = start_frame_info.pts_seconds + (
                 start_frame_info.duration_seconds / 2
             )
@@ -716,8 +716,8 @@ class TestAudioOps:
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
-        start_seconds = asset.frames[asset.default_stream_index][10].pts_seconds
-        stop_seconds = asset.frames[asset.default_stream_index][11].pts_seconds
+        start_seconds = asset.get_frame_info(idx=10).pts_seconds
+        stop_seconds = asset.get_frame_info(idx=11).pts_seconds
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
@@ -761,9 +761,7 @@ class TestAudioOps:
         # Starting at the frame immediately after the previous one is OK
         index_of_frame_at_4 = asset.get_frame_index(pts_seconds=4)
         start_seconds, stop_seconds = (
-            asset.frames[asset.default_stream_index][
-                index_of_frame_at_4 + 1
-            ].pts_seconds,
+            asset.get_frame_info(idx=index_of_frame_at_4 + 1).pts_seconds,
             5,
         )
         frames = get_frames_by_pts_in_range_audio(
