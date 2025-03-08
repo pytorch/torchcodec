@@ -842,16 +842,24 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     double stopSeconds) {
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+
   validateActiveStream(AVMEDIA_TYPE_AUDIO);
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  double frameStartTime =
-      ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
-  double frameEndTime = ptsToSeconds(
-      streamInfo.lastDecodedAvFramePts + streamInfo.lastDecodedAvFrameDuration,
-      streamInfo.timeBase);
 
-  TORCH_CHECK(startSeconds > frameEndTime, "OSKOOOOOUUUUUUURRRRRR");
+  auto lastDecodedFrameIsPlayedAtStopSeconds =
+      [this, &streamInfo, stopSeconds]() {
+        auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+        return (
+            streamInfo.lastDecodedAvFramePts <= stopPts and
+            stopPts <= streamInfo.lastDecodedAvFramePts +
+                    streamInfo.lastDecodedAvFrameDuration);
+      };
 
   setCursorPtsInSeconds(startSeconds);
 
@@ -860,26 +868,19 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> tensors;
 
-  while (true) {
-    AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
-      StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
-      return (avFrame->pts >= activeStreamInfo.discardFramesBeforePts) ||
-          (avFrame->pts < activeStreamInfo.discardFramesBeforePts &&
-           activeStreamInfo.discardFramesBeforePts <
-               avFrame->pts + avFrame->duration);
-    });
-    auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
-    tensors.push_back(frameOutput.data);
-
-    double lastFrameStartPts =
-        ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
-    double lastFrameEndPts = ptsToSeconds(
-        streamInfo.lastDecodedAvFramePts +
-            streamInfo.lastDecodedAvFrameDuration,
-        streamInfo.timeBase);
-
-    if (lastFrameStartPts <= stopSeconds and stopSeconds <= lastFrameEndPts) {
-      break;
+  bool reachedEOF = false;
+  while (!lastDecodedFrameIsPlayedAtStopSeconds() && !reachedEOF) {
+    try {
+      AVFrameStream avFrameStream =
+          decodeAVFrame([&streamInfo](AVFrame* avFrame) {
+            return (
+                streamInfo.discardFramesBeforePts <
+                avFrame->pts + getDuration(avFrame));
+          });
+      auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
+      tensors.push_back(frameOutput.data);
+    } catch (const EndOfFileException& e) {
+      reachedEOF = true;
     }
   }
   return torch::cat(tensors, 1);

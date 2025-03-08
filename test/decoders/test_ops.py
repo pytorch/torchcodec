@@ -664,12 +664,20 @@ class TestAudioOps:
         assert_frames_equal(all_frames, reference_frames)
 
     @pytest.mark.parametrize(
-        "range", ("begin_to_end", "at_frame_boundaries", "not_at_frame_boundaries")
+        "range",
+        (
+            "begin_to_end",
+            "begin_to_beyond_end",
+            "at_frame_boundaries",
+            "not_at_frame_boundaries",
+        ),
     )
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_get_frames_by_pts_in_range_audio(self, range, asset):
         if range == "begin_to_end":
             start_seconds, stop_seconds = 0, asset.duration_seconds
+        elif range == "begin_to_beyond_end":
+            start_seconds, stop_seconds = 0, asset.duration_seconds + 10
         elif range == "at_frame_boundaries":
             start_seconds = asset.frames[asset.default_stream_index][10].pts_seconds
             stop_seconds = asset.frames[asset.default_stream_index][40].pts_seconds
@@ -687,6 +695,9 @@ class TestAudioOps:
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
+        # stop_offset logic: if stop_seconds is at a frame boundary i.e. when a
+        # frame starts, then that frame should *not* be included in the output.
+        # Otherwise, it should be part of it, hence why we add 1 to `stop=`.
         stop_offset = 0 if range == "at_frame_boundaries" else 1
         reference_frames = asset.get_frame_data_by_range(
             start=asset.get_frame_index(pts_seconds=start_seconds),
@@ -708,6 +719,20 @@ class TestAudioOps:
 
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=5, stop_seconds=5 + 1e-5
+        )
+        assert frames.shape == expected_shape
+
+    @pytest.mark.parametrize(
+        "asset, expected_shape", ((NASA_AUDIO, (2, 1024)), (NASA_AUDIO_MP3, (2, 576)))
+    )
+    def test_decode_just_one_frame_at_boundaries(self, asset, expected_shape):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        start_seconds = asset.frames[asset.default_stream_index][10].pts_seconds
+        stop_seconds = asset.frames[asset.default_stream_index][11].pts_seconds
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         assert frames.shape == expected_shape
 
