@@ -1316,17 +1316,15 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     VideoDecoder::AVFrameStream& avFrameStream,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  TORCH_CHECK(
+      !preAllocatedOutputTensor.has_value(),
+      "pre-allocated audio tensor not supported yet.");
+
   const AVFrame* avFrame = avFrameStream.avFrame.get();
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
-
-  torch::Tensor outputData;
-  if (preAllocatedOutputTensor.has_value()) {
-    outputData = preAllocatedOutputTensor.value();
-  } else {
-    outputData = torch::empty({numChannels, numSamples}, torch::kFloat32);
-  }
+  torch::Tensor outputData = torch::empty({numChannels, numSamples}, torch::kFloat32);
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   // TODO-AUDIO Implement all formats.
