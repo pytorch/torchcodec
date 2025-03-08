@@ -646,6 +646,7 @@ class TestAudioOps:
         "range",
         (
             "begin_to_end",
+            "begin_to_None",
             "begin_to_beyond_end",
             "at_frame_boundaries",
             "not_at_frame_boundaries",
@@ -655,6 +656,8 @@ class TestAudioOps:
     def test_get_frames_by_pts_in_range_audio(self, range, asset):
         if range == "begin_to_end":
             start_seconds, stop_seconds = 0, asset.duration_seconds
+        elif range == "begin_to_None":
+            start_seconds, stop_seconds = 0, None
         elif range == "begin_to_beyond_end":
             start_seconds, stop_seconds = 0, asset.duration_seconds + 10
         elif range == "at_frame_boundaries":
@@ -671,17 +674,22 @@ class TestAudioOps:
                 stop_frame_info.duration_seconds / 2
             )
 
+        ref_start_index = asset.get_frame_index(pts_seconds=start_seconds)
+        if range == "begin_to_None":
+            ref_stop_index = (
+                asset.get_frame_index(pts_seconds=asset.duration_seconds) + 1
+            )
+        elif range == "at_frame_boundaries":
+            ref_stop_index = asset.get_frame_index(pts_seconds=stop_seconds)
+        else:
+            ref_stop_index = asset.get_frame_index(pts_seconds=stop_seconds) + 1
+        reference_frames = asset.get_frame_data_by_range(
+            start=ref_start_index,
+            stop=ref_stop_index,
+        )
+
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
-
-        # stop_offset logic: if stop_seconds is at a frame boundary i.e. when a
-        # frame starts, then that frame should *not* be included in the output.
-        # Otherwise, it should be part of it, hence why we add 1 to `stop=`.
-        stop_offset = 0 if range == "at_frame_boundaries" else 1
-        reference_frames = asset.get_frame_data_by_range(
-            start=asset.get_frame_index(pts_seconds=start_seconds),
-            stop=asset.get_frame_index(pts_seconds=stop_seconds) + stop_offset,
-        )
 
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds

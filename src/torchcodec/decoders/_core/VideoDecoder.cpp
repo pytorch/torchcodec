@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -840,7 +841,9 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 
 torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
-    double stopSeconds) {
+    std::optional<double> _stopSeconds) {
+  auto stopSeconds = _stopSeconds.value_or(std::numeric_limits<double>::max());
+
   TORCH_CHECK(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +

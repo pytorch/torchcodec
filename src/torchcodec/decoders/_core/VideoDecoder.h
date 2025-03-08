@@ -223,7 +223,7 @@ class VideoDecoder {
 
   torch::Tensor getFramesPlayedInRangeAudio(
       double startSeconds,
-      double stopSeconds);
+      std::optional<double> _stopSeconds = std::nullopt);
 
   class EndOfFileException : public std::runtime_error {
    public:

@@ -270,7 +270,7 @@ def get_frames_by_pts_in_range_audio_abstract(
     decoder: torch.Tensor,
     *,
     start_seconds: float,
-    stop_seconds: float,
+    stop_seconds: Optional[float] = None,
 ) -> torch.Tensor:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
     return torch.empty(image_size)
