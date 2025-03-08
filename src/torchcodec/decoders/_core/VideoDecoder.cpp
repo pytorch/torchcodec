@@ -550,7 +550,6 @@ void VideoDecoder::addAudioStream(int streamIndex) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
-
   streamMetadata.sampleRate =
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
   streamMetadata.numChannels = getNumChannels(streamInfo.codecContext);
@@ -562,12 +561,13 @@ void VideoDecoder::addAudioStream(int streamIndex) {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
   auto output = getNextFrameInternal();
-  output.data = maybePermuteOutputTensor(output.data);
+  output.data = maybePermuteHWC2CHW(output.data);
   return output;
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
     StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
     return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
@@ -576,7 +576,6 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
-  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   auto frameOutput = getFrameAtIndexInternal(frameIndex);
   frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
   return frameOutput;
@@ -585,7 +584,7 @@ VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndexInternal(
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
@@ -1386,17 +1385,6 @@ torch::Tensor allocateEmptyHWCTensor(
     return torch::empty({numFramesValue, height, width, 3}, tensorOptions);
   } else {
     return torch::empty({height, width, 3}, tensorOptions);
-  }
-}
-
-torch::Tensor VideoDecoder::maybePermuteOutputTensor(
-    torch::Tensor& outputTensor) {
-  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO) {
-    return maybePermuteHWC2CHW(outputTensor);
-  } else {
-    // No need to do anything for audio. We always return (numChannels,
-    // numSamples) or (numFrames, numChannels, numSamples)
-    return outputTensor;
   }
 }
 

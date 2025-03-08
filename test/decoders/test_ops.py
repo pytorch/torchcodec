@@ -626,6 +626,7 @@ class TestAudioOps:
             partial(get_frames_in_range, start=4, stop=5),
             partial(get_frame_at_pts, seconds=2),
             partial(get_frames_by_pts, timestamps=[0, 1.5]),
+            partial(get_next_frame),
         ),
     )
     def test_audio_bad_method(self, method):
@@ -640,28 +641,6 @@ class TestAudioOps:
             RuntimeError, match="seek_mode must be 'approximate' for audio"
         ):
             add_audio_stream(decoder)
-
-    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
-    def test_audio_decode_all_samples_with_next(self, asset):
-        decoder = create_from_file(str(asset.path), seek_mode="approximate")
-        add_audio_stream(decoder)
-
-        reference_frames = [
-            asset.get_frame_data_by_index(i) for i in range(asset.num_frames)
-        ]
-
-        reference_frames = torch.cat(reference_frames, dim=-1)
-
-        all_frames = []
-        while True:
-            try:
-                frame, *_ = get_next_frame(decoder)
-                all_frames.append(frame)
-            except IndexError:
-                break
-        all_frames = torch.cat(all_frames, dim=-1)
-
-        assert_frames_equal(all_frames, reference_frames)
 
     @pytest.mark.parametrize(
         "range",
@@ -735,43 +714,6 @@ class TestAudioOps:
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         assert frames.shape == expected_shape
-
-    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
-    def test_seek_and_next_audio(self, asset):
-        decoder = create_from_file(str(asset.path), seek_mode="approximate")
-        add_audio_stream(decoder)
-
-        pts = 2
-        # Need +1 because we're not at frames boundaries
-        reference_frame = asset.get_frame_data_by_index(
-            asset.get_frame_index(pts_seconds=pts) + 1
-        )
-        seek_to_pts(decoder, pts)
-        frame, _, _ = get_next_frame(decoder)
-        assert_frames_equal(frame, reference_frame)
-
-        # Seeking forward is OK
-        pts = 4
-        reference_frame = asset.get_frame_data_by_index(
-            asset.get_frame_index(pts_seconds=pts) + 1
-        )
-        seek_to_pts(decoder, pts)
-        frame, _, _ = get_next_frame(decoder)
-        assert_frames_equal(frame, reference_frame)
-
-        # Seeking backwards doesn't error, but it's wrong. See TODO in
-        # `seek_to_pts` op.
-        prev_pts = pts
-        pts = 1
-        seek_to_pts(decoder, pts)
-        frame, _, _ = get_next_frame(decoder)
-        # the decoder actually didn't seek, so the frame we're getting is just
-        # the "next: one without seeking. This assertion exists to illutrate
-        # what currently hapens, but it's obviously *wrong*.
-        reference_frame = asset.get_frame_data_by_index(
-            asset.get_frame_index(pts_seconds=prev_pts) + 2
-        )
-        assert_frames_equal(frame, reference_frame)
 
 
 if __name__ == "__main__":

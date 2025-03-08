@@ -376,7 +376,6 @@ class VideoDecoder {
   FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  torch::Tensor maybePermuteOutputTensor(torch::Tensor& outputTensor);
   torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
 
   FrameOutput convertAVFrameToFrameOutput(
