@@ -750,6 +750,7 @@ class TestAudioOps:
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
+        # "seeking" forward is OK
         start_seconds, stop_seconds = 3, 4
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
@@ -771,7 +772,7 @@ class TestAudioOps:
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
-        # But starting immediately on the same frame isn't OK
+        # but starting immediately on the same frame raises
         with pytest.raises(
             RuntimeError,
             match="The previous call's stop_seconds is larger than the current calls's start_seconds",
@@ -788,13 +789,13 @@ class TestAudioOps:
                 decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
             )
 
-        start_seconds, stop_seconds = 0, 2
-        frames = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
-        )
-        with pytest.raises(AssertionError):
-            torch.testing.assert_close(
-                frames, get_reference_frames(start_seconds, stop_seconds)
+        # and seeking backwards doesn't work either
+        with pytest.raises(
+            RuntimeError,
+            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
+        ):
+            frames = get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=0, stop_seconds=2
             )
 
 

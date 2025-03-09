@@ -855,14 +855,6 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  auto lastDecodedFrameIsPlayedAt = [&streamInfo](double seconds) {
-    auto pts = secondsToClosestPts(seconds, streamInfo.timeBase);
-    return (
-        streamInfo.lastDecodedAvFramePts <= pts and
-        pts <= streamInfo.lastDecodedAvFramePts +
-                streamInfo.lastDecodedAvFrameDuration);
-  };
-
   // TODO-AUDIO This essentially enforce that we don't need to seek (backwards).
   // We should remove it and seek back to the stream's beginning when needed.
   // See test_multiple_calls
@@ -871,8 +863,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
        streamInfo.lastDecodedAvFrameDuration == 0) ||
           (streamInfo.lastDecodedAvFramePts +
                streamInfo.lastDecodedAvFrameDuration <=
-           secondsToClosestPts(startSeconds, streamInfo.timeBase)) ||
-          !lastDecodedFrameIsPlayedAt(startSeconds),
+           secondsToClosestPts(startSeconds, streamInfo.timeBase)),
       "The previous call's stop_seconds is larger than the current calls's start_seconds (roughly)");
 
   setCursorPtsInSeconds(startSeconds);
@@ -883,7 +874,23 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   std::vector<torch::Tensor> tensors;
 
   bool reachedEOF = false;
-  while (!lastDecodedFrameIsPlayedAt(stopSeconds) && !reachedEOF) {
+  auto shouldStopDecoding = [&streamInfo, stopSeconds, &reachedEOF]() {
+    if (reachedEOF) {
+      return true;
+    }
+    // Return true iff stopSeconds is in [begin, end] of the last decoded frame.
+    // We use [begin, end] and not [begin, end), which may seem counter
+    // intuitive, but this actually ensures that stopSeconds is an open upper
+    // bound, i.e. a frame that starts on stopSeconds won't be part of the
+    // output.
+    auto pts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+    auto lastDecodedAvFrameEnd = streamInfo.lastDecodedAvFramePts +
+        streamInfo.lastDecodedAvFrameDuration;
+    return (streamInfo.lastDecodedAvFramePts) <= pts &&
+        (pts <= lastDecodedAvFrameEnd);
+  };
+
+  while (!shouldStopDecoding()) {
     try {
       AVFrameStream avFrameStream =
           decodeAVFrame([&streamInfo](AVFrame* avFrame) {
