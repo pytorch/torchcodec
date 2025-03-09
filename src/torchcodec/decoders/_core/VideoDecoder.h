@@ -221,6 +221,7 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
+  // TODO-AUDIO: Should accept sampleRate
   torch::Tensor getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> _stopSeconds = std::nullopt);
