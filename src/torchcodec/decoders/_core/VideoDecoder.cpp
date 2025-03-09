@@ -842,6 +842,8 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     std::optional<double> stopSecondsOptional) {
+  validateActiveStream(AVMEDIA_TYPE_AUDIO);
+
   double stopSeconds =
       stopSecondsOptional.value_or(std::numeric_limits<double>::max());
 
@@ -851,7 +853,10 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
           ") must be less than or equal to stop seconds (" +
           std::to_string(stopSeconds) + ".");
 
-  validateActiveStream(AVMEDIA_TYPE_AUDIO);
+  if (startSeconds == stopSeconds) {
+    // For consistency with video
+    return torch::empty({0});
+  }
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 

@@ -724,6 +724,15 @@ class TestAudioOps:
         assert frames.shape == expected_shape
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_decode_start_equal_stop(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=1, stop_seconds=1
+        )
+        assert frames.shape == (0,)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
         # Ensure that multiple calls are OK as long as we're decoding
         # "sequentially", i.e. we don't require a backwards seek.
