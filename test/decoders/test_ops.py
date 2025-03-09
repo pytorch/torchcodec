@@ -782,27 +782,19 @@ class TestAudioOps:
         )
 
         # but starting immediately on the same frame raises
-        with pytest.raises(
-            RuntimeError,
-            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
-        ):
+        expected_match = "Audio decoder cannot seek backwards"
+        with pytest.raises(RuntimeError, match=expected_match):
             get_frames_by_pts_in_range_audio(
                 decoder, start_seconds=stop_seconds, stop_seconds=6
             )
 
-        with pytest.raises(
-            RuntimeError,
-            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
-        ):
+        with pytest.raises(RuntimeError, match=expected_match):
             get_frames_by_pts_in_range_audio(
                 decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
             )
 
         # and seeking backwards doesn't work either
-        with pytest.raises(
-            RuntimeError,
-            match="The previous call's stop_seconds is larger than the current calls's start_seconds",
-        ):
+        with pytest.raises(RuntimeError, match=expected_match):
             frames = get_frames_by_pts_in_range_audio(
                 decoder, start_seconds=0, stop_seconds=2
             )

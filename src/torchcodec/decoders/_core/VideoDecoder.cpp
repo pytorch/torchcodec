@@ -864,12 +864,10 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   // We should remove it and seek back to the stream's beginning when needed.
   // See test_multiple_calls
   TORCH_CHECK(
-      (streamInfo.lastDecodedAvFramePts == 0 &&
-       streamInfo.lastDecodedAvFrameDuration == 0) ||
-          (streamInfo.lastDecodedAvFramePts +
-               streamInfo.lastDecodedAvFrameDuration <=
-           secondsToClosestPts(startSeconds, streamInfo.timeBase)),
-      "The previous call's stop_seconds is larger than the current calls's start_seconds (roughly)");
+      streamInfo.lastDecodedAvFramePts +
+              streamInfo.lastDecodedAvFrameDuration <=
+          secondsToClosestPts(startSeconds, streamInfo.timeBase),
+      "Audio decoder cannot seek backwards, or start from the last decoded frame.");
 
   setCursorPtsInSeconds(startSeconds);
 
