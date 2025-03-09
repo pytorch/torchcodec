@@ -112,6 +112,11 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds);
 
+torch::Tensor get_frames_by_pts_in_range_audio(
+    at::Tensor& decoder,
+    double start_seconds,
+    std::optional<double> stop_seconds = std::nullopt);
+
 // For testing only. We need to implement this operation as a core library
 // function because what we're testing is round-tripping pts values as
 // double-precision floating point numbers from C++ to Python and back to C++.

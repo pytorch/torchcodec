@@ -221,6 +221,11 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
+  // TODO-AUDIO: Should accept sampleRate
+  torch::Tensor getFramesPlayedInRangeAudio(
+      double startSeconds,
+      std::optional<double> stopSecondsOptional = std::nullopt);
+
   class EndOfFileException : public std::runtime_error {
    public:
     explicit EndOfFileException(const std::string& msg)
@@ -383,12 +388,18 @@ class VideoDecoder {
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
+  void convertAudioAVFrameToFrameOutputOnCPU(
+      AVFrameStream& avFrameStream,
+      FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
+  FrameBatchOutput makeFrameBatchOutput(int64_t numFrames);
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------

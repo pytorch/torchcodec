@@ -22,6 +22,7 @@ from ..utils import (
     get_ffmpeg_major_version,
     H265_VIDEO,
     in_fbcode,
+    NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
 )
@@ -32,7 +33,7 @@ class TestDecoder:
         "Decoder, asset",
         (
             (VideoDecoder, NASA_VIDEO),
-            (AudioDecoder, NASA_VIDEO),
+            (AudioDecoder, NASA_AUDIO),
             (AudioDecoder, NASA_AUDIO_MP3),
         ),
     )
@@ -939,11 +940,18 @@ class TestVideoDecoder:
 
 
 class TestAudioDecoder:
-    def test_metadata(self):
-        decoder = AudioDecoder(NASA_VIDEO.path)
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_metadata(self, asset):
+        decoder = AudioDecoder(asset.path)
         assert isinstance(decoder.metadata, AudioStreamMetadata)
 
-        assert decoder.stream_index == decoder.metadata.stream_index == 4
-        assert decoder.metadata.duration_seconds == pytest.approx(13.056)
-        assert decoder.metadata.sample_rate == 16_000
-        assert decoder.metadata.num_channels == 2
+        assert (
+            decoder.stream_index
+            == decoder.metadata.stream_index
+            == asset.default_stream_index
+        )
+        assert decoder.metadata.duration_seconds == pytest.approx(
+            asset.duration_seconds
+        )
+        assert decoder.metadata.sample_rate == asset.sample_rate
+        assert decoder.metadata.num_channels == asset.num_channels
