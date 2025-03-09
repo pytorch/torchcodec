@@ -854,7 +854,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  auto lastDecodedFrameIsPlayedAt = [this, &streamInfo](double seconds) {
+  auto lastDecodedFrameIsPlayedAt = [&streamInfo](double seconds) {
     auto pts = secondsToClosestPts(seconds, streamInfo.timeBase);
     return (
         streamInfo.lastDecodedAvFramePts <= pts and
