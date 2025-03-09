@@ -876,24 +876,9 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> tensors;
 
-  bool reachedEOF = false;
-  auto shouldStopDecoding = [&streamInfo, stopSeconds, &reachedEOF]() {
-    if (reachedEOF) {
-      return true;
-    }
-    // Return true iff stopSeconds is in [begin, end] of the last decoded frame.
-    // We use [begin, end] and not [begin, end), which may seem counter
-    // intuitive, but this actually ensures that stopSeconds is an open upper
-    // bound, i.e. a frame that starts on stopSeconds won't be part of the
-    // output.
-    auto pts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
-    auto lastDecodedAvFrameEnd = streamInfo.lastDecodedAvFramePts +
-        streamInfo.lastDecodedAvFrameDuration;
-    return (streamInfo.lastDecodedAvFramePts) <= pts &&
-        (pts <= lastDecodedAvFrameEnd);
-  };
-
-  while (!shouldStopDecoding()) {
+  auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+  auto shouldStopDecoding = false;
+  while (!shouldStopDecoding) {
     try {
       AVFrameStream avFrameStream =
           decodeAVFrame([&streamInfo](AVFrame* avFrame) {
@@ -904,8 +889,17 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       tensors.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
-      reachedEOF = true;
+      shouldStopDecoding = true;
     }
+
+    // If stopSeconds is in [begin, end] of the last decoded frame, we should
+    // stop decoding more frames. Note that if we were to use [begin, end),
+    // which may seem more natural, then we would decode the frame starting at
+    // stopSeconds, which isn't what we want!
+    auto lastDecodedAvFrameEnd = streamInfo.lastDecodedAvFramePts +
+        streamInfo.lastDecodedAvFrameDuration;
+    shouldStopDecoding |= (streamInfo.lastDecodedAvFramePts) <= stopPts &&
+        (stopPts <= lastDecodedAvFrameEnd);
   }
   return torch::cat(tensors, 1);
 }
