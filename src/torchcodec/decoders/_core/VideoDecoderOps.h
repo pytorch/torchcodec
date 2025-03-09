@@ -28,13 +28,6 @@ at::Tensor create_from_tensor(
     at::Tensor video_tensor,
     std::optional<std::string_view> seek_mode = std::nullopt);
 
-// This API is C++ only and will not be exposed via custom ops, use
-// videodecoder_create_from_bytes in Python
-at::Tensor create_from_buffer(
-    const void* buffer,
-    size_t length,
-    std::optional<std::string_view> seek_mode = std::nullopt);
-
 // Add a new video stream at `stream_index` using the provided options.
 void add_video_stream(
     at::Tensor& decoder,
