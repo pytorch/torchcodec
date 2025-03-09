@@ -841,8 +841,9 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 
 torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
-    std::optional<double> _stopSeconds) {
-  auto stopSeconds = _stopSeconds.value_or(std::numeric_limits<double>::max());
+    std::optional<double> stopSecondsOptional) {
+  double stopSeconds =
+      stopSecondsOptional.value_or(std::numeric_limits<double>::max());
 
   TORCH_CHECK(
       startSeconds <= stopSeconds,

@@ -224,7 +224,7 @@ class VideoDecoder {
   // TODO-AUDIO: Should accept sampleRate
   torch::Tensor getFramesPlayedInRangeAudio(
       double startSeconds,
-      std::optional<double> _stopSeconds = std::nullopt);
+      std::optional<double> stopSecondsOptional = std::nullopt);
 
   class EndOfFileException : public std::runtime_error {
    public:
