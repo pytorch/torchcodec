@@ -332,15 +332,11 @@ class VideoDecoder {
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
 
-    // The current position of the cursor in the stream, and associated frame
-    // duration.
+    // TODO since the decoder is single-stream, these should be decoder fields,
+    // not streamInfo fields. And they should be defined right next to
+    // `cursor_`, with joint documentation.
     int64_t lastDecodedAvFramePts = 0;
     int64_t lastDecodedAvFrameDuration = 0;
-    // The desired position of the cursor in the stream. We send frames >=
-    // this pts to the user when they request a frame.
-    // We update this field if the user requested a seek. This typically
-    // corresponds to the decoder's desiredPts_ attribute.
-    int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamOptions videoStreamOptions;
 
     // color-conversion fields. Only one of FilterGraphContext and
@@ -363,7 +359,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeeking(int64_t targetPts) const;
+  bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();
 
@@ -466,9 +462,11 @@ class VideoDecoder {
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
-  // Set when the user wants to seek and stores the desired pts that the user
-  // wants to seek to.
-  std::optional<double> desiredPtsSeconds_;
+
+  bool cursorWasJustSet_ = false;
+  // The desired position of the cursor in the stream. We send frames >= this
+  // pts to the user when they request a frame.
+  int64_t cursor_ = INT64_MIN;
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
