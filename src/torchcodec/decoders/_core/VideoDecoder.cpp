@@ -569,10 +569,8 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-  AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
-    StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
-    return avFrame->pts >= activeStreamInfo.discardFramesBeforePts;
-  });
+  AVFrameStream avFrameStream = decodeAVFrame(
+      [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
 }
 
@@ -909,7 +907,9 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 // --------------------------------------------------------------------------
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-  desiredPtsSeconds_ = seconds;
+  cursorWasJustSet_ = true;
+  cursor_ =
+      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase);
 }
 
 /*
@@ -937,18 +937,18 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
-bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
+bool VideoDecoder::canWeAvoidSeeking() const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     return true;
   }
-
-  int64_t lastDecodedAvFramePts = streamInfo.lastDecodedAvFramePts;
-  if (targetPts < lastDecodedAvFramePts) {
+  int64_t lastDecodedAvFramePts =
+      streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
+  if (cursor_ < lastDecodedAvFramePts) {
     // We can never skip a seek if we are seeking backwards.
     return false;
   }
-  if (lastDecodedAvFramePts == targetPts) {
+  if (lastDecodedAvFramePts == cursor_) {
     // We are seeking to the exact same frame as we are currently at. Without
     // caching we have to rewind back and decode the frame again.
     // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
@@ -956,10 +956,10 @@ bool VideoDecoder::canWeAvoidSeeking(int64_t targetPts) const {
     return false;
   }
   // We are seeking forwards.
-  // We can only skip a seek if both lastDecodedAvFramePts and targetPts share
-  // the same keyframe.
+  // We can only skip a seek if both lastDecodedAvFramePts and
+  // cursor_ share the same keyframe.
   int lastDecodedAvFrameIndex = getKeyFrameIndexForPts(lastDecodedAvFramePts);
-  int targetKeyFrameIndex = getKeyFrameIndexForPts(targetPts);
+  int targetKeyFrameIndex = getKeyFrameIndexForPts(cursor_);
   return lastDecodedAvFrameIndex >= 0 && targetKeyFrameIndex >= 0 &&
       lastDecodedAvFrameIndex == targetKeyFrameIndex;
 }
@@ -971,15 +971,13 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
   validateActiveStream();
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  int64_t desiredPts =
-      secondsToClosestPts(*desiredPtsSeconds_, streamInfo.timeBase);
-  streamInfo.discardFramesBeforePts = desiredPts;
-
   decodeStats_.numSeeksAttempted++;
-  if (canWeAvoidSeeking(desiredPts)) {
+  if (canWeAvoidSeeking()) {
     decodeStats_.numSeeksSkipped++;
     return;
   }
+
+  int64_t desiredPts = cursor_;
 
   // For some encodings like H265, FFMPEG sometimes seeks past the point we
   // set as the max_ts. So we use our own index to give it the exact pts of
@@ -1019,10 +1017,9 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 
   resetDecodeStats();
 
-  // Seek if needed.
-  if (desiredPtsSeconds_.has_value()) {
+  if (cursorWasJustSet_) {
     maybeSeekToBeforeDesiredPts();
-    desiredPtsSeconds_ = std::nullopt;
+    cursorWasJustSet_ = false;
   }
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];

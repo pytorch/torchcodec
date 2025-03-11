@@ -143,20 +143,6 @@ at::Tensor create_from_tensor(
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
-at::Tensor create_from_buffer(
-    const void* buffer,
-    size_t length,
-    std::optional<std::string_view> seek_mode) {
-  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
-  if (seek_mode.has_value()) {
-    realSeek = seekModeFromString(seek_mode.value());
-  }
-
-  std::unique_ptr<VideoDecoder> uniqueDecoder =
-      std::make_unique<VideoDecoder>(buffer, length, realSeek);
-  return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
-}
-
 void add_video_stream(
     at::Tensor& decoder,
     std::optional<int64_t> width,
