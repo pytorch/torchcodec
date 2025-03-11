@@ -878,12 +878,9 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   auto shouldStopDecoding = false;
   while (!shouldStopDecoding) {
     try {
-      AVFrameStream avFrameStream =
-          decodeAVFrame([&streamInfo](AVFrame* avFrame) {
-            return (
-                streamInfo.discardFramesBeforePts <
-                avFrame->pts + getDuration(avFrame));
-          });
+      AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
+        return cursor_ < avFrame->pts + getDuration(avFrame);
+      });
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       tensors.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
