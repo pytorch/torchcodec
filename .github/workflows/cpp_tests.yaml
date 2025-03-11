@@ -19,6 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # TODO put back 6.1.1. See
+        # https://github.com/pytorch/torchcodec/issues/518
         ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '7.0.1']
     steps:
       - name: Check out repo
