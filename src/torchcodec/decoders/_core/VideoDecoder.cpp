@@ -881,6 +881,10 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
       AVFrameStream avFrameStream = decodeAVFrame([startPts](AVFrame* avFrame) {
         return startPts < avFrame->pts + getDuration(avFrame);
       });
+      // TODO: it's not great that we are getting a FrameOutput, which is
+      // intended for videos. We should consider bypassing
+      // convertAVFrameToFrameOutput and directly call
+      // convertAudioAVFrameToFrameOutputOnCPU.
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       firstFramePtsSeconds =
           std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
