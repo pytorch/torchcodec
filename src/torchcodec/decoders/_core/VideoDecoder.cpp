@@ -850,7 +850,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
           ") must be less than or equal to stop seconds (" +
-          std::to_string(stopSeconds) + ".");
+          std::to_string(stopSeconds) + ").");
 
   if (startSeconds == stopSeconds) {
     // For consistency with video
@@ -859,29 +859,29 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  // TODO-AUDIO This essentially enforce that we don't need to seek (backwards).
-  // We should remove it and seek back to the stream's beginning when needed.
-  // See test_multiple_calls
-  TORCH_CHECK(
-      streamInfo.lastDecodedAvFramePts +
-              streamInfo.lastDecodedAvFrameDuration <=
-          secondsToClosestPts(startSeconds, streamInfo.timeBase),
-      "Audio decoder cannot seek backwards, or start from the last decoded frame.");
+  //   TORCH_CHECK(
+  //       streamInfo.lastDecodedAvFramePts +
+  //               streamInfo.lastDecodedAvFrameDuration <=
+  //           secondsToClosestPts(startSeconds, streamInfo.timeBase),
+  //       "Audio decoder cannot seek backwards, or start from the last decoded
+  //       frame.");
 
-  setCursorPtsInSeconds(startSeconds);
+  setCursorPtsInSeconds(INT64_MIN);
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
   // cat(). This would save a copy. We know the duration of the output and the
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> tensors;
 
+  auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
   auto finished = false;
   while (!finished) {
     try {
-      AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
-        return cursor_ < avFrame->pts + getDuration(avFrame);
-      });
+      AVFrameStream avFrameStream =
+          decodeAVFrame([this, startPts](AVFrame* avFrame) {
+            return startPts < avFrame->pts + getDuration(avFrame);
+          });
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       tensors.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
@@ -938,7 +938,7 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 bool VideoDecoder::canWeAvoidSeeking() const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
-    return true;
+    return false;
   }
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;

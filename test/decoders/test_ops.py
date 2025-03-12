@@ -741,11 +741,9 @@ class TestAudioOps:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
-        # Ensure that multiple calls are OK as long as we're decoding
-        # "sequentially", i.e. we don't require a backwards seek.
-        # And ensure a proper error is raised in such case.
-        # TODO-AUDIO We shouldn't error, we should just implement the seeking
-        # back to the beginning of the stream.
+        # Ensure that multiple calls to get_frames_by_pts_in_range_audio on the
+        # same decoder are supported, whether it involves forward seeks or
+        # backwards seeks.
 
         def get_reference_frames(start_seconds, stop_seconds):
             # This stateless helper exists for convenience, to avoid
@@ -794,23 +792,22 @@ class TestAudioOps:
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
-        # but starting immediately on the same frame raises
-        expected_match = "Audio decoder cannot seek backwards"
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds, stop_seconds=6
-            )
+        # starting immediately on the same frame is OK
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=stop_seconds, stop_seconds=6
+        )
+        torch.testing.assert_close(frames, get_reference_frames(stop_seconds, 6))
 
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
-            )
+        get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
+        )
+        torch.testing.assert_close(frames, get_reference_frames(stop_seconds, 6))
 
-        # and seeking backwards doesn't work either
-        with pytest.raises(RuntimeError, match=expected_match):
-            frames = get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=0, stop_seconds=2
-            )
+        # seeking backwards
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=2
+        )
+        torch.testing.assert_close(frames, get_reference_frames(0, 2))
 
 
 if __name__ == "__main__":
