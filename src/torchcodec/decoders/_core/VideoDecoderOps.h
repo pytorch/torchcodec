@@ -50,7 +50,8 @@ void _add_video_stream(
 
 void add_audio_stream(
     at::Tensor& decoder,
-    std::optional<int64_t> stream_index = std::nullopt);
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<int64_t> sample_rate = std::nullopt);
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);

@@ -23,6 +23,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -541,7 +542,9 @@ void VideoDecoder::addVideoStream(
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
 }
 
-void VideoDecoder::addAudioStream(int streamIndex) {
+void VideoDecoder::addAudioStream(
+    int streamIndex,
+    const AudioStreamOptions& audioStreamOptions) {
   TORCH_CHECK(
       seekMode_ == SeekMode::approximate,
       "seek_mode must be 'approximate' for audio streams.");
@@ -549,6 +552,8 @@ void VideoDecoder::addAudioStream(int streamIndex) {
   addStream(streamIndex, AVMEDIA_TYPE_AUDIO);
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
+  streamInfo.audioStreamOptions = audioStreamOptions;
+
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   streamMetadata.sampleRate =
@@ -1332,6 +1337,82 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       "pre-allocated audio tensor not supported yet.");
 
   const AVFrame* avFrame = avFrameStream.avFrame.get();
+  AVFrame* output_frame = nullptr;
+  SwrContext* swr_ctx = NULL; // TODO RAII
+
+  const auto sampleRate =
+      streamInfos_[activeStreamIndex_].audioStreamOptions.sampleRate;
+  if (sampleRate.has_value()) {
+    int outRate = static_cast<int>(*sampleRate);
+    auto& streamMetadata =
+        containerMetadata_.allStreamMetadata[activeStreamIndex_];
+    int inRate = static_cast<int>(streamMetadata.sampleRate.value());
+
+    printf("RESAMPLEING FROM %d to %d\n", outRate, inRate);
+    AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLTP;
+
+    AVChannelLayout stereoLayout = AV_CHANNEL_LAYOUT_STEREO;
+    const AVChannelLayout* chl = &stereoLayout;
+
+    int status = swr_alloc_set_opts2(
+        &swr_ctx,
+        chl,
+        sampleFormat,
+        outRate,
+        chl,
+        sampleFormat,
+        inRate,
+        0,
+        NULL);
+
+    TORCH_CHECK(status == 0, "IS NULL");
+
+    if (swr_init(swr_ctx) < 0) {
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Failed to initialize the resampling context\n");
+    }
+
+    // Allocate output frame
+    output_frame = av_frame_alloc();
+    if (!output_frame) {
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Could not allocate output frame\n");
+    }
+    output_frame->ch_layout = stereoLayout;
+    output_frame->sample_rate = outRate;
+    output_frame->format = sampleFormat;
+
+    output_frame->nb_samples = av_rescale_rnd(
+        swr_get_delay(swr_ctx, inRate) + avFrame->nb_samples,
+        outRate,
+        inRate,
+        AV_ROUND_UP);
+
+    if (av_frame_get_buffer(output_frame, 0) < 0) {
+      av_frame_free(&output_frame);
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Could not allocate output frame samples");
+    }
+
+    int ret = swr_convert(
+        swr_ctx,
+        output_frame->data,
+        output_frame->nb_samples,
+        (const uint8_t**)avFrame->data,
+        avFrame->nb_samples);
+    if (ret < 0) {
+      av_frame_free(&output_frame);
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Error while converting\n");
+    }
+
+    printf(
+        "nb_samples: %d %d\n", avFrame->nb_samples, output_frame->nb_samples);
+
+    avFrame = output_frame; // lmao
+  } else {
+    printf("NO RESAMPLING\n");
+  }
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
@@ -1360,6 +1441,10 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
           av_get_sample_fmt_name(format));
   }
   frameOutput.data = outputData;
+
+  // TODO
+  av_frame_free(&output_frame);
+  swr_free(&swr_ctx);
 }
 
 // --------------------------------------------------------------------------
