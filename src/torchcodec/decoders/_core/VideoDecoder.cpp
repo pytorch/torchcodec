@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -552,7 +553,8 @@ void VideoDecoder::addAudioStream(int streamIndex) {
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   streamMetadata.sampleRate =
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
-  streamMetadata.numChannels = getNumChannels(streamInfo.codecContext);
+  streamMetadata.numChannels =
+      static_cast<int64_t>(getNumChannels(streamInfo.codecContext));
 }
 
 // --------------------------------------------------------------------------
@@ -567,6 +569,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   AVFrameStream avFrameStream = decodeAVFrame(
       [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
@@ -685,6 +688,7 @@ VideoDecoder::getFramesInRange(int64_t start, int64_t stop, int64_t step) {
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   double frameStartTime =
       ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
@@ -757,7 +761,6 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
     double startSeconds,
     double stopSeconds) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   TORCH_CHECK(
@@ -835,6 +838,68 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   return frameBatchOutput;
 }
 
+torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
+    double startSeconds,
+    std::optional<double> stopSecondsOptional) {
+  validateActiveStream(AVMEDIA_TYPE_AUDIO);
+
+  double stopSeconds =
+      stopSecondsOptional.value_or(std::numeric_limits<double>::max());
+
+  TORCH_CHECK(
+      startSeconds <= stopSeconds,
+      "Start seconds (" + std::to_string(startSeconds) +
+          ") must be less than or equal to stop seconds (" +
+          std::to_string(stopSeconds) + ".");
+
+  if (startSeconds == stopSeconds) {
+    // For consistency with video
+    return torch::empty({0});
+  }
+
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+
+  // TODO-AUDIO This essentially enforce that we don't need to seek (backwards).
+  // We should remove it and seek back to the stream's beginning when needed.
+  // See test_multiple_calls
+  TORCH_CHECK(
+      streamInfo.lastDecodedAvFramePts +
+              streamInfo.lastDecodedAvFrameDuration <=
+          secondsToClosestPts(startSeconds, streamInfo.timeBase),
+      "Audio decoder cannot seek backwards, or start from the last decoded frame.");
+
+  setCursorPtsInSeconds(startSeconds);
+
+  // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
+  // cat(). This would save a copy. We know the duration of the output and the
+  // sample rate, so in theory we know the number of output samples.
+  std::vector<torch::Tensor> tensors;
+
+  auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+  auto finished = false;
+  while (!finished) {
+    try {
+      AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
+        return cursor_ < avFrame->pts + getDuration(avFrame);
+      });
+      auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
+      tensors.push_back(frameOutput.data);
+    } catch (const EndOfFileException& e) {
+      finished = true;
+    }
+
+    // If stopSeconds is in [begin, end] of the last decoded frame, we should
+    // stop decoding more frames. Note that if we were to use [begin, end),
+    // which may seem more natural, then we would decode the frame starting at
+    // stopSeconds, which isn't what we want!
+    auto lastDecodedAvFrameEnd = streamInfo.lastDecodedAvFramePts +
+        streamInfo.lastDecodedAvFrameDuration;
+    finished |= (streamInfo.lastDecodedAvFramePts) <= stopPts &&
+        (stopPts <= lastDecodedAvFrameEnd);
+  }
+  return torch::cat(tensors, 1);
+}
+
 // --------------------------------------------------------------------------
 // SEEKING APIs
 // --------------------------------------------------------------------------
@@ -871,6 +936,10 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 (2) is more efficient than (1) if there is an I frame between x and y.
 */
 bool VideoDecoder::canWeAvoidSeeking() const {
+  const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
+    return true;
+  }
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
   if (cursor_ < lastDecodedAvFramePts) {
@@ -897,7 +966,7 @@ bool VideoDecoder::canWeAvoidSeeking() const {
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
 void VideoDecoder::maybeSeekToBeforeDesiredPts() {
-  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  validateActiveStream();
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
   decodeStats_.numSeeksAttempted++;
@@ -942,7 +1011,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 
 VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
-  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  validateActiveStream();
 
   resetDecodeStats();
 
@@ -1071,13 +1140,14 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
   AVFrame* avFrame = avFrameStream.avFrame.get();
   frameOutput.streamIndex = streamIndex;
   auto& streamInfo = streamInfos_[streamIndex];
-  TORCH_CHECK(streamInfo.stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
   frameOutput.ptsSeconds = ptsToSeconds(
       avFrame->pts, formatContext_->streams[streamIndex]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
-  // TODO: we should fold preAllocatedOutputTensor into AVFrameStream.
-  if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
+  if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
+    convertAudioAVFrameToFrameOutputOnCPU(
+        avFrameStream, frameOutput, preAllocatedOutputTensor);
+  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
         avFrameStream, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
@@ -1251,6 +1321,45 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
   };
   return torch::from_blob(
       filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
+}
+
+void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
+    VideoDecoder::AVFrameStream& avFrameStream,
+    FrameOutput& frameOutput,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  TORCH_CHECK(
+      !preAllocatedOutputTensor.has_value(),
+      "pre-allocated audio tensor not supported yet.");
+
+  const AVFrame* avFrame = avFrameStream.avFrame.get();
+
+  auto numSamples = avFrame->nb_samples; // per channel
+  auto numChannels = getNumChannels(avFrame);
+  torch::Tensor outputData =
+      torch::empty({numChannels, numSamples}, torch::kFloat32);
+
+  AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
+  // TODO-AUDIO Implement all formats.
+  switch (format) {
+    case AV_SAMPLE_FMT_FLTP: {
+      uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
+      auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
+      for (auto channel = 0; channel < numChannels;
+           ++channel, outputChannelData += numBytesPerChannel) {
+        memcpy(
+            outputChannelData,
+            avFrame->extended_data[channel],
+            numBytesPerChannel);
+      }
+      break;
+    }
+    default:
+      TORCH_CHECK(
+          false,
+          "Unsupported audio format (yet!): ",
+          av_get_sample_fmt_name(format));
+  }
+  frameOutput.data = outputData;
 }
 
 // --------------------------------------------------------------------------
