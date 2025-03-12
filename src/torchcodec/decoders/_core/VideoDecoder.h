@@ -170,6 +170,11 @@ class VideoDecoder {
         const StreamMetadata& streamMetadata);
   };
 
+  struct AudioFramesOutput {
+    torch::Tensor data; // shape is (numChannels, numSamples)
+    double ptsSeconds;
+  };
+
   // Places the cursor at the first frame on or after the position in seconds.
   // Calling getNextFrame() will return the first frame at
   // or after this position.
@@ -222,7 +227,7 @@ class VideoDecoder {
       double stopSeconds);
 
   // TODO-AUDIO: Should accept sampleRate
-  torch::Tensor getFramesPlayedInRangeAudio(
+  AudioFramesOutput getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> stopSecondsOptional = std::nullopt);
 

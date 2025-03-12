@@ -74,6 +74,12 @@ using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 //   single float.
 using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
+// The elements of this tuple are all tensors that represent the concatenation
+// of multiple audio frames:
+//   1. The frames data (concatenated)
+//   2. A single float value for the pts of the first frame, in seconds.
+using OpsAudioFramesOutput = std::tuple<at::Tensor, at::Tensor>;
+
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
 // given timestamp T has T >= PTS and T < PTS + Duration.
@@ -112,7 +118,7 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
     double start_seconds,
     double stop_seconds);
 
-torch::Tensor get_frames_by_pts_in_range_audio(
+OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
     at::Tensor& decoder,
     double start_seconds,
     std::optional<double> stop_seconds = std::nullopt);
