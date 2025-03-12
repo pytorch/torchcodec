@@ -697,22 +697,24 @@ class TestAudioOps:
 
         torch.testing.assert_close(frames, reference_frames)
 
-    @pytest.mark.parametrize(
-        "asset, expected_shape", ((NASA_AUDIO, (2, 1024)), (NASA_AUDIO_MP3, (2, 576)))
-    )
-    def test_decode_epsilon_range(self, asset, expected_shape):
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_decode_epsilon_range(self, asset):
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
+        start_seconds = 5
         frames = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=5, stop_seconds=5 + 1e-5
+            decoder, start_seconds=start_seconds, stop_seconds=start_seconds + 1e-5
         )
-        assert frames.shape == expected_shape
+        torch.testing.assert_close(
+            frames,
+            asset.get_frame_data_by_index(
+                asset.get_frame_index(pts_seconds=start_seconds)
+            ),
+        )
 
-    @pytest.mark.parametrize(
-        "asset, expected_shape", ((NASA_AUDIO, (2, 1024)), (NASA_AUDIO_MP3, (2, 576)))
-    )
-    def test_decode_just_one_frame_at_boundaries(self, asset, expected_shape):
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_decode_just_one_frame_at_boundaries(self, asset):
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
@@ -721,7 +723,12 @@ class TestAudioOps:
         frames = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
-        assert frames.shape == expected_shape
+        torch.testing.assert_close(
+            frames,
+            asset.get_frame_data_by_index(
+                asset.get_frame_index(pts_seconds=start_seconds)
+            ),
+        )
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_decode_start_equal_stop(self, asset):

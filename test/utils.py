@@ -377,6 +377,7 @@ class TestAudio(TestContainerFile):
             # 0.13~, not 0.
             return 0
         try:
+            # Could use bisect() to maek this faster if needed
             return next(
                 frame_index
                 for (frame_index, frame_info) in self.frames[stream_index].items()

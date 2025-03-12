@@ -395,7 +395,6 @@ class VideoDecoder {
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
-  FrameBatchOutput makeFrameBatchOutput(int64_t numFrames);
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------

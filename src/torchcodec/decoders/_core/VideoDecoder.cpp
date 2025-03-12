@@ -553,7 +553,8 @@ void VideoDecoder::addAudioStream(int streamIndex) {
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   streamMetadata.sampleRate =
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
-  streamMetadata.numChannels = getNumChannels(streamInfo.codecContext);
+  streamMetadata.numChannels =
+      static_cast<int64_t>(getNumChannels(streamInfo.codecContext));
 }
 
 // --------------------------------------------------------------------------
@@ -875,8 +876,8 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   std::vector<torch::Tensor> tensors;
 
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
-  auto shouldStopDecoding = false;
-  while (!shouldStopDecoding) {
+  auto finished = false;
+  while (!finished) {
     try {
       AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
         return cursor_ < avFrame->pts + getDuration(avFrame);
@@ -884,7 +885,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       tensors.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
-      shouldStopDecoding = true;
+      finished = true;
     }
 
     // If stopSeconds is in [begin, end] of the last decoded frame, we should
@@ -893,7 +894,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     // stopSeconds, which isn't what we want!
     auto lastDecodedAvFrameEnd = streamInfo.lastDecodedAvFramePts +
         streamInfo.lastDecodedAvFrameDuration;
-    shouldStopDecoding |= (streamInfo.lastDecodedAvFramePts) <= stopPts &&
+    finished |= (streamInfo.lastDecodedAvFramePts) <= stopPts &&
         (stopPts <= lastDecodedAvFrameEnd);
   }
   return torch::cat(tensors, 1);
