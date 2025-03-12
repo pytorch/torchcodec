@@ -69,10 +69,10 @@ class AudioDecoder:
         #
         # We want to return the samples in [start_seconds, stop_seconds). But
         # because the core API is based on frames, the `frames` tensor contains
-        # the samples in [first_pts, last_pts).pts
+        # the samples in [first_pts, last_pts)
         #
-        # So we return a view on that tensor and do some basic math to figure
-        # out where to chunk it.
+        # So we do some basic math to figure out the position of the view that
+        # we'l; return.
 
         offset_beginning = round(
             (max(0, start_seconds - first_pts)) * self.metadata.sample_rate
