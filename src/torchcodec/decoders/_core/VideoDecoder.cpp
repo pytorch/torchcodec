@@ -850,7 +850,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
       startSeconds <= stopSeconds,
       "Start seconds (" + std::to_string(startSeconds) +
           ") must be less than or equal to stop seconds (" +
-          std::to_string(stopSeconds) + ".");
+          std::to_string(stopSeconds) + ").");
 
   if (startSeconds == stopSeconds) {
     // For consistency with video
@@ -859,16 +859,14 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  // TODO-AUDIO This essentially enforce that we don't need to seek (backwards).
-  // We should remove it and seek back to the stream's beginning when needed.
-  // See test_multiple_calls
-  TORCH_CHECK(
-      streamInfo.lastDecodedAvFramePts +
-              streamInfo.lastDecodedAvFrameDuration <=
-          secondsToClosestPts(startSeconds, streamInfo.timeBase),
-      "Audio decoder cannot seek backwards, or start from the last decoded frame.");
-
-  setCursorPtsInSeconds(startSeconds);
+  auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
+  if (startPts < streamInfo.lastDecodedAvFramePts +
+          streamInfo.lastDecodedAvFrameDuration) {
+    // If we need to seek backwards, then we have to seek back to the beginning
+    // of the stream.
+    // TODO-AUDIO: document why this is needed in a big comment.
+    setCursorPtsInSeconds(INT64_MIN);
+  }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
   // cat(). This would save a copy. We know the duration of the output and the
@@ -880,8 +878,8 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   auto finished = false;
   while (!finished) {
     try {
-      AVFrameStream avFrameStream = decodeAVFrame([this](AVFrame* avFrame) {
-        return cursor_ < avFrame->pts + getDuration(avFrame);
+      AVFrameStream avFrameStream = decodeAVFrame([startPts](AVFrame* avFrame) {
+        return startPts < avFrame->pts + getDuration(avFrame);
       });
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
       firstFramePtsSeconds =
@@ -942,7 +940,9 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 bool VideoDecoder::canWeAvoidSeeking() const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
-    return true;
+    // For audio, we only need to seek if a backwards seek was requested within
+    // getFramesPlayedInRangeAudio(), when setCursorPtsInSeconds() was called.
+    return !cursorWasJustSet_;
   }
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;
