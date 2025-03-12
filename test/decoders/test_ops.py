@@ -741,19 +741,18 @@ class TestAudioOps:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
-        # Ensure that multiple calls are OK as long as we're decoding
-        # "sequentially", i.e. we don't require a backwards seek.
-        # And ensure a proper error is raised in such case.
-        # TODO-AUDIO We shouldn't error, we should just implement the seeking
-        # back to the beginning of the stream.
+        # Ensure that multiple calls to get_frames_by_pts_in_range_audio on the
+        # same decoder are supported and correct, whether it involves forward
+        # seeks or backwards seeks.
 
         def get_reference_frames(start_seconds, stop_seconds):
-            # This stateless helper exists for convenience, to avoid
-            # complicating this test with pts-to-index conversions. Eventually
-            # we should remove it and just rely on the asset's methods.
-            # Using this helper is OK for now: we're comparing a decoder which
-            # seeks multiple times with a decoder which seeks only once (the one
-            # here, treated as the reference)
+            # Usually we get the reference frames from the asset's methods, but
+            # for this specific test, this helper is more convenient, because
+            # relying on the asset would force us to convert all timestamps into
+            # indices.
+            # Ultimately, this test compares a "stateful decoder" which calls
+            # `get_frames_by_pts_in_range_audio()`` multiple times with a
+            # "stateless decoder" (the one here, treated as the reference)
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder)
 
@@ -794,23 +793,30 @@ class TestAudioOps:
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
-        # but starting immediately on the same frame raises
-        expected_match = "Audio decoder cannot seek backwards"
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds, stop_seconds=6
-            )
+        # starting immediately on the same frame is OK
+        start_seconds, stop_seconds = stop_seconds, 6
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
-            )
+        get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds + 1e-4, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
-        # and seeking backwards doesn't work either
-        with pytest.raises(RuntimeError, match=expected_match):
-            frames = get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=0, stop_seconds=2
-            )
+        # seeking backwards
+        start_seconds, stop_seconds = 0, 2
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
 
 if __name__ == "__main__":
