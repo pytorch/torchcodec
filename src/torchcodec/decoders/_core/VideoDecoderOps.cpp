@@ -48,7 +48,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
   m.def(
-      "get_frames_by_pts_in_range_audio(Tensor(a!) decoder, *, float start_seconds, float? stop_seconds) -> Tensor");
+      "get_frames_by_pts_in_range_audio(Tensor(a!) decoder, *, float start_seconds, float? stop_seconds) -> (Tensor, Tensor)");
   m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, float[] timestamps) -> (Tensor, Tensor, Tensor)");
   m.def("_get_key_frame_indices(Tensor(a!) decoder) -> Tensor");
@@ -92,6 +92,13 @@ OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
 OpsFrameBatchOutput makeOpsFrameBatchOutput(
     VideoDecoder::FrameBatchOutput& batch) {
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
+}
+
+OpsAudioFramesOutput makeOpsAudioFramesOutput(
+    VideoDecoder::AudioFramesOutput& audioFrames) {
+  return std::make_tuple(
+      audioFrames.data,
+      torch::tensor(audioFrames.ptsSeconds, torch::dtype(torch::kFloat64)));
 }
 
 VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
@@ -290,12 +297,14 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
   return makeOpsFrameBatchOutput(result);
 }
 
-torch::Tensor get_frames_by_pts_in_range_audio(
+OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
     at::Tensor& decoder,
     double start_seconds,
     std::optional<double> stop_seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  return videoDecoder->getFramesPlayedInRangeAudio(start_seconds, stop_seconds);
+  auto result =
+      videoDecoder->getFramesPlayedInRangeAudio(start_seconds, stop_seconds);
+  return makeOpsAudioFramesOutput(result);
 }
 
 std::string quoteValue(const std::string& value) {

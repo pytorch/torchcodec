@@ -838,7 +838,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   return frameBatchOutput;
 }
 
-torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
+VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     std::optional<double> stopSecondsOptional) {
   validateActiveStream(AVMEDIA_TYPE_AUDIO);
@@ -854,7 +854,7 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   if (startSeconds == stopSeconds) {
     // For consistency with video
-    return torch::empty({0});
+    return AudioFramesOutput{torch::empty({0}), 0.0};
   }
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
@@ -871,8 +871,9 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
   // cat(). This would save a copy. We know the duration of the output and the
   // sample rate, so in theory we know the number of output samples.
-  std::vector<torch::Tensor> tensors;
+  std::vector<torch::Tensor> frames;
 
+  double firstFramePtsSeconds = std::numeric_limits<double>::max();
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
   auto finished = false;
   while (!finished) {
@@ -880,8 +881,14 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
       AVFrameStream avFrameStream = decodeAVFrame([startPts](AVFrame* avFrame) {
         return startPts < avFrame->pts + getDuration(avFrame);
       });
+      // TODO: it's not great that we are getting a FrameOutput, which is
+      // intended for videos. We should consider bypassing
+      // convertAVFrameToFrameOutput and directly call
+      // convertAudioAVFrameToFrameOutputOnCPU.
       auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
-      tensors.push_back(frameOutput.data);
+      firstFramePtsSeconds =
+          std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
+      frames.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
       finished = true;
     }
@@ -895,7 +902,8 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
     finished |= (streamInfo.lastDecodedAvFramePts) <= stopPts &&
         (stopPts <= lastDecodedAvFrameEnd);
   }
-  return torch::cat(tensors, 1);
+
+  return AudioFramesOutput{torch::cat(frames, 1), firstFramePtsSeconds};
 }
 
 // --------------------------------------------------------------------------

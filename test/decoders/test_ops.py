@@ -691,11 +691,15 @@ class TestAudioOps:
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
-
         torch.testing.assert_close(frames, reference_frames)
+
+        if range == "at_frames_boundaries":
+            assert pts_seconds == start_seconds
+        elif range == "not_at_frames_boundaries":
+            assert pts_seconds == start_frame_info.pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_decode_epsilon_range(self, asset):
@@ -703,7 +707,7 @@ class TestAudioOps:
         add_audio_stream(decoder)
 
         start_seconds = 5
-        frames = get_frames_by_pts_in_range_audio(
+        frames, *_ = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=start_seconds + 1e-5
         )
         torch.testing.assert_close(
@@ -720,7 +724,7 @@ class TestAudioOps:
 
         start_seconds = asset.get_frame_info(idx=10).pts_seconds
         stop_seconds = asset.get_frame_info(idx=11).pts_seconds
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         torch.testing.assert_close(
@@ -729,15 +733,17 @@ class TestAudioOps:
                 asset.get_frame_index(pts_seconds=start_seconds)
             ),
         )
+        assert pts_seconds == start_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_decode_start_equal_stop(self, asset):
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=1, stop_seconds=1
         )
         assert frames.shape == (0,)
+        assert pts_seconds == 0
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
