@@ -748,6 +748,12 @@ class TestAudioOps:
         # back to the beginning of the stream.
 
         def get_reference_frames(start_seconds, stop_seconds):
+            # This stateless helper exists for convenience, to avoid
+            # complicating this test with pts-to-index conversions. Eventually
+            # we should remove it and just rely on the asset's methods.
+            # Using this helper is OK for now: we're comparing a decoder which
+            # seeks multiple times with a decoder which seeks only once (the one
+            # here, treated as the reference)
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder)
 
