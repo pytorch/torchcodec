@@ -138,10 +138,19 @@ class VideoDecoder {
     torch::Device device = torch::kCPU;
   };
 
+  struct AudioStreamOptions {
+    AudioStreamOptions() {}
+
+    // explicit AudioStreamOptions(const std::string& optionsString);
+    std::optional<int> sampleRate;
+  };
+
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStream(int streamIndex);
+  void addAudioStream(
+      int streamIndex,
+      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -221,7 +230,6 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
-  // TODO-AUDIO: Should accept sampleRate
   torch::Tensor getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> stopSecondsOptional = std::nullopt);
@@ -343,6 +351,7 @@ class VideoDecoder {
     int64_t lastDecodedAvFramePts = 0;
     int64_t lastDecodedAvFrameDuration = 0;
     VideoStreamOptions videoStreamOptions;
+    AudioStreamOptions audioStreamOptions;
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
