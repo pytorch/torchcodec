@@ -742,16 +742,17 @@ class TestAudioOps:
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
         # Ensure that multiple calls to get_frames_by_pts_in_range_audio on the
-        # same decoder are supported, whether it involves forward seeks or
-        # backwards seeks.
+        # same decoder are supported and correct, whether it involves forward
+        # seeks or backwards seeks.
 
         def get_reference_frames(start_seconds, stop_seconds):
-            # This stateless helper exists for convenience, to avoid
-            # complicating this test with pts-to-index conversions. Eventually
-            # we should remove it and just rely on the asset's methods.
-            # Using this helper is OK for now: we're comparing a decoder which
-            # seeks multiple times with a decoder which seeks only once (the one
-            # here, treated as the reference)
+            # Usually we get the reference frames from the asset's methods, but
+            # for this specific test, this helper is more convenient, because
+            # relying on the asset would force us to convert all timestamps into
+            # indices.
+            # Ultimately, this test compares a "stateful decoder" which calls
+            # `get_frames_by_pts_in_range_audio()`` multiple times with a
+            # "stateless decoder" (the one here, treated as the reference)
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder)
 
