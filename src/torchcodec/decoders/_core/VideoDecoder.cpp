@@ -859,21 +859,20 @@ torch::Tensor VideoDecoder::getFramesPlayedInRangeAudio(
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
-  //   TORCH_CHECK(
-  //       streamInfo.lastDecodedAvFramePts +
-  //               streamInfo.lastDecodedAvFrameDuration <=
-  //           secondsToClosestPts(startSeconds, streamInfo.timeBase),
-  //       "Audio decoder cannot seek backwards, or start from the last decoded
-  //       frame.");
-
-  setCursorPtsInSeconds(INT64_MIN);
+  auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
+  if (startPts < streamInfo.lastDecodedAvFramePts +
+          streamInfo.lastDecodedAvFrameDuration) {
+    // If we need to seek backwards, then we have to seek back to the beginning
+    // of the stream.
+    // TODO-AUDIO: document why this is needed in a big comment.
+    setCursorPtsInSeconds(INT64_MIN);
+  }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
   // cat(). This would save a copy. We know the duration of the output and the
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> tensors;
 
-  auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
   auto finished = false;
   while (!finished) {
@@ -938,7 +937,9 @@ I    P     P    P    I    P    P    P    I    P    P    I    P    P    I    P
 bool VideoDecoder::canWeAvoidSeeking() const {
   const StreamInfo& streamInfo = streamInfos_.at(activeStreamIndex_);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
-    return false;
+    // For audio, we only need to seek if a backwards seek was requested within
+    // getFramesPlayedInRangeAudio(), when setCursorPtsInSeconds() was called.
+    return !cursorWasJustSet_;
   }
   int64_t lastDecodedAvFramePts =
       streamInfos_.at(activeStreamIndex_).lastDecodedAvFramePts;

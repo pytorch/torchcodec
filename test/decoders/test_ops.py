@@ -793,21 +793,29 @@ class TestAudioOps:
         )
 
         # starting immediately on the same frame is OK
+        start_seconds, stop_seconds = stop_seconds, 6
         frames = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=stop_seconds, stop_seconds=6
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
-        torch.testing.assert_close(frames, get_reference_frames(stop_seconds, 6))
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
         get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
+            decoder, start_seconds=start_seconds + 1e-4, stop_seconds=stop_seconds
         )
-        torch.testing.assert_close(frames, get_reference_frames(stop_seconds, 6))
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
         # seeking backwards
+        start_seconds, stop_seconds = 0, 2
         frames = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=0, stop_seconds=2
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
-        torch.testing.assert_close(frames, get_reference_frames(0, 2))
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
 
 
 if __name__ == "__main__":
