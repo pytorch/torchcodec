@@ -855,7 +855,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 
   if (startSeconds == stopSeconds) {
     // For consistency with video
-    return AudioFramesOutput{torch::empty({0}), 0.0};
+    return AudioFramesOutput{torch::empty({0, 0}), 0.0};
   }
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
