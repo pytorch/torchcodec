@@ -23,6 +23,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -1341,6 +1342,71 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   const AVFrame* avFrame = avFrameStream.avFrame.get();
 
+   AVFrame* output_frame = nullptr;
+   SwrContext* swr_ctx = NULL; // TODO RAII
+
+    const auto& streamInfo = streamInfos_[activeStreamIndex_];
+    const auto& streamMetadata =
+        containerMetadata_.allStreamMetadata[activeStreamIndex_];
+    int sampleRate = static_cast<int>(streamMetadata.sampleRate.value());
+
+    AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLTP;
+    AVChannelLayout layout = streamInfo.codecContext->ch_layout;
+
+    int status = swr_alloc_set_opts2(
+        &swr_ctx,
+        &layout,
+        sampleFormat,
+        sampleRate,
+        &layout,
+        sampleFormat,
+        sampleRate,
+        0,
+        NULL);
+
+    TORCH_CHECK(status == 0, "IS NULL");
+
+    if (swr_init(swr_ctx) < 0) {
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Failed to initialize the resampling context\n");
+    }
+
+    // Allocate output frame
+    output_frame = av_frame_alloc();
+    if (!output_frame) {
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Could not allocate output frame\n");
+    }
+    output_frame->ch_layout = layout;
+    output_frame->sample_rate = sampleRate;
+    output_frame->format = sampleFormat;
+
+    output_frame->nb_samples = av_rescale_rnd(
+        swr_get_delay(swr_ctx, sampleRate) + avFrame->nb_samples,
+        sampleRate,
+        sampleRate,
+        AV_ROUND_UP);
+
+    if (av_frame_get_buffer(output_frame, 0) < 0) {
+      av_frame_free(&output_frame);
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Could not allocate output frame samples");
+    }
+
+    int ret = swr_convert(
+        swr_ctx,
+        output_frame->data,
+        output_frame->nb_samples,
+        (const uint8_t**)avFrame->data,
+        avFrame->nb_samples);
+    if (ret < 0) {
+      av_frame_free(&output_frame);
+      swr_free(&swr_ctx);
+      TORCH_CHECK(false, "Error while converting\n");
+    }
+
+    avFrame = output_frame; // lmao
+
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
   torch::Tensor outputData =
@@ -1368,6 +1434,9 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
           av_get_sample_fmt_name(format));
   }
   frameOutput.data = outputData;
+    // TODO
+  av_frame_free(&output_frame);
+  swr_free(&swr_ctx);
 }
 
 // --------------------------------------------------------------------------
