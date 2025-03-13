@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 from torch import Tensor
 
+from torchcodec import AudioSamples
 from torchcodec.decoders import _core as core
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
@@ -39,7 +40,7 @@ class AudioDecoder:
         )
 
     def get_samples_played_in_range(
-        self, start_seconds: float = 0, stop_seconds: Optional[float] = None
+        self, start_seconds: float, stop_seconds: Optional[float] = None
     ) -> Tensor:
         """TODO-AUDIO docs"""
         if stop_seconds is not None and not start_seconds <= stop_seconds:
@@ -63,26 +64,37 @@ class AudioDecoder:
         #
         #            first_pts                                    last_pts
         #                v                                            v
-        # ....x..........x..........x...........x..........x..........x..........x.....
+        # ....x..........x..........x...........x..........x..........x.....
         #                    ^                                 ^
         #               start_seconds                      stop_seconds
         #
         # We want to return the samples in [start_seconds, stop_seconds). But
         # because the core API is based on frames, the `frames` tensor contains
         # the samples in [first_pts, last_pts)
-        #
         # So we do some basic math to figure out the position of the view that
-        # we'l; return.
+        # we'll return.
 
-        offset_beginning = round(
-            (max(0, start_seconds - first_pts)) * self.metadata.sample_rate
-        )
+        # TODO: sample_rate is either the original one from metadata, or the
+        # user-specified one (NIY)
+        sample_rate = self.metadata.sample_rate
+
+        if first_pts < start_seconds:
+            offset_beginning = round((start_seconds - first_pts) * sample_rate)
+            output_pts_seconds = start_seconds
+        else:
+            offset_beginning = 0
+            output_pts_seconds = first_pts
 
         num_samples = frames.shape[1]
-        offset_end = num_samples
         last_pts = first_pts + num_samples / self.metadata.sample_rate
         if stop_seconds is not None and stop_seconds < last_pts:
-            offset_end -= round((last_pts - stop_seconds) * self.metadata.sample_rate)
+            offset_end = num_samples - round((last_pts - stop_seconds) * sample_rate)
+        else:
+            offset_end = num_samples
 
-        return frames[:, offset_beginning:offset_end]
-        # return frames[:, offset_beginning:offset_end]
+        return AudioSamples(
+            data=frames[:, offset_beginning:offset_end],
+            pts_seconds=output_pts_seconds,
+            sample_rate=sample_rate,
+        )
+
