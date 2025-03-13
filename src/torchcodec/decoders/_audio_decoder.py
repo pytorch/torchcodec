@@ -38,10 +38,11 @@ class AudioDecoder:
         ) = get_and_validate_stream_metadata(
             decoder=self._decoder, stream_index=stream_index, media_type="audio"
         )
+        assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
 
     def get_samples_played_in_range(
         self, start_seconds: float, stop_seconds: Optional[float] = None
-    ) -> Tensor:
+    ) -> AudioSamples:
         """TODO-AUDIO docs"""
         if stop_seconds is not None and not start_seconds <= stop_seconds:
             raise ValueError(
@@ -76,7 +77,11 @@ class AudioDecoder:
 
         # TODO: sample_rate is either the original one from metadata, or the
         # user-specified one (NIY)
+        assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
         sample_rate = self.metadata.sample_rate
+
+        # TODO: metadata's sample_rate should probably not be Optional
+        assert sample_rate is not None  # mypy.
 
         if first_pts < start_seconds:
             offset_beginning = round((start_seconds - first_pts) * sample_rate)
