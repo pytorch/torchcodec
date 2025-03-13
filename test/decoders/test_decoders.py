@@ -1080,3 +1080,21 @@ class TestAudioDecoder:
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=stop_frame_index)
         torch.testing.assert_close(samples.data, reference_frames)
+
+    def test_single_channel(self):
+        asset = SINE_MONO_S32
+        decoder = AudioDecoder(asset.path)
+
+        samples = decoder.get_samples_played_in_range(start_seconds=0, stop_seconds=2)
+        assert samples.data.shape[0] == asset.num_channels == 1
+
+    def test_format_conversion(self):
+        asset = SINE_MONO_S32
+        decoder = AudioDecoder(asset.path)
+        assert decoder.metadata.sample_format == asset.sample_format == "s32"
+
+        all_samples = decoder.get_samples_played_in_range(start_seconds=0)
+        assert all_samples.data.dtype == torch.float32
+
+        reference_frames = asset.get_frame_data_by_range(start=0, stop=asset.num_frames)
+        torch.testing.assert_close(all_samples.data, reference_frames)
