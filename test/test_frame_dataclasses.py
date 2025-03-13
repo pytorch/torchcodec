@@ -1,6 +1,6 @@
 import pytest
 import torch
-from torchcodec import Frame, FrameBatch, AudioSamples
+from torchcodec import AudioSamples, Frame, FrameBatch
 
 
 def test_unpacking():
@@ -140,6 +140,7 @@ def test_framebatch_indexing():
     fb_fancy = fb[[[0], [1]]]  # select T=0 and N=1.
     assert isinstance(fb_fancy, FrameBatch)
     assert fb_fancy.data.shape == (1, C, H, W)
+
 
 def test_audio_samples_error():
     with pytest.raises(ValueError, match="data must be 2-dimensional"):

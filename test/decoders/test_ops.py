@@ -742,7 +742,7 @@ class TestAudioOps:
         frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=1, stop_seconds=1
         )
-        assert frames.shape == (0,)
+        assert frames.shape == (0, 0)
         assert pts_seconds == 0
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))

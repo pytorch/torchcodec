@@ -82,6 +82,9 @@ class AudioDecoder:
             offset_beginning = round((start_seconds - first_pts) * sample_rate)
             output_pts_seconds = start_seconds
         else:
+            # In normal cases we'll have first_pts <= start_pts, but in some
+            # edge cases it's possible to have first_pts > start_seconds,
+            # typically if the stream's first frame's pts isn't exactly 0.
             offset_beginning = 0
             output_pts_seconds = first_pts
 
@@ -97,4 +100,3 @@ class AudioDecoder:
             pts_seconds=output_pts_seconds,
             sample_rate=sample_rate,
         )
-

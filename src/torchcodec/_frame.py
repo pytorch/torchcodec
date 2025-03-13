@@ -115,13 +115,16 @@ class FrameBatch(Iterable):
     def __repr__(self):
         return _frame_repr(self)
 
+
 @dataclass
 class AudioSamples(Iterable):
     """Audio samples with associated metadata."""
+
     # TODO-AUDIO: docs
     data: Tensor
     pts_seconds: float
     sample_rate: int
+
     def __post_init__(self):
         # This is called after __init__() when a Frame is created. We can run
         # input validation checks here.
