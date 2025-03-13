@@ -955,6 +955,7 @@ class TestAudioDecoder:
         )
         assert decoder.metadata.sample_rate == asset.sample_rate
         assert decoder.metadata.num_channels == asset.num_channels
+        assert decoder.metadata.sample_format == asset.sample_format
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_error(self, asset):

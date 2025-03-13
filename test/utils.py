@@ -109,6 +109,7 @@ class TestAudioStreamInfo:
     num_channels: int
     duration_seconds: float
     num_frames: int
+    sample_format: str
 
 
 @dataclass
@@ -404,6 +405,10 @@ class TestAudio(TestContainerFile):
     def num_frames(self) -> int:
         return self.stream_infos[self.default_stream_index].num_frames
 
+    @property
+    def sample_format(self) -> str:
+        return self.stream_infos[self.default_stream_index].sample_format
+
 
 NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
@@ -411,7 +416,11 @@ NASA_AUDIO_MP3 = TestAudio(
     frames={},  # Automatically loaded from json file
     stream_infos={
         0: TestAudioStreamInfo(
-            sample_rate=8_000, num_channels=2, duration_seconds=13.248, num_frames=183
+            sample_rate=8_000,
+            num_channels=2,
+            duration_seconds=13.248,
+            num_frames=183,
+            sample_format="fltp",
         )
     },
 )
@@ -422,7 +431,11 @@ NASA_AUDIO = TestAudio(
     frames={},  # Automatically loaded from json file
     stream_infos={
         4: TestAudioStreamInfo(
-            sample_rate=16_000, num_channels=2, duration_seconds=13.056, num_frames=204
+            sample_rate=16_000,
+            num_channels=2,
+            duration_seconds=13.056,
+            num_frames=204,
+            sample_format="fltp",
         )
     },
 )
