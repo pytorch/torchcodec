@@ -556,6 +556,12 @@ void VideoDecoder::addAudioStream(int streamIndex) {
       static_cast<int64_t>(streamInfo.codecContext->sample_rate);
   streamMetadata.numChannels =
       static_cast<int64_t>(getNumChannels(streamInfo.codecContext));
+
+  // FFmpeg docs say that the decoder will try to decode natively in this
+  // format, if it can. Docs don't say what the decoder does when it doesn't
+  // support that format, but it looks like it does nothing, so this probably
+  // doesn't hurt.
+  streamInfo.codecContext->request_sample_fmt = AV_SAMPLE_FMT_FLTP;
 }
 
 // --------------------------------------------------------------------------
@@ -1342,24 +1348,28 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   const AVFrame* avFrame = avFrameStream.avFrame.get();
 
-   AVFrame* output_frame = nullptr;
-   SwrContext* swr_ctx = NULL; // TODO RAII
+  AVSampleFormat sourceSampleFormat =
+      static_cast<AVSampleFormat>(avFrame->format);
+  AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
+
+  AVFrame* output_frame = nullptr;
+  SwrContext* swr_ctx = NULL; // TODO RAII
+  if (sourceSampleFormat != desiredSampleFormat) {
 
     const auto& streamInfo = streamInfos_[activeStreamIndex_];
     const auto& streamMetadata =
         containerMetadata_.allStreamMetadata[activeStreamIndex_];
     int sampleRate = static_cast<int>(streamMetadata.sampleRate.value());
 
-    AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLTP;
     AVChannelLayout layout = streamInfo.codecContext->ch_layout;
 
     int status = swr_alloc_set_opts2(
         &swr_ctx,
         &layout,
-        sampleFormat,
+        desiredSampleFormat,
         sampleRate,
         &layout,
-        sampleFormat,
+        sourceSampleFormat,
         sampleRate,
         0,
         NULL);
@@ -1379,7 +1389,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     }
     output_frame->ch_layout = layout;
     output_frame->sample_rate = sampleRate;
-    output_frame->format = sampleFormat;
+    output_frame->format = desiredSampleFormat;
 
     output_frame->nb_samples = av_rescale_rnd(
         swr_get_delay(swr_ctx, sampleRate) + avFrame->nb_samples,
@@ -1406,6 +1416,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     }
 
     avFrame = output_frame; // lmao
+  }
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
@@ -1434,7 +1445,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
           av_get_sample_fmt_name(format));
   }
   frameOutput.data = outputData;
-    // TODO
+  // TODO
   av_frame_free(&output_frame);
   swr_free(&swr_ctx);
 }
