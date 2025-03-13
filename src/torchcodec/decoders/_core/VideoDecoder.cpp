@@ -1346,108 +1346,91 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       !preAllocatedOutputTensor.has_value(),
       "pre-allocated audio tensor not supported yet.");
 
-  const AVFrame* avFrame = avFrameStream.avFrame.get();
+  const UniqueAVFrame& avFrame = avFrameStream.avFrame;
 
   AVSampleFormat sourceSampleFormat =
       static_cast<AVSampleFormat>(avFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
-
-  AVFrame* output_frame = nullptr;
-  SwrContext* swr_ctx = NULL; // TODO RAII
-  if (sourceSampleFormat != desiredSampleFormat) {
-
-    const auto& streamInfo = streamInfos_[activeStreamIndex_];
-    const auto& streamMetadata =
-        containerMetadata_.allStreamMetadata[activeStreamIndex_];
-    int sampleRate = static_cast<int>(streamMetadata.sampleRate.value());
-
-    AVChannelLayout layout = streamInfo.codecContext->ch_layout;
-
-    int status = swr_alloc_set_opts2(
-        &swr_ctx,
-        &layout,
-        desiredSampleFormat,
-        sampleRate,
-        &layout,
-        sourceSampleFormat,
-        sampleRate,
-        0,
-        NULL);
-
-    TORCH_CHECK(status == 0, "IS NULL");
-
-    if (swr_init(swr_ctx) < 0) {
-      swr_free(&swr_ctx);
-      TORCH_CHECK(false, "Failed to initialize the resampling context\n");
-    }
-
-    // Allocate output frame
-    output_frame = av_frame_alloc();
-    if (!output_frame) {
-      swr_free(&swr_ctx);
-      TORCH_CHECK(false, "Could not allocate output frame\n");
-    }
-    output_frame->ch_layout = layout;
-    output_frame->sample_rate = sampleRate;
-    output_frame->format = desiredSampleFormat;
-
-    output_frame->nb_samples = av_rescale_rnd(
-        swr_get_delay(swr_ctx, sampleRate) + avFrame->nb_samples,
-        sampleRate,
-        sampleRate,
-        AV_ROUND_UP);
-
-    if (av_frame_get_buffer(output_frame, 0) < 0) {
-      av_frame_free(&output_frame);
-      swr_free(&swr_ctx);
-      TORCH_CHECK(false, "Could not allocate output frame samples");
-    }
-
-    int ret = swr_convert(
-        swr_ctx,
-        output_frame->data,
-        output_frame->nb_samples,
-        (const uint8_t**)avFrame->data,
-        avFrame->nb_samples);
-    if (ret < 0) {
-      av_frame_free(&output_frame);
-      swr_free(&swr_ctx);
-      TORCH_CHECK(false, "Error while converting\n");
-    }
-
-    avFrame = output_frame; // lmao
+  AVFrame* rawAVFrame = nullptr;
+  UniqueAVFrame convertedAVFrame;
+  if (sourceSampleFormat == desiredSampleFormat) {
+    rawAVFrame = avFrame.get();
+  } else {
+    convertedAVFrame = convertAudioAVFrameSampleFormat(
+        avFrame, sourceSampleFormat, desiredSampleFormat);
+    rawAVFrame = convertedAVFrame.get();
   }
 
-  auto numSamples = avFrame->nb_samples; // per channel
-  auto numChannels = getNumChannels(avFrame);
+  AVSampleFormat format = static_cast<AVSampleFormat>(rawAVFrame->format);
+  TORCH_CHECK(
+      format == desiredSampleFormat,
+      "Something went wrong, the frame didn't get converted to the desired format. ",
+      "Desired format = ",
+      av_get_sample_fmt_name(desiredSampleFormat),
+      "source format = ",
+      av_get_sample_fmt_name(format));
+
+  auto numSamples = rawAVFrame->nb_samples; // per channel
+  auto numChannels = getNumChannels(rawAVFrame);
   torch::Tensor outputData =
       torch::empty({numChannels, numSamples}, torch::kFloat32);
 
-  AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
-  // TODO-AUDIO Implement all formats.
-  switch (format) {
-    case AV_SAMPLE_FMT_FLTP: {
-      uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
-      auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
-      for (auto channel = 0; channel < numChannels;
-           ++channel, outputChannelData += numBytesPerChannel) {
-        memcpy(
-            outputChannelData,
-            avFrame->extended_data[channel],
-            numBytesPerChannel);
-      }
-      break;
-    }
-    default:
-      TORCH_CHECK(
-          false,
-          "Unsupported audio format (yet!): ",
-          av_get_sample_fmt_name(format));
+  uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
+  auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
+  for (auto channel = 0; channel < numChannels;
+       ++channel, outputChannelData += numBytesPerChannel) {
+    memcpy(
+        outputChannelData,
+        rawAVFrame->extended_data[channel],
+        numBytesPerChannel);
   }
   frameOutput.data = outputData;
-  // TODO
-  av_frame_free(&output_frame);
-  swr_free(&swr_ctx);
+}
+
+UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
+    const UniqueAVFrame& avFrame,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat
+
+) {
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  const auto& streamMetadata =
+      containerMetadata_.allStreamMetadata[activeStreamIndex_];
+  int sampleRate = static_cast<int>(streamMetadata.sampleRate.value());
+
+  if (!streamInfo.swrContext) {
+    createSwrContext(
+        streamInfo, sampleRate, sourceSampleFormat, desiredSampleFormat);
+  }
+
+  UniqueAVFrame convertedAVFrame(av_frame_alloc());
+  TORCH_CHECK(
+      convertedAVFrame,
+      "Could not allocate frame for sample format conversion.");
+
+  convertedAVFrame->ch_layout = avFrame->ch_layout;
+  convertedAVFrame->sample_rate = avFrame->sample_rate;
+  convertedAVFrame->nb_samples = avFrame->nb_samples;
+  convertedAVFrame->format = desiredSampleFormat;
+
+  auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Could not allocate frame buffers for sample format conversion: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  auto numSampleConverted = swr_convert(
+      streamInfo.swrContext.get(),
+      convertedAVFrame->data,
+      convertedAVFrame->nb_samples,
+      (const uint8_t**)avFrame->data,
+      avFrame->nb_samples);
+  TORCH_CHECK(
+      numSampleConverted > 0,
+      "Error in swr_convert: ",
+      getFFMPEGErrorStringFromErrorCode(numSampleConverted));
+
+  return convertedAVFrame;
 }
 
 // --------------------------------------------------------------------------
@@ -1681,6 +1664,39 @@ void VideoDecoder::createSwsContext(
   TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
 
   streamInfo.swsContext.reset(swsContext);
+}
+
+void VideoDecoder::createSwrContext(
+    StreamInfo& streamInfo,
+    int sampleRate,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat) {
+  SwrContext* swrContext = NULL;
+
+  AVChannelLayout layout = streamInfo.codecContext->ch_layout;
+
+  auto status = swr_alloc_set_opts2(
+      &swrContext,
+      &layout,
+      desiredSampleFormat,
+      sampleRate,
+      &layout,
+      sourceSampleFormat,
+      sampleRate,
+      0,
+      NULL);
+
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't create SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  status = swr_init(swrContext);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't initialize SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  streamInfo.swrContext.reset(swrContext);
 }
 
 // --------------------------------------------------------------------------

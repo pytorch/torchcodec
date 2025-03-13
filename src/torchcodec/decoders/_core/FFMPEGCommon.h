@@ -22,6 +22,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/version.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -67,6 +68,8 @@ using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
 using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
+using UniqueSwrContext =
+    std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:

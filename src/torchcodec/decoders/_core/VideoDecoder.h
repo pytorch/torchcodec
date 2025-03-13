@@ -354,6 +354,7 @@ class VideoDecoder {
     FilterGraphContext filterGraphContext;
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     UniqueSwsContext swsContext;
+    UniqueSwrContext swrContext;
 
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
@@ -400,6 +401,11 @@ class VideoDecoder {
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
+  UniqueAVFrame convertAudioAVFrameSampleFormat(
+      const UniqueAVFrame& avFrame,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat);
+
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------
@@ -413,6 +419,12 @@ class VideoDecoder {
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
+
+  void createSwrContext(
+      StreamInfo& streamInfo,
+      int sampleRate,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
