@@ -341,9 +341,13 @@ class TestAudio(TestContainerFile):
                 f"{self.filename}.stream{stream_index}.all_frames.pt"
             )
 
-            self._reference_frames[stream_index] = torch.load(
-                frames_data_path, weights_only=True
-            )
+            if frames_data_path.exists():
+                # To ease development, we allow for the reference frames not to
+                # exist. It means the asset cannot be used to check validity of
+                # decoded frames.
+                self._reference_frames[stream_index] = torch.load(
+                    frames_data_path, weights_only=True
+                )
 
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
@@ -436,6 +440,21 @@ NASA_AUDIO = TestAudio(
             duration_seconds=13.056,
             num_frames=204,
             sample_format="fltp",
+        )
+    },
+)
+
+SINE_MONO_S32 = TestAudio(
+    filename="sine_mono_s32.wav",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=16_000,
+            num_channels=1,
+            duration_seconds=4,
+            num_frames=63,
+            sample_format="s32",
         )
     },
 )

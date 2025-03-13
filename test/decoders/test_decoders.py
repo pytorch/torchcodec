@@ -25,6 +25,7 @@ from ..utils import (
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
+    SINE_MONO_S32,
 )
 
 
@@ -940,7 +941,7 @@ class TestVideoDecoder:
 
 
 class TestAudioDecoder:
-    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32))
     def test_metadata(self, asset):
         decoder = AudioDecoder(asset.path)
         assert isinstance(decoder.metadata, AudioStreamMetadata)
