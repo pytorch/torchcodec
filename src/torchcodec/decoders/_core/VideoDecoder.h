@@ -370,6 +370,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
+  void setCursorPtsInSecondsInternal(double seconds);
   bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();

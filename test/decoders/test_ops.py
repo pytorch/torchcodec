@@ -626,7 +626,7 @@ class TestAudioOps:
             partial(get_frames_in_range, start=4, stop=5),
             partial(get_frame_at_pts, seconds=2),
             partial(get_frames_by_pts, timestamps=[0, 1.5]),
-            partial(get_next_frame),
+            partial(seek_to_pts, seconds=5),
         ),
     )
     def test_audio_bad_method(self, method):
@@ -641,6 +641,22 @@ class TestAudioOps:
             RuntimeError, match="seek_mode must be 'approximate' for audio"
         ):
             add_audio_stream(decoder)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_next(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frame_index = 0
+        while True:
+            try:
+                frame, *_ = get_next_frame(decoder)
+            except IndexError:
+                break
+            torch.testing.assert_close(
+                frame, asset.get_frame_data_by_index(frame_index)
+            )
+            frame_index += 1
 
     @pytest.mark.parametrize(
         "range",
