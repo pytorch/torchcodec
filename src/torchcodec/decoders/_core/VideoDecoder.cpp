@@ -1351,22 +1351,20 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       !preAllocatedOutputTensor.has_value(),
       "pre-allocated audio tensor not supported yet.");
 
-  const UniqueAVFrame& avFrame = avFrameStream.avFrame;
-
   AVSampleFormat sourceSampleFormat =
-      static_cast<AVSampleFormat>(avFrame->format);
+      static_cast<AVSampleFormat>(avFrameStream.avFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
-  AVFrame* rawAVFrame = nullptr;
-  UniqueAVFrame convertedAVFrame;
-  if (sourceSampleFormat == desiredSampleFormat) {
-    rawAVFrame = avFrame.get();
-  } else {
-    convertedAVFrame = convertAudioAVFrameSampleFormat(
-        avFrame, sourceSampleFormat, desiredSampleFormat);
-    rawAVFrame = convertedAVFrame.get();
-  }
 
-  AVSampleFormat format = static_cast<AVSampleFormat>(rawAVFrame->format);
+  UniqueAVFrame convertedAVFrame;
+  if (sourceSampleFormat != desiredSampleFormat) {
+    convertedAVFrame = convertAudioAVFrameSampleFormat(
+        avFrameStream.avFrame, sourceSampleFormat, desiredSampleFormat);
+  }
+  const UniqueAVFrame& avFrame = (sourceSampleFormat != desiredSampleFormat)
+      ? convertedAVFrame
+      : avFrameStream.avFrame;
+
+  AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   TORCH_CHECK(
       format == desiredSampleFormat,
       "Something went wrong, the frame didn't get converted to the desired format. ",
@@ -1375,8 +1373,8 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       "source format = ",
       av_get_sample_fmt_name(format));
 
-  auto numSamples = rawAVFrame->nb_samples; // per channel
-  auto numChannels = getNumChannels(rawAVFrame);
+  auto numSamples = avFrame->nb_samples; // per channel
+  auto numChannels = getNumChannels(avFrame);
   torch::Tensor outputData =
       torch::empty({numChannels, numSamples}, torch::kFloat32);
 
@@ -1385,9 +1383,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   for (auto channel = 0; channel < numChannels;
        ++channel, outputChannelData += numBytesPerChannel) {
     memcpy(
-        outputChannelData,
-        rawAVFrame->extended_data[channel],
-        numBytesPerChannel);
+        outputChannelData, avFrame->extended_data[channel], numBytesPerChannel);
   }
   frameOutput.data = outputData;
 }
