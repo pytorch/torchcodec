@@ -79,7 +79,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.58
         avfilter=libavfilter.7
         swscale=libswscale.5
-        swresample=libswresample.2
+        swresample=libswresample.3
     elif [[ ${major_ver} == 5 ]]; then
         avutil=libavutil.57
         avcodec=libavcodec.59
@@ -87,7 +87,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.59
         avfilter=libavfilter.8
         swscale=libswscale.6
-        swresample=libswresample.3
+        swresample=libswresample.4
     elif [[ ${major_ver} == 6 ]]; then
         avutil=libavutil.58
         avcodec=libavcodec.60
