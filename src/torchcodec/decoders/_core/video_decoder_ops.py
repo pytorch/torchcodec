@@ -4,6 +4,8 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import importlib
+import io
 import json
 import warnings
 from typing import List, Optional, Tuple
@@ -14,6 +16,8 @@ from torch.library import get_ctx, register_fake
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
 )
+
+_pybind_ops = None
 
 
 def load_torchcodec_extension():
@@ -27,9 +31,20 @@ def load_torchcodec_extension():
 
     exceptions = []
     for ffmpeg_major_version in (7, 6, 5, 4):
-        library_name = f"libtorchcodec{ffmpeg_major_version}"
+        decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
+        custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
+        pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
-            torch.ops.load_library(_get_extension_path(library_name))
+            torch.ops.load_library(_get_extension_path(decoder_library_name))
+            torch.ops.load_library(_get_extension_path(custom_ops_library_name))
+            torch.ops.load_library(_get_extension_path(pybind_ops_library_name))
+            spec = importlib.util.spec_from_file_location(
+                f"_torchcodec_pybind_ops{ffmpeg_major_version}",
+                _get_extension_path(pybind_ops_library_name),
+            )
+            global _pybind_ops
+            _pybind_ops = importlib.util.module_from_spec(spec)
+            assert _pybind_ops is not None
             return
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
@@ -66,6 +81,9 @@ create_from_file = torch._dynamo.disallow_in_graph(
 )
 create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
+)
+_convert_to_tensor = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns._convert_to_tensor.default
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
 _add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
@@ -107,6 +125,13 @@ def create_from_bytes(
     return create_from_tensor(buffer, seek_mode)
 
 
+def create_from_file_like(
+    file_like: io.RawIOBase, seek_mode: Optional[str] = None
+) -> torch.Tensor:
+    assert _pybind_ops is not None
+    return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
@@ -119,6 +144,11 @@ def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.
 def create_from_tensor_abstract(
     video_tensor: torch.Tensor, seek_mode: Optional[str]
 ) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::_convert_to_tensor")
+def _convert_to_tensor_abstract(decoder_ptr: int) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 

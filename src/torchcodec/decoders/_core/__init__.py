@@ -20,6 +20,7 @@ from .video_decoder_ops import (
     add_video_stream,
     create_from_bytes,
     create_from_file,
+    create_from_file_like,
     create_from_tensor,
     get_ffmpeg_library_versions,
     get_frame_at_index,

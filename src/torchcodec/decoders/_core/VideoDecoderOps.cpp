@@ -13,6 +13,8 @@
 #include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
+namespace py = pybind11;
+
 namespace facebook::torchcodec {
 
 // ==============================
@@ -30,6 +32,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
+  m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
   m.def(
       "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
   m.def(
@@ -68,7 +71,7 @@ at::Tensor wrapDecoderPointerToTensor(
 
   auto deleter = [decoder](void*) { delete decoder; };
   at::Tensor tensor =
-      at::from_blob(decoder, {sizeof(VideoDecoder)}, deleter, {at::kLong});
+      at::from_blob(decoder, {sizeof(VideoDecoder*)}, deleter, {at::kLong});
   auto videoDecoder = static_cast<VideoDecoder*>(tensor.mutable_data_ptr());
   TORCH_CHECK_EQ(videoDecoder, decoder) << "videoDecoder=" << videoDecoder;
   return tensor;
@@ -91,16 +94,6 @@ OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
 OpsFrameBatchOutput makeOpsFrameBatchOutput(
     VideoDecoder::FrameBatchOutput& batch) {
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
-}
-
-VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
-  if (seekMode == "exact") {
-    return VideoDecoder::SeekMode::exact;
-  } else if (seekMode == "approximate") {
-    return VideoDecoder::SeekMode::approximate;
-  } else {
-    throw std::runtime_error("Invalid seek mode: " + std::string(seekMode));
-  }
 }
 
 } // namespace
@@ -129,7 +122,7 @@ at::Tensor create_from_tensor(
     at::Tensor video_tensor,
     std::optional<std::string_view> seek_mode) {
   TORCH_CHECK(video_tensor.is_contiguous(), "video_tensor must be contiguous");
-  void* buffer = video_tensor.mutable_data_ptr();
+  void* data = video_tensor.mutable_data_ptr();
   size_t length = video_tensor.numel();
 
   VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
@@ -137,8 +130,18 @@ at::Tensor create_from_tensor(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
+  constexpr int bufferSize = 64 * 1024;
+  auto contextHolder =
+      std::make_unique<AVIOBytesContext>(data, length, bufferSize);
+
   std::unique_ptr<VideoDecoder> uniqueDecoder =
-      std::make_unique<VideoDecoder>(buffer, length, realSeek);
+      std::make_unique<VideoDecoder>(std::move(contextHolder), realSeek);
+  return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
+}
+
+at::Tensor _convert_to_tensor(int64_t decoder_ptr) {
+  auto decoder = reinterpret_cast<VideoDecoder*>(decoder_ptr);
+  std::unique_ptr<VideoDecoder> uniqueDecoder(decoder);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -521,6 +524,7 @@ void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
   m.impl("create_from_tensor", &create_from_tensor);
+  m.impl("_convert_to_tensor", &_convert_to_tensor);
   m.impl(
       "_get_json_ffmpeg_library_versions", &_get_json_ffmpeg_library_versions);
 }

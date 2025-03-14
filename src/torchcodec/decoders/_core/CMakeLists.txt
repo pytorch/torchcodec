@@ -7,50 +7,99 @@ find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
-function(make_torchcodec_library library_name ffmpeg_target)
-    set(
-        sources
-        FFMPEGCommon.h
-        FFMPEGCommon.cpp
-        VideoDecoder.h
-        VideoDecoder.cpp
-        VideoDecoderOps.h
-        VideoDecoderOps.cpp
-        DeviceInterface.h
-    )
-    if(ENABLE_CUDA)
-        list(APPEND sources CudaDevice.cpp)
-    else()
-        list(APPEND sources CPUOnlyDevice.cpp)
-    endif()
-    add_library(${library_name} SHARED ${sources})
-    set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
+function(make_torchcodec_sublibrary
+    library_name
+    sources
+    dependent_libraries
+    ffmpeg_include_dirs)
 
-    target_include_directories(
-        ${library_name}
+    add_library(${library_name} SHARED ${sources})
+    set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
+    target_include_directories(${library_name}
         PRIVATE
         ./../../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
+        ${ffmpeg_include_dirs}
     )
 
-    set(NEEDED_LIBRARIES ${ffmpeg_target} ${TORCH_LIBRARIES}
-        ${Python3_LIBRARIES})
-    if(ENABLE_CUDA)
-        list(APPEND NEEDED_LIBRARIES
-            ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
-    endif()
+    # Avoid adding the "lib" prefix which we already add explicitly.
+    set_target_properties(${library_name} PROPERTIES PREFIX "")
+
     target_link_libraries(
         ${library_name}
         PUBLIC
-        ${NEEDED_LIBRARIES}
+        ${dependent_libraries}
+    )
+endfunction()
+
+function(make_torchcodec_libraries
+    ffmpeg_major_version
+    ffmpeg_target
+    ffmpeg_include_dirs)
+
+    # Create libtorchcodec_decoderN.so
+    set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
+    set(decoder_sources FFMPEGCommon.cpp VideoDecoder.cpp)
+
+    if(ENABLE_CUDA)
+        list(APPEND decoder_sources CudaDevice.cpp)
+    else()
+        list(APPEND decoder_sources CPUOnlyDevice.cpp)
+    endif()
+
+    set(decoder_dependent_libraries
+        ${ffmpeg_target}
+        ${TORCH_LIBRARIES}
+        ${Python3_LIBRARIES}
     )
 
-    # We already set the library_name to be libtorchcodecN, so we don't want
-    # cmake to add another "lib" prefix. We do it this way because it makes it
-    # easier to find references to libtorchcodec in the code (e.g. via `git
-    # grep`)
-    set_target_properties(${library_name} PROPERTIES PREFIX "")
+    if(ENABLE_CUDA)
+        list(APPEND decoder_dependent_libraries
+            ${CUDA_nppi_LIBRARY}
+            ${CUDA_nppicc_LIBRARY}
+        )
+    endif()
+
+    make_torchcodec_sublibrary(
+        "${decoder_library_name}"
+        "${decoder_sources}"
+        "${decoder_dependent_libraries}"
+        "${ffmpeg_include_dirs}"
+    )
+
+    # Create libtorchcodec_custom_opsN.so
+    set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
+    set(custom_ops_sources VideoDecoderOps.cpp)
+    make_torchcodec_sublibrary(
+        "${custom_ops_library_name}"
+        "${custom_ops_sources}"
+        "${decoder_library_name}"
+        "${ffmpeg_include_dirs}"
+    )
+
+    # Create libtorchcodec_pybind_opsN.so
+    set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
+    set(pybind_ops_sources PyBindOps.cpp)
+    make_torchcodec_sublibrary(
+        "${pybind_ops_library_name}"
+        "${pybind_ops_sources}"
+        "${decoder_library_name}"
+        "${ffmpeg_include_dirs}"
+    )
+    target_compile_definitions(
+        ${pybind_ops_library_name}
+        PUBLIC
+        TORCHCODEC_PYBIND=_torchcodec_pybind_ops${ffmpeg_major_version}
+    )
+
+    # Install all libraries.
+    set(
+        all_libraries
+        ${decoder_library_name}
+        ${custom_ops_library_name}
+        ${pybind_ops_library_name}
+    )
 
     # The install step is invoked within CMakeBuild.build_library() in
     # setup.py and just copies the built .so files from the temp
@@ -58,7 +107,7 @@ function(make_torchcodec_library library_name ffmpeg_target)
     # still need to manually pass "DESTINATION ..." for cmake to copy those
     # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
     install(
-        TARGETS ${library_name}
+        TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
     )
 endfunction()
@@ -76,11 +125,10 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-
-	make_torchcodec_library(libtorchcodec4 ffmpeg4)
-	make_torchcodec_library(libtorchcodec7 ffmpeg7)
-	make_torchcodec_library(libtorchcodec6 ffmpeg6)
-	make_torchcodec_library(libtorchcodec5 ffmpeg5)
+    make_torchcodec_libraries(4 ffmpeg4 $ffmpeg4_INCLUDE_DIRS)
+    make_torchcodec_libraries(7 ffmpeg7 $ffmpeg7_INCLUDE_DIRs)
+    make_torchcodec_libraries(6 ffmpeg6 $ffmpeg6_INCLUDE_DIRS)
+    make_torchcodec_libraries(5 ffmpeg5 $ffmpeg5_INCLUDE_DIRS)
 
 else()
     message(
@@ -120,10 +168,11 @@ else()
         )
     endif()
 
-    set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
-    # Make libtorchcodec_target_name available in the parent's scope, for the
-    # test's CMakeLists.txt
-    set(libtorchcodec_target_name ${libtorchcodec_target_name} PARENT_SCOPE)
+    make_torchcodec_libraries(${ffmpeg_major_version} PkgConfig::LIBAV ${LIBAV_INCLUDE_DIRS})
 
-    make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
+    # Expose these values updwards so that the test compilation does not need
+    # to re-figure it out. FIXME: it's not great that we just copy-paste the
+    # library name.
+    set(libtorchcodec_library_name "libtorchcodec_decoder${ffmpeg_major_version}" PARENT_SCOPE)
+    set(libav_include_dirs ${LIBAV_INCLUDE_DIRS} PARENT_SCOPE)
 endif()

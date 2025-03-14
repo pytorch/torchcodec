@@ -34,11 +34,9 @@ class VideoDecoder {
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // Creates a VideoDecoder from a given buffer of data. Note that the data is
-  // not owned by the VideoDecoder.
+  // TODO: make comment accurate
   explicit VideoDecoder(
-      const void* data,
-      size_t length,
+      std::unique_ptr<AVIOContextHolder> context,
       SeekMode seekMode = SeekMode::exact);
 
   // --------------------------------------------------------------------------
@@ -472,7 +470,7 @@ class VideoDecoder {
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
-  std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  std::unique_ptr<AVIOContextHolder> avioContextHolder_;
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
@@ -553,5 +551,7 @@ torch::Tensor allocateEmptyHWCTensor(
 std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats);
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode);
 
 } // namespace facebook::torchcodec
