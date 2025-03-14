@@ -34,12 +34,12 @@ def load_torchcodec_extension():
         decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
+        pybind_ops_module_name = f"_torchcodec_pybind_ops{ffmpeg_major_version}"
         try:
             torch.ops.load_library(_get_extension_path(decoder_library_name))
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
-            torch.ops.load_library(_get_extension_path(pybind_ops_library_name))
             spec = importlib.util.spec_from_file_location(
-                f"_torchcodec_pybind_ops{ffmpeg_major_version}",
+                pybind_ops_module_name,
                 _get_extension_path(pybind_ops_library_name),
             )
             global _pybind_ops
