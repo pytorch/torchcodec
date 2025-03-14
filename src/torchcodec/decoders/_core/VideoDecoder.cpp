@@ -174,7 +174,6 @@ void VideoDecoder::initializeDecoder() {
       AVSampleFormat format =
           static_cast<AVSampleFormat>(avStream->codecpar->format);
       streamMetadata.sampleFormat = av_get_sample_fmt_name(format);
-      std::cout << "FUCK " << *streamMetadata.sampleFormat << "AFEFMEMFMFE " << std::endl;
       containerMetadata_.numAudioStreams++;
     }
 
