@@ -174,6 +174,7 @@ void VideoDecoder::initializeDecoder() {
       AVSampleFormat format =
           static_cast<AVSampleFormat>(avStream->codecpar->format);
       streamMetadata.sampleFormat = av_get_sample_fmt_name(format);
+      std::cout << "FUCK " << *streamMetadata.sampleFormat << "AFEFMEMFMFE " << std::endl;
       containerMetadata_.numAudioStreams++;
     }
 
@@ -1414,9 +1415,9 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
   #else
   convertedAVFrame->channel_layout = avFrame->channel_layout;
   #endif
+  convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
   convertedAVFrame->sample_rate = avFrame->sample_rate;
   convertedAVFrame->nb_samples = avFrame->nb_samples;
-  convertedAVFrame->format = desiredSampleFormat;
 
   auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
   TORCH_CHECK(
