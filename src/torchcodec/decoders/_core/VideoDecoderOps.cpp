@@ -207,10 +207,13 @@ void _add_video_stream(
     } else if (device.value().rfind("cuda", 0) == 0) { // starts with "cuda"
       std::string deviceStr(device.value());
       videoStreamOptions.device = torch::Device(deviceStr);
+    } else if (device.value().rfind("xpu", 0) == 0) { // starts with "xpu"
+      std::string deviceStr(device.value());
+      videoStreamOptions.device = torch::Device(deviceStr);
     } else {
       throw std::runtime_error(
           "Invalid device=" + std::string(device.value()) +
-          ". device must be either cpu or cuda.");
+          ". device must be either cpu, cuda or xpu.");
     }
   }
 

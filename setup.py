@@ -112,6 +112,7 @@ class CMakeBuild(build_ext):
         torch_dir = Path(torch.utils.cmake_prefix_path) / "Torch"
         cmake_build_type = os.environ.get("CMAKE_BUILD_TYPE", "Release")
         enable_cuda = os.environ.get("ENABLE_CUDA", "")
+        enable_xpu = os.environ.get("ENABLE_XPU", "")
         python_version = sys.version_info
         cmake_args = [
             f"-DCMAKE_INSTALL_PREFIX={self._install_prefix}",
@@ -120,6 +121,7 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_BUILD_TYPE={cmake_build_type}",
             f"-DPYTHON_VERSION={python_version.major}.{python_version.minor}",
             f"-DENABLE_CUDA={enable_cuda}",
+            f"-DENABLE_XPU={enable_xpu}",
         ]
 
         Path(self.build_temp).mkdir(parents=True, exist_ok=True)
