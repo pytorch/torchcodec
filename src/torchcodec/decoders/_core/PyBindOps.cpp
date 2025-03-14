@@ -4,9 +4,9 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <pybind11/stl.h>
 #include <cstdint>
 #include <string>
-#include <pybind11/stl.h>
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
@@ -29,11 +29,14 @@ struct PyObjectDeleter {
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
   AVIOFileLikeContext(py::object fileLike, int bufferSize)
-      : fileLikeContext_{std::unique_ptr<py::object, PyObjectDeleter>(new py::object(fileLike)), bufferSize} {
+      : fileLikeContext_{
+            std::unique_ptr<py::object, PyObjectDeleter>(
+                new py::object(fileLike)),
+            bufferSize} {
     {
-      // TODO: Is it necessary to acquire the GIL here? Is it maybe even harmful? At
-      // the moment, this is only called from within a pybind function, and pybind
-      // guarantees we have the GIL.
+      // TODO: Is it necessary to acquire the GIL here? Is it maybe even
+      // harmful? At the moment, this is only called from within a pybind
+      // function, and pybind guarantees we have the GIL.
       py::gil_scoped_acquire gil;
       TORCH_CHECK(
           py::hasattr(fileLike, "read"),
@@ -132,8 +135,8 @@ class AVIOFileLikeContext : public AVIOContextHolder {
 
 } // namespace
 
-// In principle, this should be able to return a tensor. But when we try that, we
-// run into the bug reported here:
+// In principle, this should be able to return a tensor. But when we try that,
+// we run into the bug reported here:
 //
 //   https://github.com/pytorch/pytorch/issues/136664
 //
