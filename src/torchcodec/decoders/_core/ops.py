@@ -8,6 +8,7 @@ import importlib
 import io
 import json
 import warnings
+from types import ModuleType
 from typing import List, Optional, Tuple
 
 import torch
@@ -17,7 +18,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
     _get_extension_path,
 )
 
-_pybind_ops = None
+_pybind_ops: Optional[ModuleType] = None
 
 
 def load_torchcodec_extension():
@@ -130,6 +131,7 @@ def create_from_bytes(
 def create_from_file_like(
     file_like: io.RawIOBase, seek_mode: Optional[str] = None
 ) -> torch.Tensor:
+    assert _pybind_ops is not None
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
 
 
