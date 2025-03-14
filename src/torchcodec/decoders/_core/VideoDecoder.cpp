@@ -1709,6 +1709,8 @@ void VideoDecoder::createSwrContext(
       nullptr);
 #endif
 
+  TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
+
   status = swr_init(swrContext);
   TORCH_CHECK(
       status == AVSUCCESS,
