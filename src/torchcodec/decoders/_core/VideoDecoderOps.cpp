@@ -13,8 +13,6 @@
 #include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
-namespace py = pybind11;
-
 namespace facebook::torchcodec {
 
 // ==============================
