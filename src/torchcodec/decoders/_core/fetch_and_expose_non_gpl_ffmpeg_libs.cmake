@@ -45,7 +45,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavdevice.so.58
        libavfilter.so.7
        libswscale.so.5
-       libswresample.3
+       libswresample.so.3
     )
     set(
        f5_library_file_names
@@ -55,7 +55,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavdevice.so.59
        libavfilter.so.8
        libswscale.so.6
-       libswresample.4
+       libswresample.so.4
     )
     set(
        f6_library_file_names
@@ -65,7 +65,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavdevice.so.60
        libavfilter.so.9
        libswscale.so.7
-       libswresample.4
+       libswresample.so.4
     )
     set(
        f7_library_file_names
@@ -75,7 +75,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libavdevice.so.61
        libavfilter.so.10
        libswscale.so.8
-       libswresample.5
+       libswresample.so.5
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(
