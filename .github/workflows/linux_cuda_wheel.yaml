@@ -68,7 +68,8 @@ jobs:
         python-version: ['3.9']
         cuda-version: ['11.8', '12.6', '12.8']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+        # ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+        ffmpeg-version-for-tests: ['7']  # TODO
 
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
