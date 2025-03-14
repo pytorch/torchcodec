@@ -626,6 +626,7 @@ class TestAudioOps:
             partial(get_frames_in_range, start=4, stop=5),
             partial(get_frame_at_pts, seconds=2),
             partial(get_frames_by_pts, timestamps=[0, 1.5]),
+            partial(get_next_frame),
         ),
     )
     def test_audio_bad_method(self, method):

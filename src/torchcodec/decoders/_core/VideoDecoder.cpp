@@ -573,15 +573,13 @@ void VideoDecoder::addAudioStream(int streamIndex) {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
   auto output = getNextFrameInternal();
-  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO) {
-    output.data = maybePermuteHWC2CHW(output.data);
-  }
+  output.data = maybePermuteHWC2CHW(output.data);
   return output;
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateActiveStream();
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
   AVFrameStream avFrameStream = decodeAVFrame(
       [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
