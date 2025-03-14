@@ -12,7 +12,7 @@ from ._metadata import (
     get_container_metadata_from_header,
     VideoStreamMetadata,
 )
-from .video_decoder_ops import (
+from .ops import (
     _add_video_stream,
     _get_key_frame_indices,
     _test_frame_pts_equality,
@@ -28,6 +28,7 @@ from .video_decoder_ops import (
     get_frames_at_indices,
     get_frames_by_pts,
     get_frames_by_pts_in_range,
+    get_frames_by_pts_in_range_audio,
     get_frames_in_range,
     get_json_metadata,
     get_next_frame,

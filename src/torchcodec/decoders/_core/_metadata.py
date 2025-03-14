@@ -12,7 +12,7 @@ from typing import List, Optional, Union
 
 import torch
 
-from torchcodec.decoders._core.video_decoder_ops import (
+from torchcodec.decoders._core.ops import (
     _get_container_json_metadata,
     _get_stream_json_metadata,
     create_from_file,
@@ -161,9 +161,9 @@ class VideoStreamMetadata(StreamMetadata):
 class AudioStreamMetadata(StreamMetadata):
     """Metadata of a single audio stream."""
 
-    # TODO-AUDIO Add sample format field
     sample_rate: Optional[int]
     num_channels: Optional[int]
+    sample_format: Optional[str]
 
     def __repr__(self):
         return super().__repr__()
@@ -240,6 +240,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                 AudioStreamMetadata(
                     sample_rate=stream_dict.get("sampleRate"),
                     num_channels=stream_dict.get("numChannels"),
+                    sample_format=stream_dict.get("sampleFormat"),
                     **common_meta,
                 )
             )

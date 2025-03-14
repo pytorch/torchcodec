@@ -12,7 +12,7 @@ from torch import Tensor
 
 
 def _frame_repr(self):
-    # Utility to replace Frame and FrameBatch __repr__ method. This prints the
+    # Utility to replace __repr__ method of dataclasses below. This prints the
     # shape of the .data tensor rather than printing the (potentially very long)
     # data tensor itself.
     s = self.__class__.__name__ + ":\n"
@@ -111,6 +111,31 @@ class FrameBatch(Iterable):
 
     def __len__(self):
         return len(self.data)
+
+    def __repr__(self):
+        return _frame_repr(self)
+
+
+@dataclass
+class AudioSamples(Iterable):
+    """Audio samples with associated metadata."""
+
+    # TODO-AUDIO: docs
+    data: Tensor
+    pts_seconds: float
+    sample_rate: int
+
+    def __post_init__(self):
+        # This is called after __init__() when a Frame is created. We can run
+        # input validation checks here.
+        if not self.data.ndim == 2:
+            raise ValueError(f"data must be 2-dimensional, got {self.data.shape = }")
+        self.pts_seconds = float(self.pts_seconds)
+        self.sample_rate = int(self.sample_rate)
+
+    def __iter__(self) -> Iterator[Union[Tensor, float]]:
+        for field in dataclasses.fields(self):
+            yield getattr(self, field.name)
 
     def __repr__(self):
         return _frame_repr(self)

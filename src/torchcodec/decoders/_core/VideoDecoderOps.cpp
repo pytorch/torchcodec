@@ -27,8 +27,7 @@ namespace facebook::torchcodec {
 //   https://github.com/pytorch/pytorch/tree/main/aten/src/ATen/native#readme
 TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
-      "torchcodec.decoders._core.video_decoder_ops",
-      "//pytorch/torchcodec:torchcodec");
+      "torchcodec.decoders._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
@@ -51,6 +50,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "get_frames_in_range(Tensor(a!) decoder, *, int start, int stop, int? step=None) -> (Tensor, Tensor, Tensor)");
   m.def(
       "get_frames_by_pts_in_range(Tensor(a!) decoder, *, float start_seconds, float stop_seconds) -> (Tensor, Tensor, Tensor)");
+  m.def(
+      "get_frames_by_pts_in_range_audio(Tensor(a!) decoder, *, float start_seconds, float? stop_seconds) -> (Tensor, Tensor)");
   m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, float[] timestamps) -> (Tensor, Tensor, Tensor)");
   m.def("_get_key_frame_indices(Tensor(a!) decoder) -> Tensor");
@@ -96,6 +97,12 @@ OpsFrameBatchOutput makeOpsFrameBatchOutput(
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
 
+OpsAudioFramesOutput makeOpsAudioFramesOutput(
+    VideoDecoder::AudioFramesOutput& audioFrames) {
+  return std::make_tuple(
+      audioFrames.data,
+      torch::tensor(audioFrames.ptsSeconds, torch::dtype(torch::kFloat64)));
+}
 } // namespace
 
 // ==============================
@@ -292,6 +299,16 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
   return makeOpsFrameBatchOutput(result);
 }
 
+OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
+    at::Tensor& decoder,
+    double start_seconds,
+    std::optional<double> stop_seconds) {
+  auto videoDecoder = unwrapTensorToGetDecoder(decoder);
+  auto result =
+      videoDecoder->getFramesPlayedInRangeAudio(start_seconds, stop_seconds);
+  return makeOpsAudioFramesOutput(result);
+}
+
 std::string quoteValue(const std::string& value) {
   return "\"" + value + "\"";
 }
@@ -480,12 +497,15 @@ std::string get_stream_json_metadata(
   if (streamMetadata.numChannels.has_value()) {
     map["numChannels"] = std::to_string(*streamMetadata.numChannels);
   }
+  if (streamMetadata.sampleFormat.has_value()) {
+    map["sampleFormat"] = quoteValue(streamMetadata.sampleFormat.value());
+  }
   if (streamMetadata.mediaType == AVMEDIA_TYPE_VIDEO) {
-    map["mediaType"] = "\"video\"";
+    map["mediaType"] = quoteValue("video");
   } else if (streamMetadata.mediaType == AVMEDIA_TYPE_AUDIO) {
-    map["mediaType"] = "\"audio\"";
+    map["mediaType"] = quoteValue("audio");
   } else {
-    map["mediaType"] = "\"other\"";
+    map["mediaType"] = quoteValue("other");
   }
   return mapToJson(map);
 }
@@ -544,6 +564,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("get_frames_at_indices", &get_frames_at_indices);
   m.impl("get_frames_in_range", &get_frames_in_range);
   m.impl("get_frames_by_pts_in_range", &get_frames_by_pts_in_range);
+  m.impl("get_frames_by_pts_in_range_audio", &get_frames_by_pts_in_range_audio);
   m.impl("get_frames_by_pts", &get_frames_by_pts);
   m.impl("_test_frame_pts_equality", &_test_frame_pts_equality);
   m.impl(

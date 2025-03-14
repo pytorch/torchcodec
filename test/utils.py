@@ -4,8 +4,8 @@ import os
 import pathlib
 import sys
 
-from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pytest
@@ -90,11 +90,6 @@ def _get_file_path(filename: str) -> pathlib.Path:
         return pathlib.Path(__file__).parent / "resources" / filename
 
 
-def _load_tensor_from_file(filename: str) -> torch.Tensor:
-    file_path = _get_file_path(filename)
-    return torch.load(file_path, weights_only=True).permute(2, 0, 1)
-
-
 @dataclass
 class TestFrameInfo:
     pts_seconds: float
@@ -113,6 +108,8 @@ class TestAudioStreamInfo:
     sample_rate: int
     num_channels: int
     duration_seconds: float
+    num_frames: int
+    sample_format: str
 
 
 @dataclass
@@ -171,12 +168,7 @@ class TestContainerFile:
     def get_frame_data_by_index(
         self, idx: int, *, stream_index: Optional[int] = None
     ) -> torch.Tensor:
-        if stream_index is None:
-            stream_index = self.default_stream_index
-
-        return _load_tensor_from_file(
-            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
-        )
+        raise NotImplementedError("Override in child classes")
 
     def get_frame_data_by_range(
         self,
@@ -186,11 +178,7 @@ class TestContainerFile:
         *,
         stream_index: Optional[int] = None,
     ) -> torch.Tensor:
-        tensors = [
-            self.get_frame_data_by_index(i, stream_index=stream_index)
-            for i in range(start, stop, step)
-        ]
-        return torch.stack(tensors)
+        raise NotImplementedError("Override in child classes")
 
     def get_pts_seconds_by_range(
         self,
@@ -244,6 +232,32 @@ class TestContainerFile:
 
 @dataclass
 class TestVideo(TestContainerFile):
+    """Base class for the *video* streams of a video container"""
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        file_path = _get_file_path(
+            f"{self.filename}.stream{stream_index}.frame{idx:06d}.pt"
+        )
+        return torch.load(file_path, weights_only=True).permute(2, 0, 1)
+
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.stack(tensors)
 
     @property
     def width(self) -> int:
@@ -303,15 +317,146 @@ NASA_VIDEO = TestVideo(
     frames={},  # Automatically loaded from json file
 )
 
-NASA_AUDIO_MP3 = TestContainerFile(
+
+@dataclass
+class TestAudio(TestContainerFile):
+    """Base class for the *audio* streams of a container (potentially a video),
+    or a pure audio file"""
+
+    stream_infos: Dict[int, TestAudioStreamInfo]
+    # stream_index -> list of 2D frame tensors of shape (num_channels, num_samples_in_that_frame)
+    # num_samples_in_that_frame isn't necessarily constant for a given stream.
+    _reference_frames: Dict[int, List[torch.Tensor]] = field(default_factory=dict)
+
+    # Storing each individual frame is too expensive for audio, because there's
+    # a massive overhead in the binary format saved by pytorch. Saving all the
+    # frames in a single file uses 1.6MB while saving all frames in individual
+    # files uses 302MB (yes).
+    # So we store the reference frames in a single file, and load/cache those
+    # when the TestAudio instance is created.
+    def __post_init__(self):
+        super().__post_init__()
+        for stream_index in self.stream_infos:
+            frames_data_path = _get_file_path(
+                f"{self.filename}.stream{stream_index}.all_frames.pt"
+            )
+
+            if frames_data_path.exists():
+                # To ease development, we allow for the reference frames not to
+                # exist. It means the asset cannot be used to check validity of
+                # decoded frames.
+                self._reference_frames[stream_index] = torch.load(
+                    frames_data_path, weights_only=True
+                )
+
+    def get_frame_data_by_index(
+        self, idx: int, *, stream_index: Optional[int] = None
+    ) -> torch.Tensor:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        return self._reference_frames[stream_index][idx]
+
+    def get_frame_data_by_range(
+        self,
+        start: int,
+        stop: int,
+        step: int = 1,
+        *,
+        stream_index: Optional[int] = None,
+    ) -> torch.Tensor:
+        tensors = [
+            self.get_frame_data_by_index(i, stream_index=stream_index)
+            for i in range(start, stop, step)
+        ]
+        return torch.cat(tensors, dim=-1)
+
+    def get_frame_index(
+        self, *, pts_seconds: float, stream_index: Optional[int] = None
+    ) -> int:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+
+        if pts_seconds <= self.frames[stream_index][0].pts_seconds:
+            # Special case for e.g. NASA_AUDIO_MP3 whose first frame's pts is
+            # 0.13~, not 0.
+            return 0
+        try:
+            # Could use bisect() to maek this faster if needed
+            return next(
+                frame_index
+                for (frame_index, frame_info) in self.frames[stream_index].items()
+                if frame_info.pts_seconds
+                <= pts_seconds
+                < frame_info.pts_seconds + frame_info.duration_seconds
+            )
+        except StopIteration:
+            return len(self.frames[stream_index]) - 1
+
+    @property
+    def sample_rate(self) -> int:
+        return self.stream_infos[self.default_stream_index].sample_rate
+
+    @property
+    def num_channels(self) -> int:
+        return self.stream_infos[self.default_stream_index].num_channels
+
+    @property
+    def duration_seconds(self) -> float:
+        return self.stream_infos[self.default_stream_index].duration_seconds
+
+    @property
+    def num_frames(self) -> int:
+        return self.stream_infos[self.default_stream_index].num_frames
+
+    @property
+    def sample_format(self) -> str:
+        return self.stream_infos[self.default_stream_index].sample_format
+
+
+NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
     default_stream_index=0,
+    frames={},  # Automatically loaded from json file
     stream_infos={
         0: TestAudioStreamInfo(
-            sample_rate=8_000, num_channels=2, duration_seconds=13.248
+            sample_rate=8_000,
+            num_channels=2,
+            duration_seconds=13.248,
+            num_frames=183,
+            sample_format="fltp",
         )
     },
+)
+
+NASA_AUDIO = TestAudio(
+    filename="nasa_13013.mp4",
+    default_stream_index=4,
     frames={},  # Automatically loaded from json file
+    stream_infos={
+        4: TestAudioStreamInfo(
+            sample_rate=16_000,
+            num_channels=2,
+            duration_seconds=13.056,
+            num_frames=204,
+            sample_format="fltp",
+        )
+    },
+)
+
+SINE_MONO_S32 = TestAudio(
+    filename="sine_mono_s32.wav",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=16_000,
+            num_channels=1,
+            duration_seconds=4,
+            num_frames=63,
+            sample_format="s32",
+        )
+    },
 )
 
 H265_VIDEO = TestVideo(
