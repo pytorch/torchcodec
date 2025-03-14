@@ -1409,7 +1409,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
       convertedAVFrame,
       "Could not allocate frame for sample format conversion.");
 
+  #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   convertedAVFrame->ch_layout = avFrame->ch_layout;
+  #else
+  convertedAVFrame->channel_layout = avFrame->channel_layout;
+  #endif
   convertedAVFrame->sample_rate = avFrame->sample_rate;
   convertedAVFrame->nb_samples = avFrame->nb_samples;
   convertedAVFrame->format = desiredSampleFormat;
@@ -1672,11 +1676,12 @@ void VideoDecoder::createSwrContext(
     int sampleRate,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat) {
-  SwrContext* swrContext = NULL;
+  SwrContext* swrContext = nullptr;
 
+  int status = AVSUCCESS;
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   AVChannelLayout layout = streamInfo.codecContext->ch_layout;
-
-  auto status = swr_alloc_set_opts2(
+  status = swr_alloc_set_opts2(
       &swrContext,
       &layout,
       desiredSampleFormat,
@@ -1685,12 +1690,26 @@ void VideoDecoder::createSwrContext(
       sourceSampleFormat,
       sampleRate,
       0,
-      NULL);
+      nullptr);
 
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't create SwrContext: ",
       getFFMPEGErrorStringFromErrorCode(status));
+#else
+  int64_t layout =
+      static_cast<int64_t>(streamInfo.codecContext->channel_layout);
+  swrContext = swr_alloc_set_opts(
+      nullptr,
+      layout,
+      desiredSampleFormat,
+      sampleRate,
+      layout,
+      sourceSampleFormat,
+      sampleRate,
+      0,
+      nullptr);
+#endif
 
   status = swr_init(swrContext);
   TORCH_CHECK(
