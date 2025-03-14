@@ -653,7 +653,9 @@ class TestAudioOps:
                 frame, *_ = get_next_frame(decoder)
             except IndexError:
                 break
-            torch.testing.assert_close(frame, asset.get_frame_data_by_index(frame_index))
+            torch.testing.assert_close(
+                frame, asset.get_frame_data_by_index(frame_index)
+            )
             frame_index += 1
 
     @pytest.mark.parametrize(

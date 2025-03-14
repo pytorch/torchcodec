@@ -916,8 +916,8 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 // --------------------------------------------------------------------------
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
-    validateActiveStream(AVMEDIA_TYPE_VIDEO);
-    setCursorPtsInSecondsInternal(seconds);
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  setCursorPtsInSecondsInternal(seconds);
 }
 
 void VideoDecoder::setCursorPtsInSecondsInternal(double seconds) {
