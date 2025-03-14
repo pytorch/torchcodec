@@ -34,7 +34,7 @@ jobs:
       contents: read
     with:
       job-name: Build
-      upload-artifact: ffmpeg-lgpl-linux-${{ strategy.job-index }}
+      upload-artifact: ffmpeg-lgpl-linux_x86_64-${{ matrix.ffmpeg-version }}
       repository: pytorch/torchcodec
       script: |
         export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
@@ -56,7 +56,7 @@ jobs:
     uses: pytorch/test-infra/.github/workflows/macos_job.yml@main
     with:
       job-name: Build
-      upload-artifact: ffmpeg-lgpl-macos-${{ strategy.job-index }}
+      upload-artifact: ffmpeg-lgpl-macos-${{ matrix.ffmpeg-version }}
       repository: pytorch/torchcodec
       runner: macos-14-xlarge
       script: |
