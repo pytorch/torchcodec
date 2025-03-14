@@ -60,7 +60,7 @@ int64_t getDuration(const AVFrame* frame) {
 #endif
 }
 
-int getNumChannels(const AVFrame* avFrame) {
+int getNumChannels(const UniqueAVFrame& avFrame) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
   return avFrame->ch_layout.nb_channels;
