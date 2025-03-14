@@ -1409,11 +1409,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
       convertedAVFrame,
       "Could not allocate frame for sample format conversion.");
 
-  #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   convertedAVFrame->ch_layout = avFrame->ch_layout;
-  #else
+#else
   convertedAVFrame->channel_layout = avFrame->channel_layout;
-  #endif
+#endif
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
   convertedAVFrame->sample_rate = avFrame->sample_rate;
   convertedAVFrame->nb_samples = avFrame->nb_samples;
