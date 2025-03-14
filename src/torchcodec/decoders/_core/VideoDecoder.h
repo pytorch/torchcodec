@@ -81,6 +81,7 @@ class VideoDecoder {
     // Audio-only fields
     std::optional<int64_t> sampleRate;
     std::optional<int64_t> numChannels;
+    std::optional<std::string> sampleFormat;
   };
 
   struct ContainerMetadata {

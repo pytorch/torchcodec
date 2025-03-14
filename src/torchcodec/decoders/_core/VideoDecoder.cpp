@@ -170,6 +170,9 @@ void VideoDecoder::initializeDecoder() {
       }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+      AVSampleFormat format =
+          static_cast<AVSampleFormat>(avStream->codecpar->format);
+      streamMetadata.sampleFormat = av_get_sample_fmt_name(format);
       containerMetadata_.numAudioStreams++;
     }
 
