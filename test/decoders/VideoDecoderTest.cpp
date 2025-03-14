@@ -48,10 +48,15 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       std::ifstream input(filepath, std::ios::binary);
       outputStringStream << input.rdbuf();
       content_ = outputStringStream.str();
+
       void* buffer = content_.data();
-      size_t length = outputStringStream.str().length();
+      size_t length = content_.length();
+      constexpr int bufferSize = 64 * 1024;
+      auto contextHolder =
+          std::make_unique<AVIOBytesContext>(buffer, length, bufferSize);
+
       return std::make_unique<VideoDecoder>(
-          buffer, length, VideoDecoder::SeekMode::approximate);
+          std::move(contextHolder), VideoDecoder::SeekMode::approximate);
     } else {
       return std::make_unique<VideoDecoder>(
           filepath, VideoDecoder::SeekMode::approximate);
