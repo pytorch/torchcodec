@@ -147,7 +147,7 @@ class VideoDecoder {
   // DECODING AND SEEKING APIs
   // --------------------------------------------------------------------------
 
-  // All public decoding entry points return either a FrameOutput or a
+  // All public video decoding entry points return either a FrameOutput or a
   // FrameBatchOutput.
   // They are the equivalent of the user-facing Frame and FrameBatch classes in
   // Python. They contain RGB decoded frames along with some associated data

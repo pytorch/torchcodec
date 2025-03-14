@@ -742,7 +742,7 @@ class TestAudioOps:
         frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=1, stop_seconds=1
         )
-        assert frames.shape == (0,)
+        assert frames.shape == (0, 0)
         assert pts_seconds == 0
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
@@ -823,6 +823,32 @@ class TestAudioOps:
         torch.testing.assert_close(
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_pts(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        for frame_index in range(asset.num_frames):
+            frame_info = asset.get_frame_info(idx=frame_index)
+            start_seconds = frame_info.pts_seconds
+
+            frames, pts_seconds = get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=start_seconds, stop_seconds=start_seconds + 1e-3
+            )
+            torch.testing.assert_close(
+                frames, asset.get_frame_data_by_index(frame_index)
+            )
+
+            if asset is NASA_AUDIO_MP3 and frame_index == 0:
+                # TODO This is a bug. The 0.138125 is correct while 0.072 is
+                # incorrect, even though it comes from the decoded AVFrame's pts
+                # field.
+                # See https://github.com/pytorch/torchcodec/issues/553
+                assert pts_seconds == 0.072
+                assert start_seconds == 0.138125
+            else:
+                assert pts_seconds == start_seconds
 
 
 if __name__ == "__main__":
