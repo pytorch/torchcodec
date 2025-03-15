@@ -26,11 +26,12 @@ struct PyObjectDeleter {
   }
 };
 
+using UniquePyObject = std::unique_ptr<py::object, PyObjectDeleter>;
+
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
   explicit AVIOFileLikeContext(py::object fileLike)
-      : fileLikeContext_{std::unique_ptr<py::object, PyObjectDeleter>(
-            new py::object(fileLike))} {
+      : fileLike_{UniquePyObject(new py::object(fileLike))} {
     {
       // TODO: Is it necessary to acquire the GIL here? Is it maybe even
       // harmful? At the moment, this is only called from within a pybind
@@ -43,18 +44,18 @@ class AVIOFileLikeContext : public AVIOContextHolder {
           py::hasattr(fileLike, "seek"),
           "File like object must implement a seek method.");
     }
-    createAVIOContext(&read, &seek, &fileLikeContext_);
+    createAVIOContext(&read, &seek, &fileLike_);
   }
 
   static int read(void* opaque, uint8_t* buf, int buf_size) {
-    auto fileLikeContext = static_cast<FileLikeContext*>(opaque);
+    auto fileLike = static_cast<UniquePyObject*>(opaque);
 
     int num_read = 0;
     while (num_read < buf_size) {
       int request = buf_size - num_read;
       py::gil_scoped_acquire gil;
-      auto chunk = static_cast<std::string>(static_cast<py::bytes>(
-          fileLikeContext->fileLike->attr("read")(request)));
+      auto chunk = static_cast<std::string>(
+          static_cast<py::bytes>((*fileLike)->attr("read")(request)));
       int chunk_len = static_cast<int>(chunk.length());
       if (chunk_len == 0) {
         break;
@@ -78,26 +79,21 @@ class AVIOFileLikeContext : public AVIOContextHolder {
     if (whence == AVSEEK_SIZE) {
       return AVERROR(EIO);
     }
-    auto fileLikeContext = static_cast<FileLikeContext*>(opaque);
+    auto fileLike = static_cast<UniquePyObject*>(opaque);
     py::gil_scoped_acquire gil;
-    return py::cast<int64_t>(
-        fileLikeContext->fileLike->attr("seek")(offset, whence));
+    return py::cast<int64_t>((*fileLike)->attr("seek")(offset, whence));
   }
 
  private:
-  struct FileLikeContext {
-    // Note that we keep a pointer to the Python object because we need to
-    // strictly control when its destructor is called. We must hold the GIL
-    // when its destructor gets called, as it needs to update the reference
-    // count. It's easiest to control that when it's a pointer. Otherwise, we'd
-    // have to ensure whatever enclosing scope holds the object has the GIL,
-    // and that's, at least, hard. For all of the common pitfalls, see:
-    //
-    //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
-    std::unique_ptr<py::object, PyObjectDeleter> fileLike;
-  };
-
-  FileLikeContext fileLikeContext_;
+  // Note that we keep a pointer to the Python object because we need to
+  // strictly control when its destructor is called. We must hold the GIL
+  // when its destructor gets called, as it needs to update the reference
+  // count. It's easiest to control that when it's a pointer. Otherwise, we'd
+  // have to ensure whatever enclosing scope holds the object has the GIL,
+  // and that's, at least, hard. For all of the common pitfalls, see:
+  //
+  //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
+  UniquePyObject fileLike_;
 };
 
 } // namespace
