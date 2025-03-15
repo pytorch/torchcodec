@@ -90,6 +90,7 @@ def test_get_metadata(metadata_getter):
     )
     assert best_audio_stream_metadata.bit_rate == 128837
     assert best_audio_stream_metadata.codec == "aac"
+    assert best_audio_stream_metadata.sample_format == "fltp"
 
 
 @pytest.mark.parametrize(
@@ -109,6 +110,7 @@ def test_get_metadata_audio_file(metadata_getter):
     )
     assert best_audio_stream_metadata.bit_rate == 64000
     assert best_audio_stream_metadata.codec == "mp3"
+    assert best_audio_stream_metadata.sample_format == "fltp"
 
 
 @pytest.mark.parametrize(

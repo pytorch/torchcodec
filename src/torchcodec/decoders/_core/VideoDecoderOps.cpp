@@ -495,12 +495,15 @@ std::string get_stream_json_metadata(
   if (streamMetadata.numChannels.has_value()) {
     map["numChannels"] = std::to_string(*streamMetadata.numChannels);
   }
+  if (streamMetadata.sampleFormat.has_value()) {
+    map["sampleFormat"] = quoteValue(streamMetadata.sampleFormat.value());
+  }
   if (streamMetadata.mediaType == AVMEDIA_TYPE_VIDEO) {
-    map["mediaType"] = "\"video\"";
+    map["mediaType"] = quoteValue("video");
   } else if (streamMetadata.mediaType == AVMEDIA_TYPE_AUDIO) {
-    map["mediaType"] = "\"audio\"";
+    map["mediaType"] = quoteValue("audio");
   } else {
-    map["mediaType"] = "\"other\"";
+    map["mediaType"] = quoteValue("other");
   }
   return mapToJson(map);
 }
