@@ -64,6 +64,82 @@ TORCH_LIBRARY(torchcodec_ns, m) {
 }
 
 namespace {
+
+// TODO: make comment below better
+// A struct that holds state for reading bytes from an IO context.
+// We give this to FFMPEG and it will pass it back to us when it needs to read
+// or seek in the memory buffer.
+//
+// A class that can be used as AVFormatContext's IO context. It reads from a
+// memory buffer that is passed in.
+class AVIOBytesContext : public AVIOContextHolder {
+ public:
+  explicit AVIOBytesContext(const void* data, int64_t dataSize)
+      : dataContext_{static_cast<const uint8_t*>(data), dataSize, 0} {
+    TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
+    TORCH_CHECK(dataSize > 0, "Video data size must be positive");
+    createAVIOContext(&read, &seek, &dataContext_);
+  }
+
+  // The signature of this function is defined by FFMPEG.
+  static int read(void* opaque, uint8_t* buf, int buf_size) {
+    auto dataContext = static_cast<DataContext*>(opaque);
+    TORCH_CHECK(
+        dataContext->current <= dataContext->size,
+        "Tried to read outside of the buffer: current=",
+        dataContext->current,
+        ", size=",
+        dataContext->size);
+
+    buf_size = FFMIN(
+        buf_size, static_cast<int>(dataContext->size - dataContext->current));
+    TORCH_CHECK(
+        buf_size >= 0,
+        "Tried to read negative bytes: buf_size=",
+        buf_size,
+        ", size=",
+        dataContext->size,
+        ", current=",
+        dataContext->current);
+
+    if (!buf_size) {
+      return AVERROR_EOF;
+    }
+    memcpy(buf, dataContext->data + dataContext->current, buf_size);
+    dataContext->current += buf_size;
+    return buf_size;
+  }
+
+  // The signature of this function is defined by FFMPEG.
+  static int64_t seek(void* opaque, int64_t offset, int whence) {
+    auto dataContext = static_cast<DataContext*>(opaque);
+    int64_t ret = -1;
+
+    switch (whence) {
+      case AVSEEK_SIZE:
+        ret = dataContext->size;
+        break;
+      case SEEK_SET:
+        dataContext->current = offset;
+        ret = offset;
+        break;
+      default:
+        break;
+    }
+
+    return ret;
+  }
+
+ private:
+  struct DataContext {
+    const uint8_t* data;
+    int64_t size;
+    int64_t current;
+  };
+
+  DataContext dataContext_;
+};
+
 at::Tensor wrapDecoderPointerToTensor(
     std::unique_ptr<VideoDecoder> uniqueDecoder) {
   VideoDecoder* decoder = uniqueDecoder.release();
@@ -135,9 +211,7 @@ at::Tensor create_from_tensor(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  constexpr int bufferSize = 64 * 1024;
-  auto contextHolder =
-      std::make_unique<AVIOBytesContext>(data, length, bufferSize);
+  auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
 
   std::unique_ptr<VideoDecoder> uniqueDecoder =
       std::make_unique<VideoDecoder>(std::move(contextHolder), realSeek);

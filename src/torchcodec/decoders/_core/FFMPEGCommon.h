@@ -145,43 +145,27 @@ int getNumChannels(const UniqueAVCodecContext& avCodecContext);
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
 
+using AVIOReadFunction = int (*)(void*, uint8_t*, int);
+using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
+
 // TODO: explain purpose of context holder
 class AVIOContextHolder {
  public:
-  virtual ~AVIOContextHolder(){};
-  virtual AVIOContext* getAVIOContext() const = 0;
-};
+  virtual ~AVIOContextHolder();
+  AVIOContext* getAVIOContext();
 
-// TODO: make comment below better
-// A struct that holds state for reading bytes from an IO context.
-// We give this to FFMPEG and it will pass it back to us when it needs to read
-// or seek in the memory buffer.
-//
-// A class that can be used as AVFormatContext's IO context. It reads from a
-// memory buffer that is passed in.
-class AVIOBytesContext : public AVIOContextHolder {
- public:
-  AVIOBytesContext(const void* data, int64_t dataSize, int bufferSize);
-  virtual ~AVIOBytesContext();
-
-  // Returns the AVIOContext that can be passed to FFMPEG.
-  virtual AVIOContext* getAVIOContext() const override;
-
-  // The signature of this function is defined by FFMPEG.
-  static int read(void* opaque, uint8_t* buf, int buf_size);
-
-  // The signature of this function is defined by FFMPEG.
-  static int64_t seek(void* opaque, int64_t offset, int whence);
+ protected:
+  void createAVIOContext(
+      AVIOReadFunction read,
+      AVIOSeekFunction seek,
+      void* heldData,
+      int bufferSize = defaultBufferSize);
 
  private:
-  struct DataContext {
-    const uint8_t* data;
-    int64_t size;
-    int64_t current;
-  };
-
   UniqueAVIOContext avioContext_;
-  DataContext dataContext_;
+
+  // Defaults to 64 KB
+  static const int defaultBufferSize = 64 * 1014;
 };
 
 } // namespace facebook::torchcodec

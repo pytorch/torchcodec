@@ -28,11 +28,9 @@ struct PyObjectDeleter {
 
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
-  AVIOFileLikeContext(py::object fileLike, int bufferSize)
-      : fileLikeContext_{
-            std::unique_ptr<py::object, PyObjectDeleter>(
-                new py::object(fileLike)),
-            bufferSize} {
+  explicit AVIOFileLikeContext(py::object fileLike)
+      : fileLikeContext_{std::unique_ptr<py::object, PyObjectDeleter>(
+            new py::object(fileLike))} {
     {
       // TODO: Is it necessary to acquire the GIL here? Is it maybe even
       // harmful? At the moment, this is only called from within a pybind
@@ -45,40 +43,11 @@ class AVIOFileLikeContext : public AVIOContextHolder {
           py::hasattr(fileLike, "seek"),
           "File like object must implement a seek method.");
     }
-
-    auto buffer = static_cast<uint8_t*>(av_malloc(bufferSize));
-    TORCH_CHECK(
-        buffer != nullptr,
-        "Failed to allocate buffer of size " + std::to_string(bufferSize));
-
-    avioContext_.reset(avio_alloc_context(
-        buffer,
-        bufferSize,
-        0,
-        &fileLikeContext_,
-        &AVIOFileLikeContext::read,
-        nullptr,
-        &AVIOFileLikeContext::seek));
-
-    if (!avioContext_) {
-      av_freep(&buffer);
-      TORCH_CHECK(false, "Failed to allocate AVIOContext");
-    }
-  }
-
-  virtual ~AVIOFileLikeContext() {
-    if (avioContext_) {
-      av_freep(&avioContext_->buffer);
-    }
-  }
-
-  virtual AVIOContext* getAVIOContext() const override {
-    return avioContext_.get();
+    createAVIOContext(&read, &seek, &fileLikeContext_);
   }
 
   static int read(void* opaque, uint8_t* buf, int buf_size) {
     auto fileLikeContext = static_cast<FileLikeContext*>(opaque);
-    buf_size = FFMIN(buf_size, fileLikeContext->bufferSize);
 
     int num_read = 0;
     while (num_read < buf_size) {
@@ -126,10 +95,8 @@ class AVIOFileLikeContext : public AVIOContextHolder {
     //
     //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
     std::unique_ptr<py::object, PyObjectDeleter> fileLike;
-    int bufferSize;
   };
 
-  UniqueAVIOContext avioContext_;
   FileLikeContext fileLikeContext_;
 };
 
@@ -150,9 +117,7 @@ int64_t create_from_file_like(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  constexpr int bufferSize = 64 * 1024;
-  auto contextHolder =
-      std::make_unique<AVIOFileLikeContext>(file_like, bufferSize);
+  auto contextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
 
   VideoDecoder* decoder = new VideoDecoder(std::move(contextHolder), realSeek);
   return reinterpret_cast<int64_t>(decoder);

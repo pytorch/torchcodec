@@ -78,14 +78,14 @@ int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #endif
 }
 
-AVIOBytesContext::AVIOBytesContext(
-    const void* data,
-    int64_t dataSize,
-    int bufferSize)
-    : dataContext_{static_cast<const uint8_t*>(data), dataSize, 0} {
-  TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
-  TORCH_CHECK(dataSize > 0, "Video data size must be positive");
-
+void AVIOContextHolder::createAVIOContext(
+    AVIOReadFunction read,
+    AVIOSeekFunction seek,
+    void* heldData,
+    int bufferSize) {
+  TORCH_CHECK(
+      bufferSize > 0,
+      "Buffer size must be greater than 0; is " + std::to_string(bufferSize));
   auto buffer = static_cast<uint8_t*>(av_malloc(bufferSize));
   TORCH_CHECK(
       buffer != nullptr,
@@ -95,10 +95,10 @@ AVIOBytesContext::AVIOBytesContext(
       buffer,
       bufferSize,
       0,
-      &dataContext_,
-      &AVIOBytesContext::read,
-      nullptr,
-      &AVIOBytesContext::seek));
+      heldData,
+      read,
+      nullptr, // write function; not supported yet
+      seek));
 
   if (!avioContext_) {
     av_freep(&buffer);
@@ -106,63 +106,14 @@ AVIOBytesContext::AVIOBytesContext(
   }
 }
 
-AVIOBytesContext::~AVIOBytesContext() {
+AVIOContextHolder::~AVIOContextHolder() {
   if (avioContext_) {
     av_freep(&avioContext_->buffer);
   }
 }
 
-AVIOContext* AVIOBytesContext::getAVIOContext() const {
+AVIOContext* AVIOContextHolder::getAVIOContext() {
   return avioContext_.get();
-}
-
-// The signature of this function is defined by FFmpeg.
-int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
-  auto dataContext = static_cast<DataContext*>(opaque);
-  TORCH_CHECK(
-      dataContext->current <= dataContext->size,
-      "Tried to read outside of the buffer: current=",
-      dataContext->current,
-      ", size=",
-      dataContext->size);
-
-  buf_size = FFMIN(
-      buf_size, static_cast<int>(dataContext->size - dataContext->current));
-  TORCH_CHECK(
-      buf_size >= 0,
-      "Tried to read negative bytes: buf_size=",
-      buf_size,
-      ", size=",
-      dataContext->size,
-      ", current=",
-      dataContext->current);
-
-  if (!buf_size) {
-    return AVERROR_EOF;
-  }
-  memcpy(buf, dataContext->data + dataContext->current, buf_size);
-  dataContext->current += buf_size;
-  return buf_size;
-}
-
-// The signature of this function is defined by FFmpeg.
-int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
-  auto dataContext = static_cast<DataContext*>(opaque);
-  int64_t ret = -1;
-
-  switch (whence) {
-    case AVSEEK_SIZE:
-      ret = dataContext->size;
-      break;
-    case SEEK_SET:
-      dataContext->current = offset;
-      ret = offset;
-      break;
-    default:
-      break;
-  }
-
-  return ret;
 }
 
 } // namespace facebook::torchcodec
