@@ -552,7 +552,7 @@ FrameDims getHeightAndWidthFromOptionsOrMetadata(
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const AVFrame& avFrame);
+    const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
     int height,

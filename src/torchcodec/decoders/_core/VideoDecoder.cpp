@@ -1205,7 +1205,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
   auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
-      streamInfo.videoStreamOptions, *(avFrame.get()));
+      streamInfo.videoStreamOptions, avFrame);
   int expectedOutputHeight = frameDims.height;
   int expectedOutputWidth = frameDims.width;
 
@@ -1941,10 +1941,10 @@ FrameDims getHeightAndWidthFromOptionsOrMetadata(
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const AVFrame& avFrame) {
+    const UniqueAVFrame& avFrame) {
   return FrameDims(
-      videoStreamOptions.height.value_or(avFrame.height),
-      videoStreamOptions.width.value_or(avFrame.width));
+      videoStreamOptions.height.value_or(avFrame->height),
+      videoStreamOptions.width.value_or(avFrame->width));
 }
 
 } // namespace facebook::torchcodec
