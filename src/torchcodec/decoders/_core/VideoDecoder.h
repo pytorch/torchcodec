@@ -404,7 +404,7 @@ class VideoDecoder {
       torch::Tensor& outputTensor);
 
   UniqueAVFrame convertAudioAVFrameSampleFormat(
-      const UniqueAVFrame& avFrame,
+      UniqueAVFrame& avFrame,
       AVSampleFormat sourceSampleFormat,
       AVSampleFormat desiredSampleFormat);
 
