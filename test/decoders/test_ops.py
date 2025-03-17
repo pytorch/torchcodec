@@ -631,7 +631,7 @@ class TestAudioOps:
             partial(get_frames_in_range, start=4, stop=5),
             partial(get_frame_at_pts, seconds=2),
             partial(get_frames_by_pts, timestamps=[0, 1.5]),
-            partial(get_next_frame),
+            partial(seek_to_pts, seconds=5),
         ),
     )
     def test_audio_bad_method(self, method):
@@ -646,6 +646,22 @@ class TestAudioOps:
             RuntimeError, match="seek_mode must be 'approximate' for audio"
         ):
             add_audio_stream(decoder)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_next(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frame_index = 0
+        while True:
+            try:
+                frame, *_ = get_next_frame(decoder)
+            except IndexError:
+                break
+            torch.testing.assert_close(
+                frame, asset.get_frame_data_by_index(frame_index)
+            )
+            frame_index += 1
 
     @pytest.mark.parametrize(
         "range",
@@ -831,6 +847,8 @@ class TestAudioOps:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_pts(self, asset):
+        # Non-regression test for
+        # https://github.com/pytorch/torchcodec/issues/553
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
@@ -845,15 +863,24 @@ class TestAudioOps:
                 frames, asset.get_frame_data_by_index(frame_index)
             )
 
-            if asset is NASA_AUDIO_MP3 and frame_index == 0:
-                # TODO This is a bug. The 0.138125 is correct while 0.072 is
-                # incorrect, even though it comes from the decoded AVFrame's pts
-                # field.
-                # See https://github.com/pytorch/torchcodec/issues/553
-                assert pts_seconds == 0.072
-                assert start_seconds == 0.138125
-            else:
-                assert pts_seconds == start_seconds
+            assert pts_seconds == start_seconds
+
+    def test_decode_before_frame_start(self):
+        # Test illustrating bug described in
+        # https://github.com/pytorch/torchcodec/issues/567
+        asset = NASA_AUDIO_MP3
+
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=0.05
+        )
+        all_frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=None
+        )
+        # TODO fix this. `frames` should be empty.
+        torch.testing.assert_close(frames, all_frames)
 
 
 if __name__ == "__main__":
