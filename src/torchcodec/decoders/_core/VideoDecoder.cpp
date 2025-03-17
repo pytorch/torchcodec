@@ -1268,7 +1268,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
       streamInfo.prevFrameContext = frameContext;
     }
-    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame.get());
+    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -1319,11 +1319,11 @@ int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
 }
 
 torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
-    const AVFrame* avFrame) {
+    const UniqueAVFrame& avFrame) {
   FilterGraphContext& filterGraphContext =
       streamInfos_[activeStreamIndex_].filterGraphContext;
   int status =
-      av_buffersrc_write_frame(filterGraphContext.sourceContext, avFrame);
+      av_buffersrc_write_frame(filterGraphContext.sourceContext, avFrame.get());
   if (status < AVSUCCESS) {
     throw std::runtime_error("Failed to add frame to buffer source context");
   }
