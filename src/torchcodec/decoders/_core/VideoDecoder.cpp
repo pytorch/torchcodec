@@ -467,6 +467,7 @@ void VideoDecoder::addStream(
   TORCH_CHECK_EQ(retVal, AVSUCCESS);
 
   streamInfo.codecContext->thread_count = ffmpegThreadCount.value_or(0);
+  streamInfo.codecContext->pkt_timebase = streamInfo.stream->time_base;
 
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
