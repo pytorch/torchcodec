@@ -990,13 +990,7 @@ class TestAudioDecoder:
         torch.testing.assert_close(samples.data, reference_frames)
         assert samples.sample_rate == asset.sample_rate
 
-        # TODO there's a bug with NASA_AUDIO_MP3: https://github.com/pytorch/torchcodec/issues/553
-        expected_pts = (
-            0.072
-            if asset is NASA_AUDIO_MP3
-            else asset.get_frame_info(idx=0).pts_seconds
-        )
-        assert samples.pts_seconds == expected_pts
+        assert samples.pts_seconds == asset.get_frame_info(idx=0).pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_at_frame_boundaries(self, asset):
@@ -1060,12 +1054,8 @@ class TestAudioDecoder:
         assert samples.data.shape == (0, 0)
 
     def test_frame_start_is_not_zero(self):
-        # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.072 [1].
+        # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.138125.
         # So if we request start = 0.05, we shouldn't be truncating anything.
-        #
-        # [1] well, really it's at 0.138125, not 0.072 (see
-        # https://github.com/pytorch/torchcodec/issues/553), but for the purpose
-        # of this test it doesn't matter.
 
         asset = NASA_AUDIO_MP3
         start_seconds = 0.05  # this is less than the first frame's pts
