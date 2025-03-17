@@ -1361,14 +1361,8 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       static_cast<AVSampleFormat>(avFrameStream.avFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
-  UniqueAVFrame convertedAVFrame;
-  if (sourceSampleFormat != desiredSampleFormat) {
-    convertedAVFrame = convertAudioAVFrameSampleFormat(
-        avFrameStream.avFrame, sourceSampleFormat, desiredSampleFormat);
-  }
-  const UniqueAVFrame& avFrame = (sourceSampleFormat != desiredSampleFormat)
-      ? convertedAVFrame
-      : avFrameStream.avFrame;
+  const UniqueAVFrame avFrame = convertAudioAVFrameSampleFormat(
+      avFrameStream.avFrame, sourceSampleFormat, desiredSampleFormat);
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   TORCH_CHECK(
@@ -1395,11 +1389,13 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 }
 
 UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
-    const UniqueAVFrame& avFrame,
+    UniqueAVFrame& avFrame,
     AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat
+    AVSampleFormat desiredSampleFormat) {
+  if (sourceSampleFormat == desiredSampleFormat) {
+    return std::move(avFrame);
+  }
 
-) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
