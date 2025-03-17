@@ -384,7 +384,7 @@ class VideoDecoder {
       const AVFrame* srcAVFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
-      const AVFrame* avFrame,
+      UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
   UniqueAVFrame convertAudioAVFrameSampleFormat(

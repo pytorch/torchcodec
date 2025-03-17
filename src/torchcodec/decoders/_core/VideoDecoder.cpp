@@ -1248,7 +1248,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       streamInfo.prevFrameContext = frameContext;
     }
     int resultHeight =
-        convertAVFrameToTensorUsingSwsScale(avFrame.get(), outputTensor);
+        convertAVFrameToTensorUsingSwsScale(avFrame, outputTensor);
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?
@@ -1299,7 +1299,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
 }
 
 int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
-    const AVFrame* avFrame,
+    UniqueAVFrame& avFrame,
     torch::Tensor& outputTensor) {
   StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
   SwsContext* swsContext = activeStreamInfo.swsContext.get();
