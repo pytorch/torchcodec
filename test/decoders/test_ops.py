@@ -860,6 +860,23 @@ class TestAudioOps:
 
             assert pts_seconds == start_seconds
 
+    def test_decode_before_frame_start(self):
+        # Test illustrating bug described in
+        # https://github.com/pytorch/torchcodec/issues/567
+        asset = NASA_AUDIO_MP3
+
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=0.05
+        )
+        all_frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=None
+        )
+        # TODO fix this. `frames` should be empty.
+        torch.testing.assert_close(frames, all_frames)
+
 
 if __name__ == "__main__":
     pytest.main()
