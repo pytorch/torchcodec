@@ -39,10 +39,13 @@ def load_torchcodec_extension():
         try:
             torch.ops.load_library(_get_extension_path(decoder_library_name))
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
+
             spec = importlib.util.spec_from_file_location(
                 pybind_ops_module_name,
                 _get_extension_path(pybind_ops_library_name),
             )
+            assert spec is not None
+
             global _pybind_ops
             _pybind_ops = importlib.util.module_from_spec(spec)
             return
