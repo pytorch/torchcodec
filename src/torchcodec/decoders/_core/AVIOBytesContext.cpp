@@ -4,8 +4,8 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <torch/types.h>
 #include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
+#include <torch/types.h>
 
 namespace facebook::torchcodec {
 

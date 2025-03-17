@@ -4,13 +4,13 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <torch/types.h>
 #include "src/torchcodec/decoders/_core/AVIOFileLikeContext.h"
+#include <torch/types.h>
 
 namespace facebook::torchcodec {
 
 AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
-      : fileLike_{UniquePyObject(new py::object(fileLike))} {
+    : fileLike_{UniquePyObject(new py::object(fileLike))} {
   {
     // TODO: Is it necessary to acquire the GIL here? Is it maybe even
     // harmful? At the moment, this is only called from within a pybind
