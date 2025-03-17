@@ -197,8 +197,8 @@ void convertAVFrameToFrameOutputOnCuda(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
-  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
-      videoStreamOptions, avFrame);
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;

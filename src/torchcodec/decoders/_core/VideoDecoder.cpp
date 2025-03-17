@@ -584,7 +584,7 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
   UniqueAVFrame avFrame = decodeAVFrame(
-      [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
+      [this](const UniqueAVFrame& avFrame) { return avFrame->pts >= cursor_; });
   return convertAVFrameToFrameOutput(avFrame, preAllocatedOutputTensor);
 }
 
@@ -715,23 +715,24 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
   }
 
   setCursorPtsInSeconds(seconds);
-  UniqueAVFrame avFrame = decodeAVFrame([seconds, this](AVFrame* avFrame) {
-    StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-    double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
-    double frameEndTime =
-        ptsToSeconds(avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
-    if (frameStartTime > seconds) {
-      // FFMPEG seeked past the frame we are looking for even though we
-      // set max_ts to be our needed timestamp in avformat_seek_file()
-      // in maybeSeekToBeforeDesiredPts().
-      // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
-      // In this case we return the very next frame instead of throwing an
-      // exception.
-      // TODO: Maybe log to stderr for Debug builds?
-      return true;
-    }
-    return seconds >= frameStartTime && seconds < frameEndTime;
-  });
+  UniqueAVFrame avFrame =
+      decodeAVFrame([seconds, this](const UniqueAVFrame& avFrame) {
+        StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+        double frameEndTime = ptsToSeconds(
+            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+        if (frameStartTime > seconds) {
+          // FFMPEG seeked past the frame we are looking for even though we
+          // set max_ts to be our needed timestamp in avformat_seek_file()
+          // in maybeSeekToBeforeDesiredPts().
+          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
+          // In this case we return the very next frame instead of throwing an
+          // exception.
+          // TODO: Maybe log to stderr for Debug builds?
+          return true;
+        }
+        return seconds >= frameStartTime && seconds < frameEndTime;
+      });
 
   // Convert the frame to tensor.
   FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrame);
@@ -890,9 +891,10 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   auto finished = false;
   while (!finished) {
     try {
-      UniqueAVFrame avFrame = decodeAVFrame([startPts](AVFrame* avFrame) {
-        return startPts < avFrame->pts + getDuration(avFrame);
-      });
+      UniqueAVFrame avFrame =
+          decodeAVFrame([startPts](const UniqueAVFrame& avFrame) {
+            return startPts < avFrame->pts + getDuration(avFrame);
+          });
       // TODO: it's not great that we are getting a FrameOutput, which is
       // intended for videos. We should consider bypassing
       // convertAVFrameToFrameOutput and directly call
@@ -1035,7 +1037,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 // --------------------------------------------------------------------------
 
 UniqueAVFrame VideoDecoder::decodeAVFrame(
-    std::function<bool(AVFrame*)> filterFunction) {
+    std::function<bool(const UniqueAVFrame&)> filterFunction) {
   validateActiveStream();
 
   resetDecodeStats();
@@ -1063,7 +1065,7 @@ UniqueAVFrame VideoDecoder::decodeAVFrame(
 
     decodeStats_.numFramesReceivedByDecoder++;
     // Is this the kind of frame we're looking for?
-    if (status == AVSUCCESS && filterFunction(avFrame.get())) {
+    if (status == AVSUCCESS && filterFunction(avFrame)) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
       break;
     } else if (status == AVSUCCESS) {

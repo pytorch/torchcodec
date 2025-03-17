@@ -359,7 +359,8 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  UniqueAVFrame decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
+  UniqueAVFrame decodeAVFrame(
+      std::function<bool(const UniqueAVFrame&)> filterFunction);
 
   FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
