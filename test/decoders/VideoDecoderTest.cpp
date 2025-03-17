@@ -51,10 +51,7 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
 
       void* buffer = content_.data();
       size_t length = content_.length();
-      constexpr int bufferSize = 64 * 1024;
-      auto contextHolder =
-          std::make_unique<AVIOBytesContext>(buffer, length, bufferSize);
-
+      auto contextHolder = std::make_unique<AVIOBytesContext>(buffer, length);
       return std::make_unique<VideoDecoder>(
           std::move(contextHolder), VideoDecoder::SeekMode::approximate);
     } else {

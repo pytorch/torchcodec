@@ -53,6 +53,8 @@ class AVIOFileLikeContext : public AVIOContextHolder {
     int num_read = 0;
     while (num_read < buf_size) {
       int request = buf_size - num_read;
+      // TODO: It is maybe more efficient to grab the lock once in the
+      // surrounding scope?
       py::gil_scoped_acquire gil;
       auto chunk = static_cast<std::string>(
           static_cast<py::bytes>((*fileLike)->attr("read")(request)));
@@ -85,11 +87,11 @@ class AVIOFileLikeContext : public AVIOContextHolder {
   }
 
  private:
-  // Note that we keep a pointer to the Python object because we need to
+  // Note that we dynamically allocate the Python object because we need to
   // strictly control when its destructor is called. We must hold the GIL
   // when its destructor gets called, as it needs to update the reference
-  // count. It's easiest to control that when it's a pointer. Otherwise, we'd
-  // have to ensure whatever enclosing scope holds the object has the GIL,
+  // count. It's easiest to control that when it's dynamic memory. Otherwise,
+  // we'd have to ensure whatever enclosing scope holds the object has the GIL,
   // and that's, at least, hard. For all of the common pitfalls, see:
   //
   //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
