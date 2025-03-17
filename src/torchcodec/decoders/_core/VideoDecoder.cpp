@@ -583,9 +583,9 @@ VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
-  AVFrameStream avFrameStream = decodeAVFrame(
+  UniqueAVFrame avFrame = decodeAVFrame(
       [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
-  return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
+  return convertAVFrameToFrameOutput(avFrame, preAllocatedOutputTensor);
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getFrameAtIndex(int64_t frameIndex) {
@@ -715,27 +715,26 @@ VideoDecoder::FrameOutput VideoDecoder::getFramePlayedAt(double seconds) {
   }
 
   setCursorPtsInSeconds(seconds);
-  AVFrameStream avFrameStream =
-      decodeAVFrame([seconds, this](AVFrame* avFrame) {
-        StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
-        double frameEndTime = ptsToSeconds(
-            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
-        if (frameStartTime > seconds) {
-          // FFMPEG seeked past the frame we are looking for even though we
-          // set max_ts to be our needed timestamp in avformat_seek_file()
-          // in maybeSeekToBeforeDesiredPts().
-          // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
-          // In this case we return the very next frame instead of throwing an
-          // exception.
-          // TODO: Maybe log to stderr for Debug builds?
-          return true;
-        }
-        return seconds >= frameStartTime && seconds < frameEndTime;
-      });
+  UniqueAVFrame avFrame = decodeAVFrame([seconds, this](AVFrame* avFrame) {
+    StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+    double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+    double frameEndTime =
+        ptsToSeconds(avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+    if (frameStartTime > seconds) {
+      // FFMPEG seeked past the frame we are looking for even though we
+      // set max_ts to be our needed timestamp in avformat_seek_file()
+      // in maybeSeekToBeforeDesiredPts().
+      // This could be a bug in FFMPEG: https://trac.ffmpeg.org/ticket/11137
+      // In this case we return the very next frame instead of throwing an
+      // exception.
+      // TODO: Maybe log to stderr for Debug builds?
+      return true;
+    }
+    return seconds >= frameStartTime && seconds < frameEndTime;
+  });
 
   // Convert the frame to tensor.
-  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrameStream);
+  FrameOutput frameOutput = convertAVFrameToFrameOutput(avFrame);
   frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
   return frameOutput;
 }
@@ -891,14 +890,14 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   auto finished = false;
   while (!finished) {
     try {
-      AVFrameStream avFrameStream = decodeAVFrame([startPts](AVFrame* avFrame) {
+      UniqueAVFrame avFrame = decodeAVFrame([startPts](AVFrame* avFrame) {
         return startPts < avFrame->pts + getDuration(avFrame);
       });
       // TODO: it's not great that we are getting a FrameOutput, which is
       // intended for videos. We should consider bypassing
       // convertAVFrameToFrameOutput and directly call
       // convertAudioAVFrameToFrameOutputOnCPU.
-      auto frameOutput = convertAVFrameToFrameOutput(avFrameStream);
+      auto frameOutput = convertAVFrameToFrameOutput(avFrame);
       firstFramePtsSeconds =
           std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
       frames.push_back(frameOutput.data);
@@ -1035,7 +1034,7 @@ void VideoDecoder::maybeSeekToBeforeDesiredPts() {
 // LOW-LEVEL DECODING
 // --------------------------------------------------------------------------
 
-VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
+UniqueAVFrame VideoDecoder::decodeAVFrame(
     std::function<bool(AVFrame*)> filterFunction) {
   validateActiveStream();
 
@@ -1150,7 +1149,7 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
   streamInfo.lastDecodedAvFramePts = avFrame->pts;
   streamInfo.lastDecodedAvFrameDuration = getDuration(avFrame);
 
-  return AVFrameStream(std::move(avFrame), activeStreamIndex_);
+  return avFrame;
 }
 
 // --------------------------------------------------------------------------
@@ -1158,29 +1157,28 @@ VideoDecoder::AVFrameStream VideoDecoder::decodeAVFrame(
 // --------------------------------------------------------------------------
 
 VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
-    VideoDecoder::AVFrameStream& avFrameStream,
+    UniqueAVFrame& avFrame,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   FrameOutput frameOutput;
-  int streamIndex = avFrameStream.streamIndex;
-  AVFrame* avFrame = avFrameStream.avFrame.get();
-  frameOutput.streamIndex = streamIndex;
-  auto& streamInfo = streamInfos_[streamIndex];
+  frameOutput.streamIndex = activeStreamIndex_;
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
   frameOutput.ptsSeconds = ptsToSeconds(
-      avFrame->pts, formatContext_->streams[streamIndex]->time_base);
+      avFrame->pts, formatContext_->streams[activeStreamIndex_]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
-      getDuration(avFrame), formatContext_->streams[streamIndex]->time_base);
+      getDuration(avFrame),
+      formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(
-        avFrameStream, frameOutput, preAllocatedOutputTensor);
+        avFrame, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
-        avFrameStream, frameOutput, preAllocatedOutputTensor);
+        avFrame, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
     convertAVFrameToFrameOutputOnCuda(
         streamInfo.videoStreamOptions.device,
         streamInfo.videoStreamOptions,
-        avFrameStream,
+        avFrame,
         frameOutput,
         preAllocatedOutputTensor);
   } else {
@@ -1201,14 +1199,13 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
 // Dimension order of the preAllocatedOutputTensor must be HWC, regardless of
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
-    VideoDecoder::AVFrameStream& avFrameStream,
+    UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrame* avFrame = avFrameStream.avFrame.get();
   auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
-      streamInfo.videoStreamOptions, *avFrame);
+      streamInfo.videoStreamOptions, *(avFrame.get()));
   int expectedOutputHeight = frameDims.height;
   int expectedOutputWidth = frameDims.width;
 
@@ -1251,7 +1248,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       streamInfo.prevFrameContext = frameContext;
     }
     int resultHeight =
-        convertAVFrameToTensorUsingSwsScale(avFrame, outputTensor);
+        convertAVFrameToTensorUsingSwsScale(avFrame.get(), outputTensor);
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?
@@ -1271,7 +1268,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
       createFilterGraph(streamInfo, expectedOutputHeight, expectedOutputWidth);
       streamInfo.prevFrameContext = frameContext;
     }
-    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
+    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame.get());
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -1350,7 +1347,7 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 }
 
 void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
-    VideoDecoder::AVFrameStream& avFrameStream,
+    UniqueAVFrame& srcAVFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   TORCH_CHECK(
@@ -1358,17 +1355,17 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       "pre-allocated audio tensor not supported yet.");
 
   AVSampleFormat sourceSampleFormat =
-      static_cast<AVSampleFormat>(avFrameStream.avFrame->format);
+      static_cast<AVSampleFormat>(srcAVFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
   UniqueAVFrame convertedAVFrame;
   if (sourceSampleFormat != desiredSampleFormat) {
     convertedAVFrame = convertAudioAVFrameSampleFormat(
-        avFrameStream.avFrame, sourceSampleFormat, desiredSampleFormat);
+        srcAVFrame, sourceSampleFormat, desiredSampleFormat);
   }
   const UniqueAVFrame& avFrame = (sourceSampleFormat != desiredSampleFormat)
       ? convertedAVFrame
-      : avFrameStream.avFrame;
+      : srcAVFrame;
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   TORCH_CHECK(

@@ -190,17 +190,15 @@ void initializeContextOnCuda(
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    VideoDecoder::AVFrameStream& avFrameStream,
+    UniqueAVFrame& avFrame,
     VideoDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  AVFrame* avFrame = avFrameStream.avFrame.get();
-
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got " +
           std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, *avFrame);
+  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(
+      videoStreamOptions, *(avFrame.get()));
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
