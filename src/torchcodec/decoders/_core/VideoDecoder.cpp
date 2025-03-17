@@ -567,13 +567,15 @@ void VideoDecoder::addAudioStream(int streamIndex) {
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrame() {
   auto output = getNextFrameInternal();
-  output.data = maybePermuteHWC2CHW(output.data);
+  if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO) {
+    output.data = maybePermuteHWC2CHW(output.data);
+  }
   return output;
 }
 
 VideoDecoder::FrameOutput VideoDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  validateActiveStream();
   AVFrameStream avFrameStream = decodeAVFrame(
       [this](AVFrame* avFrame) { return avFrame->pts >= cursor_; });
   return convertAVFrameToFrameOutput(avFrameStream, preAllocatedOutputTensor);
@@ -869,7 +871,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
     // TODO-AUDIO: document why this is needed in a big comment.
-    setCursorPtsInSeconds(INT64_MIN);
+    setCursorPtsInSecondsInternal(INT64_MIN);
   }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
@@ -915,6 +917,11 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 // --------------------------------------------------------------------------
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
+  validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  setCursorPtsInSecondsInternal(seconds);
+}
+
+void VideoDecoder::setCursorPtsInSecondsInternal(double seconds) {
   cursorWasJustSet_ = true;
   cursor_ =
       secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase);
