@@ -97,11 +97,6 @@ function(make_torchcodec_libraries
         "${decoder_library_name}"
         "${ffmpeg_include_dirs}"
     )
-    target_compile_definitions(
-        ${pybind_ops_library_name}
-        PUBLIC
-        TORCHCODEC_PYBIND=_torchcodec_pybind_ops${ffmpeg_major_version}
-    )
     # pybind11 quirk, see:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
     target_compile_options(

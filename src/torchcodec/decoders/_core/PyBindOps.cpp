@@ -37,11 +37,7 @@ int64_t create_from_file_like(
   return reinterpret_cast<int64_t>(decoder);
 }
 
-#ifndef TORCHCODEC_PYBIND
-#error TORCHCODEC_PYBIND must be defined.
-#endif
-
-PYBIND11_MODULE(TORCHCODEC_PYBIND, m) {
+PYBIND11_MODULE(_torchcodec_pybind_ops, m) {
   m.def("create_from_file_like", &create_from_file_like);
 }
 
