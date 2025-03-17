@@ -444,6 +444,9 @@ NASA_AUDIO = TestAudio(
     },
 )
 
+# Note that the file itself is s32 sample format, but the reference frames are
+# stored as fltp. We can add the s32 original reference frames once we support
+# decoding to non-fltp format, but for now we don't need to.
 SINE_MONO_S32 = TestAudio(
     filename="sine_mono_s32.wav",
     default_stream_index=0,
