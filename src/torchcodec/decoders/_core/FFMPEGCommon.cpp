@@ -84,7 +84,7 @@ void setChannelLayout(
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   dstAVFrame->ch_layout = srcAVFrame->ch_layout;
 #else
-  dstAVFrame->channel_layout = avFrame->channel_layout;
+  dstAVFrame->channel_layout = srcAVFrame->channel_layout;
 #endif
 }
 
