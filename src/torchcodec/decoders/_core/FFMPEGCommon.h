@@ -145,6 +145,15 @@ int64_t getDuration(const AVFrame* frame);
 int getNumChannels(const UniqueAVFrame& avFrame);
 int getNumChannels(const UniqueAVCodecContext& avCodecContext);
 
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVFrame& srcAVFrame);
+SwrContext* allocateSwrContext(
+    UniqueAVCodecContext& avCodecContext,
+    int sampleRate,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat);
+
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
 

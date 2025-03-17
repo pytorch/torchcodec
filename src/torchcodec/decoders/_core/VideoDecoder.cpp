@@ -1415,11 +1415,7 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
       convertedAVFrame,
       "Could not allocate frame for sample format conversion.");
 
-#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  convertedAVFrame->ch_layout = avFrame->ch_layout;
-#else
-  convertedAVFrame->channel_layout = avFrame->channel_layout;
-#endif
+  setChannelLayout(convertedAVFrame, avFrame);
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
   convertedAVFrame->sample_rate = avFrame->sample_rate;
   convertedAVFrame->nb_samples = avFrame->nb_samples;
@@ -1434,7 +1430,7 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
       streamInfo.swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
-      (const uint8_t**)avFrame->data,
+      (const uint8_t**)(avFrame->data),
       avFrame->nb_samples);
   TORCH_CHECK(
       numSampleConverted > 0,
@@ -1682,44 +1678,14 @@ void VideoDecoder::createSwrContext(
     int sampleRate,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat) {
-  SwrContext* swrContext = nullptr;
 
-  int status = AVSUCCESS;
-#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  AVChannelLayout layout = streamInfo.codecContext->ch_layout;
-  status = swr_alloc_set_opts2(
-      &swrContext,
-      &layout,
-      desiredSampleFormat,
+  auto swrContext = allocateSwrContext(
+      streamInfo.codecContext,
       sampleRate,
-      &layout,
       sourceSampleFormat,
-      sampleRate,
-      0,
-      nullptr);
+      desiredSampleFormat);
 
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't create SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status));
-#else
-  int64_t layout =
-      static_cast<int64_t>(streamInfo.codecContext->channel_layout);
-  swrContext = swr_alloc_set_opts(
-      nullptr,
-      layout,
-      desiredSampleFormat,
-      sampleRate,
-      layout,
-      sourceSampleFormat,
-      sampleRate,
-      0,
-      nullptr);
-#endif
-
-  TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
-
-  status = swr_init(swrContext);
+  auto status = swr_init(swrContext);
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't initialize SwrContext: ",

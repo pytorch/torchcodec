@@ -78,6 +78,57 @@ int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #endif
 }
 
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVFrame& srcAVFrame) {
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  dstAVFrame->ch_layout = srcAVFrame->ch_layout;
+#else
+  dstAVFrame->channel_layout = avFrame->channel_layout;
+#endif
+}
+
+SwrContext* allocateSwrContext(
+    UniqueAVCodecContext& avCodecContext,
+    int sampleRate,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat) {
+  SwrContext* swrContext = nullptr;
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  AVChannelLayout layout = avCodecContext->ch_layout;
+  auto status = swr_alloc_set_opts2(
+      &swrContext,
+      &layout,
+      desiredSampleFormat,
+      sampleRate,
+      &layout,
+      sourceSampleFormat,
+      sampleRate,
+      0,
+      nullptr);
+
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't create SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+#else
+  int64_t layout = static_cast<int64_t>(avCodecContext->channel_layout);
+  swrContext = swr_alloc_set_opts(
+      nullptr,
+      layout,
+      desiredSampleFormat,
+      sampleRate,
+      layout,
+      sourceSampleFormat,
+      sampleRate,
+      0,
+      nullptr);
+#endif
+
+  TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
+  return swrContext;
+}
+
 AVIOBytesContext::AVIOBytesContext(
     const void* data,
     size_t dataSize,
