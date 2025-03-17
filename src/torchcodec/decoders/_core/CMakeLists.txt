@@ -142,11 +142,10 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-    make_torchcodec_libraries(4 ffmpeg4 $ffmpeg4_INCLUDE_DIRS)
     make_torchcodec_libraries(7 ffmpeg7 $ffmpeg7_INCLUDE_DIRs)
     make_torchcodec_libraries(6 ffmpeg6 $ffmpeg6_INCLUDE_DIRS)
+    make_torchcodec_libraries(4 ffmpeg4 $ffmpeg4_INCLUDE_DIRS)
     make_torchcodec_libraries(5 ffmpeg5 $ffmpeg5_INCLUDE_DIRS)
-
 else()
     message(
         STATUS
@@ -162,6 +161,7 @@ else()
         libavformat
         libavcodec
         libavutil
+        libswresample
         libswscale
     )
 

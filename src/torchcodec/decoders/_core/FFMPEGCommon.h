@@ -22,6 +22,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/version.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -67,6 +68,8 @@ using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
 using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
+using UniqueSwrContext =
+    std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
@@ -139,8 +142,17 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 int64_t getDuration(const UniqueAVFrame& frame);
 int64_t getDuration(const AVFrame* frame);
 
-int getNumChannels(const AVFrame* avFrame);
+int getNumChannels(const UniqueAVFrame& avFrame);
 int getNumChannels(const UniqueAVCodecContext& avCodecContext);
+
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVFrame& srcAVFrame);
+SwrContext* allocateSwrContext(
+    UniqueAVCodecContext& avCodecContext,
+    int sampleRate,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat);
 
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
