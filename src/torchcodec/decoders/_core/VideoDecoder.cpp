@@ -1430,7 +1430,7 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
       streamInfo.swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
-      (const uint8_t**)(avFrame->data),
+      static_cast<const uint8_t**>(const_cast<const uint8_t**>(avFrame->data)),
       avFrame->nb_samples);
   TORCH_CHECK(
       numSampleConverted > 0,
@@ -1678,7 +1678,6 @@ void VideoDecoder::createSwrContext(
     int sampleRate,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat) {
-
   auto swrContext = allocateSwrContext(
       streamInfo.codecContext,
       sampleRate,
