@@ -12,6 +12,7 @@
 #include <ostream>
 #include <string_view>
 
+#include "src/torchcodec/decoders/_core/AVIOContextHolder.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -34,7 +35,10 @@ class VideoDecoder {
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // TODO: make comment accurate
+  // Creates a VideoDecoder using the provided AVIOContext inside the
+  // AVIOContextHolder. The AVIOContextHolder is the base class, and the
+  // derived class will have specialized how the custom read, seek and writes
+  // work.
   explicit VideoDecoder(
       std::unique_ptr<AVIOContextHolder> context,
       SeekMode seekMode = SeekMode::exact);

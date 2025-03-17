@@ -40,7 +40,11 @@ function(make_torchcodec_libraries
 
     # Create libtorchcodec_decoderN.so
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
-    set(decoder_sources FFMPEGCommon.cpp VideoDecoder.cpp)
+    set(decoder_sources
+      AVIOContextHolder.cpp
+      FFMPEGCommon.cpp
+      VideoDecoder.cpp
+    )
 
     if(ENABLE_CUDA)
         list(APPEND decoder_sources CudaDevice.cpp)
@@ -70,7 +74,10 @@ function(make_torchcodec_libraries
 
     # Create libtorchcodec_custom_opsN.so
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
-    set(custom_ops_sources VideoDecoderOps.cpp)
+    set(custom_ops_sources
+      AVIOBytesContext.cpp
+      VideoDecoderOps.cpp
+    )
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
         "${custom_ops_sources}"
@@ -80,7 +87,10 @@ function(make_torchcodec_libraries
 
     # Create libtorchcodec_pybind_opsN.so
     set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
-    set(pybind_ops_sources PyBindOps.cpp)
+    set(pybind_ops_sources
+      AVIOFileLikeContext.cpp
+      PyBindOps.cpp
+    )
     make_torchcodec_sublibrary(
         "${pybind_ops_library_name}"
         "${pybind_ops_sources}"
@@ -91,6 +101,13 @@ function(make_torchcodec_libraries
         ${pybind_ops_library_name}
         PUBLIC
         TORCHCODEC_PYBIND=_torchcodec_pybind_ops${ffmpeg_major_version}
+    )
+    # pybind11 quirk, see:
+    #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+    target_compile_options(
+      ${pybind_ops_library_name}
+      PUBLIC
+      "-fvisibility=hidden"
     )
 
     # Install all libraries.
@@ -172,7 +189,8 @@ else()
 
     # Expose these values updwards so that the test compilation does not need
     # to re-figure it out. FIXME: it's not great that we just copy-paste the
-    # library name.
+    # library names.
     set(libtorchcodec_library_name "libtorchcodec_decoder${ffmpeg_major_version}" PARENT_SCOPE)
+    set(libtorchcodec_custom_ops_name "libtorchcodec_custom_ops${ffmpeg_major_version}" PARENT_SCOPE)
     set(libav_include_dirs ${LIBAV_INCLUDE_DIRS} PARENT_SCOPE)
 endif()

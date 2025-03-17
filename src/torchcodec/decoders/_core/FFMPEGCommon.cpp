@@ -78,42 +78,4 @@ int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #endif
 }
 
-void AVIOContextHolder::createAVIOContext(
-    AVIOReadFunction read,
-    AVIOSeekFunction seek,
-    void* heldData,
-    int bufferSize) {
-  TORCH_CHECK(
-      bufferSize > 0,
-      "Buffer size must be greater than 0; is " + std::to_string(bufferSize));
-  auto buffer = static_cast<uint8_t*>(av_malloc(bufferSize));
-  TORCH_CHECK(
-      buffer != nullptr,
-      "Failed to allocate buffer of size " + std::to_string(bufferSize));
-
-  avioContext_.reset(avio_alloc_context(
-      buffer,
-      bufferSize,
-      0,
-      heldData,
-      read,
-      nullptr, // write function; not supported yet
-      seek));
-
-  if (!avioContext_) {
-    av_freep(&buffer);
-    TORCH_CHECK(false, "Failed to allocate AVIOContext");
-  }
-}
-
-AVIOContextHolder::~AVIOContextHolder() {
-  if (avioContext_) {
-    av_freep(&avioContext_->buffer);
-  }
-}
-
-AVIOContext* AVIOContextHolder::getAVIOContext() {
-  return avioContext_.get();
-}
-
 } // namespace facebook::torchcodec
