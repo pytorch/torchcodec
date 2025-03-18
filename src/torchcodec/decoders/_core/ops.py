@@ -9,7 +9,7 @@ import io
 import json
 import warnings
 from types import ModuleType
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch.library import get_ctx, register_fake
@@ -137,7 +137,7 @@ def create_from_bytes(
 
 
 def create_from_file_like(
-    file_like: io.RawIOBase | io.BytesIO, seek_mode: Optional[str] = None
+    file_like: Union[io.RawIOBase, io.BytesIO], seek_mode: Optional[str] = None
 ) -> torch.Tensor:
     assert _pybind_ops is not None
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
