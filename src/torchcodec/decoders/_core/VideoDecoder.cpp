@@ -1365,10 +1365,20 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       static_cast<AVSampleFormat>(avFrameStream.avFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
+  int sourceSampleRate = avFrameStream.avFrame->sample_rate;
+  int desiredSampleRate =
+      streamInfos_[activeStreamIndex_].audioStreamOptions.sampleRate.value_or(
+          sourceSampleRate);
+
   UniqueAVFrame convertedAVFrame;
-  if (sourceSampleFormat != desiredSampleFormat) {
-    convertedAVFrame = convertAudioAVFrameSampleFormat(
-        avFrameStream.avFrame, sourceSampleFormat, desiredSampleFormat);
+  if (sourceSampleFormat != desiredSampleFormat ||
+      sourceSampleRate != desiredSampleRate) {
+    convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+        avFrameStream.avFrame,
+        sourceSampleFormat,
+        desiredSampleFormat,
+        sourceSampleRate,
+        desiredSampleRate);
   }
   const UniqueAVFrame& avFrame = (sourceSampleFormat != desiredSampleFormat)
       ? convertedAVFrame
@@ -1398,12 +1408,12 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   frameOutput.data = outputData;
 }
 
-UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
+UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
     const UniqueAVFrame& avFrame,
     AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat
-
-) {
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];

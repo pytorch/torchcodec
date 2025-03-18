@@ -142,7 +142,6 @@ class VideoDecoder {
   struct AudioStreamOptions {
     AudioStreamOptions() {}
 
-    // explicit AudioStreamOptions(const std::string& optionsString);
     std::optional<int> sampleRate;
   };
 
@@ -413,10 +412,12 @@ class VideoDecoder {
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
-  UniqueAVFrame convertAudioAVFrameSampleFormat(
+  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
       const UniqueAVFrame& avFrame,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
