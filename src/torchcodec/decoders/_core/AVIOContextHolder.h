@@ -14,7 +14,7 @@ namespace facebook::torchcodec {
 //
 //   1. It is a smart pointer for the AVIOContext. It has the logic to create
 //      a new AVIOContext and will appropriately free the AVIOContext when it
-//      goes out of scope. Note that this requires more than just the having a
+//      goes out of scope. Note that this requires more than just having a
 //      UniqueAVIOContext, as the AVIOContext points to a buffer which must be
 //      freed.
 //   2. It is a base class for AVIOContext specializations. When specializing a
