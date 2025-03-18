@@ -137,7 +137,7 @@ def create_from_bytes(
 
 
 def create_from_file_like(
-    file_like: io.RawIOBase, seek_mode: Optional[str] = None
+    file_like: io.RawIOBase | io.BytesIO, seek_mode: Optional[str] = None
 ) -> torch.Tensor:
     assert _pybind_ops is not None
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
