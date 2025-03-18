@@ -990,13 +990,7 @@ class TestAudioDecoder:
         torch.testing.assert_close(samples.data, reference_frames)
         assert samples.sample_rate == asset.sample_rate
 
-        # TODO there's a bug with NASA_AUDIO_MP3: https://github.com/pytorch/torchcodec/issues/553
-        expected_pts = (
-            0.072
-            if asset is NASA_AUDIO_MP3
-            else asset.get_frame_info(idx=0).pts_seconds
-        )
-        assert samples.pts_seconds == expected_pts
+        assert samples.pts_seconds == asset.get_frame_info(idx=0).pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_at_frame_boundaries(self, asset):
@@ -1060,12 +1054,8 @@ class TestAudioDecoder:
         assert samples.data.shape == (0, 0)
 
     def test_frame_start_is_not_zero(self):
-        # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.072 [1].
+        # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.138125.
         # So if we request start = 0.05, we shouldn't be truncating anything.
-        #
-        # [1] well, really it's at 0.138125, not 0.072 (see
-        # https://github.com/pytorch/torchcodec/issues/553), but for the purpose
-        # of this test it doesn't matter.
 
         asset = NASA_AUDIO_MP3
         start_seconds = 0.05  # this is less than the first frame's pts
@@ -1080,3 +1070,21 @@ class TestAudioDecoder:
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=stop_frame_index)
         torch.testing.assert_close(samples.data, reference_frames)
+
+    def test_single_channel(self):
+        asset = SINE_MONO_S32
+        decoder = AudioDecoder(asset.path)
+
+        samples = decoder.get_samples_played_in_range(start_seconds=0, stop_seconds=2)
+        assert samples.data.shape[0] == asset.num_channels == 1
+
+    def test_format_conversion(self):
+        asset = SINE_MONO_S32
+        decoder = AudioDecoder(asset.path)
+        assert decoder.metadata.sample_format == asset.sample_format == "s32"
+
+        all_samples = decoder.get_samples_played_in_range(start_seconds=0)
+        assert all_samples.data.dtype == torch.float32
+
+        reference_frames = asset.get_frame_data_by_range(start=0, stop=asset.num_frames)
+        torch.testing.assert_close(all_samples.data, reference_frames)
