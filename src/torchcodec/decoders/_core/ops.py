@@ -41,6 +41,7 @@ def load_torchcodec_extension():
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
 
             pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
+            torch.ops.load_library(pybind_ops_library_path)
             spec = importlib.util.spec_from_file_location(
                 pybind_ops_module_name,
                 pybind_ops_library_path,
