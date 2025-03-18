@@ -1396,10 +1396,6 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
         outputChannelData, avFrame->extended_data[channel], numBytesPerChannel);
   }
   frameOutput.data = outputData;
-
-  // TODO
-  av_frame_free(&output_frame);
-  swr_free(&swr_ctx);
 }
 
 UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormat(
