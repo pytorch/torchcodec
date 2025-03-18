@@ -10,10 +10,6 @@
 
 namespace facebook::torchcodec {
 
-// These signatures are defined by FFmpeg.
-using AVIOReadFunction = int (*)(void*, uint8_t*, int);
-using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
-
 // The AVIOContextHolder serves several purposes:
 //
 //   1. It is a smart pointer for the AVIOContext. It has the logic to create
@@ -33,7 +29,7 @@ using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
 //           write callback functions.
 //      While it's not required, it is natural for the derived classes to make
 //      all of the above members. Base classes need to call
-//      createAVIOContext(), ideally in there constructor.
+//      createAVIOContext(), ideally in their constructor.
 //  3. A generic handle for those that just need to manage having access to an
 //     AVIOContext, but aren't necessarily concerned with how it was customized.
 class AVIOContextHolder {
@@ -46,6 +42,10 @@ class AVIOContextHolder {
   // an AVIOContextHolder without deriving it. (Ordinarily this would be
   // enforced by having a pure virtual methods, but we don't have any.)
   AVIOContextHolder() = default;
+
+  // These signatures are defined by FFmpeg.
+  using AVIOReadFunction = int (*)(void*, uint8_t*, int);
+  using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
 
   // Deriving classes should call this function in their constructor.
   void createAVIOContext(

@@ -54,7 +54,7 @@ def load_torchcodec_extension():
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
             # but we should probably handle that via a proper logging mechanism.
-            exceptions.append(ffmpeg_major_version, e)
+            exceptions.append((ffmpeg_major_version, e))
 
     traceback = (
         "\n[start of libtorchcodec loading traceback]\n"

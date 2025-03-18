@@ -15,18 +15,6 @@ namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
-// Necessary to make sure that we hold the GIL when we delete a py::object.
-struct PyObjectDeleter {
-  inline void operator()(py::object* obj) const {
-    if (obj) {
-      py::gil_scoped_acquire gil;
-      delete obj;
-    }
-  }
-};
-
-using UniquePyObject = std::unique_ptr<py::object, PyObjectDeleter>;
-
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
   explicit AVIOFileLikeContext(py::object fileLike);
@@ -43,6 +31,16 @@ class AVIOFileLikeContext : public AVIOContextHolder {
   // and that's, at least, hard. For all of the common pitfalls, see:
   //
   //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
+  struct PyObjectDeleter {
+    inline void operator()(py::object* obj) const {
+      if (obj) {
+        py::gil_scoped_acquire gil;
+        delete obj;
+      }
+    }
+  };
+
+  using UniquePyObject = std::unique_ptr<py::object, PyObjectDeleter>;
   UniquePyObject fileLike_;
 };
 
