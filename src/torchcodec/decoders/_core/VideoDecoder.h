@@ -81,6 +81,7 @@ class VideoDecoder {
     // Audio-only fields
     std::optional<int64_t> sampleRate;
     std::optional<int64_t> numChannels;
+    std::optional<std::string> sampleFormat;
   };
 
   struct ContainerMetadata {
@@ -156,7 +157,7 @@ class VideoDecoder {
   // DECODING AND SEEKING APIs
   // --------------------------------------------------------------------------
 
-  // All public decoding entry points return either a FrameOutput or a
+  // All public video decoding entry points return either a FrameOutput or a
   // FrameBatchOutput.
   // They are the equivalent of the user-facing Frame and FrameBatch classes in
   // Python. They contain RGB decoded frames along with some associated data
@@ -177,6 +178,11 @@ class VideoDecoder {
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
+  };
+
+  struct AudioFramesOutput {
+    torch::Tensor data; // shape is (numChannels, numSamples)
+    double ptsSeconds;
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
@@ -230,7 +236,8 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
-  torch::Tensor getFramesPlayedInRangeAudio(
+  // TODO-AUDIO: Should accept sampleRate
+  AudioFramesOutput getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> stopSecondsOptional = std::nullopt);
 
@@ -358,6 +365,7 @@ class VideoDecoder {
     FilterGraphContext filterGraphContext;
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     UniqueSwsContext swsContext;
+    UniqueSwrContext swrContext;
 
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
@@ -373,6 +381,7 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
+  void setCursorPtsInSecondsInternal(double seconds);
   bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();
@@ -404,6 +413,11 @@ class VideoDecoder {
       const AVFrame* avFrame,
       torch::Tensor& outputTensor);
 
+  UniqueAVFrame convertAudioAVFrameSampleFormat(
+      const UniqueAVFrame& avFrame,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat);
+
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------
@@ -417,6 +431,12 @@ class VideoDecoder {
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
+
+  void createSwrContext(
+      StreamInfo& streamInfo,
+      int sampleRate,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS

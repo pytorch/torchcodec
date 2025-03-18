@@ -271,9 +271,9 @@ def get_frames_by_pts_in_range_audio_abstract(
     *,
     start_seconds: float,
     stop_seconds: Optional[float] = None,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     image_size = [get_ctx().new_dynamic_size() for _ in range(4)]
-    return torch.empty(image_size)
+    return (torch.empty(image_size), torch.empty([], dtype=torch.float))
 
 
 @register_fake("torchcodec_ns::_get_key_frame_indices")

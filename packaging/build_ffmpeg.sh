@@ -61,7 +61,8 @@ tar -xf ffmpeg.tar.gz --strip-components 1
     --enable-avfilter \
     --enable-avformat \
     --enable-avutil \
-    --enable-swscale
+    --enable-swscale \
+    --enable-swresample
 
 make -j install
 ls ${prefix}/*
@@ -78,6 +79,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.58
         avfilter=libavfilter.7
         swscale=libswscale.5
+        swresample=libswresample.3
     elif [[ ${major_ver} == 5 ]]; then
         avutil=libavutil.57
         avcodec=libavcodec.59
@@ -85,6 +87,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.59
         avfilter=libavfilter.8
         swscale=libswscale.6
+        swresample=libswresample.4
     elif [[ ${major_ver} == 6 ]]; then
         avutil=libavutil.58
         avcodec=libavcodec.60
@@ -92,6 +95,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.60
         avfilter=libavfilter.9
         swscale=libswscale.7
+        swresample=libswresample.4
     elif [[ ${major_ver} == 7 ]]; then
         avutil=libavutil.59
         avcodec=libavcodec.61
@@ -99,6 +103,7 @@ if [[ "$(uname)" == Darwin ]]; then
         avdevice=libavdevice.61
         avfilter=libavfilter.10
         swscale=libswscale.8
+        swresample=libswresample.5
     else
         printf "Error: unexpected FFmpeg major version: %s\n"  ${major_ver}
         exit 1;
@@ -120,7 +125,7 @@ if [[ "$(uname)" == Darwin ]]; then
     fi
 
     # list up the paths to fix
-    for lib in ${avcodec} ${avdevice} ${avfilter} ${avformat} ${avutil} ${swscale}; do
+    for lib in ${avcodec} ${avdevice} ${avfilter} ${avformat} ${avutil} ${swscale} ${swresample}; do
         ${otool} -l ${prefix}/lib/${lib}.dylib | grep -B2 ${prefix}
     done
 
@@ -154,6 +159,13 @@ if [[ "$(uname)" == Darwin ]]; then
         -id @rpath/${swscale}.dylib \
         ${prefix}/lib/${swscale}.dylib
     ${otool} -l ${prefix}/lib/${swscale}.dylib | grep -B2 ${prefix}
+
+    ${install_name_tool} \
+        -change ${prefix}/lib/${avutil}.dylib @rpath/${avutil}.dylib \
+        -delete_rpath ${prefix}/lib \
+        -id @rpath/${swresample}.dylib \
+        ${prefix}/lib/${swresample}.dylib
+    ${otool} -l ${prefix}/lib/${swresample}.dylib | grep -B2 ${prefix}
 
     ${install_name_tool} \
         -change ${prefix}/lib/${avcodec}.dylib @rpath/${avcodec}.dylib \

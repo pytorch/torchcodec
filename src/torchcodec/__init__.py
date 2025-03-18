@@ -6,7 +6,7 @@
 
 # Note: usort wants to put Frame and FrameBatch after decoders and samplers,
 # but that results in circular import.
-from ._frame import Frame, FrameBatch  # usort:skip # noqa
+from ._frame import AudioSamples, Frame, FrameBatch  # usort:skip # noqa
 from . import decoders, samplers  # noqa
 
 try:

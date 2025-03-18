@@ -626,7 +626,7 @@ class TestAudioOps:
             partial(get_frames_in_range, start=4, stop=5),
             partial(get_frame_at_pts, seconds=2),
             partial(get_frames_by_pts, timestamps=[0, 1.5]),
-            partial(get_next_frame),
+            partial(seek_to_pts, seconds=5),
         ),
     )
     def test_audio_bad_method(self, method):
@@ -641,6 +641,22 @@ class TestAudioOps:
             RuntimeError, match="seek_mode must be 'approximate' for audio"
         ):
             add_audio_stream(decoder)
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_next(self, asset):
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frame_index = 0
+        while True:
+            try:
+                frame, *_ = get_next_frame(decoder)
+            except IndexError:
+                break
+            torch.testing.assert_close(
+                frame, asset.get_frame_data_by_index(frame_index)
+            )
+            frame_index += 1
 
     @pytest.mark.parametrize(
         "range",
@@ -691,11 +707,15 @@ class TestAudioOps:
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
 
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
-
         torch.testing.assert_close(frames, reference_frames)
+
+        if range == "at_frames_boundaries":
+            assert pts_seconds == start_seconds
+        elif range == "not_at_frames_boundaries":
+            assert pts_seconds == start_frame_info.pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_decode_epsilon_range(self, asset):
@@ -703,7 +723,7 @@ class TestAudioOps:
         add_audio_stream(decoder)
 
         start_seconds = 5
-        frames = get_frames_by_pts_in_range_audio(
+        frames, *_ = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=start_seconds + 1e-5
         )
         torch.testing.assert_close(
@@ -720,7 +740,7 @@ class TestAudioOps:
 
         start_seconds = asset.get_frame_info(idx=10).pts_seconds
         stop_seconds = asset.get_frame_info(idx=11).pts_seconds
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
         )
         torch.testing.assert_close(
@@ -729,31 +749,32 @@ class TestAudioOps:
                 asset.get_frame_index(pts_seconds=start_seconds)
             ),
         )
+        assert pts_seconds == start_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_decode_start_equal_stop(self, asset):
         decoder = create_from_file(str(asset.path), seek_mode="approximate")
         add_audio_stream(decoder)
-        frames = get_frames_by_pts_in_range_audio(
+        frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=1, stop_seconds=1
         )
-        assert frames.shape == (0,)
+        assert frames.shape == (0, 0)
+        assert pts_seconds == 0
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_multiple_calls(self, asset):
-        # Ensure that multiple calls are OK as long as we're decoding
-        # "sequentially", i.e. we don't require a backwards seek.
-        # And ensure a proper error is raised in such case.
-        # TODO-AUDIO We shouldn't error, we should just implement the seeking
-        # back to the beginning of the stream.
+        # Ensure that multiple calls to get_frames_by_pts_in_range_audio on the
+        # same decoder are supported and correct, whether it involves forward
+        # seeks or backwards seeks.
 
         def get_reference_frames(start_seconds, stop_seconds):
-            # This stateless helper exists for convenience, to avoid
-            # complicating this test with pts-to-index conversions. Eventually
-            # we should remove it and just rely on the asset's methods.
-            # Using this helper is OK for now: we're comparing a decoder which
-            # seeks multiple times with a decoder which seeks only once (the one
-            # here, treated as the reference)
+            # Usually we get the reference frames from the asset's methods, but
+            # for this specific test, this helper is more convenient, because
+            # relying on the asset would force us to convert all timestamps into
+            # indices.
+            # Ultimately, this test compares a "stateful decoder" which calls
+            # `get_frames_by_pts_in_range_audio()`` multiple times with a
+            # "stateless decoder" (the one here, treated as the reference)
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder)
 
@@ -794,23 +815,67 @@ class TestAudioOps:
             frames, get_reference_frames(start_seconds, stop_seconds)
         )
 
-        # but starting immediately on the same frame raises
-        expected_match = "Audio decoder cannot seek backwards"
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds, stop_seconds=6
+        # starting immediately on the same frame is OK
+        start_seconds, stop_seconds = stop_seconds, 6
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
+
+        get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds + 1e-4, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
+
+        # seeking backwards
+        start_seconds, stop_seconds = 0, 2
+        frames = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        torch.testing.assert_close(
+            frames, get_reference_frames(start_seconds, stop_seconds)
+        )
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_pts(self, asset):
+        # Non-regression test for
+        # https://github.com/pytorch/torchcodec/issues/553
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        for frame_index in range(asset.num_frames):
+            frame_info = asset.get_frame_info(idx=frame_index)
+            start_seconds = frame_info.pts_seconds
+
+            frames, pts_seconds = get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=start_seconds, stop_seconds=start_seconds + 1e-3
+            )
+            torch.testing.assert_close(
+                frames, asset.get_frame_data_by_index(frame_index)
             )
 
-        with pytest.raises(RuntimeError, match=expected_match):
-            get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=stop_seconds + 1e-4, stop_seconds=6
-            )
+            assert pts_seconds == start_seconds
 
-        # and seeking backwards doesn't work either
-        with pytest.raises(RuntimeError, match=expected_match):
-            frames = get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=0, stop_seconds=2
-            )
+    def test_decode_before_frame_start(self):
+        # Test illustrating bug described in
+        # https://github.com/pytorch/torchcodec/issues/567
+        asset = NASA_AUDIO_MP3
+
+        decoder = create_from_file(str(asset.path), seek_mode="approximate")
+        add_audio_stream(decoder)
+
+        frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=0.05
+        )
+        all_frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=None
+        )
+        # TODO fix this. `frames` should be empty.
+        torch.testing.assert_close(frames, all_frames)
 
 
 if __name__ == "__main__":
