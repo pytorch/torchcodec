@@ -46,7 +46,9 @@ def load_torchcodec_extension():
                 _get_extension_path(pybind_ops_library_name),
             )
             if spec is None:
-                raise ImportError("Unable to load spec for pybind_ops")
+                spec = importlib.util.find_spec(pybind_ops_module_name)
+                if spec is None:
+                    raise ImportError("Unable to load spec for pybind_ops")
 
             global _pybind_ops
             _pybind_ops = importlib.util.module_from_spec(spec)
