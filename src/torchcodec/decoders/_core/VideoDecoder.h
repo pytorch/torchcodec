@@ -435,9 +435,10 @@ class VideoDecoder {
 
   void createSwrContext(
       StreamInfo& streamInfo,
-      int sampleRate,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS

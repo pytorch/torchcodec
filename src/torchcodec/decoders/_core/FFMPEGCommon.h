@@ -150,9 +150,10 @@ void setChannelLayout(
     const UniqueAVFrame& srcAVFrame);
 SwrContext* allocateSwrContext(
     UniqueAVCodecContext& avCodecContext,
-    int sampleRate,
     AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat);
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate);
 
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();

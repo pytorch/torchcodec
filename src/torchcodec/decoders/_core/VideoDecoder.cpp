@@ -1370,9 +1370,12 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       streamInfos_[activeStreamIndex_].audioStreamOptions.sampleRate.value_or(
           sourceSampleRate);
 
+  bool mustConvert =
+      (sourceSampleFormat != desiredSampleFormat ||
+       sourceSampleRate != desiredSampleRate);
+
   UniqueAVFrame convertedAVFrame;
-  if (sourceSampleFormat != desiredSampleFormat ||
-      sourceSampleRate != desiredSampleRate) {
+  if (mustConvert) {
     convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
         avFrameStream.avFrame,
         sourceSampleFormat,
@@ -1380,9 +1383,8 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
         sourceSampleRate,
         desiredSampleRate);
   }
-  const UniqueAVFrame& avFrame = (sourceSampleFormat != desiredSampleFormat)
-      ? convertedAVFrame
-      : avFrameStream.avFrame;
+  const UniqueAVFrame& avFrame =
+      mustConvert ? convertedAVFrame : avFrameStream.avFrame;
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   TORCH_CHECK(
@@ -1415,13 +1417,14 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
     int sourceSampleRate,
     int desiredSampleRate) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
-  const auto& streamMetadata =
-      containerMetadata_.allStreamMetadata[activeStreamIndex_];
-  int sampleRate = static_cast<int>(streamMetadata.sampleRate.value());
 
   if (!streamInfo.swrContext) {
     createSwrContext(
-        streamInfo, sampleRate, sourceSampleFormat, desiredSampleFormat);
+        streamInfo,
+        sourceSampleFormat,
+        desiredSampleFormat,
+        sourceSampleRate,
+        desiredSampleRate);
   }
 
   UniqueAVFrame convertedAVFrame(av_frame_alloc());
@@ -1431,8 +1434,17 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
 
   setChannelLayout(convertedAVFrame, avFrame);
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
-  convertedAVFrame->sample_rate = avFrame->sample_rate;
-  convertedAVFrame->nb_samples = avFrame->nb_samples;
+  convertedAVFrame->sample_rate = desiredSampleRate;
+  if (sourceSampleRate != desiredSampleRate) {
+    convertedAVFrame->nb_samples = av_rescale_rnd(
+        swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
+            avFrame->nb_samples,
+        desiredSampleRate,
+        sourceSampleRate,
+        AV_ROUND_UP);
+  } else {
+    convertedAVFrame->nb_samples = avFrame->nb_samples;
+  }
 
   auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
   TORCH_CHECK(
@@ -1689,14 +1701,16 @@ void VideoDecoder::createSwsContext(
 
 void VideoDecoder::createSwrContext(
     StreamInfo& streamInfo,
-    int sampleRate,
     AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat) {
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate) {
   auto swrContext = allocateSwrContext(
       streamInfo.codecContext,
-      sampleRate,
       sourceSampleFormat,
-      desiredSampleFormat);
+      desiredSampleFormat,
+      sourceSampleRate,
+      desiredSampleRate);
 
   auto status = swr_init(swrContext);
   TORCH_CHECK(

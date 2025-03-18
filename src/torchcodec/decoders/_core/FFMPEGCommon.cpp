@@ -90,9 +90,10 @@ void setChannelLayout(
 
 SwrContext* allocateSwrContext(
     UniqueAVCodecContext& avCodecContext,
-    int sampleRate,
     AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat) {
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate) {
   SwrContext* swrContext = nullptr;
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   AVChannelLayout layout = avCodecContext->ch_layout;
@@ -100,10 +101,10 @@ SwrContext* allocateSwrContext(
       &swrContext,
       &layout,
       desiredSampleFormat,
-      sampleRate,
+      desiredSampleRate,
       &layout,
       sourceSampleFormat,
-      sampleRate,
+      sourceSampleRate,
       0,
       nullptr);
 
@@ -117,10 +118,10 @@ SwrContext* allocateSwrContext(
       nullptr,
       layout,
       desiredSampleFormat,
-      sampleRate,
+      desiredSampleRate,
       layout,
       sourceSampleFormat,
-      sampleRate,
+      sourceSampleRate,
       0,
       nullptr);
 #endif
