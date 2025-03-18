@@ -153,9 +153,13 @@ class VideoDecoder {
   // They are the equivalent of the user-facing Frame and FrameBatch classes in
   // Python. They contain RGB decoded frames along with some associated data
   // like PTS and duration.
+  // FrameOutput is also relevant for audio decoding, typically as the output of
+  // getNextFrame(), or as a temporary output variable.
   struct FrameOutput {
-    torch::Tensor data; // 3D: of shape CHW or HWC.
-    int streamIndex;
+    // data shape is:
+    // - 3D (C, H, W) or (H, W, C) for videos
+    // - 2D (numChannels, numSamples) for audio
+    torch::Tensor data;
     double ptsSeconds;
     double durationSeconds;
   };
