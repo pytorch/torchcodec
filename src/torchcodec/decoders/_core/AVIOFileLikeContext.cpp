@@ -47,7 +47,7 @@ int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
         request,
         " bytes but, received ",
         chunk_len,
-        " bytes. The given object does not confirm to read protocol of file object.");
+        " bytes. The given object does not conform to read protocol of file object.");
     memcpy(buf, chunk.data(), chunk_len);
     buf += chunk_len;
     num_read += chunk_len;
