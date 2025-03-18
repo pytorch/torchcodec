@@ -31,26 +31,26 @@ def load_torchcodec_extension():
     # correct .so file, so this for-loop succeeds on the first iteration.
 
     exceptions = []
+    pybind_ops_module_name = "_torchcodec_pybind_ops"
     for ffmpeg_major_version in (7, 6, 5, 4):
         decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
-        pybind_ops_module_name = "_torchcodec_pybind_ops"
         try:
             torch.ops.load_library(_get_extension_path(decoder_library_name))
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
-            torch.ops.load_library(_get_extension_path(pybind_ops_library_name))
 
+            pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
             spec = importlib.util.spec_from_file_location(
                 pybind_ops_module_name,
-                _get_extension_path(pybind_ops_library_name),
+                pybind_ops_library_path,
             )
-            global _pybind_ops
             if spec is None:
-                _pybind_ops = importlib.import_module(pybind_ops_module_name)
-                if _pybind_ops is None:
-                    raise ImportError("Unable to load spec for pybind_ops")
+                raise ImportError(
+                    f"Unable to load spec for module {pybind_ops_module_name} from path {pybind_ops_library_path}"
+                )
 
+            global _pybind_ops
             _pybind_ops = importlib.util.module_from_spec(spec)
             return
         except Exception as e:
