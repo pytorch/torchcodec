@@ -1436,6 +1436,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
   convertedAVFrame->sample_rate = desiredSampleRate;
   if (sourceSampleRate != desiredSampleRate) {
+    // Note that this is an upper bound on the number of output samples.
+    // `swr_convert()` will likely not fill convertedAVFrame with that many
+    // samples, it will buffer the last few ones because those require future
+    // samples. That's also why we reset nb_samples after the call to
+    // `swr_convert()`.
     convertedAVFrame->nb_samples = av_rescale_rnd(
         swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
             avFrame->nb_samples,
@@ -1452,16 +1457,20 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       "Could not allocate frame buffers for sample format conversion: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  auto numSampleConverted = swr_convert(
+  auto numConvertedSamples = swr_convert(
       streamInfo.swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
       static_cast<const uint8_t**>(const_cast<const uint8_t**>(avFrame->data)),
       avFrame->nb_samples);
   TORCH_CHECK(
-      numSampleConverted > 0,
+      numConvertedSamples > 0,
       "Error in swr_convert: ",
-      getFFMPEGErrorStringFromErrorCode(numSampleConverted));
+      getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
+
+  // See comment above about nb_samples
+  convertedAVFrame->nb_samples = numConvertedSamples;
+  // TODO need to flush properly to retrieve the last few samples.
 
   return convertedAVFrame;
 }
