@@ -10,8 +10,8 @@
 
 namespace facebook::torchcodec {
 
-// TODO: make comment below better
-// memory buffer that is passed in.
+// Enables users to pass in the entire video as bytes. Our read and seek
+// functions then traverse the bytes in memory.
 class AVIOBytesContext : public AVIOContextHolder {
  public:
   explicit AVIOBytesContext(const void* data, int64_t dataSize);

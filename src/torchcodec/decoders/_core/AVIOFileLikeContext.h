@@ -15,6 +15,8 @@ namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
+// Enables uers to pass in a Python file-like object. We then forward all read
+// and seek calls back up to the methods on the Python object.
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
   explicit AVIOFileLikeContext(py::object fileLike);
