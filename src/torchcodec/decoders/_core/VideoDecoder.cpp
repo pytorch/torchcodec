@@ -1301,7 +1301,7 @@ void VideoDecoder::convertAVFrameToFrameOutputOnCPU(
 }
 
 int VideoDecoder::convertAVFrameToTensorUsingSwsScale(
-    UniqueAVFrame& avFrame,
+    const UniqueAVFrame& avFrame,
     torch::Tensor& outputTensor) {
   StreamInfo& activeStreamInfo = streamInfos_[activeStreamIndex_];
   SwsContext* swsContext = activeStreamInfo.swsContext.get();
