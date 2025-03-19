@@ -407,6 +407,8 @@ class VideoDecoder {
       int sourceSampleRate,
       int desiredSampleRate);
 
+  torch::Tensor maybeFlushSwrBuffers();
+
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------

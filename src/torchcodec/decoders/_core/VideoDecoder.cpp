@@ -917,6 +917,11 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
         (stopPts <= lastDecodedAvFrameEnd);
   }
 
+  torch::Tensor lastSamples = maybeFlushSwrBuffers();
+  if (lastSamples.numel() > 0) {
+    frames.push_back(lastSamples);
+  }
+
   return AudioFramesOutput{torch::cat(frames, 1), firstFramePtsSeconds};
 }
 
@@ -1349,7 +1354,6 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     UniqueAVFrame& srcAVFrame,
     FrameOutput& frameOutput) {
-
   AVSampleFormat sourceSampleFormat =
       static_cast<AVSampleFormat>(srcAVFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
@@ -1395,6 +1399,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     memcpy(
         outputChannelData, avFrame->extended_data[channel], numBytesPerChannel);
   }
+
   frameOutput.data = outputData;
 }
 
@@ -1449,7 +1454,8 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       streamInfo.swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
-      static_cast<const uint8_t**>(const_cast<const uint8_t**>(srcAVFrame->data)),
+      static_cast<const uint8_t**>(
+          const_cast<const uint8_t**>(srcAVFrame->data)),
       srcAVFrame->nb_samples);
   TORCH_CHECK(
       numConvertedSamples > 0,
@@ -1461,6 +1467,38 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
   // TODO need to flush properly to retrieve the last few samples.
 
   return convertedAVFrame;
+}
+
+torch::Tensor VideoDecoder::maybeFlushSwrBuffers() {
+  // When sample rate conversion is involved, swresample buffers some of the
+  // samples in-between calls to swr_convert (see the libswresample docs).
+  // That's because the last few samples in a given frame require future samples
+  // from the next frame to be properly converted. This function flushes out the
+  // samples that are stored in swresample's buffers.
+  auto& streamInfo = streamInfos_[activeStreamIndex_];
+  if (!streamInfo.swrContext) {
+    return torch::empty({0, 0});
+  }
+  auto numRemainingSamples = // this is an upper bound
+      swr_get_out_samples(streamInfo.swrContext.get(), 0);
+
+  if (numRemainingSamples == 0) {
+    return torch::empty({0, 0});
+  }
+
+  torch::Tensor lastSamples = torch::empty(
+      {getNumChannels(streamInfo.codecContext), numRemainingSamples},
+      torch::kFloat32);
+  uint8_t* lastSamplesData = static_cast<uint8_t*>(lastSamples.data_ptr());
+
+  auto actualNumRemainingSamples = swr_convert(
+      streamInfo.swrContext.get(),
+      &lastSamplesData,
+      numRemainingSamples,
+      NULL,
+      0);
+  return lastSamples.narrow(
+      /*dim=*/1, /*start=*/0, /*length=*/actualNumRemainingSamples);
 }
 
 // --------------------------------------------------------------------------
