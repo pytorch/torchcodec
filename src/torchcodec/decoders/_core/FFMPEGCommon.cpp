@@ -48,15 +48,11 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
   return std::string(errorBuffer);
 }
 
-int64_t getDuration(const UniqueAVFrame& frame) {
-  return getDuration(frame.get());
-}
-
-int64_t getDuration(const AVFrame* frame) {
+int64_t getDuration(const UniqueAVFrame& avFrame) {
 #if LIBAVUTIL_VERSION_MAJOR < 58
-  return frame->pkt_duration;
+  return avFrame->pkt_duration;
 #else
-  return frame->duration;
+  return avFrame->duration;
 #endif
 }
 
