@@ -33,7 +33,8 @@ int64_t create_from_file_like(
 
   auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
 
-  VideoDecoder* decoder = new VideoDecoder(std::move(avioContextHolder), realSeek);
+  VideoDecoder* decoder =
+      new VideoDecoder(std::move(avioContextHolder), realSeek);
   return reinterpret_cast<int64_t>(decoder);
 }
 

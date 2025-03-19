@@ -129,7 +129,9 @@ at::Tensor create_from_tensor(
     at::Tensor video_tensor,
     std::optional<std::string_view> seek_mode) {
   TORCH_CHECK(video_tensor.is_contiguous(), "video_tensor must be contiguous");
-  TORCH_CHECK(video_tensor.scalar_type() == torch::kUInt8, "video_tensor must be kUInt8");
+  TORCH_CHECK(
+      video_tensor.scalar_type() == torch::kUInt8,
+      "video_tensor must be kUInt8");
   void* data = video_tensor.mutable_data_ptr();
   size_t length = video_tensor.numel();
 
