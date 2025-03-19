@@ -895,10 +895,6 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
           decodeAVFrame([startPts](const UniqueAVFrame& avFrame) {
             return startPts < avFrame->pts + getDuration(avFrame);
           });
-      // TODO: it's not great that we are getting a FrameOutput, which is
-      // intended for videos. We should consider bypassing
-      // convertAVFrameToFrameOutput and directly call
-      // convertAudioAVFrameToFrameOutputOnCPU.
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
       firstFramePtsSeconds =
           std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
@@ -1163,7 +1159,6 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
   FrameOutput frameOutput;
-  frameOutput.streamIndex = activeStreamIndex_;
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   frameOutput.ptsSeconds = ptsToSeconds(
       avFrame->pts, formatContext_->streams[activeStreamIndex_]->time_base);
