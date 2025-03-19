@@ -463,7 +463,7 @@ SINE_MONO_S32 = TestAudio(
 )
 
 # This file is an upsampled version of SINE_MONO_S32, generated with:
-# ffmpeg -i test/resources/sine_mono_s32.wav -ar 44100 test/resources/sine_mono_s32_44100.wav
+# ffmpeg -i test/resources/sine_mono_s32.wav -ar 44100 -c:a pcm_s32le test/resources/sine_mono_s32_44100.wav
 SINE_MONO_S32_44100 = TestAudio(
     filename="sine_mono_s32_44100.wav",
     default_stream_index=0,
@@ -473,14 +473,14 @@ SINE_MONO_S32_44100 = TestAudio(
             sample_rate=44_100,
             num_channels=1,
             duration_seconds=4,
-            num_frames=87,
+            num_frames=173,
             sample_format="s32",
         )
     },
 )
 
 # This file is a downsampled version of SINE_MONO_S32, generated with:
-# ffmpeg -i test/resources/sine_mono_s32.wav -ar 8000 test/resources/sine_mono_s32_8000.wav
+# ffmpeg -i test/resources/sine_mono_s32.wav -ar 8000 -c:a pcm_s32le test/resources/sine_mono_s32_8000.wav
 SINE_MONO_S32_8000 = TestAudio(
     filename="sine_mono_s32_8000.wav",
     default_stream_index=0,
@@ -490,7 +490,7 @@ SINE_MONO_S32_8000 = TestAudio(
             sample_rate=8000,
             num_channels=1,
             duration_seconds=4,
-            num_frames=16,
+            num_frames=32,
             sample_format="s32",
         )
     },

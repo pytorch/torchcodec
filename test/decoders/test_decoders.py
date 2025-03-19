@@ -1109,7 +1109,7 @@ class TestAudioDecoder:
         # preceeding samples for sample-rate conversion. This leads to a
         # slightly different sample-rate conversion that we would otherwise get,
         # had we started the stream from the beginning.
-        atol = 1e-4 if start_seconds == 0 else 1e-2
+        atol = 1e-6 if start_seconds == 0 else 1e-2
         rtol = 1e-6
 
         # Upsample

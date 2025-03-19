@@ -899,9 +899,7 @@ class TestAudioOps:
         assert SINE_MONO_S32.sample_rate == 16_000
         frames_upsampled_to_44100 = get_all_frames(SINE_MONO_S32, sample_rate=44_100)
 
-        torch.testing.assert_close(
-            frames_upsampled_to_44100, frames_44100_native, atol=1e-4, rtol=1e-6
-        )
+        torch.testing.assert_close(frames_upsampled_to_44100, frames_44100_native)
 
         # Downsample
         assert SINE_MONO_S32_8000.sample_rate == 8000
@@ -910,9 +908,7 @@ class TestAudioOps:
         assert SINE_MONO_S32.sample_rate == 16_000
         frames_downsampled_to_8000 = get_all_frames(SINE_MONO_S32, sample_rate=8000)
 
-        torch.testing.assert_close(
-            frames_downsampled_to_8000, frames_8000_native, atol=1e-4, rtol=1e-6
-        )
+        torch.testing.assert_close(frames_downsampled_to_8000, frames_8000_native)
 
 
 if __name__ == "__main__":
