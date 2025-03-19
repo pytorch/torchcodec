@@ -462,6 +462,40 @@ SINE_MONO_S32 = TestAudio(
     },
 )
 
+# This file is an upsampled version of SINE_MONO_S32, generated with:
+# ffmpeg -i test/resources/sine_mono_s32.wav -ar 44100 test/resources/sine_mono_s32_44100.wav
+SINE_MONO_S32_44100 = TestAudio(
+    filename="sine_mono_s32_44100.wav",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=44_100,
+            num_channels=1,
+            duration_seconds=4,
+            num_frames=87,
+            sample_format="s32",
+        )
+    },
+)
+
+# This file is a downsampled version of SINE_MONO_S32, generated with:
+# ffmpeg -i test/resources/sine_mono_s32.wav -ar 8000 test/resources/sine_mono_s32_8000.wav
+SINE_MONO_S32_8000 = TestAudio(
+    filename="sine_mono_s32_8000.wav",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=8000,
+            num_channels=1,
+            duration_seconds=4,
+            num_frames=16,
+            sample_format="s32",
+        )
+    },
+)
+
 H265_VIDEO = TestVideo(
     filename="h265_video.mp4",
     default_stream_index=0,
