@@ -884,11 +884,11 @@ class TestAudioOps:
         torch.testing.assert_close(frames, all_frames)
 
     def test_sample_rate_conversion(self):
-        def get_all_frames(asset, sample_rate=None):
+        def get_all_frames(asset, sample_rate=None, stop_seconds=None):
             decoder = create_from_file(str(asset.path), seek_mode="approximate")
             add_audio_stream(decoder, sample_rate=sample_rate)
             frames, *_ = get_frames_by_pts_in_range_audio(
-                decoder, start_seconds=0, stop_seconds=None
+                decoder, start_seconds=0, stop_seconds=stop_seconds
             )
             return frames
 

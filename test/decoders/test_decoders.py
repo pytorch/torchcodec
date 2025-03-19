@@ -26,6 +26,8 @@ from ..utils import (
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     SINE_MONO_S32,
+    SINE_MONO_S32_44100,
+    SINE_MONO_S32_8000,
 )
 
 
@@ -1088,3 +1090,65 @@ class TestAudioDecoder:
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=asset.num_frames)
         torch.testing.assert_close(all_samples.data, reference_frames)
+
+    @pytest.mark.parametrize(
+        "start_seconds, stop_seconds",
+        (
+            (0, None),
+            (0, 4),
+            (0, 3),
+            (2, None),
+            (2, 3),
+        ),
+    )
+    def test_sample_rate_conversion(self, start_seconds, stop_seconds):
+        # When start_seconds is not exactly 0, we have to increase the tolerance
+        # a bit. This is because sample_rate conversion relies on a sliding
+        # window of samples: if we start a stream in the middle, the first few
+        # samples aren't able to take advantage of the preceeding samples.
+        atol = 1e-4 if start_seconds == 0 else 1e-2
+        rtol = 1e-6
+
+        # Upsample
+        decoder = AudioDecoder(SINE_MONO_S32_44100.path)
+        assert decoder.metadata.sample_rate == 44_100
+        frames_44100_native = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert frames_44100_native.sample_rate == 44_100
+
+        decoder = AudioDecoder(SINE_MONO_S32.path, sample_rate=44_100)
+        frames_upsampled_to_44100 = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert decoder.metadata.sample_rate == 16_000
+        assert frames_upsampled_to_44100.sample_rate == 44_100
+
+        torch.testing.assert_close(
+            frames_upsampled_to_44100.data,
+            frames_44100_native.data,
+            atol=atol,
+            rtol=rtol,
+        )
+
+        # Downsample
+        decoder = AudioDecoder(SINE_MONO_S32_8000.path)
+        assert decoder.metadata.sample_rate == 8000
+        frames_8000_native = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert frames_8000_native.sample_rate == 8000
+
+        decoder = AudioDecoder(SINE_MONO_S32.path, sample_rate=8000)
+        frames_downsampled_to_8000 = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert decoder.metadata.sample_rate == 16_000
+        assert frames_downsampled_to_8000.sample_rate == 8000
+
+        torch.testing.assert_close(
+            frames_downsampled_to_8000.data,
+            frames_8000_native.data,
+            atol=atol,
+            rtol=rtol,
+        )
