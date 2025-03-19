@@ -42,9 +42,8 @@ class AudioDecoder:
             decoder=self._decoder, stream_index=stream_index, media_type="audio"
         )
         assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
-        self._source_sample_rate = self.metadata.sample_rate
         self._desired_sample_rate = (
-            sample_rate if sample_rate is not None else self._source_sample_rate
+            sample_rate if sample_rate is not None else self.metadata.sample_rate
         )
 
     def get_samples_played_in_range(

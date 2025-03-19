@@ -1104,8 +1104,11 @@ class TestAudioDecoder:
     def test_sample_rate_conversion(self, start_seconds, stop_seconds):
         # When start_seconds is not exactly 0, we have to increase the tolerance
         # a bit. This is because sample_rate conversion relies on a sliding
-        # window of samples: if we start a stream in the middle, the first few
-        # samples aren't able to take advantage of the preceeding samples.
+        # window of samples: if we start decoding a stream in the middle, the
+        # first few samples we're decoding aren't able to take advantage of the
+        # preceeding samples for sample-rate conversion. This leads to a
+        # slightly different sample-rate conversion that we would otherwise get,
+        # had we started the stream from the beginning.
         atol = 1e-4 if start_seconds == 0 else 1e-2
         rtol = 1e-6
 
