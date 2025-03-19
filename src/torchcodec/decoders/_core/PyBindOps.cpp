@@ -31,9 +31,9 @@ int64_t create_from_file_like(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
+  auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
 
-  VideoDecoder* decoder = new VideoDecoder(std::move(contextHolder), realSeek);
+  VideoDecoder* decoder = new VideoDecoder(std::move(avioContextHolder), realSeek);
   return reinterpret_cast<int64_t>(decoder);
 }
 

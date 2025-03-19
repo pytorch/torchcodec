@@ -33,6 +33,11 @@ class AVIOFileLikeContext : public AVIOContextHolder {
   // and that's, at least, hard. For all of the common pitfalls, see:
   //
   //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
+  //
+  // We maintain a reference to the file-like object because the file-like
+  // object that was created on the Python side must live as long as our
+  // potential use. That is, even if there are no more references to the object
+  // on the Python side, we require that the object is still live.
   struct PyObjectDeleter {
     inline void operator()(py::object* obj) const {
       if (obj) {

@@ -10,8 +10,7 @@ find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 function(make_torchcodec_sublibrary
     library_name
     sources
-    dependent_libraries
-    ffmpeg_include_dirs)
+    library_dependencies)
 
     add_library(${library_name} SHARED ${sources})
     set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
@@ -20,7 +19,6 @@ function(make_torchcodec_sublibrary
         ./../../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
-        ${ffmpeg_include_dirs}
     )
 
     # Avoid adding the "lib" prefix which we already add explicitly.
@@ -29,14 +27,15 @@ function(make_torchcodec_sublibrary
     target_link_libraries(
         ${library_name}
         PUBLIC
-        ${dependent_libraries}
+        ${library_dependencies}
     )
 endfunction()
 
 function(make_torchcodec_libraries
     ffmpeg_major_version
-    ffmpeg_target
-    ffmpeg_include_dirs)
+    ffmpeg_target)
+
+    # TODO: List each library and its purpose.
 
     # Create libtorchcodec_decoderN.so
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
@@ -52,14 +51,14 @@ function(make_torchcodec_libraries
         list(APPEND decoder_sources CPUOnlyDevice.cpp)
     endif()
 
-    set(decoder_dependent_libraries
+    set(decoder_library_dependencies
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
         ${Python3_LIBRARIES}
     )
 
     if(ENABLE_CUDA)
-        list(APPEND decoder_dependent_libraries
+        list(APPEND decoder_library_dependencies
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
@@ -68,8 +67,7 @@ function(make_torchcodec_libraries
     make_torchcodec_sublibrary(
         "${decoder_library_name}"
         "${decoder_sources}"
-        "${decoder_dependent_libraries}"
-        "${ffmpeg_include_dirs}"
+        "${decoder_library_dependencies}"
     )
 
     # Create libtorchcodec_custom_opsN.so
@@ -82,7 +80,6 @@ function(make_torchcodec_libraries
         "${custom_ops_library_name}"
         "${custom_ops_sources}"
         "${decoder_library_name}"
-        "${ffmpeg_include_dirs}"
     )
 
     # Create libtorchcodec_pybind_opsN.so
@@ -95,7 +92,6 @@ function(make_torchcodec_libraries
         "${pybind_ops_library_name}"
         "${pybind_ops_sources}"
         "${decoder_library_name}"
-        "${ffmpeg_include_dirs}"
     )
     # pybind11 quirk, see:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
@@ -137,10 +133,10 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-    make_torchcodec_libraries(7 ffmpeg7 $ffmpeg7_INCLUDE_DIRs)
-    make_torchcodec_libraries(6 ffmpeg6 $ffmpeg6_INCLUDE_DIRS)
-    make_torchcodec_libraries(4 ffmpeg4 $ffmpeg4_INCLUDE_DIRS)
-    make_torchcodec_libraries(5 ffmpeg5 $ffmpeg5_INCLUDE_DIRS)
+    make_torchcodec_libraries(7 ffmpeg7)
+    make_torchcodec_libraries(6 ffmpeg6)
+    make_torchcodec_libraries(4 ffmpeg4)
+    make_torchcodec_libraries(5 ffmpeg5)
 else()
     message(
         STATUS
@@ -180,7 +176,7 @@ else()
         )
     endif()
 
-    make_torchcodec_libraries(${ffmpeg_major_version} PkgConfig::LIBAV ${LIBAV_INCLUDE_DIRS})
+    make_torchcodec_libraries(${ffmpeg_major_version} PkgConfig::LIBAV)
 
     # Expose these values updwards so that the test compilation does not need
     # to re-figure it out. FIXME: it's not great that we just copy-paste the

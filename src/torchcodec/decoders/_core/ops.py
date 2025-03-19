@@ -21,7 +21,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
 _pybind_ops: Optional[ModuleType] = None
 
 
-def load_torchcodec_extension():
+def load_torchcodec_shared_libraries():
     # Successively try to load libtorchcodec7.so, libtorchcodec6.so,
     # libtorchcodec5.so, and libtorchcodec4.so. Each of these correspond to an
     # ffmpeg major version. This should cover all potential ffmpeg versions
@@ -79,7 +79,7 @@ def load_torchcodec_extension():
     )
 
 
-load_torchcodec_extension()
+load_torchcodec_shared_libraries()
 
 
 # Note: We use disallow_in_graph because PyTorch does constant propagation of

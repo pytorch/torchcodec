@@ -29,12 +29,12 @@ AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
   auto fileLike = static_cast<UniquePyObject*>(opaque);
 
+  // Note that we acquire the GIL outside of the loop. This is likely more
+  // efficient than releasing and acquiring it each loop iteration.
+  py::gil_scoped_acquire gil;
   int num_read = 0;
   while (num_read < buf_size) {
     int request = buf_size - num_read;
-    // TODO: It is maybe more efficient to grab the lock once in the
-    // surrounding scope?
-    py::gil_scoped_acquire gil;
     auto chunk = static_cast<std::string>(
         static_cast<py::bytes>((*fileLike)->attr("read")(request)));
     int chunk_len = static_cast<int>(chunk.length());

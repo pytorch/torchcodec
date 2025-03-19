@@ -68,7 +68,7 @@ class CMakeBuild(build_ext):
         super().run()
 
     def build_extension(self, ext):
-        """Call our CMake build system to build libtorchcodec?.so"""
+        """Call our CMake build system to build libtorchcodec*.so"""
         # Setuptools was designed to build one extension (.so file) at a time,
         # calling this method for each Extension object. We're using a
         # CMake-based build where all our extensions are built together at once.

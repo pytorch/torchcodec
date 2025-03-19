@@ -363,7 +363,7 @@ class TestVideoOps:
             decoder = create_from_file_like(open(path, mode="rb", buffering=0), "exact")
         elif create_from == "file_like_bufferedio":
             decoder = create_from_file_like(
-                open(path, mode="rb", buffering=-4096), "exact"
+                open(path, mode="rb", buffering=4096), "exact"
             )
         else:
             raise ValueError("Oops, double check the parametrization of this test!")
