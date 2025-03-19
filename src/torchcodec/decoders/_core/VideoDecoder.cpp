@@ -68,7 +68,7 @@ std::vector<std::string> splitStringWithDelimiters(
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
-  void setFFmpegLogLevel();
+  setFFmpegLogLevel();
 
   AVFormatContext* rawContext = nullptr;
   int status =
@@ -87,7 +87,7 @@ VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
   TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
 
-  void setFFmpegLogLevel();
+  setFFmpegLogLevel();
 
   constexpr int bufferSize = 64 * 1024;
   ioBytesContext_.reset(new AVIOBytesContext(data, length, bufferSize));
