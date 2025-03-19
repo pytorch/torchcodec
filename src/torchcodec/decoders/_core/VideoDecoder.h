@@ -391,8 +391,7 @@ class VideoDecoder {
 
   void convertAudioAVFrameToFrameOutputOnCPU(
       UniqueAVFrame& srcAVFrame,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      FrameOutput& frameOutput);
 
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(
       const UniqueAVFrame& avFrame);

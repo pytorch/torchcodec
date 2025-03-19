@@ -1170,8 +1170,7 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
       getDuration(avFrame),
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
-    convertAudioAVFrameToFrameOutputOnCPU(
-        avFrame, frameOutput, preAllocatedOutputTensor);
+    convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
@@ -1349,11 +1348,7 @@ torch::Tensor VideoDecoder::convertAVFrameToTensorUsingFilterGraph(
 
 void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     UniqueAVFrame& srcAVFrame,
-    FrameOutput& frameOutput,
-    std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  TORCH_CHECK(
-      !preAllocatedOutputTensor.has_value(),
-      "pre-allocated audio tensor not supported yet.");
+    FrameOutput& frameOutput) {
 
   AVSampleFormat sourceSampleFormat =
       static_cast<AVSampleFormat>(srcAVFrame->format);
