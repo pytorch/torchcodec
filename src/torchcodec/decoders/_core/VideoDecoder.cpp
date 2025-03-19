@@ -1399,7 +1399,7 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 }
 
 UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
-    const UniqueAVFrame& avFrame,
+    const UniqueAVFrame& srcAVFrame,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
@@ -1420,7 +1420,7 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       convertedAVFrame,
       "Could not allocate frame for sample format conversion.");
 
-  setChannelLayout(convertedAVFrame, avFrame);
+  setChannelLayout(convertedAVFrame, srcAVFrame);
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
   convertedAVFrame->sample_rate = desiredSampleRate;
   if (sourceSampleRate != desiredSampleRate) {
@@ -1431,12 +1431,12 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
     // `swr_convert()`.
     convertedAVFrame->nb_samples = av_rescale_rnd(
         swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
-            avFrame->nb_samples,
+            srcAVFrame->nb_samples,
         desiredSampleRate,
         sourceSampleRate,
         AV_ROUND_UP);
   } else {
-    convertedAVFrame->nb_samples = avFrame->nb_samples;
+    convertedAVFrame->nb_samples = srcAVFrame->nb_samples;
   }
 
   auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
@@ -1449,8 +1449,8 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       streamInfo.swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
-      static_cast<const uint8_t**>(const_cast<const uint8_t**>(avFrame->data)),
-      avFrame->nb_samples);
+      static_cast<const uint8_t**>(const_cast<const uint8_t**>(srcAVFrame->data)),
+      srcAVFrame->nb_samples);
   TORCH_CHECK(
       numConvertedSamples > 0,
       "Error in swr_convert: ",
