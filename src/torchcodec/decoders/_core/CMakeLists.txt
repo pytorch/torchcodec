@@ -38,9 +38,21 @@ function(make_torchcodec_libraries
     ffmpeg_major_version
     ffmpeg_target)
 
-    # TODO: List each library and its purpose.
+    # We create three shared libraries per version of FFmpeg, where the version
+    # is denoted by N:
+    #
+    # 1. libtorchcodec_decoderN.so: Base library which contains the
+    #    implementation of VideoDecoder and everything VideoDecoder needs.
+    #
+    # 2. libtorchcodec_custom_opsN.so: Implementation of the PyTorch custom
+    #    ops. Depends on libtorchcodec_decoderN.so.
+    #
+    # 3. libtorchcodec_pybind_opsN.so: Implementation of the pybind11 ops. We
+    #    keep these separate from the PyTorch custom ops because we have to
+    #    load these libraries separately on the Python side. Depends on
+    #    libtorchcodec_decoderN.so.
 
-    # Create libtorchcodec_decoderN.so
+    # 1. Create libtorchcodec_decoderN.so.
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
     set(decoder_sources
         AVIOContextHolder.cpp
@@ -73,7 +85,7 @@ function(make_torchcodec_libraries
         "${decoder_library_dependencies}"
     )
 
-    # Create libtorchcodec_custom_opsN.so
+    # 2. Create libtorchcodec_custom_opsN.so.
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
     set(custom_ops_sources
         AVIOBytesContext.cpp
@@ -86,7 +98,7 @@ function(make_torchcodec_libraries
         "${decoder_library_name}"
     )
 
-    # Create libtorchcodec_pybind_opsN.so
+    # 3. Create libtorchcodec_pybind_opsN.so.
     set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
     set(pybind_ops_sources
         AVIOFileLikeContext.cpp
@@ -98,7 +110,9 @@ function(make_torchcodec_libraries
     )
     make_torchcodec_sublibrary(
         "${pybind_ops_library_name}"
-        MODULE
+        MODULE # Note that this not SHARED; otherwise we build the wrong kind
+               # of library on Mac. On Mac, SHARED becomes .dylib and MODULE becomes
+               # a .so. We want pybind11 libraries to become .so.
         "${pybind_ops_sources}"
         "${pybind_ops_dependencies}"
     )
@@ -109,6 +123,9 @@ function(make_torchcodec_libraries
         PUBLIC
       "-fvisibility=hidden"
     )
+    # If we don't make sure this flag is set, we run into segfauls at import
+    # time on Mac. See:
+    #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
     target_link_options(
         ${pybind_ops_library_name}
         PUBLIC
@@ -124,7 +141,7 @@ function(make_torchcodec_libraries
     )
 
     # The install step is invoked within CMakeBuild.build_library() in
-    # setup.py and just copies the built .so files from the temp
+    # setup.py and just copies the built files from the temp
     # cmake/setuptools build folder into the CMAKE_INSTALL_PREFIX folder. We
     # still need to manually pass "DESTINATION ..." for cmake to copy those
     # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.

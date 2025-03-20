@@ -140,6 +140,11 @@ class CMakeBuild(build_ext):
         if sys.platform == "linux":
             extensions = ["so"]
         elif sys.platform == "darwin":
+            # Mac has BOTH .dylib and .so as library extensions. Short version
+            # is that a .dylib is a shared library that can be both dynamically
+            # loaded and depended on by other libraries; a .so can only be a
+            # dynamically loaded module. For more, see:
+            #   https://stackoverflow.com/a/2339910
             extensions = ["dylib", "so"]
         else:
             raise NotImplementedError(

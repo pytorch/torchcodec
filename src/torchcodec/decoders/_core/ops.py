@@ -22,8 +22,8 @@ _pybind_ops: Optional[ModuleType] = None
 
 
 def load_torchcodec_shared_libraries():
-    # Successively try to load libtorchcodec7.so, libtorchcodec6.so,
-    # libtorchcodec5.so, and libtorchcodec4.so. Each of these correspond to an
+    # Successively try to load libtorchcodec_*7.so, libtorchcodec_*6.so,
+    # libtorchcodec_*5.so, and libtorchcodec_*4.so. Each of these correspond to an
     # ffmpeg major version. This should cover all potential ffmpeg versions
     # installed on the user's machine.
     #
