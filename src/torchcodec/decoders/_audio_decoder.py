@@ -25,10 +25,13 @@ class AudioDecoder:
         source: Union[str, Path, bytes, Tensor],
         *,
         stream_index: Optional[int] = None,
+        sample_rate: Optional[int] = None,
     ):
         self._decoder = create_decoder(source=source, seek_mode="approximate")
 
-        core.add_audio_stream(self._decoder, stream_index=stream_index)
+        core.add_audio_stream(
+            self._decoder, stream_index=stream_index, sample_rate=sample_rate
+        )
 
         (
             self.metadata,
@@ -39,6 +42,9 @@ class AudioDecoder:
             decoder=self._decoder, stream_index=stream_index, media_type="audio"
         )
         assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
+        self._desired_sample_rate = (
+            sample_rate if sample_rate is not None else self.metadata.sample_rate
+        )
 
     def get_samples_played_in_range(
         self, start_seconds: float, stop_seconds: Optional[float] = None
@@ -75,11 +81,7 @@ class AudioDecoder:
         # So we do some basic math to figure out the position of the view that
         # we'll return.
 
-        # TODO: sample_rate is either the original one from metadata, or the
-        # user-specified one (NIY)
-        assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
-        sample_rate = self.metadata.sample_rate
-
+        sample_rate = self._desired_sample_rate
         # TODO: metadata's sample_rate should probably not be Optional
         assert sample_rate is not None  # mypy.
 
@@ -94,7 +96,7 @@ class AudioDecoder:
             output_pts_seconds = first_pts
 
         num_samples = frames.shape[1]
-        last_pts = first_pts + num_samples / self.metadata.sample_rate
+        last_pts = first_pts + num_samples / sample_rate
         if stop_seconds is not None and stop_seconds < last_pts:
             offset_end = num_samples - round((last_pts - stop_seconds) * sample_rate)
         else:

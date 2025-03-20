@@ -44,6 +44,9 @@ from ..utils import (
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
+    SINE_MONO_S32,
+    SINE_MONO_S32_44100,
+    SINE_MONO_S32_8000,
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
@@ -879,6 +882,33 @@ class TestAudioOps:
         )
         # TODO fix this. `frames` should be empty.
         torch.testing.assert_close(frames, all_frames)
+
+    def test_sample_rate_conversion(self):
+        def get_all_frames(asset, sample_rate=None, stop_seconds=None):
+            decoder = create_from_file(str(asset.path), seek_mode="approximate")
+            add_audio_stream(decoder, sample_rate=sample_rate)
+            frames, *_ = get_frames_by_pts_in_range_audio(
+                decoder, start_seconds=0, stop_seconds=stop_seconds
+            )
+            return frames
+
+        # Upsample
+        assert SINE_MONO_S32_44100.sample_rate == 44_100
+        frames_44100_native = get_all_frames(SINE_MONO_S32_44100)
+
+        assert SINE_MONO_S32.sample_rate == 16_000
+        frames_upsampled_to_44100 = get_all_frames(SINE_MONO_S32, sample_rate=44_100)
+
+        torch.testing.assert_close(frames_upsampled_to_44100, frames_44100_native)
+
+        # Downsample
+        assert SINE_MONO_S32_8000.sample_rate == 8000
+        frames_8000_native = get_all_frames(SINE_MONO_S32_8000)
+
+        assert SINE_MONO_S32.sample_rate == 16_000
+        frames_downsampled_to_8000 = get_all_frames(SINE_MONO_S32, sample_rate=8000)
+
+        torch.testing.assert_close(frames_downsampled_to_8000, frames_8000_native)
 
 
 if __name__ == "__main__":
