@@ -1716,7 +1716,10 @@ void VideoDecoder::createSwrContext(
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't initialize SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+      getFFMPEGErrorStringFromErrorCode(status),
+      ". If the error says 'Invalid argument', it's likely that you are using "
+      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
+      "valid scenarios. Try to upgrade FFmpeg?");
   streamInfo.swrContext.reset(swrContext);
 }
 
