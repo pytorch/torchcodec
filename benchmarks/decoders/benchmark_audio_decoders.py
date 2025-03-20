@@ -86,7 +86,7 @@ def decode_with_torchaudio_load(path: Path, backend: str) -> None:
 
 
 parser = ArgumentParser()
-parser.add_argument("--path", type=str, help="path to file")
+parser.add_argument("--path", type=str, help="path to file", required=True)
 parser.add_argument(
     "--num-exp",
     type=int,
