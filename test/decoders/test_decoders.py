@@ -25,7 +25,10 @@ from ..utils import (
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
+    SINE_MONO_S16,
     SINE_MONO_S32,
+    SINE_MONO_S32_44100,
+    SINE_MONO_S32_8000,
 )
 
 
@@ -1088,3 +1091,89 @@ class TestAudioDecoder:
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=asset.num_frames)
         torch.testing.assert_close(all_samples.data, reference_frames)
+
+    @pytest.mark.parametrize(
+        "start_seconds, stop_seconds",
+        (
+            (0, None),
+            (0, 4),
+            (0, 3),
+            (2, None),
+            (2, 3),
+        ),
+    )
+    def test_sample_rate_conversion(self, start_seconds, stop_seconds):
+        # When start_seconds is not exactly 0, we have to increase the tolerance
+        # a bit. This is because sample_rate conversion relies on a sliding
+        # window of samples: if we start decoding a stream in the middle, the
+        # first few samples we're decoding aren't able to take advantage of the
+        # preceeding samples for sample-rate conversion. This leads to a
+        # slightly different sample-rate conversion that we would otherwise get,
+        # had we started the stream from the beginning.
+        atol = 1e-6 if start_seconds == 0 else 1e-2
+        rtol = 1e-6
+
+        # Upsample
+        decoder = AudioDecoder(SINE_MONO_S32_44100.path)
+        assert decoder.metadata.sample_rate == 44_100
+        frames_44100_native = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert frames_44100_native.sample_rate == 44_100
+
+        decoder = AudioDecoder(SINE_MONO_S32.path, sample_rate=44_100)
+        frames_upsampled_to_44100 = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert decoder.metadata.sample_rate == 16_000
+        assert frames_upsampled_to_44100.sample_rate == 44_100
+
+        torch.testing.assert_close(
+            frames_upsampled_to_44100.data,
+            frames_44100_native.data,
+            atol=atol,
+            rtol=rtol,
+        )
+
+        # Downsample
+        decoder = AudioDecoder(SINE_MONO_S32_8000.path)
+        assert decoder.metadata.sample_rate == 8000
+        frames_8000_native = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert frames_8000_native.sample_rate == 8000
+
+        decoder = AudioDecoder(SINE_MONO_S32.path, sample_rate=8000)
+        frames_downsampled_to_8000 = decoder.get_samples_played_in_range(
+            start_seconds=start_seconds, stop_seconds=stop_seconds
+        )
+        assert decoder.metadata.sample_rate == 16_000
+        assert frames_downsampled_to_8000.sample_rate == 8000
+
+        torch.testing.assert_close(
+            frames_downsampled_to_8000.data,
+            frames_8000_native.data,
+            atol=atol,
+            rtol=rtol,
+        )
+
+    def test_s16_ffmpeg4_bug(self):
+        # s16 fails on FFmpeg4 but can be decoded on other versions.
+        # Debugging logs show that we're hitting:
+        # [SWR @ 0x560a7abdaf80] Input channel count and layout are unset
+        # which seems to point to:
+        # https://github.com/FFmpeg/FFmpeg/blob/40a6963fbd0c47be358a3760480180b7b532e1e9/libswresample/swresample.c#L293-L305
+        # ¯\_(ツ)_/¯
+
+        asset = SINE_MONO_S16
+        decoder = AudioDecoder(asset.path)
+        assert decoder.metadata.sample_rate == asset.sample_rate
+        assert decoder.metadata.sample_format == asset.sample_format
+
+        cm = (
+            pytest.raises(RuntimeError, match="Invalid argument")
+            if get_ffmpeg_major_version() == 4
+            else contextlib.nullcontext()
+        )
+        with cm:
+            decoder.get_samples_played_in_range(start_seconds=0)

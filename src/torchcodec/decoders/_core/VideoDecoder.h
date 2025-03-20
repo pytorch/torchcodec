@@ -141,10 +141,18 @@ class VideoDecoder {
     torch::Device device = torch::kCPU;
   };
 
+  struct AudioStreamOptions {
+    AudioStreamOptions() {}
+
+    std::optional<int> sampleRate;
+  };
+
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStream(int streamIndex);
+  void addAudioStream(
+      int streamIndex,
+      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -155,9 +163,13 @@ class VideoDecoder {
   // They are the equivalent of the user-facing Frame and FrameBatch classes in
   // Python. They contain RGB decoded frames along with some associated data
   // like PTS and duration.
+  // FrameOutput is also relevant for audio decoding, typically as the output of
+  // getNextFrame(), or as a temporary output variable.
   struct FrameOutput {
-    torch::Tensor data; // 3D: of shape CHW or HWC.
-    int streamIndex;
+    // data shape is:
+    // - 3D (C, H, W) or (H, W, C) for videos
+    // - 2D (numChannels, numSamples) for audio
+    torch::Tensor data;
     double ptsSeconds;
     double durationSeconds;
   };
@@ -245,23 +257,6 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // These are APIs that should be private, but that are effectively exposed for
   // practical reasons, typically for testing purposes.
-
-  // This struct is needed because AVFrame doesn't retain the streamIndex. Only
-  // the AVPacket knows its stream. This is what the low-level private decoding
-  // entry points return. The AVFrameStream is then converted to a FrameOutput
-  // with convertAVFrameToFrameOutput. It should be private, but is currently
-  // used by DeviceInterface.
-  struct AVFrameStream {
-    // The actual decoded output as a unique pointer to an AVFrame.
-    // Usually, this is a YUV frame. It'll be converted to RGB in
-    // convertAVFrameToFrameOutput.
-    UniqueAVFrame avFrame;
-    // The stream index of the decoded frame.
-    int streamIndex;
-
-    explicit AVFrameStream(UniqueAVFrame&& a, int s)
-        : avFrame(std::move(a)), streamIndex(s) {}
-  };
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
   // can move it back to private.
@@ -351,6 +346,7 @@ class VideoDecoder {
     int64_t lastDecodedAvFramePts = 0;
     int64_t lastDecodedAvFrameDuration = 0;
     VideoStreamOptions videoStreamOptions;
+    AudioStreamOptions audioStreamOptions;
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
@@ -369,6 +365,7 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
 
   void initializeDecoder();
+  void setFFmpegLogLevel();
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
@@ -378,7 +375,8 @@ class VideoDecoder {
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
+  UniqueAVFrame decodeAVFrame(
+      std::function<bool(const UniqueAVFrame&)> filterFunction);
 
   FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -386,29 +384,33 @@ class VideoDecoder {
   torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
 
   FrameOutput convertAVFrameToFrameOutput(
-      AVFrameStream& avFrameStream,
+      UniqueAVFrame& avFrame,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   void convertAVFrameToFrameOutputOnCPU(
-      AVFrameStream& avFrameStream,
+      UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   void convertAudioAVFrameToFrameOutputOnCPU(
-      AVFrameStream& avFrameStream,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      UniqueAVFrame& srcAVFrame,
+      FrameOutput& frameOutput);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
+      const UniqueAVFrame& avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
-      const AVFrame* avFrame,
+      const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  UniqueAVFrame convertAudioAVFrameSampleFormat(
-      const UniqueAVFrame& avFrame,
+  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+      const UniqueAVFrame& srcAVFrame,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
+
+  std::optional<torch::Tensor> maybeFlushSwrBuffers();
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
@@ -426,9 +428,10 @@ class VideoDecoder {
 
   void createSwrContext(
       StreamInfo& streamInfo,
-      int sampleRate,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
@@ -570,7 +573,7 @@ FrameDims getHeightAndWidthFromOptionsOrMetadata(
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const AVFrame& avFrame);
+    const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
     int height,
