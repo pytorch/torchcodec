@@ -121,7 +121,6 @@ class VideoDecoder {
   struct VideoStreamOptions {
     VideoStreamOptions() {}
 
-    explicit VideoStreamOptions(const std::string& optionsString);
     // Number of threads we pass to FFMPEG for decoding.
     // 0 means FFMPEG will choose the number of threads automatically to fully
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
