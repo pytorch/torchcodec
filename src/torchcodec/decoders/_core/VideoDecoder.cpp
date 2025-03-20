@@ -951,9 +951,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
         (stopPts <= lastDecodedAvFrameEnd);
   }
 
-  torch::Tensor lastSamples = maybeFlushSwrBuffers();
-  if (lastSamples.numel() > 0) {
-    frames.push_back(lastSamples);
+  auto lastSamples = maybeFlushSwrBuffers();
+  if (lastSamples.has_value()) {
+    frames.push_back(*lastSamples);
   }
 
   return AudioFramesOutput{torch::cat(frames, 1), firstFramePtsSeconds};
@@ -1505,7 +1505,7 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
   return convertedAVFrame;
 }
 
-torch::Tensor VideoDecoder::maybeFlushSwrBuffers() {
+std::optional<torch::Tensor> VideoDecoder::maybeFlushSwrBuffers() {
   // When sample rate conversion is involved, swresample buffers some of the
   // samples in-between calls to swr_convert (see the libswresample docs).
   // That's because the last few samples in a given frame require future samples
@@ -1513,13 +1513,13 @@ torch::Tensor VideoDecoder::maybeFlushSwrBuffers() {
   // samples that are stored in swresample's buffers.
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   if (!streamInfo.swrContext) {
-    return torch::empty({0, 0});
+    return std::nullopt;
   }
   auto numRemainingSamples = // this is an upper bound
       swr_get_out_samples(streamInfo.swrContext.get(), 0);
 
   if (numRemainingSamples == 0) {
-    return torch::empty({0, 0});
+    return std::nullopt;
   }
 
   torch::Tensor lastSamples = torch::empty(
