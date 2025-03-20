@@ -1157,6 +1157,12 @@ class TestAudioDecoder:
             rtol=rtol,
         )
 
+    def test_upsample(self):
+        asset = NASA_AUDIO_MP3
+        assert asset.sample_rate == 8000
+        decoder = AudioDecoder(asset.path, sample_rate=44100)
+        decoder.get_samples_played_in_range(start_seconds=0)
+
     def test_s16_ffmpeg4_bug(self):
         # s16 fails on FFmpeg4 but can be decoded on other versions.
         # Debugging logs show that we're hitting:
