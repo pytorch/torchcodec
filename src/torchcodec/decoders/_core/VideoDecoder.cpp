@@ -1468,6 +1468,9 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
     // samples if sample rate conversion is needed. It will buffer the last few
     // ones because those require future samples. That's also why we reset
     // nb_samples after the call to `swr_convert()`.
+    // We could also use `swr_get_out_samples()` to determine the number of
+    // output samples, but empirically `av_rescale_rnd()` seems to provide a
+    // tighter bound.
     convertedAVFrame->nb_samples = av_rescale_rnd(
         swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
             srcAVFrame->nb_samples,
