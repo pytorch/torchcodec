@@ -900,12 +900,13 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 // we want those to be close to FFmpeg concepts, but the higher-level public
 // APIs expose samples. As a result:
 // - We don't expose index-based APIs for audio, because exposing index-based
-//   APIs expliciltly exposes the concept of audio frame. For know, we think
+//   APIs explicitly exposes the concept of audio frame. For know, we think
 //   exposing time-based APIs is more natural.
 // - We never perform a scan for audio streams. We don't need to, since we won't
-//   be converting timestamps to indices. That's why we enfore the "seek_mode"
-//   to be "approximate" (which is slightly mis-leading, because technically the
-//   output frames / samples will be perfectly exact).
+//   be converting timestamps to indices. That's why we enforce the "seek_mode"
+//   to be "approximate" (which is slightly misleading, because technically the
+//   output frames / samples will be at their exact positions. But this
+//   incongruence is only exposed at the C++/core private levels).
 //
 // Audio frames are of variable dimensions: in the same stream, a frame can
 // contain 1024 samples and the next one may contain 512 [1]. This makes it
@@ -918,7 +919,7 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
 // [IMPORTANT!] There is one key invariant that we must respect when decoding
 // audio frames:
 //
-// BEFORE DECODING FRAME I, WE MUST DECODE ALL FRAMES j < i.
+// BEFORE DECODING FRAME i, WE MUST DECODE ALL FRAMES j < i.
 //
 // Always. Why? We don't know. What we know is that if we don't, we get clipped,
 // incorrect audio as output [1]. All other (correct) libraries like TorchAudio
