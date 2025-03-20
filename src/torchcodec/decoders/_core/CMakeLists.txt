@@ -41,16 +41,18 @@ function(make_torchcodec_libraries
     # We create three shared libraries per version of FFmpeg, where the version
     # is denoted by N:
     #
-    # 1. libtorchcodec_decoderN.so: Base library which contains the
-    #    implementation of VideoDecoder and everything VideoDecoder needs.
+    # 1. libtorchcodec_decoderN.{ext}: Base library which contains the
+    #    implementation of VideoDecoder and everything VideoDecoder needs. On
+    #    Linux, {ext} is so. On Mac, it is dylib.
     #
-    # 2. libtorchcodec_custom_opsN.so: Implementation of the PyTorch custom
-    #    ops. Depends on libtorchcodec_decoderN.so.
+    # 2. libtorchcodec_custom_opsN.{ext}: Implementation of the PyTorch custom
+    #    ops. Depends on libtorchcodec_decoderN.{ext}. On Linux, {ext} is so.
+    #    On Mac, it is dylib.
     #
-    # 3. libtorchcodec_pybind_opsN.so: Implementation of the pybind11 ops. We
+    # 3. libtorchcodec_pybind_opsN.{ext}: Implementation of the pybind11 ops. We
     #    keep these separate from the PyTorch custom ops because we have to
     #    load these libraries separately on the Python side. Depends on
-    #    libtorchcodec_decoderN.so.
+    #    libtorchcodec_decoderN.{ext}. On BOTH Linux and Mac {ext} is so.
 
     # 1. Create libtorchcodec_decoderN.so.
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
