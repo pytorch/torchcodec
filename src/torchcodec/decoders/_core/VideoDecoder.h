@@ -138,10 +138,18 @@ class VideoDecoder {
     torch::Device device = torch::kCPU;
   };
 
+  struct AudioStreamOptions {
+    AudioStreamOptions() {}
+
+    std::optional<int> sampleRate;
+  };
+
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStream(int streamIndex);
+  void addAudioStream(
+      int streamIndex,
+      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -335,6 +343,7 @@ class VideoDecoder {
     int64_t lastDecodedAvFramePts = 0;
     int64_t lastDecodedAvFrameDuration = 0;
     VideoStreamOptions videoStreamOptions;
+    AudioStreamOptions audioStreamOptions;
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
@@ -382,8 +391,7 @@ class VideoDecoder {
 
   void convertAudioAVFrameToFrameOutputOnCPU(
       UniqueAVFrame& srcAVFrame,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+      FrameOutput& frameOutput);
 
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(
       const UniqueAVFrame& avFrame);
@@ -392,10 +400,14 @@ class VideoDecoder {
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  UniqueAVFrame convertAudioAVFrameSampleFormat(
-      const UniqueAVFrame& avFrame,
+  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+      const UniqueAVFrame& srcAVFrame,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
+
+  std::optional<torch::Tensor> maybeFlushSwrBuffers();
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
@@ -413,9 +425,10 @@ class VideoDecoder {
 
   void createSwrContext(
       StreamInfo& streamInfo,
-      int sampleRate,
       AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat);
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
