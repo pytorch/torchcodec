@@ -7,6 +7,7 @@
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -67,7 +68,7 @@ std::vector<std::string> splitStringWithDelimiters(
 
 VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
     : seekMode_(seekMode) {
-  av_log_set_level(AV_LOG_QUIET);
+  setFFmpegLogLevel();
 
   AVFormatContext* rawContext = nullptr;
   int status =
@@ -86,7 +87,7 @@ VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
     : seekMode_(seekMode) {
   TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
 
-  av_log_set_level(AV_LOG_QUIET);
+  setFFmpegLogLevel();
 
   constexpr int bufferSize = 64 * 1024;
   ioBytesContext_.reset(new AVIOBytesContext(data, length, bufferSize));
@@ -204,6 +205,39 @@ void VideoDecoder::initializeDecoder() {
   }
 
   initialized_ = true;
+}
+
+void VideoDecoder::setFFmpegLogLevel() {
+  auto logLevel = AV_LOG_QUIET;
+  const char* logLevelEnv = std::getenv("TORCHCODEC_FFMPEG_LOG_LEVEL");
+  if (logLevelEnv != nullptr) {
+    if (std::strcmp(logLevelEnv, "QUIET") == 0) {
+      logLevel = AV_LOG_QUIET;
+    } else if (std::strcmp(logLevelEnv, "PANIC") == 0) {
+      logLevel = AV_LOG_PANIC;
+    } else if (std::strcmp(logLevelEnv, "FATAL") == 0) {
+      logLevel = AV_LOG_FATAL;
+    } else if (std::strcmp(logLevelEnv, "ERROR") == 0) {
+      logLevel = AV_LOG_ERROR;
+    } else if (std::strcmp(logLevelEnv, "WARNING") == 0) {
+      logLevel = AV_LOG_WARNING;
+    } else if (std::strcmp(logLevelEnv, "INFO") == 0) {
+      logLevel = AV_LOG_INFO;
+    } else if (std::strcmp(logLevelEnv, "VERBOSE") == 0) {
+      logLevel = AV_LOG_VERBOSE;
+    } else if (std::strcmp(logLevelEnv, "DEBUG") == 0) {
+      logLevel = AV_LOG_DEBUG;
+    } else if (std::strcmp(logLevelEnv, "TRACE") == 0) {
+      logLevel = AV_LOG_TRACE;
+    } else {
+      TORCH_CHECK(
+          false,
+          "Invalid TORCHCODEC_FFMPEG_LOG_LEVEL: ",
+          logLevelEnv,
+          ". Use e.g. 'QUIET', 'PANIC', 'VERBOSE', etc.");
+    }
+  }
+  av_log_set_level(logLevel);
 }
 
 int VideoDecoder::getBestStreamIndex(AVMediaType mediaType) {
@@ -1750,7 +1784,10 @@ void VideoDecoder::createSwrContext(
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't initialize SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+      getFFMPEGErrorStringFromErrorCode(status),
+      ". If the error says 'Invalid argument', it's likely that you are using "
+      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
+      "valid scenarios. Try to upgrade FFmpeg?");
   streamInfo.swrContext.reset(swrContext);
 }
 

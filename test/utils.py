@@ -496,6 +496,23 @@ SINE_MONO_S32_8000 = TestAudio(
     },
 )
 
+# Same sample rate as SINE_MONO_S32, but encoded as s16 instead of s32. Generated with:
+# ffmpeg -i test/resources/sine_mono_s32.wav -ar 16000 -c:a pcm_s16le test/resources/sine_mono_s16.wav
+SINE_MONO_S16 = TestAudio(
+    filename="sine_mono_s16.wav",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=16_000,
+            num_channels=1,
+            duration_seconds=4,
+            num_frames=63,
+            sample_format="s16",
+        )
+    },
+)
+
 H265_VIDEO = TestVideo(
     filename="h265_video.mp4",
     default_stream_index=0,

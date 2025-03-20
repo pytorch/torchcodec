@@ -25,6 +25,7 @@ from ..utils import (
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
+    SINE_MONO_S16,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
@@ -1155,3 +1156,24 @@ class TestAudioDecoder:
             atol=atol,
             rtol=rtol,
         )
+
+    def test_s16_ffmpeg4_bug(self):
+        # s16 fails on FFmpeg4 but can be decoded on other versions.
+        # Debugging logs show that we're hitting:
+        # [SWR @ 0x560a7abdaf80] Input channel count and layout are unset
+        # which seems to point to:
+        # https://github.com/FFmpeg/FFmpeg/blob/40a6963fbd0c47be358a3760480180b7b532e1e9/libswresample/swresample.c#L293-L305
+        # ¯\_(ツ)_/¯
+
+        asset = SINE_MONO_S16
+        decoder = AudioDecoder(asset.path)
+        assert decoder.metadata.sample_rate == asset.sample_rate
+        assert decoder.metadata.sample_format == asset.sample_format
+
+        cm = (
+            pytest.raises(RuntimeError, match="Invalid argument")
+            if get_ffmpeg_major_version() == 4
+            else contextlib.nullcontext()
+        )
+        with cm:
+            decoder.get_samples_played_in_range(start_seconds=0)
