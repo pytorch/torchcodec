@@ -1531,7 +1531,7 @@ torch::Tensor VideoDecoder::maybeFlushSwrBuffers() {
       streamInfo.swrContext.get(),
       &lastSamplesData,
       numRemainingSamples,
-      NULL,
+      nullptr,
       0);
   return lastSamples.narrow(
       /*dim=*/1, /*start=*/0, /*length=*/actualNumRemainingSamples);
