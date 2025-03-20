@@ -10,6 +10,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "needs_cuda: mark for tests that rely on a CUDA device"
     )
+    config.addinivalue_line(
+        "markers", "needs_xpu: mark for tests that rely on a XPU device"
+    )
 
 
 def pytest_collection_modifyitems(items):
@@ -19,15 +22,16 @@ def pytest_collection_modifyitems(items):
 
     out_items = []
     for item in items:
-        # The needs_cuda mark will exist if the test was explicitly decorated
-        # with the @needs_cuda decorator. It will also exist if it was
+        # The needs_[cuda|xpu] mark will exist if the test was explicitly decorated
+        # with the respective @needs_* decorator. It will also exist if it was
         # parametrized with a parameter that has the mark: for example if a test
         # is parametrized with
-        # @pytest.mark.parametrize('device', cpu_and_cuda())
+        # @pytest.mark.parametrize('device', cpu_and_accelerators())
         # the "instances" of the tests where device == 'cuda' will have the
         # 'needs_cuda' mark, and the ones with device == 'cpu' won't have the
         # mark.
         needs_cuda = item.get_closest_marker("needs_cuda") is not None
+        needs_xpu = item.get_closest_marker("needs_xpu") is not None
 
         if (
             needs_cuda
@@ -41,6 +45,13 @@ def pytest_collection_modifyitems(items):
             # supposed to run the CUDA tests, so if CUDA isn't available on
             # those for whatever reason, we need to know.
             item.add_marker(pytest.mark.skip(reason="CUDA not available."))
+
+        if (
+            needs_xpu
+            and not torch.xpu.is_available()
+            and os.environ.get("FAIL_WITHOUT_XPU") is None
+        ):
+            item.add_marker(pytest.mark.skip(reason="XPU not available."))
 
         out_items.append(item)
 
@@ -56,6 +67,8 @@ def prevent_leaking_rng():
     builtin_rng_state = random.getstate()
     if torch.cuda.is_available():
         cuda_rng_state = torch.cuda.get_rng_state()
+    if torch.xpu.is_available():
+        xpu_rng_state = torch.xpu.get_rng_state()
 
     yield
 
@@ -63,3 +76,5 @@ def prevent_leaking_rng():
     random.setstate(builtin_rng_state)
     if torch.cuda.is_available():
         torch.cuda.set_rng_state(cuda_rng_state)
+    if torch.xpu.is_available():
+        torch.xpu.set_rng_state(xpu_rng_state)
