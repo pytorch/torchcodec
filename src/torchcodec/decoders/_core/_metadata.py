@@ -25,6 +25,8 @@ SPACES = "  "
 # TODO-AUDIO: docs below are mostly for video streams, we should edit them and /
 # or make sure they're OK for audio streams as well. Not sure how to best handle
 # docs for such class hierarchy.
+# TODO very related, none of these common fields in this base class show up in
+# the docs right now.
 @dataclass
 class StreamMetadata:
     duration_seconds_from_header: Optional[float]
@@ -162,8 +164,11 @@ class AudioStreamMetadata(StreamMetadata):
     """Metadata of a single audio stream."""
 
     sample_rate: Optional[int]
+    """The original sample rate."""
     num_channels: Optional[int]
+    """The number of channels (1 for mono, 2 for stereo, etc.)"""
     sample_format: Optional[str]
+    """The original sample format, as described by FFmpeg. E.g. 'fltp', 's32', etc."""
 
     def __repr__(self):
         return super().__repr__()
