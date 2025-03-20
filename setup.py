@@ -136,21 +136,22 @@ class CMakeBuild(build_ext):
         This is called by setuptools at the end of .run() during editable installs.
         """
         self.get_finalized_command("build_py")
-        extension = ""
+        extensions = []
         if sys.platform == "linux":
-            extension = "so"
+            extensions = ["so"]
         elif sys.platform == "darwin":
-            extension = "dylib"
+            extensions = ["dylib", "so"]
         else:
             raise NotImplementedError(
                 "Platforms other than linux/darwin are not supported yet"
             )
 
-        for so_file in self._install_prefix.glob(f"*.{extension}"):
-            assert "libtorchcodec" in so_file.name
-            destination = Path("src/torchcodec/") / so_file.name
-            print(f"Copying {so_file} to {destination}")
-            self.copy_file(so_file, destination, level=self.verbose)
+        for ext in extensions:
+            for lib_file in self._install_prefix.glob(f"*.{ext}"):
+                assert "libtorchcodec" in lib_file.name
+                destination = Path("src/torchcodec/") / lib_file.name
+                print(f"Copying {lib_file} to {destination}")
+                self.copy_file(lib_file, destination, level=self.verbose)
 
 
 NOT_A_LICENSE_VIOLATION_VAR = "I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION"

@@ -3,16 +3,19 @@ project(TorchCodec)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
 
 function(make_torchcodec_sublibrary
     library_name
+    type
     sources
     library_dependencies)
 
-    add_library(${library_name} SHARED ${sources})
+    add_library(${library_name} ${type} ${sources})
     set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
     target_include_directories(${library_name}
         PRIVATE
@@ -40,9 +43,9 @@ function(make_torchcodec_libraries
     # Create libtorchcodec_decoderN.so
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
     set(decoder_sources
-      AVIOContextHolder.cpp
-      FFMPEGCommon.cpp
-      VideoDecoder.cpp
+        AVIOContextHolder.cpp
+        FFMPEGCommon.cpp
+        VideoDecoder.cpp
     )
 
     if(ENABLE_CUDA)
@@ -54,7 +57,6 @@ function(make_torchcodec_libraries
     set(decoder_library_dependencies
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
-        ${Python3_LIBRARIES}
     )
 
     if(ENABLE_CUDA)
@@ -66,6 +68,7 @@ function(make_torchcodec_libraries
 
     make_torchcodec_sublibrary(
         "${decoder_library_name}"
+        SHARED
         "${decoder_sources}"
         "${decoder_library_dependencies}"
     )
@@ -73,11 +76,12 @@ function(make_torchcodec_libraries
     # Create libtorchcodec_custom_opsN.so
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
     set(custom_ops_sources
-      AVIOBytesContext.cpp
-      VideoDecoderOps.cpp
+        AVIOBytesContext.cpp
+        VideoDecoderOps.cpp
     )
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
+        SHARED
         "${custom_ops_sources}"
         "${decoder_library_name}"
     )
@@ -85,20 +89,30 @@ function(make_torchcodec_libraries
     # Create libtorchcodec_pybind_opsN.so
     set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
     set(pybind_ops_sources
-      AVIOFileLikeContext.cpp
-      PyBindOps.cpp
+        AVIOFileLikeContext.cpp
+        PyBindOps.cpp
+    )
+    set(pybind_ops_dependencies
+       ${decoder_library_name}
+       pybind11::module
     )
     make_torchcodec_sublibrary(
         "${pybind_ops_library_name}"
+        MODULE
         "${pybind_ops_sources}"
-        "${decoder_library_name}"
+        "${pybind_ops_dependencies}"
     )
     # pybind11 quirk, see:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
     target_compile_options(
-      ${pybind_ops_library_name}
-      PUBLIC
+        ${pybind_ops_library_name}
+        PUBLIC
       "-fvisibility=hidden"
+    )
+    target_link_options(
+        ${pybind_ops_library_name}
+        PUBLIC
+        "-undefined dynamic_lookup"
     )
 
     # Install all libraries.
