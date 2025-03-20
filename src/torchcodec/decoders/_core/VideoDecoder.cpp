@@ -885,6 +885,58 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   return frameBatchOutput;
 }
 
+// Note [Audio Decoding Design]
+// This note explains why audio decoding is implemented the way it is, and why
+// it inherently differs from video decoding.
+//
+// Like for video, FFmpeg exposes the concept of a frame for audio streams. An
+// audio frame is a contiguous sequence of samples, where a sample consists of
+// `numChannels` values. An audio frame, or a sequence thereof, is always
+// converted into a tensor of shape `(numChannels, numSamplesPerChannel)`
+// tensors.
+//
+// The notion of 'frame' in audio isn't what users want to interact with. Users
+// want to interact with samples. The C++ and core APIs return frames, because
+// we want those to be close to FFmpeg concepts, but the higher-level public
+// APIs expose samples. As a result:
+// - We don't expose index-based APIs for audio, because exposing index-based
+//   APIs expliciltly exposes the concept of audio frame. For know, we think
+//   exposing time-based APIs is more natural.
+// - We never perform a scan for audio streams. We don't need to, since we won't
+//   be converting timestamps to indices. That's why we enfore the "seek_mode"
+//   to be "approximate" (which is slightly mis-leading, because technically the
+//   output frames / samples will be perfectly exact).
+//
+// Audio frames are of variable dimensions: in the same stream, a frame can
+// contain 1024 samples and the next one may contain 512 [1]. This makes it
+// impossible to stack audio frames in the same way we can stack video frames.
+// That's why audio frames are *concatenated* along the samples dimension, not
+// stacked. This is also why we cannot re-use the same pre-allocation logic we
+// have for videos in getFramesPlayedInRange(): this would require constant (and
+// known) frame dimensions.
+//
+// [IMPORTANT!] There is one key invariant that we must respect when decoding
+// audio frames:
+//
+// BEFORE DECODING FRAME I, WE MUST DECODE ALL FRAMES j < i.
+//
+// Always. Why? We don't know. What we know is that if we don't, we get clipped,
+// incorrect audio as output [1]. All other (correct) libraries like TorchAudio
+// or Decord do something similar, whether it was intended or not. This has a
+// few implications:
+// - The **only** place we're allowed to seek to in an audio stream is the
+//   stream's beginning. This ensures that if we need a frame, we'll have
+//   decoded all previous frames.
+// - Because of that, we don't allow the public APIs to seek. Public APIs can
+//   call next() and `getFramesPlayedInRangeAudio()`, but they cannot manually
+//   seek.
+// - We try not to seek, when we can avoid it. Typically if the next frame we
+//   need is in the future, we don't seek back to the beginning, we just decode
+//   all the frames in-between.
+//
+// [1] If you're brave and curious, you can read the long "Seek offset for
+// audio" note in https://github.com/pytorch/torchcodec/pull/507/files, which
+// sums up past (and failed) attemps at working around this issue.
 VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     std::optional<double> stopSecondsOptional) {
@@ -911,7 +963,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
           streamInfo.lastDecodedAvFrameDuration) {
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
-    // TODO-AUDIO: document why this is needed in a big comment.
+    // See [Audio Decoding Design].
     setCursorPtsInSecondsInternal(INT64_MIN);
   }
 
@@ -955,6 +1007,8 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 // --------------------------------------------------------------------------
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
+  // We don't allow public audio decoding APIs to seek, see [Audio Decoding
+  // Design]
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
   setCursorPtsInSecondsInternal(seconds);
 }
@@ -995,6 +1049,7 @@ bool VideoDecoder::canWeAvoidSeeking() const {
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     // For audio, we only need to seek if a backwards seek was requested within
     // getFramesPlayedInRangeAudio(), when setCursorPtsInSeconds() was called.
+    // For more context, see [Audio Decoding Design]
     return !cursorWasJustSet_;
   }
   int64_t lastDecodedAvFramePts =
