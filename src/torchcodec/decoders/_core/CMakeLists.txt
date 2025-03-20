@@ -54,7 +54,7 @@ function(make_torchcodec_libraries
     #    load these libraries separately on the Python side. Depends on
     #    libtorchcodec_decoderN.{ext}. On BOTH Linux and Mac {ext} is so.
 
-    # 1. Create libtorchcodec_decoderN.so.
+    # 1. Create libtorchcodec_decoderN.{ext}.
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
     set(decoder_sources
         AVIOContextHolder.cpp
@@ -87,7 +87,7 @@ function(make_torchcodec_libraries
         "${decoder_library_dependencies}"
     )
 
-    # 2. Create libtorchcodec_custom_opsN.so.
+    # 2. Create libtorchcodec_custom_opsN.{ext}.
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
     set(custom_ops_sources
         AVIOBytesContext.cpp
