@@ -1481,8 +1481,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       static_cast<const uint8_t**>(
           const_cast<const uint8_t**>(srcAVFrame->data)),
       srcAVFrame->nb_samples);
+  // numConvertedSamples can be 0 if we're downsampling by a great factor and
+  // the first frame doesn't contain a lot of samples. It should be handled
+  // properly by the caller.
   TORCH_CHECK(
-      numConvertedSamples > 0,
+      numConvertedSamples >= 0,
       "Error in swr_convert: ",
       getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
 

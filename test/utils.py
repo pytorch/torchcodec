@@ -429,6 +429,23 @@ NASA_AUDIO_MP3 = TestAudio(
     },
 )
 
+# This file is the same as NASA_AUDIO_MP3, with a sample rate of 44_100. It was generated with:
+# ffmpeg -i test/resources/nasa_13013.mp4.audio.mp3 -ar 44100 test/resources/nasa_13013.mp4.audio_44100.mp3
+NASA_AUDIO_MP3_44100 = TestAudio(
+    filename="nasa_13013.mp4.audio_44100.mp3",
+    default_stream_index=0,
+    frames={},  # Automatically loaded from json file
+    stream_infos={
+        0: TestAudioStreamInfo(
+            sample_rate=44_100,
+            num_channels=2,
+            duration_seconds=13.09,
+            num_frames=501,
+            sample_format="fltp",
+        )
+    },
+)
+
 NASA_AUDIO = TestAudio(
     filename="nasa_13013.mp4",
     default_stream_index=4,
