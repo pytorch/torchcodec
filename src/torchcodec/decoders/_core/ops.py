@@ -20,6 +20,7 @@ from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchco
 
 _pybind_ops: Optional[ModuleType] = None
 
+# TODO: More on why we need two different ways of loading external modules.
 
 def load_torchcodec_shared_libraries():
     # Successively try to load libtorchcodec_*7.so, libtorchcodec_*6.so,
