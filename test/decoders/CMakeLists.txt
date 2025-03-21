@@ -22,11 +22,13 @@ add_executable(
 )
 
 target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
+target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${libav_include_dirs})
 target_include_directories(VideoDecoderTest PRIVATE ../../)
 
 target_link_libraries(
   VideoDecoderTest
-  ${libtorchcodec_target_name}
+  ${libtorchcodec_library_name}
+  ${libtorchcodec_custom_ops_name}
   GTest::gtest_main
 )
 

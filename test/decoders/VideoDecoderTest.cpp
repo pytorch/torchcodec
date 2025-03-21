@@ -5,6 +5,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
 
 #include <c10/util/Flags.h>
 #include <gtest/gtest.h>
@@ -48,10 +49,12 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       std::ifstream input(filepath, std::ios::binary);
       outputStringStream << input.rdbuf();
       content_ = outputStringStream.str();
+
       void* buffer = content_.data();
-      size_t length = outputStringStream.str().length();
+      size_t length = content_.length();
+      auto contextHolder = std::make_unique<AVIOBytesContext>(buffer, length);
       return std::make_unique<VideoDecoder>(
-          buffer, length, VideoDecoder::SeekMode::approximate);
+          std::move(contextHolder), VideoDecoder::SeekMode::approximate);
     } else {
       return std::make_unique<VideoDecoder>(
           filepath, VideoDecoder::SeekMode::approximate);
