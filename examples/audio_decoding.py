@@ -71,6 +71,18 @@ play_audio(samples)
 # The ``.data`` field is a tensor of shape ``(num_channels, num_samples)`` and
 # of float dtype with values in [-1, 1].
 #
+# The ``.pts_seconds`` field indicates the starting time of the output samples.
+# Here it's 0.025 seconds, even though we asked for samples starting from 0. Not
+# all streams start exactly at 0! This is not a bug in TorchCodec, this is a
+# property of the file that was defined when it was encoded.
+#
+# We only output the *start* of the samples, not the end or the duration. Those can
+# be easily derived from the number of samples and the sample rate:
+
+duration_seconds = samples.data.shape[1] / samples.sample_rate
+print(f"Duration = {int(duration_seconds // 60)}m{int(duration_seconds % 60)}s.")
+
+# %%
 # Specifying a range
 # ------------------
 #
