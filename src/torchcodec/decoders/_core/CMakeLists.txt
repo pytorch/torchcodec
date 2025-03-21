@@ -3,6 +3,7 @@ project(TorchCodec)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
@@ -93,11 +94,15 @@ function(make_torchcodec_libraries
         AVIOBytesContext.cpp
         VideoDecoderOps.cpp
     )
+    set(custom_ops_dependencies
+        ${decoder_library_name}
+        ${Python3_LIBRARIES}
+    )
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
         SHARED
         "${custom_ops_sources}"
-        "${decoder_library_name}"
+        "${custom_ops_dependencies}"
     )
 
     # 3. Create libtorchcodec_pybind_opsN.so.
