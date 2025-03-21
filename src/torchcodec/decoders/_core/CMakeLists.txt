@@ -116,7 +116,9 @@ function(make_torchcodec_libraries
        pybind11::module # This library dependency makes sure we have the right
                         # Python libraries included as well as all of the right
                         # settings so that we can successfully load the shared
-                        # library as a Python module.
+                        # library as a Python module on Mac. If we instead use
+                        # ${Python3_LIBRARIES}, it works on Linux but not on
+                        # Mac.
     )
     make_torchcodec_sublibrary(
         "${pybind_ops_library_name}"
