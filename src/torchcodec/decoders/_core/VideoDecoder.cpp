@@ -908,7 +908,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> frames;
 
-  double firstFramePtsSeconds = std::numeric_limits<double>::max();
+  std::optional<double> firstFramePtsSeconds = std::nullopt;
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
   auto finished = false;
   while (!finished) {
@@ -918,8 +918,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
             return startPts < avFrame->pts + getDuration(avFrame);
           });
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
-      firstFramePtsSeconds =
-          std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
+      if (!firstFramePtsSeconds.has_value()) {
+        firstFramePtsSeconds = frameOutput.ptsSeconds;
+      }
       frames.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
       finished = true;
@@ -940,7 +941,13 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     frames.push_back(*lastSamples);
   }
 
-  return AudioFramesOutput{torch::cat(frames, 1), firstFramePtsSeconds};
+  TORCH_CHECK(
+      frames.size() > 0 && firstFramePtsSeconds.has_value(),
+      "No audio frames were decoded. ",
+      "This should probably not happen. ",
+      "Please report an issue on the TorchCodec repo.");
+
+  return AudioFramesOutput{torch::cat(frames, 1), *firstFramePtsSeconds};
 }
 
 // --------------------------------------------------------------------------
