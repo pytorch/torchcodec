@@ -20,8 +20,10 @@ In this example, we'll learn how to decode an audio file using the
 import requests
 from IPython.display import Audio
 
+
 def play_audio(samples):
     return Audio(samples.data, rate=samples.sample_rate)
+
 
 # Audio source is CC0: https://opengameart.org/content/town-theme-rpg
 # Attribution: cynicmusic.com pixelsphere.org
@@ -61,6 +63,7 @@ print(decoder.metadata)
 # which returns an :class:`~torchcodec.AudioSamples` object:
 
 samples = decoder.get_samples_played_in_range(start_seconds=0)
+
 print(samples)
 play_audio(samples)
 
@@ -76,16 +79,21 @@ play_audio(samples)
 # the entire audio stream, but we can specify a custom range:
 
 samples = decoder.get_samples_played_in_range(start_seconds=10, stop_seconds=70)
+
+print(samples)
 play_audio(samples)
 
+# %%
 # Custom sample rate
 # ------------------
 #
 # We can also decode the samples into a desired sample rate using the
-# ``sample_rate`` parameter of :class:`~torchcodec.decoders.AudioDecoder`:
+# ``sample_rate`` parameter of :class:`~torchcodec.decoders.AudioDecoder`. The
+# ouput will sound the same, but note that the number of samples greatly
+# increased:
 
-sample_rate = 16_000
-decoder = AudioDecoder(raw_audio_bytes, sample_rate=sample_rate)
+decoder = AudioDecoder(raw_audio_bytes, sample_rate=16_000)
 samples = decoder.get_samples_played_in_range(start_seconds=0)
+
 print(samples)
 play_audio(samples)

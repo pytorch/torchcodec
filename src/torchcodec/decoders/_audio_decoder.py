@@ -24,7 +24,7 @@ class AudioDecoder:
     etc.), or from videos that contain audio streams (e.g. mp4 videos).
 
     Returned samples are float samples normalized in [-1, 1]
-    
+
     Args:
         source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the audio:
 
