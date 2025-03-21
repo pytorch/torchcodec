@@ -24,6 +24,7 @@ from ..utils import (
     in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
+    NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
     SINE_MONO_S16,
     SINE_MONO_S32,
@@ -1155,6 +1156,43 @@ class TestAudioDecoder:
             frames_8000_native.data,
             atol=atol,
             rtol=rtol,
+        )
+
+    def test_sample_rate_conversion_stereo(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/pull/584
+        asset = NASA_AUDIO_MP3
+        assert asset.sample_rate == 8000
+        assert asset.num_channels == 2
+        decoder = AudioDecoder(asset.path, sample_rate=44_100)
+        decoder.get_samples_played_in_range(start_seconds=0)
+
+    def test_downsample_empty_frame(self):
+        # Non-regression test for
+        # https://github.com/pytorch/torchcodec/pull/586: when downsampling  by
+        # a great factor, if an input frame has a small amount of sample, the
+        # resampled frame (as output by swresample) may contain zero sample. We
+        # make sure we handle this properly.
+        #
+        # NASA_AUDIO_MP3_44100's first frame has only 47 samples which triggers
+        # the test scenario:
+        # ```
+        # » ffprobe -v error -hide_banner -select_streams a:0 -show_frames -of json test/resources/nasa_13013.mp4.audio_44100.mp3 | grep nb_samples | head -n 3
+        # "nb_samples": 47,
+        # "nb_samples": 1152,
+        # "nb_samples": 1152,
+        # ```
+        asset = NASA_AUDIO_MP3_44100
+        assert asset.sample_rate == 44_100
+        decoder = AudioDecoder(asset.path, sample_rate=8_000)
+        frames_44100_to_8000 = decoder.get_samples_played_in_range(start_seconds=0)
+
+        # Just checking correctness now
+        asset = NASA_AUDIO_MP3
+        assert asset.sample_rate == 8_000
+        decoder = AudioDecoder(asset.path)
+        frames_8000 = decoder.get_samples_played_in_range(start_seconds=0)
+        torch.testing.assert_close(
+            frames_44100_to_8000.data, frames_8000.data, atol=0.03, rtol=0
         )
 
     def test_s16_ffmpeg4_bug(self):

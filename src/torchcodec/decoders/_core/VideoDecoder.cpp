@@ -1494,8 +1494,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       static_cast<const uint8_t**>(
           const_cast<const uint8_t**>(srcAVFrame->data)),
       srcAVFrame->nb_samples);
+  // numConvertedSamples can be 0 if we're downsampling by a great factor and
+  // the first frame doesn't contain a lot of samples. It should be handled
+  // properly by the caller.
   TORCH_CHECK(
-      numConvertedSamples > 0,
+      numConvertedSamples >= 0,
       "Error in swr_convert: ",
       getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
 
@@ -1522,17 +1525,22 @@ std::optional<torch::Tensor> VideoDecoder::maybeFlushSwrBuffers() {
     return std::nullopt;
   }
 
-  torch::Tensor lastSamples = torch::empty(
-      {getNumChannels(streamInfo.codecContext), numRemainingSamples},
-      torch::kFloat32);
-  uint8_t* lastSamplesData = static_cast<uint8_t*>(lastSamples.data_ptr());
+  auto numChannels = getNumChannels(streamInfo.codecContext);
+  torch::Tensor lastSamples =
+      torch::empty({numChannels, numRemainingSamples}, torch::kFloat32);
+
+  std::vector<uint8_t*> outputBuffers(numChannels);
+  for (auto i = 0; i < numChannels; i++) {
+    outputBuffers[i] = static_cast<uint8_t*>(lastSamples[i].data_ptr());
+  }
 
   auto actualNumRemainingSamples = swr_convert(
       streamInfo.swrContext.get(),
-      &lastSamplesData,
+      outputBuffers.data(),
       numRemainingSamples,
       nullptr,
       0);
+
   return lastSamples.narrow(
       /*dim=*/1, /*start=*/0, /*length=*/actualNumRemainingSamples);
 }
