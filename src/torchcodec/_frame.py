@@ -124,6 +124,8 @@ class AudioSamples(Iterable):
     """The sample data (``torch.Tensor`` of float in [-1, 1], shape is ``(num_channels, num_samples)``)."""
     pts_seconds: float
     """The :term:`pts` of the first sample, in seconds."""
+    duration_seconds: float
+    """The duration of the sampleas, in seconds."""
     sample_rate: int
     """The sample rate of the samples, in Hz."""
 
