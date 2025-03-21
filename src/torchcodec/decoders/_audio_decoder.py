@@ -70,9 +70,8 @@ class AudioDecoder:
             sample_rate if sample_rate is not None else self.metadata.sample_rate
         )
 
-    # TODO-AUDIO: start_seconds should be 0 by default
     def get_samples_played_in_range(
-        self, start_seconds: float, stop_seconds: Optional[float] = None
+        self, start_seconds: float = 0.0, stop_seconds: Optional[float] = None
     ) -> AudioSamples:
         """Returns audio samples in the given range.
 
@@ -80,7 +79,7 @@ class AudioDecoder:
 
         Args:
             start_seconds (float): Time, in seconds, of the start of the
-                range.
+                range. Default: 0.
             stop_seconds (float): Time, in seconds, of the end of the
                 range. As a half open range, the end is excluded.
 

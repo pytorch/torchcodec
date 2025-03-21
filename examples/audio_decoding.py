@@ -62,7 +62,7 @@ print(decoder.metadata)
 # :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range` method,
 # which returns an :class:`~torchcodec.AudioSamples` object:
 
-samples = decoder.get_samples_played_in_range(start_seconds=0)
+samples = decoder.get_samples_played_in_range()
 
 print(samples)
 play_audio(samples)
