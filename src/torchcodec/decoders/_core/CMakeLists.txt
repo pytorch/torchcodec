@@ -113,17 +113,25 @@ function(make_torchcodec_libraries
     )
     set(pybind_ops_dependencies
        ${decoder_library_name}
-       pybind11::module
+       pybind11::module # This library dependency makes sure we have the right
+                        # Python libraries included as well as all of the right
+                        # settings so that we can successfully load the shared
+                        # library as a Python module.
     )
     make_torchcodec_sublibrary(
         "${pybind_ops_library_name}"
         MODULE # Note that this not SHARED; otherwise we build the wrong kind
                # of library on Mac. On Mac, SHARED becomes .dylib and MODULE becomes
-               # a .so. We want pybind11 libraries to become .so.
+               # a .so. We want pybind11 libraries to become .so. If this is
+               # changed to SHARED, we will be able to succesfully compile a
+               # .dylib, but we will not be able to succesfully import that as
+               # a Python module on Mac.
         "${pybind_ops_sources}"
         "${pybind_ops_dependencies}"
     )
-    # pybind11 quirk, see:
+    # pybind11 limits the visibility of symbols in the shared library to prevent
+    # stray initialization of py::objects. The rest of the object code must
+    # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
     target_compile_options(
         ${pybind_ops_library_name}
