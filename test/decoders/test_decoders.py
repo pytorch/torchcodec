@@ -24,6 +24,7 @@ from ..utils import (
     in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
+    NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
     SINE_MONO_S16,
     SINE_MONO_S32,
@@ -1164,6 +1165,22 @@ class TestAudioDecoder:
         assert asset.num_channels == 2
         decoder = AudioDecoder(asset.path, sample_rate=44_100)
         decoder.get_samples_played_in_range(start_seconds=0)
+
+    def test_downsample_empty_frame(self):
+        # Non-regression test for TODO.
+        #
+        # This asset has 
+        # ```
+        # » ffprobe -v error -hide_banner -select_streams a:0 -show_frames -of json test/resources/nasa_13013.mp4.audio_44100.mp3 | grep nb_samples | head -n 3
+        # "nb_samples": 47,
+        # "nb_samples": 1152,
+        # "nb_samples": 1152,
+        # ```
+        asset = NASA_AUDIO_MP3_44100
+        # assert asset.sample_rate == 8000
+        # assert asset.num_channels == 2
+        # decoder = AudioDecoder(asset.path, sample_rate=44_100)
+        # decoder.get_samples_played_in_range(start_seconds=0)
 
     def test_s16_ffmpeg4_bug(self):
         # s16 fails on FFmpeg4 but can be decoded on other versions.
