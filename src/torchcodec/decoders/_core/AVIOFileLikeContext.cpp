@@ -32,27 +32,38 @@ int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
   // Note that we acquire the GIL outside of the loop. This is likely more
   // efficient than releasing and acquiring it each loop iteration.
   py::gil_scoped_acquire gil;
-  int num_read = 0;
-  while (num_read < buf_size) {
-    int request = buf_size - num_read;
-    auto chunk = static_cast<std::string>(
-        static_cast<py::bytes>((*fileLike)->attr("read")(request)));
-    int chunk_len = static_cast<int>(chunk.length());
-    if (chunk_len == 0) {
+
+  int totalNumRead = 0;
+  while (totalNumRead < buf_size) {
+    int request = buf_size - totalNumRead;
+
+    // The Python method returns the actual bytes, which we access through the
+    // py::bytes wrapper. That wrapper, however, does not provide us access to
+    // the underlying data pointer, which we need for the memcpy below. So we
+    // convert the bytes to a string_view to get access to the data pointer.
+    // Becauase it's a view and not a copy, it should be cheap.
+    auto bytesRead = static_cast<py::bytes>((*fileLike)->attr("read")(request));
+    auto bytesView = static_cast<std::string_view>(bytes);
+
+    int numBytesRead = static_cast<int>(bytesView.size());
+    if (numBytesRead == 0) {
       break;
     }
+
     TORCH_CHECK(
-        chunk_len <= request,
+        numBytesRead <= request,
         "Requested up to ",
         request,
         " bytes but, received ",
-        chunk_len,
+        numBytesRead,
         " bytes. The given object does not conform to read protocol of file object.");
-    memcpy(buf, chunk.data(), chunk_len);
-    buf += chunk_len;
-    num_read += chunk_len;
+
+    std::memcpy(buf, bytesView.data(), numBytesRead);
+    buf += numBytesRead;
+    totalNumRead += numBytesRead;
   }
-  return num_read == 0 ? AVERROR_EOF : num_read;
+
+  return totalNumRead == 0 ? AVERROR_EOF : totalNumRead;
 }
 
 int64_t AVIOFileLikeContext::seek(void* opaque, int64_t offset, int whence) {
@@ -60,6 +71,7 @@ int64_t AVIOFileLikeContext::seek(void* opaque, int64_t offset, int whence) {
   if (whence == AVSEEK_SIZE) {
     return AVERROR(EIO);
   }
+
   auto fileLike = static_cast<UniquePyObject*>(opaque);
   py::gil_scoped_acquire gil;
   return py::cast<int64_t>((*fileLike)->attr("seek")(offset, whence));
