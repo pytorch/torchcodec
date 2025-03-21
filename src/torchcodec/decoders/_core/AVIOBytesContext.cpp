@@ -26,23 +26,25 @@ int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
       ", size=",
       dataContext->size);
 
-  buf_size = FFMIN(
-      buf_size, static_cast<int>(dataContext->size - dataContext->current));
+  int64_t numBytesRead = std::min(
+      static_cast<int64_t>(buf_size), dataContext->size - dataContext->current);
+
   TORCH_CHECK(
-      buf_size >= 0,
-      "Tried to read negative bytes: buf_size=",
-      buf_size,
+      numBytesRead >= 0,
+      "Tried to read negative bytes: numBytesRead=",
+      numBytesRead,
       ", size=",
       dataContext->size,
       ", current=",
       dataContext->current);
 
-  if (!buf_size) {
+  if (numBytesRead == 0) {
     return AVERROR_EOF;
   }
-  memcpy(buf, dataContext->data + dataContext->current, buf_size);
-  dataContext->current += buf_size;
-  return buf_size;
+
+  std::memcpy(buf, dataContext->data + dataContext->current, numBytesRead);
+  dataContext->current += numBytesRead;
+  return numBytesRead;
 }
 
 // The signature of this function is defined by FFMPEG.

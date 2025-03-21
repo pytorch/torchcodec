@@ -43,7 +43,7 @@ int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
     // convert the bytes to a string_view to get access to the data pointer.
     // Becauase it's a view and not a copy, it should be cheap.
     auto bytesRead = static_cast<py::bytes>((*fileLike)->attr("read")(request));
-    auto bytesView = static_cast<std::string_view>(bytes);
+    auto bytesView = static_cast<std::string_view>(bytesRead);
 
     int numBytesRead = static_cast<int>(bytesView.size());
     if (numBytesRead == 0) {
