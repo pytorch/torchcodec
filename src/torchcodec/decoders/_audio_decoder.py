@@ -71,7 +71,7 @@ class AudioDecoder:
         )
 
     def get_samples_played_in_range(
-        self, start_seconds: float = 0., stop_seconds: Optional[float] = None
+        self, start_seconds: float = 0.0, stop_seconds: Optional[float] = None
     ) -> AudioSamples:
         """Returns audio samples in the given range.
 
