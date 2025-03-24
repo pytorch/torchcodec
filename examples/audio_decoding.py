@@ -59,10 +59,10 @@ print(decoder.metadata)
 # ----------------
 #
 # To get decoded samples, we just need to call the
-# :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range` method,
+# :meth:`~torchcodec.decoders.AudioDecoder.get_all_samples` method,
 # which returns an :class:`~torchcodec.AudioSamples` object:
 
-samples = decoder.get_samples_played_in_range()
+samples = decoder.get_all_samples()
 
 print(samples)
 play_audio(samples)
@@ -80,9 +80,9 @@ play_audio(samples)
 # Specifying a range
 # ------------------
 #
-# By default,
-# :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range`  decodes
-# the entire audio stream, but we can specify a custom range:
+# If we don't need all the samples, we can use
+# :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range` to
+# decode the samples within a custom range:
 
 samples = decoder.get_samples_played_in_range(start_seconds=10, stop_seconds=70)
 
@@ -99,7 +99,7 @@ play_audio(samples)
 # increased:
 
 decoder = AudioDecoder(raw_audio_bytes, sample_rate=16_000)
-samples = decoder.get_samples_played_in_range(start_seconds=0)
+samples = decoder.get_all_samples()
 
 print(samples)
 play_audio(samples)

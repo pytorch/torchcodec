@@ -75,6 +75,14 @@ class AudioDecoder:
             sample_rate if sample_rate is not None else self.metadata.sample_rate
         )
 
+    def get_all_samples(self) -> AudioSamples:
+        """Returns all the audio samples from the source.
+
+        Returns:
+            AudioSamples: The samples within the file.
+        """
+        return self.get_samples_played_in_range()
+
     def get_samples_played_in_range(
         self, start_seconds: float = 0.0, stop_seconds: Optional[float] = None
     ) -> AudioSamples:

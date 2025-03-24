@@ -239,7 +239,6 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
-  // TODO-AUDIO: Should accept sampleRate
   AudioFramesOutput getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> stopSecondsOptional = std::nullopt);
