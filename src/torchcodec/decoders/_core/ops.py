@@ -32,15 +32,15 @@ def load_torchcodec_shared_libraries():
     #
     # Note that we use two different methods for loading shared libraries:
     #
-    #   1. torch.ops.load_library(): For PyTorch custom ops. Loading libraries
-    #      through PyTorch registers the custom ops with PyTorch's runtime and
-    #      the ops can be accessed through torch.ops after loading.
+    #   1. torch.ops.load_library(): For PyTorch custom ops and the C++ only
+    #      libraries the custom ops depend on. Loading libraries through PyTorch
+    #      registers the custom ops with PyTorch's runtime and the ops can be
+    #      accessed through torch.ops after loading.
     #
     #   2. importlib: For pybind11 modules. We load them dynamically, rather
     #      than using a plain import statement. A plain import statement only
-    #      works when the module name and file name match exactly, and the
-    #      shared library file is in the import path. Our shared libraries do
-    #      not meet those conditions.
+    #      works when the module name and file name match exactly. Our shared
+    #      libraries do not meet those conditions.
 
     exceptions = []
     pybind_ops_module_name = "torchcodec_pybind_ops"
