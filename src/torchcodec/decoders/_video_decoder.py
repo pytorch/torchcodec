@@ -348,6 +348,7 @@ def _get_and_validate_stream_metadata(
             )
 
     metadata = container_metadata.streams[stream_index]
+    assert isinstance(metadata, core._metadata.VideoStreamMetadata)  # mypy
 
     if metadata.begin_stream_seconds is None:
         raise ValueError(

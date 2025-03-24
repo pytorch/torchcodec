@@ -11,7 +11,10 @@ from torch import Tensor
 
 from torchcodec import AudioSamples
 from torchcodec.decoders import _core as core
-from torchcodec.decoders._decoder_utils import create_decoder
+from torchcodec.decoders._decoder_utils import (
+    create_decoder,
+    ERROR_REPORTING_INSTRUCTIONS,
+)
 
 
 class AudioDecoder:
