@@ -955,7 +955,7 @@ class TestAudioDecoder:
             == decoder.metadata.stream_index
             == asset.default_stream_index
         )
-        assert decoder.metadata.duration_seconds == pytest.approx(
+        assert decoder.metadata.duration_seconds_from_header == pytest.approx(
             asset.duration_seconds
         )
         assert decoder.metadata.sample_rate == asset.sample_rate
@@ -967,13 +967,18 @@ class TestAudioDecoder:
         decoder = AudioDecoder(asset.path)
 
         with pytest.raises(ValueError, match="Invalid start seconds"):
-            decoder.get_samples_played_in_range(start_seconds=-1300)
+            decoder.get_samples_played_in_range(start_seconds=3, stop_seconds=2)
 
-        with pytest.raises(ValueError, match="Invalid start seconds"):
+        with pytest.raises(RuntimeError, match="No audio frames were decoded"):
             decoder.get_samples_played_in_range(start_seconds=9999)
 
-        with pytest.raises(ValueError, match="Invalid start seconds"):
-            decoder.get_samples_played_in_range(start_seconds=3, stop_seconds=2)
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_negative_start(self, asset):
+        decoder = AudioDecoder(asset.path)
+        samples = decoder.get_samples_played_in_range(start_seconds=-1300)
+        reference_samples = decoder.get_samples_played_in_range()
+        torch.testing.assert_close(samples.data, reference_samples.data)
+        assert samples.pts_seconds == reference_samples.pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     @pytest.mark.parametrize("stop_seconds", (None, "duration", 99999999))

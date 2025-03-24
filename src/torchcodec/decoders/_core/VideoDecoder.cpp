@@ -948,8 +948,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   TORCH_CHECK(
       frames.size() > 0 && firstFramePtsSeconds.has_value(),
       "No audio frames were decoded. ",
-      "This should probably not happen. ",
-      "Please report an issue on the TorchCodec repo.");
+      "This is probably because start_seconds is too high? ",
+      "Current value is ",
+      startSeconds);
 
   return AudioFramesOutput{torch::cat(frames, 1), *firstFramePtsSeconds};
 }

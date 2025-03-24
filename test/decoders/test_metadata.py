@@ -90,9 +90,7 @@ def test_get_metadata(metadata_getter):
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
     assert best_audio_stream_metadata is metadata.best_audio_stream
-    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
-        13.056, abs=0.001
-    )
+    assert best_audio_stream_metadata.duration_seconds_from_header == 13.056
     assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_audio_stream_metadata.bit_rate == 128837
     assert best_audio_stream_metadata.codec == "aac"
@@ -111,9 +109,7 @@ def test_get_metadata_audio_file(metadata_getter):
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
     assert best_audio_stream_metadata is metadata.best_audio_stream
-    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
-        13.248, abs=0.001
-    )
+    assert best_audio_stream_metadata.duration_seconds_from_header == 13.248
     assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0.138125
     assert best_audio_stream_metadata.bit_rate == 64000
     assert best_audio_stream_metadata.codec == "mp3"

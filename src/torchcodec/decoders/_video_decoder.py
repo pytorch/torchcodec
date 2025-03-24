@@ -6,7 +6,7 @@
 
 import numbers
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Tuple, Union
 
 from torch import device, Tensor
 
@@ -15,7 +15,6 @@ from torchcodec.decoders import _core as core
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
     ERROR_REPORTING_INSTRUCTIONS,
-    get_and_validate_stream_metadata,
 )
 
 
@@ -108,17 +107,10 @@ class VideoDecoder:
             self.stream_index,
             self._begin_stream_seconds,
             self._end_stream_seconds,
-        ) = get_and_validate_stream_metadata(
-            decoder=self._decoder, stream_index=stream_index, media_type="video"
+            self._num_frames,
+        ) = _get_and_validate_stream_metadata(
+            decoder=self._decoder, stream_index=stream_index
         )
-
-        assert isinstance(self.metadata, core.VideoStreamMetadata)  # mypy
-
-        if self.metadata.num_frames is None:
-            raise ValueError(
-                "The number of frames is unknown. " + ERROR_REPORTING_INSTRUCTIONS
-            )
-        self._num_frames = self.metadata.num_frames
 
     def __len__(self) -> int:
         return self._num_frames
@@ -338,3 +330,49 @@ class VideoDecoder:
             stop_seconds=stop_seconds,
         )
         return FrameBatch(*frames)
+
+
+def _get_and_validate_stream_metadata(
+    *,
+    decoder: Tensor,
+    stream_index: Optional[int] = None,
+) -> Tuple[core._metadata.VideoStreamMetadata, int, float, float, int]:
+
+    container_metadata = core.get_container_metadata(decoder)
+
+    if stream_index is None:
+        if (stream_index := container_metadata.best_video_stream_index) is None:
+            raise ValueError(
+                "The best video stream is unknown and there is no specified stream. "
+                + ERROR_REPORTING_INSTRUCTIONS
+            )
+
+    metadata = container_metadata.streams[stream_index]
+
+    if metadata.begin_stream_seconds is None:
+        raise ValueError(
+            "The minimum pts value in seconds is unknown. "
+            + ERROR_REPORTING_INSTRUCTIONS
+        )
+    begin_stream_seconds = metadata.begin_stream_seconds
+
+    if metadata.end_stream_seconds is None:
+        raise ValueError(
+            "The maximum pts value in seconds is unknown. "
+            + ERROR_REPORTING_INSTRUCTIONS
+        )
+    end_stream_seconds = metadata.end_stream_seconds
+
+    if metadata.num_frames is None:
+        raise ValueError(
+            "The number of frames is unknown. " + ERROR_REPORTING_INSTRUCTIONS
+        )
+    num_frames = metadata.num_frames
+
+    return (
+        metadata,
+        stream_index,
+        begin_stream_seconds,
+        end_stream_seconds,
+        num_frames,
+    )
