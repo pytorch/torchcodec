@@ -78,6 +78,9 @@ class AudioDecoder:
     def get_all_samples(self) -> AudioSamples:
         """Returns all the audio samples from the source.
 
+        To decode samples in a specific range, use
+        :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range`.
+
         Returns:
             AudioSamples: The samples within the file.
         """
@@ -90,11 +93,18 @@ class AudioDecoder:
 
         Samples are in the half open range [start_seconds, stop_seconds).
 
+        To decode all the samples from beginning to end, you can call this
+        method while leaving ``start_seconds`` and ``stop_seconds`` to their
+        default values, or use
+        :meth:`~torchcodec.decoders.AudioDecoder.get_all_samples` as a more
+        convenient alias.
+
         Args:
             start_seconds (float): Time, in seconds, of the start of the
                 range. Default: 0.
-            stop_seconds (float): Time, in seconds, of the end of the
-                range. As a half open range, the end is excluded.
+            stop_seconds (float or None): Time, in seconds, of the end of the
+                range. As a half open range, the end is excluded. Default: None,
+                which decodes samples until the end.
 
         Returns:
             AudioSamples: The samples within the specified range.
