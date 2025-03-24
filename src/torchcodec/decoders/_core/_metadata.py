@@ -32,20 +32,18 @@ class StreamMetadata:
     duration_seconds_from_header: Optional[float]
     """Duration of the stream, in seconds, obtained from the header (float or
     None). This could be inaccurate."""
-    bit_rate: Optional[float]
-    """Bit rate of the stream, in seconds (float or None)."""
     begin_stream_seconds_from_header: Optional[float]
     """Beginning of the stream, in seconds, obtained from the header (float or
     None). Usually, this is equal to 0."""
+    bit_rate: Optional[float]
+    """Bit rate of the stream, in seconds (float or None)."""
     codec: Optional[str]
     """Codec (str or None)."""
     stream_index: int
     """Index of the stream within the video (int)."""
 
     def __repr__(self):
-        # Overridden because properites are not printed by default.
         s = self.__class__.__name__ + ":\n"
-        s += f"{SPACES}duration_seconds: {self.duration_seconds}\n"
         for field in dataclasses.fields(self):
             s += f"{SPACES}{field.name}: {getattr(self, field.name)}\n"
         return s
@@ -158,6 +156,9 @@ class VideoStreamMetadata(StreamMetadata):
 
     def __repr__(self):
         s = super().__repr__()
+        s += f"{SPACES}duration_seconds: {self.duration_seconds}\n"
+        s += f"{SPACES}begin_stream_seconds: {self.begin_stream_seconds}\n"
+        s += f"{SPACES}end_stream_seconds: {self.end_stream_seconds}\n"
         s += f"{SPACES}num_frames: {self.num_frames}\n"
         s += f"{SPACES}average_fps: {self.average_fps}\n"
         return s
