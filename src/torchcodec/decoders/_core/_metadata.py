@@ -32,27 +32,59 @@ class StreamMetadata:
     duration_seconds_from_header: Optional[float]
     """Duration of the stream, in seconds, obtained from the header (float or
     None). This could be inaccurate."""
+    begin_stream_seconds_from_header: Optional[float]
+    """Beginning of the stream, in seconds, obtained from the header (float or
+    None). Usually, this is equal to 0."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
-    begin_stream_seconds_from_content: Optional[float]
-    """Beginning of the stream, in seconds (float or None).
-    Conceptually, this corresponds to the first frame's :term:`pts`. It is
-    computed as min(frame.pts) across all frames in the stream. Usually, this is
-    equal to 0."""
-    end_stream_seconds_from_content: Optional[float]
-    """End of the stream, in seconds (float or None).
-    Conceptually, this corresponds to last_frame.pts + last_frame.duration. It
-    is computed as max(frame.pts + frame.duration) across all frames in the
-    stream. Note that no frame is played at this time value, so calling
-    :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at` with
-    this value would result in an error. Retrieving the last frame is best done
-    by simply indexing the :class:`~torchcodec.decoders.VideoDecoder`
-    object with ``[-1]``.
-    """
     codec: Optional[str]
     """Codec (str or None)."""
     stream_index: int
     """Index of the stream within the video (int)."""
+
+    def __repr__(self):
+        s = self.__class__.__name__ + ":\n"
+        for field in dataclasses.fields(self):
+            s += f"{SPACES}{field.name}: {getattr(self, field.name)}\n"
+        return s
+
+
+@dataclass
+class VideoStreamMetadata(StreamMetadata):
+    """Metadata of a single video stream."""
+
+    begin_stream_seconds_from_content: Optional[float]
+    """Beginning of the stream, in seconds (float or None).
+    Conceptually, this corresponds to the first frame's :term:`pts`. It is only
+    computed when a :term:`scan` is done as min(frame.pts) across all frames in
+    the stream. Usually, this is equal to 0."""
+    end_stream_seconds_from_content: Optional[float]
+    """End of the stream, in seconds (float or None).
+    Conceptually, this corresponds to last_frame.pts + last_frame.duration. It
+    is only computed when a :term:`scan` is done as max(frame.pts +
+    frame.duration) across all frames in the stream. Note that no frame is
+    played at this time value, so calling
+    :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at` with this
+    value would result in an error. Retrieving the last frame is best done by
+    simply indexing the :class:`~torchcodec.decoders.VideoDecoder` object with
+    ``[-1]``.
+    """
+    width: Optional[int]
+    """Width of the frames (int or None)."""
+    height: Optional[int]
+    """Height of the frames (int or None)."""
+    num_frames_from_header: Optional[int]
+    """Number of frames, from the stream's metadata. This is potentially
+    inaccurate. We recommend using the ``num_frames`` attribute instead.
+    (int or None)."""
+    num_frames_from_content: Optional[int]
+    """Number of frames computed by TorchCodec by scanning the stream's
+    content (the scan doesn't involve decoding). This is more accurate
+    than ``num_frames_from_header``. We recommend using the
+    ``num_frames`` attribute instead. (int or None)."""
+    average_fps_from_header: Optional[float]
+    """Averate fps of the stream, obtained from the header (float or None).
+    We recommend using the ``average_fps`` attribute instead."""
 
     @property
     def duration_seconds(self) -> Optional[float]:
@@ -94,36 +126,6 @@ class StreamMetadata:
         else:
             return self.end_stream_seconds_from_content
 
-    def __repr__(self):
-        # Overridden because properites are not printed by default.
-        s = self.__class__.__name__ + ":\n"
-        s += f"{SPACES}duration_seconds: {self.duration_seconds}\n"
-        for field in dataclasses.fields(self):
-            s += f"{SPACES}{field.name}: {getattr(self, field.name)}\n"
-        return s
-
-
-@dataclass
-class VideoStreamMetadata(StreamMetadata):
-    """Metadata of a single video stream."""
-
-    width: Optional[int]
-    """Width of the frames (int or None)."""
-    height: Optional[int]
-    """Height of the frames (int or None)."""
-    num_frames_from_header: Optional[int]
-    """Number of frames, from the stream's metadata. This is potentially
-    inaccurate. We recommend using the ``num_frames`` attribute instead.
-    (int or None)."""
-    num_frames_from_content: Optional[int]
-    """Number of frames computed by TorchCodec by scanning the stream's
-    content (the scan doesn't involve decoding). This is more accurate
-    than ``num_frames_from_header``. We recommend using the
-    ``num_frames`` attribute instead. (int or None)."""
-    average_fps_from_header: Optional[float]
-    """Averate fps of the stream, obtained from the header (float or None).
-    We recommend using the ``average_fps`` attribute instead."""
-
     @property
     def num_frames(self) -> Optional[int]:
         """Number of frames in the stream. This corresponds to
@@ -154,6 +156,9 @@ class VideoStreamMetadata(StreamMetadata):
 
     def __repr__(self):
         s = super().__repr__()
+        s += f"{SPACES}duration_seconds: {self.duration_seconds}\n"
+        s += f"{SPACES}begin_stream_seconds: {self.begin_stream_seconds}\n"
+        s += f"{SPACES}end_stream_seconds: {self.end_stream_seconds}\n"
         s += f"{SPACES}num_frames: {self.num_frames}\n"
         s += f"{SPACES}average_fps: {self.average_fps}\n"
         return s
@@ -224,14 +229,19 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
         common_meta = dict(
             duration_seconds_from_header=stream_dict.get("durationSeconds"),
             bit_rate=stream_dict.get("bitRate"),
-            begin_stream_seconds_from_content=stream_dict.get("minPtsSecondsFromScan"),
-            end_stream_seconds_from_content=stream_dict.get("maxPtsSecondsFromScan"),
+            begin_stream_seconds_from_header=stream_dict.get("beginStreamFromHeader"),
             codec=stream_dict.get("codec"),
             stream_index=stream_index,
         )
         if stream_dict["mediaType"] == "video":
             streams_metadata.append(
                 VideoStreamMetadata(
+                    begin_stream_seconds_from_content=stream_dict.get(
+                        "minPtsSecondsFromScan"
+                    ),
+                    end_stream_seconds_from_content=stream_dict.get(
+                        "maxPtsSecondsFromScan"
+                    ),
                     width=stream_dict.get("width"),
                     height=stream_dict.get("height"),
                     num_frames_from_header=stream_dict.get("numFrames"),

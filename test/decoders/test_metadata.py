@@ -7,6 +7,7 @@
 import functools
 
 import pytest
+from torchcodec.decoders import AudioDecoder, VideoDecoder
 
 from torchcodec.decoders._core import (
     AudioStreamMetadata,
@@ -18,6 +19,10 @@ from torchcodec.decoders._core import (
 )
 
 from ..utils import NASA_AUDIO_MP3, NASA_VIDEO
+
+
+# TODO: Expected values in these tests should be based on the assets's
+# attributes rather than on hard-coded values.
 
 
 def _get_container_metadata(path, seek_mode):
@@ -73,6 +78,7 @@ def test_get_metadata(metadata_getter):
     assert best_video_stream_metadata.duration_seconds == pytest.approx(
         13.013, abs=0.001
     )
+    assert best_video_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_video_stream_metadata.bit_rate == 128783
     assert best_video_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
     assert best_video_stream_metadata.codec == "h264"
@@ -85,9 +91,8 @@ def test_get_metadata(metadata_getter):
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
     assert best_audio_stream_metadata is metadata.best_audio_stream
-    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
-        13.056, abs=0.001
-    )
+    assert best_audio_stream_metadata.duration_seconds_from_header == 13.056
+    assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_audio_stream_metadata.bit_rate == 128837
     assert best_audio_stream_metadata.codec == "aac"
     assert best_audio_stream_metadata.sample_format == "fltp"
@@ -105,9 +110,8 @@ def test_get_metadata_audio_file(metadata_getter):
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
     assert best_audio_stream_metadata is metadata.best_audio_stream
-    assert best_audio_stream_metadata.duration_seconds == pytest.approx(
-        13.248, abs=0.001
-    )
+    assert best_audio_stream_metadata.duration_seconds_from_header == 13.248
+    assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0.138125
     assert best_audio_stream_metadata.bit_rate == 64000
     assert best_audio_stream_metadata.codec == "mp3"
     assert best_audio_stream_metadata.sample_format == "fltp"
@@ -126,6 +130,7 @@ def test_num_frames_fallback(
         bit_rate=123,
         num_frames_from_header=num_frames_from_header,
         num_frames_from_content=num_frames_from_content,
+        begin_stream_seconds_from_header=0,
         begin_stream_seconds_from_content=0,
         end_stream_seconds_from_content=4,
         codec="whatever",
@@ -136,3 +141,44 @@ def test_num_frames_fallback(
     )
 
     assert metadata.num_frames == expected_num_frames
+
+
+def test_repr():
+    # Test for calls to print(), str(), etc. Useful to make sure we don't forget
+    # to add additional @properties to __repr__
+    assert (
+        str(VideoDecoder(NASA_VIDEO.path).metadata)
+        == """VideoStreamMetadata:
+  duration_seconds_from_header: 13.013
+  begin_stream_seconds_from_header: 0.0
+  bit_rate: 128783.0
+  codec: h264
+  stream_index: 3
+  begin_stream_seconds_from_content: 0.0
+  end_stream_seconds_from_content: 13.013
+  width: 480
+  height: 270
+  num_frames_from_header: 390
+  num_frames_from_content: 390
+  average_fps_from_header: 29.97003
+  duration_seconds: 13.013
+  begin_stream_seconds: 0.0
+  end_stream_seconds: 13.013
+  num_frames: 390
+  average_fps: 29.97002997002997
+"""
+    )
+
+    assert (
+        str(AudioDecoder(NASA_AUDIO_MP3.path).metadata)
+        == """AudioStreamMetadata:
+  duration_seconds_from_header: 13.248
+  begin_stream_seconds_from_header: 0.138125
+  bit_rate: 64000.0
+  codec: mp3
+  stream_index: 0
+  sample_rate: 8000
+  num_channels: 2
+  sample_format: fltp
+"""
+    )

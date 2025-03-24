@@ -147,6 +147,10 @@ void VideoDecoder::initializeDecoder() {
       streamMetadata.durationSeconds =
           av_q2d(avStream->time_base) * avStream->duration;
     }
+    if (avStream->start_time != AV_NOPTS_VALUE) {
+      streamMetadata.beginStreamFromHeader =
+          av_q2d(avStream->time_base) * avStream->start_time;
+    }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
       double fps = av_q2d(avStream->r_frame_rate);
@@ -944,8 +948,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   TORCH_CHECK(
       frames.size() > 0 && firstFramePtsSeconds.has_value(),
       "No audio frames were decoded. ",
-      "This should probably not happen. ",
-      "Please report an issue on the TorchCodec repo.");
+      "This is probably because start_seconds is too high? ",
+      "Current value is ",
+      startSeconds);
 
   return AudioFramesOutput{torch::cat(frames, 1), *firstFramePtsSeconds};
 }
