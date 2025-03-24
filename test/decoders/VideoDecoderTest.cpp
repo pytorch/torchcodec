@@ -230,9 +230,9 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.dimensionOrder = "NHWC";
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
@@ -395,9 +395,10 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.colorConversionLibrary =
+      VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
@@ -412,9 +413,10 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.colorConversionLibrary =
+      VideoDecoder::ColorConversionLibrary::SWSCALE;
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());

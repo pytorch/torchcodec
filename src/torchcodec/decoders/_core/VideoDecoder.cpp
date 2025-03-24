@@ -43,23 +43,6 @@ int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
   return static_cast<int64_t>(std::round(seconds * timeBase.den));
 }
 
-std::vector<std::string> splitStringWithDelimiters(
-    const std::string& str,
-    const std::string& delims) {
-  std::vector<std::string> result;
-  if (str.empty()) {
-    return result;
-  }
-
-  std::string::size_type start = 0, end = 0;
-  while ((end = str.find_first_of(delims, start)) != std::string::npos) {
-    result.push_back(str.substr(start, end - start));
-    start = end + 1;
-  }
-  result.push_back(str.substr(start));
-  return result;
-}
-
 } // namespace
 
 // --------------------------------------------------------------------------
@@ -161,6 +144,10 @@ void VideoDecoder::initializeDecoder() {
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
       streamMetadata.durationSeconds =
           av_q2d(avStream->time_base) * avStream->duration;
+    }
+    if (avStream->start_time != AV_NOPTS_VALUE) {
+      streamMetadata.beginStreamFromHeader =
+          av_q2d(avStream->time_base) * avStream->start_time;
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -392,57 +379,6 @@ torch::Tensor VideoDecoder::getKeyFrameIndices() {
 // --------------------------------------------------------------------------
 // ADDING STREAMS API
 // --------------------------------------------------------------------------
-
-VideoDecoder::VideoStreamOptions::VideoStreamOptions(
-    const std::string& optionsString) {
-  std::vector<std::string> tokens =
-      splitStringWithDelimiters(optionsString, ",");
-  for (auto token : tokens) {
-    std::vector<std::string> pairs = splitStringWithDelimiters(token, "=");
-    if (pairs.size() != 2) {
-      throw std::runtime_error(
-          "Invalid option: " + token +
-          ". Options must be in the form 'option=value'.");
-    }
-    std::string key = pairs[0];
-    std::string value = pairs[1];
-    if (key == "ffmpeg_thread_count") {
-      ffmpegThreadCount = std::stoi(value);
-      if (ffmpegThreadCount < 0) {
-        throw std::runtime_error(
-            "Invalid ffmpeg_thread_count=" + value +
-            ". ffmpeg_thread_count must be >= 0.");
-      }
-    } else if (key == "dimension_order") {
-      if (value != "NHWC" && value != "NCHW") {
-        throw std::runtime_error(
-            "Invalid dimension_order=" + value +
-            ". dimensionOrder must be either NHWC or NCHW.");
-      }
-      dimensionOrder = value;
-    } else if (key == "width") {
-      width = std::stoi(value);
-    } else if (key == "height") {
-      height = std::stoi(value);
-    } else if (key == "color_conversion_library") {
-      if (value == "filtergraph") {
-        colorConversionLibrary = ColorConversionLibrary::FILTERGRAPH;
-      } else if (value == "swscale") {
-        colorConversionLibrary = ColorConversionLibrary::SWSCALE;
-      } else {
-        throw std::runtime_error(
-            "Invalid color_conversion_library=" + value +
-            ". color_conversion_library must be either "
-            "filtergraph or swscale.");
-      }
-    } else {
-      throw std::runtime_error(
-          "Invalid option: " + key +
-          ". Valid options are: "
-          "ffmpeg_thread_count=<int>,dimension_order=<string>");
-    }
-  }
-}
 
 void VideoDecoder::addStream(
     int streamIndex,
@@ -887,6 +823,58 @@ VideoDecoder::FrameBatchOutput VideoDecoder::getFramesPlayedInRange(
   return frameBatchOutput;
 }
 
+// Note [Audio Decoding Design]
+// This note explains why audio decoding is implemented the way it is, and why
+// it inherently differs from video decoding.
+//
+// Like for video, FFmpeg exposes the concept of a frame for audio streams. An
+// audio frame is a contiguous sequence of samples, where a sample consists of
+// `numChannels` values. An audio frame, or a sequence thereof, is always
+// converted into a tensor of shape `(numChannels, numSamplesPerChannel)`.
+//
+// The notion of 'frame' in audio isn't what users want to interact with. Users
+// want to interact with samples. The C++ and core APIs return frames, because
+// we want those to be close to FFmpeg concepts, but the higher-level public
+// APIs expose samples. As a result:
+// - We don't expose index-based APIs for audio, because that would mean
+//   exposing the concept of audio frame. For now, we think exposing time-based
+//   APIs is more natural.
+// - We never perform a scan for audio streams. We don't need to, since we won't
+//   be converting timestamps to indices. That's why we enforce the seek_mode
+//   to be "approximate" (which is slightly misleading, because technically the
+//   output samples will be at their exact positions. But this incongruence is
+//   only exposed at the C++/core private levels).
+//
+// Audio frames are of variable dimensions: in the same stream, a frame can
+// contain 1024 samples and the next one may contain 512 [1]. This makes it
+// impossible to stack audio frames in the same way we can stack video frames.
+// This is one of the main reasons we cannot reuse the same pre-allocation logic
+// we have for videos in getFramesPlayedInRange(): pre-allocating a batch
+// requires constant (and known) frame dimensions. That's also why
+// *concatenated* along the samples dimension, not stacked.
+//
+// [IMPORTANT!] There is one key invariant that we must respect when decoding
+// audio frames:
+//
+// BEFORE DECODING FRAME i, WE MUST DECODE ALL FRAMES j < i.
+//
+// Always. Why? We don't know. What we know is that if we don't, we get clipped,
+// incorrect audio as output [2]. All other (correct) libraries like TorchAudio
+// or Decord do something similar, whether it was intended or not. This has a
+// few implications:
+// - The **only** place we're allowed to seek to in an audio stream is the
+//   stream's beginning. This ensures that if we need a frame, we'll have
+//   decoded all previous frames.
+// - Because of that, we don't allow the public APIs to seek. Public APIs can
+//   call next() and `getFramesPlayedInRangeAudio()`, but they cannot manually
+//   seek.
+// - We try not to seek, when we can avoid it. Typically if the next frame we
+//   need is in the future, we don't seek back to the beginning, we just decode
+//   all the frames in-between.
+//
+// [2] If you're brave and curious, you can read the long "Seek offset for
+// audio" note in https://github.com/pytorch/torchcodec/pull/507/files, which
+// sums up past (and failed) attemps at working around this issue.
 VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     std::optional<double> stopSecondsOptional) {
@@ -913,7 +901,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
           streamInfo.lastDecodedAvFrameDuration) {
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
-    // TODO-AUDIO: document why this is needed in a big comment.
+    // See [Audio Decoding Design].
     setCursorPtsInSecondsInternal(INT64_MIN);
   }
 
@@ -922,7 +910,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   // sample rate, so in theory we know the number of output samples.
   std::vector<torch::Tensor> frames;
 
-  double firstFramePtsSeconds = std::numeric_limits<double>::max();
+  std::optional<double> firstFramePtsSeconds = std::nullopt;
   auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
   auto finished = false;
   while (!finished) {
@@ -932,8 +920,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
             return startPts < avFrame->pts + getDuration(avFrame);
           });
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
-      firstFramePtsSeconds =
-          std::min(firstFramePtsSeconds, frameOutput.ptsSeconds);
+      if (!firstFramePtsSeconds.has_value()) {
+        firstFramePtsSeconds = frameOutput.ptsSeconds;
+      }
       frames.push_back(frameOutput.data);
     } catch (const EndOfFileException& e) {
       finished = true;
@@ -954,7 +943,14 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     frames.push_back(*lastSamples);
   }
 
-  return AudioFramesOutput{torch::cat(frames, 1), firstFramePtsSeconds};
+  TORCH_CHECK(
+      frames.size() > 0 && firstFramePtsSeconds.has_value(),
+      "No audio frames were decoded. ",
+      "This is probably because start_seconds is too high? ",
+      "Current value is ",
+      startSeconds);
+
+  return AudioFramesOutput{torch::cat(frames, 1), *firstFramePtsSeconds};
 }
 
 // --------------------------------------------------------------------------
@@ -962,6 +958,8 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
 // --------------------------------------------------------------------------
 
 void VideoDecoder::setCursorPtsInSeconds(double seconds) {
+  // We don't allow public audio decoding APIs to seek, see [Audio Decoding
+  // Design]
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
   setCursorPtsInSecondsInternal(seconds);
 }
@@ -1002,6 +1000,7 @@ bool VideoDecoder::canWeAvoidSeeking() const {
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     // For audio, we only need to seek if a backwards seek was requested within
     // getFramesPlayedInRangeAudio(), when setCursorPtsInSeconds() was called.
+    // For more context, see [Audio Decoding Design]
     return !cursorWasJustSet_;
   }
   int64_t lastDecodedAvFramePts =
@@ -1492,8 +1491,11 @@ UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       static_cast<const uint8_t**>(
           const_cast<const uint8_t**>(srcAVFrame->data)),
       srcAVFrame->nb_samples);
+  // numConvertedSamples can be 0 if we're downsampling by a great factor and
+  // the first frame doesn't contain a lot of samples. It should be handled
+  // properly by the caller.
   TORCH_CHECK(
-      numConvertedSamples > 0,
+      numConvertedSamples >= 0,
       "Error in swr_convert: ",
       getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
 
@@ -1520,17 +1522,22 @@ std::optional<torch::Tensor> VideoDecoder::maybeFlushSwrBuffers() {
     return std::nullopt;
   }
 
-  torch::Tensor lastSamples = torch::empty(
-      {getNumChannels(streamInfo.codecContext), numRemainingSamples},
-      torch::kFloat32);
-  uint8_t* lastSamplesData = static_cast<uint8_t*>(lastSamples.data_ptr());
+  auto numChannels = getNumChannels(streamInfo.codecContext);
+  torch::Tensor lastSamples =
+      torch::empty({numChannels, numRemainingSamples}, torch::kFloat32);
+
+  std::vector<uint8_t*> outputBuffers(numChannels);
+  for (auto i = 0; i < numChannels; i++) {
+    outputBuffers[i] = static_cast<uint8_t*>(lastSamples[i].data_ptr());
+  }
 
   auto actualNumRemainingSamples = swr_convert(
       streamInfo.swrContext.get(),
-      &lastSamplesData,
+      outputBuffers.data(),
       numRemainingSamples,
       nullptr,
       0);
+
   return lastSamples.narrow(
       /*dim=*/1, /*start=*/0, /*length=*/actualNumRemainingSamples);
 }

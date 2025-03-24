@@ -13,12 +13,36 @@ from torchcodec import AudioSamples
 from torchcodec.decoders import _core as core
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
-    get_and_validate_stream_metadata,
+    ERROR_REPORTING_INSTRUCTIONS,
 )
 
 
 class AudioDecoder:
-    """TODO-AUDIO docs"""
+    """A single-stream audio decoder.
+
+    This can be used to decode audio from pure audio files (e.g. mp3, wav,
+    etc.), or from videos that contain audio streams (e.g. mp4 videos).
+
+    Returned samples are float samples normalized in [-1, 1]
+
+    Args:
+        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the audio:
+
+            - If ``str``: a local path or a URL to a video or audio file.
+            - If ``Pathlib.path``: a path to a local video or audio file.
+            - If ``bytes`` object or ``torch.Tensor``: the raw encoded audio data.
+        stream_index (int, optional): Specifies which stream in the file to decode samples from.
+            Note that this index is absolute across all media types. If left unspecified, then
+            the :term:`best stream` is used.
+        sample_rate (int, optional): The desired output sample rate of the decoded samples.
+            By default, the samples are returned in their original sample rate.
+
+    Attributes:
+        metadata (AudioStreamMetadata): Metadata of the audio stream.
+        stream_index (int): The stream index that this decoder is retrieving samples from. If a
+            stream index was provided at initialization, this is the same value. If it was left
+            unspecified, this is the :term:`best stream`.
+    """
 
     def __init__(
         self,
@@ -33,32 +57,43 @@ class AudioDecoder:
             self._decoder, stream_index=stream_index, sample_rate=sample_rate
         )
 
-        (
-            self.metadata,
-            self.stream_index,
-            self._begin_stream_seconds,
-            self._end_stream_seconds,
-        ) = get_and_validate_stream_metadata(
-            decoder=self._decoder, stream_index=stream_index, media_type="audio"
+        container_metadata = core.get_container_metadata(self._decoder)
+        self.stream_index = (
+            container_metadata.best_audio_stream_index
+            if stream_index is None
+            else stream_index
         )
+        if self.stream_index is None:
+            raise ValueError(
+                "The best audio stream is unknown and there is no specified stream. "
+                + ERROR_REPORTING_INSTRUCTIONS
+            )
+        self.metadata = container_metadata.streams[self.stream_index]
         assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
+
         self._desired_sample_rate = (
             sample_rate if sample_rate is not None else self.metadata.sample_rate
         )
 
     def get_samples_played_in_range(
-        self, start_seconds: float, stop_seconds: Optional[float] = None
+        self, start_seconds: float = 0.0, stop_seconds: Optional[float] = None
     ) -> AudioSamples:
-        """TODO-AUDIO docs"""
+        """Returns audio samples in the given range.
+
+        Samples are in the half open range [start_seconds, stop_seconds).
+
+        Args:
+            start_seconds (float): Time, in seconds, of the start of the
+                range. Default: 0.
+            stop_seconds (float): Time, in seconds, of the end of the
+                range. As a half open range, the end is excluded.
+
+        Returns:
+            AudioSamples: The samples within the specified range.
+        """
         if stop_seconds is not None and not start_seconds <= stop_seconds:
             raise ValueError(
                 f"Invalid start seconds: {start_seconds}. It must be less than or equal to stop seconds ({stop_seconds})."
-            )
-        if not self._begin_stream_seconds <= start_seconds < self._end_stream_seconds:
-            raise ValueError(
-                f"Invalid start seconds: {start_seconds}. "
-                f"It must be greater than or equal to {self._begin_stream_seconds} "
-                f"and less than or equal to {self._end_stream_seconds}."
             )
         frames, first_pts = core.get_frames_by_pts_in_range_audio(
             self._decoder,
@@ -102,8 +137,10 @@ class AudioDecoder:
         else:
             offset_end = num_samples
 
+        data = frames[:, offset_beginning:offset_end]
         return AudioSamples(
-            data=frames[:, offset_beginning:offset_end],
+            data=data,
             pts_seconds=output_pts_seconds,
+            duration_seconds=data.shape[1] / sample_rate,
             sample_rate=sample_rate,
         )

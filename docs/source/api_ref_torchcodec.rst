@@ -14,3 +14,4 @@ torchcodec
 
     Frame
     FrameBatch
+    AudioSamples

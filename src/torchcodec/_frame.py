@@ -120,10 +120,14 @@ class FrameBatch(Iterable):
 class AudioSamples(Iterable):
     """Audio samples with associated metadata."""
 
-    # TODO-AUDIO: docs
     data: Tensor
+    """The sample data (``torch.Tensor`` of float in [-1, 1], shape is ``(num_channels, num_samples)``)."""
     pts_seconds: float
+    """The :term:`pts` of the first sample, in seconds."""
+    duration_seconds: float
+    """The duration of the sampleas, in seconds."""
     sample_rate: int
+    """The sample rate of the samples, in Hz."""
 
     def __post_init__(self):
         # This is called after __init__() when a Frame is created. We can run
