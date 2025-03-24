@@ -76,7 +76,6 @@ play_audio(samples)
 # all streams start exactly at 0! This is not a bug in TorchCodec, this is a
 # property of the file that was defined when it was encoded.
 #
-# %%
 # Specifying a range
 # ------------------
 #
