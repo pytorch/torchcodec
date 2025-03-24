@@ -983,9 +983,7 @@ class TestAudioDecoder:
         if stop_seconds == "duration":
             stop_seconds = asset.duration_seconds
 
-        samples = decoder.get_samples_played_in_range(
-            start_seconds=0, stop_seconds=stop_seconds
-        )
+        samples = decoder.get_samples_played_in_range(stop_seconds=stop_seconds)
 
         reference_frames = asset.get_frame_data_by_range(
             start=0, stop=asset.get_frame_index(pts_seconds=asset.duration_seconds) + 1
@@ -993,7 +991,6 @@ class TestAudioDecoder:
 
         torch.testing.assert_close(samples.data, reference_frames)
         assert samples.sample_rate == asset.sample_rate
-
         assert samples.pts_seconds == asset.get_frame_info(idx=0).pts_seconds
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
@@ -1079,7 +1076,7 @@ class TestAudioDecoder:
         asset = SINE_MONO_S32
         decoder = AudioDecoder(asset.path)
 
-        samples = decoder.get_samples_played_in_range(start_seconds=0, stop_seconds=2)
+        samples = decoder.get_samples_played_in_range(stop_seconds=2)
         assert samples.data.shape[0] == asset.num_channels == 1
 
     def test_format_conversion(self):
@@ -1087,7 +1084,7 @@ class TestAudioDecoder:
         decoder = AudioDecoder(asset.path)
         assert decoder.metadata.sample_format == asset.sample_format == "s32"
 
-        all_samples = decoder.get_samples_played_in_range(start_seconds=0)
+        all_samples = decoder.get_samples_played_in_range()
         assert all_samples.data.dtype == torch.float32
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=asset.num_frames)
@@ -1164,7 +1161,7 @@ class TestAudioDecoder:
         assert asset.sample_rate == 8000
         assert asset.num_channels == 2
         decoder = AudioDecoder(asset.path, sample_rate=44_100)
-        decoder.get_samples_played_in_range(start_seconds=0)
+        decoder.get_samples_played_in_range()
 
     def test_downsample_empty_frame(self):
         # Non-regression test for
@@ -1184,13 +1181,13 @@ class TestAudioDecoder:
         asset = NASA_AUDIO_MP3_44100
         assert asset.sample_rate == 44_100
         decoder = AudioDecoder(asset.path, sample_rate=8_000)
-        frames_44100_to_8000 = decoder.get_samples_played_in_range(start_seconds=0)
+        frames_44100_to_8000 = decoder.get_samples_played_in_range()
 
         # Just checking correctness now
         asset = NASA_AUDIO_MP3
         assert asset.sample_rate == 8_000
         decoder = AudioDecoder(asset.path)
-        frames_8000 = decoder.get_samples_played_in_range(start_seconds=0)
+        frames_8000 = decoder.get_samples_played_in_range()
         torch.testing.assert_close(
             frames_44100_to_8000.data, frames_8000.data, atol=0.03, rtol=0
         )
@@ -1214,4 +1211,11 @@ class TestAudioDecoder:
             else contextlib.nullcontext()
         )
         with cm:
-            decoder.get_samples_played_in_range(start_seconds=0)
+            decoder.get_samples_played_in_range()
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    @pytest.mark.parametrize("sample_rate", (None, 8000, 16_000, 44_1000))
+    def test_samples_duration(self, asset, sample_rate):
+        decoder = AudioDecoder(asset.path, sample_rate=sample_rate)
+        samples = decoder.get_samples_played_in_range(start_seconds=1, stop_seconds=2)
+        assert samples.duration_seconds == 1
