@@ -982,7 +982,7 @@ class TestAudioDecoder:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     @pytest.mark.parametrize("stop_seconds", (None, "duration", 99999999))
-    def test_get_all_samples(self, asset, stop_seconds):
+    def test_get_all_samples_with_range(self, asset, stop_seconds):
         decoder = AudioDecoder(asset.path)
 
         if stop_seconds == "duration":
@@ -997,6 +997,14 @@ class TestAudioDecoder:
         torch.testing.assert_close(samples.data, reference_frames)
         assert samples.sample_rate == asset.sample_rate
         assert samples.pts_seconds == asset.get_frame_info(idx=0).pts_seconds
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
+    def test_get_all_samples(self, asset):
+        decoder = AudioDecoder(asset.path)
+        torch.testing.assert_close(
+            decoder.get_all_samples().data,
+            decoder.get_samples_played_in_range().data,
+        )
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     def test_at_frame_boundaries(self, asset):
