@@ -1,0 +1,9 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.samplers
+
+
+clips_at_random_indices
+=======================
+
+.. autofunction:: clips_at_random_indices

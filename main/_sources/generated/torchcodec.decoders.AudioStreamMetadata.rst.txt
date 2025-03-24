@@ -1,0 +1,12 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.decoders
+
+
+AudioStreamMetadata
+===================
+
+.. autoclass:: AudioStreamMetadata
+    :members:
+    :undoc-members: __init__
+    :inherited-members:
