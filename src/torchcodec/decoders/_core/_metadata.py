@@ -34,20 +34,24 @@ class StreamMetadata:
     None). This could be inaccurate."""
     bit_rate: Optional[float]
     """Bit rate of the stream, in seconds (float or None)."""
+    begin_stream_seconds_from_header: Optional[float]
+    """Beginning of the stream, in seconds, obtained from the header (float or
+    None). Usually, this is equal to 0."""
     begin_stream_seconds_from_content: Optional[float]
     """Beginning of the stream, in seconds (float or None).
-    Conceptually, this corresponds to the first frame's :term:`pts`. It is
-    computed as min(frame.pts) across all frames in the stream. Usually, this is
-    equal to 0."""
+    Conceptually, this corresponds to the first frame's :term:`pts`. It is only
+    computed when a :term:`scan` is done as min(frame.pts) across all frames in
+    the stream. Usually, this is equal to 0."""
     end_stream_seconds_from_content: Optional[float]
     """End of the stream, in seconds (float or None).
     Conceptually, this corresponds to last_frame.pts + last_frame.duration. It
-    is computed as max(frame.pts + frame.duration) across all frames in the
-    stream. Note that no frame is played at this time value, so calling
-    :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at` with
-    this value would result in an error. Retrieving the last frame is best done
-    by simply indexing the :class:`~torchcodec.decoders.VideoDecoder`
-    object with ``[-1]``.
+    is only computed when a :term:`scan` is done as max(frame.pts +
+    frame.duration) across all frames in the stream. Note that no frame is
+    played at this time value, so calling
+    :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at` with this
+    value would result in an error. Retrieving the last frame is best done by
+    simply indexing the :class:`~torchcodec.decoders.VideoDecoder` object with
+    ``[-1]``.
     """
     codec: Optional[str]
     """Codec (str or None)."""
@@ -224,6 +228,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
         common_meta = dict(
             duration_seconds_from_header=stream_dict.get("durationSeconds"),
             bit_rate=stream_dict.get("bitRate"),
+            begin_stream_seconds_from_header=stream_dict.get("beginStreamFromHeader"),
             begin_stream_seconds_from_content=stream_dict.get("minPtsSecondsFromScan"),
             end_stream_seconds_from_content=stream_dict.get("maxPtsSecondsFromScan"),
             codec=stream_dict.get("codec"),

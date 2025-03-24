@@ -473,6 +473,10 @@ std::string get_stream_json_metadata(
   if (streamMetadata.numFrames.has_value()) {
     map["numFrames"] = std::to_string(*streamMetadata.numFrames);
   }
+  if (streamMetadata.beginStreamFromHeader.has_value()) {
+    map["beginStreamFromHeader"] =
+        std::to_string(*streamMetadata.beginStreamFromHeader);
+  }
   if (streamMetadata.minPtsSecondsFromScan.has_value()) {
     map["minPtsSecondsFromScan"] =
         std::to_string(*streamMetadata.minPtsSecondsFromScan);

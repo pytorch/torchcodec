@@ -147,6 +147,10 @@ void VideoDecoder::initializeDecoder() {
       streamMetadata.durationSeconds =
           av_q2d(avStream->time_base) * avStream->duration;
     }
+    if (avStream->start_time != AV_NOPTS_VALUE) {
+      streamMetadata.beginStreamFromHeader =
+          av_q2d(avStream->time_base) * avStream->start_time;
+    }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
       double fps = av_q2d(avStream->r_frame_rate);

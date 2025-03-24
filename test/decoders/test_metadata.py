@@ -20,6 +20,10 @@ from torchcodec.decoders._core import (
 from ..utils import NASA_AUDIO_MP3, NASA_VIDEO
 
 
+# TODO: Expected values in these tests should be based on the assets's
+# attributes rather than on hard-coded values.
+
+
 def _get_container_metadata(path, seek_mode):
     decoder = create_from_file(str(path), seek_mode=seek_mode)
     return get_container_metadata(decoder)
@@ -73,6 +77,7 @@ def test_get_metadata(metadata_getter):
     assert best_video_stream_metadata.duration_seconds == pytest.approx(
         13.013, abs=0.001
     )
+    assert best_video_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_video_stream_metadata.bit_rate == 128783
     assert best_video_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
     assert best_video_stream_metadata.codec == "h264"
@@ -88,6 +93,7 @@ def test_get_metadata(metadata_getter):
     assert best_audio_stream_metadata.duration_seconds == pytest.approx(
         13.056, abs=0.001
     )
+    assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_audio_stream_metadata.bit_rate == 128837
     assert best_audio_stream_metadata.codec == "aac"
     assert best_audio_stream_metadata.sample_format == "fltp"
@@ -108,6 +114,7 @@ def test_get_metadata_audio_file(metadata_getter):
     assert best_audio_stream_metadata.duration_seconds == pytest.approx(
         13.248, abs=0.001
     )
+    assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0.138125
     assert best_audio_stream_metadata.bit_rate == 64000
     assert best_audio_stream_metadata.codec == "mp3"
     assert best_audio_stream_metadata.sample_format == "fltp"
@@ -126,6 +133,7 @@ def test_num_frames_fallback(
         bit_rate=123,
         num_frames_from_header=num_frames_from_header,
         num_frames_from_content=num_frames_from_content,
+        begin_stream_seconds_from_header=0,
         begin_stream_seconds_from_content=0,
         end_stream_seconds_from_content=4,
         codec="whatever",
