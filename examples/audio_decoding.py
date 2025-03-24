@@ -76,12 +76,6 @@ play_audio(samples)
 # all streams start exactly at 0! This is not a bug in TorchCodec, this is a
 # property of the file that was defined when it was encoded.
 #
-# We only output the *start* of the samples, not the end or the duration. Those can
-# be easily derived from the number of samples and the sample rate:
-
-duration_seconds = samples.data.shape[1] / samples.sample_rate
-print(f"Duration = {int(duration_seconds // 60)}m{int(duration_seconds % 60)}s.")
-
 # %%
 # Specifying a range
 # ------------------

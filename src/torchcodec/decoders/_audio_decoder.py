@@ -138,8 +138,10 @@ class AudioDecoder:
         else:
             offset_end = num_samples
 
+        data = frames[:, offset_beginning:offset_end]
         return AudioSamples(
-            data=frames[:, offset_beginning:offset_end],
+            data=data,
             pts_seconds=output_pts_seconds,
+            duration_seconds=data.shape[1] / sample_rate,
             sample_rate=sample_rate,
         )
