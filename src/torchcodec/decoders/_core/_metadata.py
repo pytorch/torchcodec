@@ -22,11 +22,6 @@ from torchcodec.decoders._core.ops import (
 SPACES = "  "
 
 
-# TODO-AUDIO: docs below are mostly for video streams, we should edit them and /
-# or make sure they're OK for audio streams as well. Not sure how to best handle
-# docs for such class hierarchy.
-# TODO very related, none of these common fields in this base class show up in
-# the docs right now.
 @dataclass
 class StreamMetadata:
     duration_seconds_from_header: Optional[float]
@@ -40,7 +35,7 @@ class StreamMetadata:
     codec: Optional[str]
     """Codec (str or None)."""
     stream_index: int
-    """Index of the stream within the video (int)."""
+    """Index of the stream that this metadata refers to (int)."""
 
     def __repr__(self):
         s = self.__class__.__name__ + ":\n"
