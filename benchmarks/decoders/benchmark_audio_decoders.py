@@ -1,5 +1,3 @@
-import subprocess
-
 from argparse import ArgumentParser
 from datetime import timedelta
 from pathlib import Path
@@ -44,30 +42,6 @@ def report_stats(times: Tensor, unit: str = "ms", prefix: str = "") -> float:
     print(
         f"{prefix:<40} {med = :.2f}, {mean = :.2f} +- {std:.2f}, {min = :.2f}, {max = :.2f} - in {unit}"
     )
-
-
-def get_duration(path: Path) -> str:
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-
-        # Remove microseconds
-        return str(timedelta(seconds=float(result.stdout.strip()))).split(".")[0]
-    except Exception:
-        return "?"
 
 
 def decode_with_torchcodec(path: Path) -> None:
