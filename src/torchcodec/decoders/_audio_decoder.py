@@ -13,7 +13,7 @@ from torchcodec import AudioSamples
 from torchcodec.decoders import _core as core
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
-    get_and_validate_stream_metadata,
+    ERROR_REPORTING_INSTRUCTIONS,
 )
 
 
@@ -57,18 +57,34 @@ class AudioDecoder:
             self._decoder, stream_index=stream_index, sample_rate=sample_rate
         )
 
-        (
-            self.metadata,
-            self.stream_index,
-            self._begin_stream_seconds,
-            self._end_stream_seconds,
-        ) = get_and_validate_stream_metadata(
-            decoder=self._decoder, stream_index=stream_index, media_type="audio"
+        container_metadata = core.get_container_metadata(self._decoder)
+        self.stream_index = (
+            container_metadata.best_audio_stream_index
+            if stream_index is None
+            else stream_index
         )
+        if self.stream_index is None:
+            raise ValueError(
+                "The best audio stream is unknown and there is no specified stream. "
+                + ERROR_REPORTING_INSTRUCTIONS
+            )
+        self.metadata = container_metadata.streams[self.stream_index]
         assert isinstance(self.metadata, core.AudioStreamMetadata)  # mypy
+
         self._desired_sample_rate = (
             sample_rate if sample_rate is not None else self.metadata.sample_rate
         )
+
+    def get_all_samples(self) -> AudioSamples:
+        """Returns all the audio samples from the source.
+
+        To decode samples in a specific range, use
+        :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range`.
+
+        Returns:
+            AudioSamples: The samples within the file.
+        """
+        return self.get_samples_played_in_range()
 
     def get_samples_played_in_range(
         self, start_seconds: float = 0.0, stop_seconds: Optional[float] = None
@@ -77,11 +93,18 @@ class AudioDecoder:
 
         Samples are in the half open range [start_seconds, stop_seconds).
 
+        To decode all the samples from beginning to end, you can call this
+        method while leaving ``start_seconds`` and ``stop_seconds`` to their
+        default values, or use
+        :meth:`~torchcodec.decoders.AudioDecoder.get_all_samples` as a more
+        convenient alias.
+
         Args:
             start_seconds (float): Time, in seconds, of the start of the
                 range. Default: 0.
-            stop_seconds (float): Time, in seconds, of the end of the
-                range. As a half open range, the end is excluded.
+            stop_seconds (float or None): Time, in seconds, of the end of the
+                range. As a half open range, the end is excluded. Default: None,
+                which decodes samples until the end.
 
         Returns:
             AudioSamples: The samples within the specified range.
@@ -89,12 +112,6 @@ class AudioDecoder:
         if stop_seconds is not None and not start_seconds <= stop_seconds:
             raise ValueError(
                 f"Invalid start seconds: {start_seconds}. It must be less than or equal to stop seconds ({stop_seconds})."
-            )
-        if not self._begin_stream_seconds <= start_seconds < self._end_stream_seconds:
-            raise ValueError(
-                f"Invalid start seconds: {start_seconds}. "
-                f"It must be greater than or equal to {self._begin_stream_seconds} "
-                f"and less than or equal to {self._end_stream_seconds}."
             )
         frames, first_pts = core.get_frames_by_pts_in_range_audio(
             self._decoder,

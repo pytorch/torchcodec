@@ -59,6 +59,7 @@ class VideoDecoder {
     std::optional<AVCodecID> codecId;
     std::optional<std::string> codecName;
     std::optional<double> durationSeconds;
+    std::optional<double> beginStreamFromHeader;
     std::optional<int64_t> numFrames;
     std::optional<int64_t> numKeyFrames;
     std::optional<double> averageFps;
@@ -238,7 +239,6 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
-  // TODO-AUDIO: Should accept sampleRate
   AudioFramesOutput getFramesPlayedInRangeAudio(
       double startSeconds,
       std::optional<double> stopSecondsOptional = std::nullopt);

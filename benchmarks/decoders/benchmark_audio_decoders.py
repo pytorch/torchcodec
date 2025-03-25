@@ -71,7 +71,7 @@ def get_duration(path: Path) -> str:
 
 
 def decode_with_torchcodec(path: Path) -> None:
-    AudioDecoder(path).get_samples_played_in_range(start_seconds=0, stop_seconds=None)
+    AudioDecoder(path).get_all_samples()
 
 
 def decode_with_torchaudio_StreamReader(path: Path) -> None:
