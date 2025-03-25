@@ -102,20 +102,24 @@ print(
     f"Benchmarking {path.name}, duration: {get_duration(path)}, averaging over {args.num_exp} runs:"
 )
 
-times = bench(decode_with_torchcodec, path, num_exp=args.num_exp)
-report_stats(times, prefix="torchcodec.AudioDecoder")
+for decode_f, kwargs, prefix in (
+    (decode_with_torchcodec, {}, "torchcodec.AudioDecoder"),
+    (
+        decode_with_torchaudio_load,
+        {"backend": "ffmpeg"},
+        "torchaudio.load(backend='ffmpeg')",
+    ),
+    (decode_with_torchaudio_load, {"backend": "sox"}, "torchaudio.load(backend='sox')"),
+    (
+        decode_with_torchaudio_load,
+        {"backend": "soundfile"},
+        "torchaudio.load(backend='soundfile')",
+    ),
+    (decode_with_torchaudio_StreamReader, {}, "torchaudio.StreamReader"),
+):
 
-times = bench(decode_with_torchaudio_load, path, backend="ffmpeg", num_exp=args.num_exp)
-report_stats(times, prefix="torchaudio.load(backend='ffmpeg')")
-
-prefix = "torchaudio.load(backend='sox')"
-try:
-    times = bench(
-        decode_with_torchaudio_load, path, backend="sox", num_exp=args.num_exp
-    )
-    report_stats(times, prefix=prefix)
-except RuntimeError:
-    print(f"{prefix:<40} Not supported")
-
-times = bench(decode_with_torchaudio_StreamReader, path, num_exp=args.num_exp)
-report_stats(times, prefix="torchaudio.StreamReader")
+    try:
+        times = bench(decode_f, path, **kwargs, num_exp=args.num_exp)
+        report_stats(times, prefix=prefix)
+    except RuntimeError:
+        print(f"{prefix:<40} Not supported")
