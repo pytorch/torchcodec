@@ -97,9 +97,11 @@ parser.add_argument(
 args = parser.parse_args()
 path = Path(args.path)
 
+metadata = AudioDecoder(path).metadata
+duration = str(timedelta(seconds=metadata.duration_seconds_from_header)).split(".")[0]
 
 print(
-    f"Benchmarking {path.name}, duration: {get_duration(path)}, averaging over {args.num_exp} runs:"
+    f"Benchmarking {path.name}, duration: {duration}, codec: {metadata.codec}, format: {metadata.sample_format}, averaging over {args.num_exp} runs:"
 )
 
 for decode_f, kwargs, prefix in (
