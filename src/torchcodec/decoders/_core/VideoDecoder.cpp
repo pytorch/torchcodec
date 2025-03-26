@@ -159,7 +159,15 @@ void VideoDecoder::initializeDecoder() {
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       AVSampleFormat format =
           static_cast<AVSampleFormat>(avStream->codecpar->format);
-      streamMetadata.sampleFormat = av_get_sample_fmt_name(format);
+
+      // If the AVSampleFormat is not recognized, we get back nullptr. We have
+      // to make sure we don't initialize a std::string with nullptr. There's
+      // nothing to do on the else branch because we're already using an
+      // optional; it'll just remain empty.
+      const char* rawSampleFormat = av_get_sample_fmt_name(format);
+      if (rawSampleFormat != nullptr) {
+        streamMetadata.sampleFormat = std::string(rawSampleFormat);
+      }
       containerMetadata_.numAudioStreams++;
     }
 
