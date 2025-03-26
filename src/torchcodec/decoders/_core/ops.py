@@ -4,7 +4,6 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import importlib
 import io
 import json
 import warnings
@@ -16,6 +15,7 @@ from torch.library import get_ctx, register_fake
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
+    _load_pybind11_module,
 )
 
 _pybind_ops: Optional[ModuleType] = None
@@ -43,7 +43,7 @@ def load_torchcodec_shared_libraries():
     #      libraries do not meet those conditions.
 
     exceptions = []
-    pybind_ops_module_name = "torchcodec_pybind_ops"
+    pybind_ops_module_name = "decoder_core_pybind_ops"
     for ffmpeg_major_version in (7, 6, 5, 4):
         decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
@@ -53,17 +53,10 @@ def load_torchcodec_shared_libraries():
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
 
             pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
-            spec = importlib.util.spec_from_file_location(
-                pybind_ops_module_name,
-                pybind_ops_library_path,
-            )
-            if spec is None:
-                raise ImportError(
-                    f"Unable to load spec for module {pybind_ops_module_name} from path {pybind_ops_library_path}"
-                )
-
             global _pybind_ops
-            _pybind_ops = importlib.util.module_from_spec(spec)
+            _pybind_ops = _load_pybind11_module(
+                pybind_ops_module_name, pybind_ops_library_path
+            )
             return
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
