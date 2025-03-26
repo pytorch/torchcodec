@@ -32,7 +32,10 @@ def _get_extension_path(lib_name: str) -> str:
     )
     ext_specs = extfinder.find_spec(lib_name)
     if ext_specs is None:
-        raise ImportError
+        raise ImportError(f"No spec found for {lib_name}")
+
+    if ext_specs.origin is None:
+        raise ImportError(f"Existing spec found for {lib_name} does not have an origin")
 
     return ext_specs.origin
 
