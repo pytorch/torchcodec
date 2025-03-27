@@ -370,6 +370,7 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
 
   void setCursor(int64_t pts);
+  void setCursor(double) = delete; // prevent calls with doubles and floats
   bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();
