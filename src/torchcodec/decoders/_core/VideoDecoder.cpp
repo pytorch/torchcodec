@@ -1430,18 +1430,21 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
-  torch::Tensor outputData =
-      torch::empty({numChannels, numSamples}, torch::kFloat32);
 
-  uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
-  auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
-  for (auto channel = 0; channel < numChannels;
-       ++channel, outputChannelData += numBytesPerChannel) {
-    memcpy(
-        outputChannelData, avFrame->extended_data[channel], numBytesPerChannel);
+  frameOutput.data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+
+  if (numSamples > 0) {
+    uint8_t* outputChannelData =
+        static_cast<uint8_t*>(frameOutput.data.data_ptr());
+    auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
+    for (auto channel = 0; channel < numChannels;
+         ++channel, outputChannelData += numBytesPerChannel) {
+      memcpy(
+          outputChannelData,
+          avFrame->extended_data[channel],
+          numBytesPerChannel);
+    }
   }
-
-  frameOutput.data = outputData;
 }
 
 UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
