@@ -1,5 +1,3 @@
-import subprocess
-
 from argparse import ArgumentParser
 from datetime import timedelta
 from pathlib import Path
@@ -46,30 +44,6 @@ def report_stats(times: Tensor, unit: str = "ms", prefix: str = "") -> float:
     )
 
 
-def get_duration(path: Path) -> str:
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-
-        # Remove microseconds
-        return str(timedelta(seconds=float(result.stdout.strip()))).split(".")[0]
-    except Exception:
-        return "?"
-
-
 def decode_with_torchcodec(path: Path) -> None:
     AudioDecoder(path).get_all_samples()
 
@@ -97,25 +71,31 @@ parser.add_argument(
 args = parser.parse_args()
 path = Path(args.path)
 
+metadata = AudioDecoder(path).metadata
+duration = str(timedelta(seconds=metadata.duration_seconds_from_header)).split(".")[0]
 
 print(
-    f"Benchmarking {path.name}, duration: {get_duration(path)}, averaging over {args.num_exp} runs:"
+    f"Benchmarking {path.name}, duration: {duration}, codec: {metadata.codec}, format: {metadata.sample_format}, averaging over {args.num_exp} runs:"
 )
 
-times = bench(decode_with_torchcodec, path, num_exp=args.num_exp)
-report_stats(times, prefix="torchcodec.AudioDecoder")
+for decode_f, kwargs, prefix in (
+    (decode_with_torchcodec, {}, "torchcodec.AudioDecoder"),
+    (
+        decode_with_torchaudio_load,
+        {"backend": "ffmpeg"},
+        "torchaudio.load(backend='ffmpeg')",
+    ),
+    (decode_with_torchaudio_load, {"backend": "sox"}, "torchaudio.load(backend='sox')"),
+    (
+        decode_with_torchaudio_load,
+        {"backend": "soundfile"},
+        "torchaudio.load(backend='soundfile')",
+    ),
+    (decode_with_torchaudio_StreamReader, {}, "torchaudio.StreamReader"),
+):
 
-times = bench(decode_with_torchaudio_load, path, backend="ffmpeg", num_exp=args.num_exp)
-report_stats(times, prefix="torchaudio.load(backend='ffmpeg')")
-
-prefix = "torchaudio.load(backend='sox')"
-try:
-    times = bench(
-        decode_with_torchaudio_load, path, backend="sox", num_exp=args.num_exp
-    )
-    report_stats(times, prefix=prefix)
-except RuntimeError:
-    print(f"{prefix:<40} Not supported")
-
-times = bench(decode_with_torchaudio_StreamReader, path, num_exp=args.num_exp)
-report_stats(times, prefix="torchaudio.StreamReader")
+    try:
+        times = bench(decode_f, path, **kwargs, num_exp=args.num_exp)
+        report_stats(times, prefix=prefix)
+    except RuntimeError:
+        print(f"{prefix:<40} Not supported")
