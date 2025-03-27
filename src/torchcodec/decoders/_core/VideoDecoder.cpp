@@ -912,7 +912,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
     // See [Audio Decoding Design].
-    setCursorPtsInSecondsInternal(INT64_MIN);
+    setCursor(INT64_MIN);
   }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
@@ -971,13 +971,13 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   // We don't allow public audio decoding APIs to seek, see [Audio Decoding
   // Design]
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-  setCursorPtsInSecondsInternal(seconds);
+  setCursor(
+      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase));
 }
 
-void VideoDecoder::setCursorPtsInSecondsInternal(double seconds) {
+void VideoDecoder::setCursor(int64_t pts) {
   cursorWasJustSet_ = true;
-  cursor_ =
-      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase);
+  cursor_ = pts;
 }
 
 /*
