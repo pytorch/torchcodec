@@ -890,16 +890,15 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     std::optional<double> stopSecondsOptional) {
   validateActiveStream(AVMEDIA_TYPE_AUDIO);
 
-  double stopSeconds =
-      stopSecondsOptional.value_or(std::numeric_limits<double>::max());
+  if (stopSecondsOptional.has_value()) {
+    TORCH_CHECK(
+        startSeconds <= *stopSecondsOptional,
+        "Start seconds (" + std::to_string(startSeconds) +
+            ") must be less than or equal to stop seconds (" +
+            std::to_string(*stopSecondsOptional) + ").");
+  }
 
-  TORCH_CHECK(
-      startSeconds <= stopSeconds,
-      "Start seconds (" + std::to_string(startSeconds) +
-          ") must be less than or equal to stop seconds (" +
-          std::to_string(stopSeconds) + ").");
-
-  if (startSeconds == stopSeconds) {
+  if (stopSecondsOptional.has_value() && startSeconds == *stopSecondsOptional) {
     // For consistency with video
     return AudioFramesOutput{torch::empty({0, 0}), 0.0};
   }
@@ -912,7 +911,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
     // See [Audio Decoding Design].
-    setCursorPtsInSecondsInternal(INT64_MIN);
+    setCursor(INT64_MIN);
   }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
@@ -921,7 +920,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   std::vector<torch::Tensor> frames;
 
   std::optional<double> firstFramePtsSeconds = std::nullopt;
-  auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+  auto stopPts = stopSecondsOptional.has_value()
+      ? secondsToClosestPts(*stopSecondsOptional, streamInfo.timeBase)
+      : INT64_MAX;
   auto finished = false;
   while (!finished) {
     try {
@@ -971,13 +972,13 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   // We don't allow public audio decoding APIs to seek, see [Audio Decoding
   // Design]
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-  setCursorPtsInSecondsInternal(seconds);
+  setCursor(
+      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase));
 }
 
-void VideoDecoder::setCursorPtsInSecondsInternal(double seconds) {
+void VideoDecoder::setCursor(int64_t pts) {
   cursorWasJustSet_ = true;
-  cursor_ =
-      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase);
+  cursor_ = pts;
 }
 
 /*
