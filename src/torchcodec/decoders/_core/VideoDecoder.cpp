@@ -66,15 +66,13 @@ VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
   initializeDecoder();
 }
 
-VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
-    : seekMode_(seekMode) {
-  TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
-
+VideoDecoder::VideoDecoder(
+    std::unique_ptr<AVIOContextHolder> context,
+    SeekMode seekMode)
+    : seekMode_(seekMode), avioContextHolder_(std::move(context)) {
   setFFmpegLogLevel();
 
-  constexpr int bufferSize = 64 * 1024;
-  ioBytesContext_.reset(new AVIOBytesContext(data, length, bufferSize));
-  TORCH_CHECK(ioBytesContext_, "Failed to create AVIOBytesContext");
+  TORCH_CHECK(avioContextHolder_, "Context holder cannot be null");
 
   // Because FFmpeg requires a reference to a pointer in the call to open, we
   // can't use a unique pointer here. Note that means we must call free if open
@@ -82,7 +80,7 @@ VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
   AVFormatContext* rawContext = avformat_alloc_context();
   TORCH_CHECK(rawContext != nullptr, "Unable to alloc avformat context");
 
-  rawContext->pb = ioBytesContext_->getAVIO();
+  rawContext->pb = avioContextHolder_->getAVIOContext();
   int status = avformat_open_input(&rawContext, nullptr, nullptr, nullptr);
   if (status != 0) {
     avformat_free_context(rawContext);
@@ -2069,6 +2067,16 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
   return FrameDims(
       videoStreamOptions.height.value_or(avFrame->height),
       videoStreamOptions.width.value_or(avFrame->width));
+}
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
+  if (seekMode == "exact") {
+    return VideoDecoder::SeekMode::exact;
+  } else if (seekMode == "approximate") {
+    return VideoDecoder::SeekMode::approximate;
+  } else {
+    TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
+  }
 }
 
 } // namespace facebook::torchcodec
