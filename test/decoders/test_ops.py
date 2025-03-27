@@ -40,11 +40,12 @@ from torchcodec.decoders._core import (
 
 from ..utils import (
     assert_frames_equal,
-    cpu_and_cuda,
+    cpu_and_accelerators,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
+    needs_xpu,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
@@ -56,7 +57,7 @@ INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
 class TestVideoOps:
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -73,7 +74,7 @@ class TestVideoOps:
         )
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_seek_to_negative_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -85,7 +86,7 @@ class TestVideoOps:
         frame0, _, _ = get_next_frame(decoder)
         assert_frames_equal(frame0, reference_frame0.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frame_at_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -109,7 +110,7 @@ class TestVideoOps:
             with pytest.raises(AssertionError):
                 assert_frames_equal(next_frame, reference_frame6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -123,7 +124,7 @@ class TestVideoOps:
         )
         assert_frames_equal(frame6, reference_frame6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -135,7 +136,7 @@ class TestVideoOps:
         assert pts.item() == pytest.approx(6.006, rel=1e-3)
         assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frames_at_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -147,7 +148,7 @@ class TestVideoOps:
         assert_frames_equal(frames0and180[0], reference_frame0.to(device))
         assert_frames_equal(frames0and180[1], reference_frame180.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
@@ -174,7 +175,7 @@ class TestVideoOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
@@ -202,7 +203,7 @@ class TestVideoOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_pts_apis_against_index_ref(self, device):
         # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
@@ -257,7 +258,7 @@ class TestVideoOps:
         )
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_get_frames_in_range(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -297,7 +298,7 @@ class TestVideoOps:
         empty_frame, *_ = get_frames_in_range(decoder, start=5, stop=5)
         assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_throws_exception_at_eof(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -312,7 +313,7 @@ class TestVideoOps:
         with pytest.raises(IndexError, match="no more frames"):
             get_frame_at_pts(decoder, seconds=1000.0)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_throws_exception_if_seek_too_far(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -321,7 +322,7 @@ class TestVideoOps:
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     def test_compile_seek_and_next(self, device):
         # TODO_OPEN_ISSUE Scott (T180277797): Get this to work with the inductor stack. Right now
         # compilation fails because it can't handle tensors of size unknown at
@@ -345,7 +346,7 @@ class TestVideoOps:
         assert_frames_equal(frame0, reference_frame0.to(device))
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", cpu_and_accelerators())
     @pytest.mark.parametrize(
         "create_from",
         ("file", "tensor", "bytes", "file_like_rawio", "file_like_bufferedio"),
@@ -626,6 +627,19 @@ class TestVideoOps:
         assert frame0.device.type == "cuda"
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to("cuda"))
+        assert pts == torch.tensor([0])
+        torch.testing.assert_close(
+            duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
+        )
+
+    @needs_xpu
+    def test_xpu_decoder(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device="xpu")
+        frame0, pts, duration = get_next_frame(decoder)
+        assert frame0.device.type == "xpu"
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        assert_frames_equal(frame0, reference_frame0.to("xpu"))
         assert pts == torch.tensor([0])
         torch.testing.assert_close(
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3

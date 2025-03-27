@@ -9,6 +9,15 @@ find_package(Torch REQUIRED)
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
+if(ENABLE_CUDA)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_CUDA")
+endif()
+if(ENABLE_XPU)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(L0 REQUIRED IMPORTED_TARGET level-zero)
+    pkg_check_modules(LIBVA REQUIRED IMPORTED_TARGET libva)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_XPU")
+endif()
 
 function(make_torchcodec_sublibrary
     library_name
@@ -61,12 +70,15 @@ function(make_torchcodec_libraries
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
         VideoDecoder.cpp
+	CPUOnlyDevice.cpp
     )
 
     if(ENABLE_CUDA)
         list(APPEND decoder_sources CudaDevice.cpp)
-    else()
-        list(APPEND decoder_sources CPUOnlyDevice.cpp)
+    endif()
+
+    if(ENABLE_XPU)
+        list(APPEND decoder_sources XpuDevice.cpp)
     endif()
 
     set(decoder_library_dependencies
@@ -79,6 +91,11 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
+    endif()
+
+    if(ENABLE_XPU)
+        list(APPEND decoder_library_dependencies
+            PkgConfig::L0 PkgConfig::LIBVA)
     endif()
 
     make_torchcodec_sublibrary(
