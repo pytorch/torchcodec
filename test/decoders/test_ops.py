@@ -23,6 +23,7 @@ from torchcodec.decoders._core import (
     add_video_stream,
     create_from_bytes,
     create_from_file,
+    create_from_file_like,
     create_from_tensor,
     get_ffmpeg_library_versions,
     get_frame_at_index,
@@ -345,7 +346,10 @@ class TestVideoOps:
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    @pytest.mark.parametrize("create_from", ("file", "tensor", "bytes"))
+    @pytest.mark.parametrize(
+        "create_from",
+        ("file", "tensor", "bytes", "file_like_rawio", "file_like_bufferedio"),
+    )
     def test_create_decoder(self, create_from, device):
         path = str(NASA_VIDEO.path)
         if create_from == "file":
@@ -354,10 +358,18 @@ class TestVideoOps:
             arr = np.fromfile(path, dtype=np.uint8)
             video_tensor = torch.from_numpy(arr)
             decoder = create_from_tensor(video_tensor)
-        else:  # bytes
+        elif create_from == "bytes":
             with open(path, "rb") as f:
                 video_bytes = f.read()
             decoder = create_from_bytes(video_bytes)
+        elif create_from == "file_like_rawio":
+            decoder = create_from_file_like(open(path, mode="rb", buffering=0), "exact")
+        elif create_from == "file_like_bufferedio":
+            decoder = create_from_file_like(
+                open(path, mode="rb", buffering=4096), "exact"
+            )
+        else:
+            raise ValueError("Oops, double check the parametrization of this test!")
 
         add_video_stream(decoder, device=device)
         frame0, _, _ = get_next_frame(decoder)

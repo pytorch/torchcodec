@@ -12,6 +12,7 @@
 #include <ostream>
 #include <string_view>
 
+#include "src/torchcodec/decoders/_core/AVIOContextHolder.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -34,11 +35,12 @@ class VideoDecoder {
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // Creates a VideoDecoder from a given buffer of data. Note that the data is
-  // not owned by the VideoDecoder.
+  // Creates a VideoDecoder using the provided AVIOContext inside the
+  // AVIOContextHolder. The AVIOContextHolder is the base class, and the
+  // derived class will have specialized how the custom read, seek and writes
+  // work.
   explicit VideoDecoder(
-      const void* data,
-      size_t length,
+      std::unique_ptr<AVIOContextHolder> context,
       SeekMode seekMode = SeekMode::exact);
 
   // --------------------------------------------------------------------------
@@ -367,7 +369,8 @@ class VideoDecoder {
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  void setCursorPtsInSecondsInternal(double seconds);
+  void setCursor(int64_t pts);
+  void setCursor(double) = delete; // prevent calls with doubles and floats
   bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();
@@ -501,7 +504,7 @@ class VideoDecoder {
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
-  std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  std::unique_ptr<AVIOContextHolder> avioContextHolder_;
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
@@ -582,5 +585,7 @@ torch::Tensor allocateEmptyHWCTensor(
 std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats);
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode);
 
 } // namespace facebook::torchcodec

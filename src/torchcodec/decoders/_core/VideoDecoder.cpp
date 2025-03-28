@@ -66,15 +66,13 @@ VideoDecoder::VideoDecoder(const std::string& videoFilePath, SeekMode seekMode)
   initializeDecoder();
 }
 
-VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
-    : seekMode_(seekMode) {
-  TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
-
+VideoDecoder::VideoDecoder(
+    std::unique_ptr<AVIOContextHolder> context,
+    SeekMode seekMode)
+    : seekMode_(seekMode), avioContextHolder_(std::move(context)) {
   setFFmpegLogLevel();
 
-  constexpr int bufferSize = 64 * 1024;
-  ioBytesContext_.reset(new AVIOBytesContext(data, length, bufferSize));
-  TORCH_CHECK(ioBytesContext_, "Failed to create AVIOBytesContext");
+  TORCH_CHECK(avioContextHolder_, "Context holder cannot be null");
 
   // Because FFmpeg requires a reference to a pointer in the call to open, we
   // can't use a unique pointer here. Note that means we must call free if open
@@ -82,7 +80,7 @@ VideoDecoder::VideoDecoder(const void* data, size_t length, SeekMode seekMode)
   AVFormatContext* rawContext = avformat_alloc_context();
   TORCH_CHECK(rawContext != nullptr, "Unable to alloc avformat context");
 
-  rawContext->pb = ioBytesContext_->getAVIO();
+  rawContext->pb = avioContextHolder_->getAVIOContext();
   int status = avformat_open_input(&rawContext, nullptr, nullptr, nullptr);
   if (status != 0) {
     avformat_free_context(rawContext);
@@ -890,16 +888,15 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     std::optional<double> stopSecondsOptional) {
   validateActiveStream(AVMEDIA_TYPE_AUDIO);
 
-  double stopSeconds =
-      stopSecondsOptional.value_or(std::numeric_limits<double>::max());
+  if (stopSecondsOptional.has_value()) {
+    TORCH_CHECK(
+        startSeconds <= *stopSecondsOptional,
+        "Start seconds (" + std::to_string(startSeconds) +
+            ") must be less than or equal to stop seconds (" +
+            std::to_string(*stopSecondsOptional) + ").");
+  }
 
-  TORCH_CHECK(
-      startSeconds <= stopSeconds,
-      "Start seconds (" + std::to_string(startSeconds) +
-          ") must be less than or equal to stop seconds (" +
-          std::to_string(stopSeconds) + ").");
-
-  if (startSeconds == stopSeconds) {
+  if (stopSecondsOptional.has_value() && startSeconds == *stopSecondsOptional) {
     // For consistency with video
     return AudioFramesOutput{torch::empty({0, 0}), 0.0};
   }
@@ -912,7 +909,7 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
     // If we need to seek backwards, then we have to seek back to the beginning
     // of the stream.
     // See [Audio Decoding Design].
-    setCursorPtsInSecondsInternal(INT64_MIN);
+    setCursor(INT64_MIN);
   }
 
   // TODO-AUDIO Pre-allocate a long-enough tensor instead of creating a vec +
@@ -921,7 +918,9 @@ VideoDecoder::AudioFramesOutput VideoDecoder::getFramesPlayedInRangeAudio(
   std::vector<torch::Tensor> frames;
 
   std::optional<double> firstFramePtsSeconds = std::nullopt;
-  auto stopPts = secondsToClosestPts(stopSeconds, streamInfo.timeBase);
+  auto stopPts = stopSecondsOptional.has_value()
+      ? secondsToClosestPts(*stopSecondsOptional, streamInfo.timeBase)
+      : INT64_MAX;
   auto finished = false;
   while (!finished) {
     try {
@@ -971,13 +970,13 @@ void VideoDecoder::setCursorPtsInSeconds(double seconds) {
   // We don't allow public audio decoding APIs to seek, see [Audio Decoding
   // Design]
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-  setCursorPtsInSecondsInternal(seconds);
+  setCursor(
+      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase));
 }
 
-void VideoDecoder::setCursorPtsInSecondsInternal(double seconds) {
+void VideoDecoder::setCursor(int64_t pts) {
   cursorWasJustSet_ = true;
-  cursor_ =
-      secondsToClosestPts(seconds, streamInfos_[activeStreamIndex_].timeBase);
+  cursor_ = pts;
 }
 
 /*
@@ -1430,18 +1429,21 @@ void VideoDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   auto numSamples = avFrame->nb_samples; // per channel
   auto numChannels = getNumChannels(avFrame);
-  torch::Tensor outputData =
-      torch::empty({numChannels, numSamples}, torch::kFloat32);
 
-  uint8_t* outputChannelData = static_cast<uint8_t*>(outputData.data_ptr());
-  auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
-  for (auto channel = 0; channel < numChannels;
-       ++channel, outputChannelData += numBytesPerChannel) {
-    memcpy(
-        outputChannelData, avFrame->extended_data[channel], numBytesPerChannel);
+  frameOutput.data = torch::empty({numChannels, numSamples}, torch::kFloat32);
+
+  if (numSamples > 0) {
+    uint8_t* outputChannelData =
+        static_cast<uint8_t*>(frameOutput.data.data_ptr());
+    auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
+    for (auto channel = 0; channel < numChannels;
+         ++channel, outputChannelData += numBytesPerChannel) {
+      memcpy(
+          outputChannelData,
+          avFrame->extended_data[channel],
+          numBytesPerChannel);
+    }
   }
-
-  frameOutput.data = outputData;
 }
 
 UniqueAVFrame VideoDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
@@ -2065,6 +2067,16 @@ FrameDims getHeightAndWidthFromOptionsOrAVFrame(
   return FrameDims(
       videoStreamOptions.height.value_or(avFrame->height),
       videoStreamOptions.width.value_or(avFrame->width));
+}
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
+  if (seekMode == "exact") {
+    return VideoDecoder::SeekMode::exact;
+  } else if (seekMode == "approximate") {
+    return VideoDecoder::SeekMode::approximate;
+  } else {
+    TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
+  }
 }
 
 } // namespace facebook::torchcodec

@@ -4,41 +4,68 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import io
 import json
 import warnings
-from typing import List, Optional, Tuple
+from types import ModuleType
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch.library import get_ctx, register_fake
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
+    _load_pybind11_module,
 )
 
+_pybind_ops: Optional[ModuleType] = None
 
-def load_torchcodec_extension():
-    # Successively try to load libtorchcodec7.so, libtorchcodec6.so,
-    # libtorchcodec5.so, and libtorchcodec4.so. Each of these correspond to an
+
+def load_torchcodec_shared_libraries():
+    # Successively try to load libtorchcodec_*7.so, libtorchcodec_*6.so,
+    # libtorchcodec_*5.so, and libtorchcodec_*4.so. Each of these correspond to an
     # ffmpeg major version. This should cover all potential ffmpeg versions
     # installed on the user's machine.
     #
     # On fbcode, _get_extension_path() is overridden and directly points to the
     # correct .so file, so this for-loop succeeds on the first iteration.
+    #
+    # Note that we use two different methods for loading shared libraries:
+    #
+    #   1. torch.ops.load_library(): For PyTorch custom ops and the C++ only
+    #      libraries the custom ops depend on. Loading libraries through PyTorch
+    #      registers the custom ops with PyTorch's runtime and the ops can be
+    #      accessed through torch.ops after loading.
+    #
+    #   2. importlib: For pybind11 modules. We load them dynamically, rather
+    #      than using a plain import statement. A plain import statement only
+    #      works when the module name and file name match exactly. Our shared
+    #      libraries do not meet those conditions.
 
     exceptions = []
+    pybind_ops_module_name = "decoder_core_pybind_ops"
     for ffmpeg_major_version in (7, 6, 5, 4):
-        library_name = f"libtorchcodec{ffmpeg_major_version}"
+        decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
+        custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
+        pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
-            torch.ops.load_library(_get_extension_path(library_name))
+            torch.ops.load_library(_get_extension_path(decoder_library_name))
+            torch.ops.load_library(_get_extension_path(custom_ops_library_name))
+
+            pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
+            global _pybind_ops
+            _pybind_ops = _load_pybind11_module(
+                pybind_ops_module_name, pybind_ops_library_path
+            )
             return
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
             # but we should probably handle that via a proper logging mechanism.
-            exceptions.append(e)
+            exceptions.append((ffmpeg_major_version, e))
 
     traceback = (
         "\n[start of libtorchcodec loading traceback]\n"
-        + "\n".join(str(e) for e in exceptions)
+        + "\n".join(f"FFmpeg version {v}: {str(e)}" for v, e in exceptions)
         + "\n[end of libtorchcodec loading traceback]."
     )
     raise RuntimeError(
@@ -56,7 +83,7 @@ def load_torchcodec_extension():
     )
 
 
-load_torchcodec_extension()
+load_torchcodec_shared_libraries()
 
 
 # Note: We use disallow_in_graph because PyTorch does constant propagation of
@@ -66,6 +93,9 @@ create_from_file = torch._dynamo.disallow_in_graph(
 )
 create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
+)
+_convert_to_tensor = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns._convert_to_tensor.default
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
 _add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
@@ -110,6 +140,13 @@ def create_from_bytes(
     return create_from_tensor(buffer, seek_mode)
 
 
+def create_from_file_like(
+    file_like: Union[io.RawIOBase, io.BytesIO], seek_mode: Optional[str] = None
+) -> torch.Tensor:
+    assert _pybind_ops is not None
+    return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
@@ -122,6 +159,11 @@ def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.
 def create_from_tensor_abstract(
     video_tensor: torch.Tensor, seek_mode: Optional[str]
 ) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::_convert_to_tensor")
+def _convert_to_tensor_abstract(decoder_ptr: int) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
