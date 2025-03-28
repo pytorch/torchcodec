@@ -12,6 +12,7 @@
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
 #include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
+#include "src/torchcodec/decoders/_core/DeviceInterface.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
@@ -205,16 +206,8 @@ void _add_video_stream(
     }
   }
   if (device.has_value()) {
-    if (device.value() == "cpu") {
-      videoStreamOptions.device = torch::Device(torch::kCPU);
-    } else if (device.value().rfind("cuda", 0) == 0) { // starts with "cuda"
-      std::string deviceStr(device.value());
-      videoStreamOptions.device = torch::Device(deviceStr);
-    } else {
-      throw std::runtime_error(
-          "Invalid device=" + std::string(device.value()) +
-          ". device must be either cpu or cuda.");
-    }
+    videoStreamOptions.device =
+        createDeviceInterface(std::string(device.value()));
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

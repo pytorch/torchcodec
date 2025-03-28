@@ -4,7 +4,7 @@
 #include <torch/types.h>
 #include <mutex>
 
-#include "src/torchcodec/decoders/_core/DeviceInterface.h"
+#include "src/torchcodec/decoders/_core/CudaDevice.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
 
@@ -15,6 +15,10 @@ extern "C" {
 
 namespace facebook::torchcodec {
 namespace {
+
+bool g_cuda = registerDeviceInterface("cuda", [](const std::string& device) {
+  return new CudaDevice(device);
+});
 
 // We reuse cuda contexts across VideoDeoder instances. This is because
 // creating a cuda context is expensive. The cache mechanism is as follows:
@@ -156,39 +160,29 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
       device, nonNegativeDeviceIndex, type);
 #endif
 }
-
-void throwErrorIfNonCudaDevice(const torch::Device& device) {
-  TORCH_CHECK(
-      device.type() != torch::kCPU,
-      "Device functions should only be called if the device is not CPU.")
-  if (device.type() != torch::kCUDA) {
-    throw std::runtime_error("Unsupported device: " + device.str());
-  }
-}
 } // namespace
 
-void releaseContextOnCuda(
-    const torch::Device& device,
-    AVCodecContext* codecContext) {
-  throwErrorIfNonCudaDevice(device);
-  addToCacheIfCacheHasCapacity(device, codecContext);
+CudaDevice::CudaDevice(const std::string& device) : DeviceInterface(device) {
+  if (device_.type() != torch::kCUDA) {
+    throw std::runtime_error("Unsupported device: " + device_.str());
+  }
 }
 
-void initializeContextOnCuda(
-    const torch::Device& device,
-    AVCodecContext* codecContext) {
-  throwErrorIfNonCudaDevice(device);
+void CudaDevice::releaseContext(AVCodecContext* codecContext) {
+  addToCacheIfCacheHasCapacity(device_, codecContext);
+}
+
+void CudaDevice::initializeContext(AVCodecContext* codecContext) {
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
   // This is a dummy tensor to initialize the cuda context.
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
-      {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device));
-  codecContext->hw_device_ctx = getCudaContext(device);
+      {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
+  codecContext->hw_device_ctx = getCudaContext(device_);
   return;
 }
 
-void convertAVFrameToFrameOutputOnCuda(
-    const torch::Device& device,
+void CudaDevice::convertAVFrameToFrameOutput(
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
     UniqueAVFrame& avFrame,
     VideoDecoder::FrameOutput& frameOutput,
@@ -215,11 +209,11 @@ void convertAVFrameToFrameOutputOnCuda(
         "x3, got ",
         shape);
   } else {
-    dst = allocateEmptyHWCTensor(height, width, videoStreamOptions.device);
+    dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
   // Use the user-requested GPU for running the NPP kernel.
-  c10::cuda::CUDAGuard deviceGuard(device);
+  c10::cuda::CUDAGuard deviceGuard(device_);
 
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
@@ -247,7 +241,7 @@ void convertAVFrameToFrameOutputOnCuda(
   // output.
   at::cuda::CUDAEvent nppDoneEvent;
   at::cuda::CUDAStream nppStreamWrapper =
-      c10::cuda::getStreamFromExternal(nppGetStream(), device.index());
+      c10::cuda::getStreamFromExternal(nppGetStream(), device_.index());
   nppDoneEvent.record(nppStreamWrapper);
   nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
 
@@ -262,11 +256,7 @@ void convertAVFrameToFrameOutputOnCuda(
 // we have to do this because of an FFmpeg bug where hardware decoding is not
 // appropriately set, so we just go off and find the matching codec for the CUDA
 // device
-std::optional<const AVCodec*> findCudaCodec(
-    const torch::Device& device,
-    const AVCodecID& codecId) {
-  throwErrorIfNonCudaDevice(device);
-
+std::optional<const AVCodec*> CudaDevice::findCodec(const AVCodecID& codecId) {
   void* i = nullptr;
   const AVCodec* codec = nullptr;
   while ((codec = av_codec_iterate(&i)) != nullptr) {

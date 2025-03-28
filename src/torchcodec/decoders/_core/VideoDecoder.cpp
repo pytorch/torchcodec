@@ -98,11 +98,8 @@ VideoDecoder::VideoDecoder(
 VideoDecoder::~VideoDecoder() {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     auto& device = streamInfo.videoStreamOptions.device;
-    if (device.type() == torch::kCPU) {
-    } else if (device.type() == torch::kCUDA) {
-      releaseContextOnCuda(device, streamInfo.codecContext.get());
-    } else {
-      TORCH_CHECK(false, "Invalid device type: " + device.str());
+    if (device) {
+      device->releaseContext(streamInfo.codecContext.get());
     }
   }
 }
@@ -391,7 +388,7 @@ torch::Tensor VideoDecoder::getKeyFrameIndices() {
 void VideoDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
-    const torch::Device& device,
+    DeviceInterface* device,
     std::optional<int> ffmpegThreadCount) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
@@ -429,10 +426,12 @@ void VideoDecoder::addStream(
 
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
-            .value_or(avCodec));
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (device) {
+      avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+          device->findCodec(streamInfo.stream->codecpar->codec_id)
+              .value_or(avCodec));
+    }
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
@@ -447,8 +446,10 @@ void VideoDecoder::addStream(
   streamInfo.codecContext->pkt_timebase = streamInfo.stream->time_base;
 
   // TODO_CODE_QUALITY same as above.
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    initializeContextOnCuda(device, codecContext);
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (device) {
+      device->initializeContext(codecContext);
+    }
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
@@ -474,15 +475,10 @@ void VideoDecoder::addStream(
 void VideoDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions) {
-  TORCH_CHECK(
-      videoStreamOptions.device.type() == torch::kCPU ||
-          videoStreamOptions.device.type() == torch::kCUDA,
-      "Invalid device type: " + videoStreamOptions.device.str());
-
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
-      videoStreamOptions.device,
+      videoStreamOptions.device.get(),
       videoStreamOptions.ffmpegThreadCount);
 
   auto& streamMetadata =
@@ -1216,20 +1212,15 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
+  } else if (!streamInfo.videoStreamOptions.device) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
-    convertAVFrameToFrameOutputOnCuda(
-        streamInfo.videoStreamOptions.device,
+  } else if (streamInfo.videoStreamOptions.device) {
+    streamInfo.videoStreamOptions.device->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,
         preAllocatedOutputTensor);
-  } else {
-    TORCH_CHECK(
-        false,
-        "Invalid device type: " + streamInfo.videoStreamOptions.device.str());
   }
   return frameOutput;
 }
@@ -1568,8 +1559,10 @@ VideoDecoder::FrameBatchOutput::FrameBatchOutput(
       videoStreamOptions, streamMetadata);
   int height = frameDims.height;
   int width = frameDims.width;
-  data = allocateEmptyHWCTensor(
-      height, width, videoStreamOptions.device, numFrames);
+  torch::Device device = (videoStreamOptions.device)
+      ? videoStreamOptions.device->device()
+      : torch::kCPU;
+  data = allocateEmptyHWCTensor(height, width, device, numFrames);
 }
 
 torch::Tensor allocateEmptyHWCTensor(

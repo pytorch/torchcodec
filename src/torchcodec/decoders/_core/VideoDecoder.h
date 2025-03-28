@@ -17,6 +17,8 @@
 
 namespace facebook::torchcodec {
 
+class DeviceInterface;
+
 // The VideoDecoder class can be used to decode video frames to Tensors.
 // Note that VideoDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
@@ -138,7 +140,7 @@ class VideoDecoder {
     std::optional<int> height;
     std::optional<ColorConversionLibrary> colorConversionLibrary;
     // By default we use CPU for decoding for both C++ and python users.
-    torch::Device device = torch::kCPU;
+    std::shared_ptr<DeviceInterface> device;
   };
 
   struct AudioStreamOptions {
@@ -459,7 +461,7 @@ class VideoDecoder {
   void addStream(
       int streamIndex,
       AVMediaType mediaType,
-      const torch::Device& device = torch::kCPU,
+      DeviceInterface* device = nullptr,
       std::optional<int> ffmpegThreadCount = std::nullopt);
 
   // Returns the "best" stream index for a given media type. The "best" is
