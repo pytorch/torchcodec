@@ -13,7 +13,6 @@ import pandas as pd
 
 import torch
 import torch.utils.benchmark as benchmark
-from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
 from torchcodec._core import (
     _add_video_stream,
@@ -24,6 +23,7 @@ from torchcodec._core import (
     get_next_frame,
     seek_to_pts,
 )
+from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
 torch._dynamo.config.cache_size_limit = 100
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
