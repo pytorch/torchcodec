@@ -5,6 +5,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 #include <c10/util/Flags.h>

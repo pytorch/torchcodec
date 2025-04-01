@@ -36,7 +36,7 @@ bool registerDeviceInterface(
   return true;
 }
 
-std::shared_ptr<DeviceInterface> createDeviceInterface(
+std::unique_ptr<DeviceInterface> createDeviceInterface(
     const std::string device) {
   // TODO: remove once DeviceInterface for CPU is implemented
   if (device == "cpu") {
@@ -50,7 +50,7 @@ std::shared_ptr<DeviceInterface> createDeviceInterface(
       "Unsupported device: ",
       device);
 
-  return std::shared_ptr<DeviceInterface>(g_interface_map[deviceType](device));
+  return std::unique_ptr<DeviceInterface>(g_interface_map[deviceType](device));
 }
 
 } // namespace facebook::torchcodec

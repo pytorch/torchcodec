@@ -59,7 +59,7 @@ bool registerDeviceInterface(
     const std::string deviceType,
     const CreateDeviceInterfaceFn createInterface);
 
-std::shared_ptr<DeviceInterface> createDeviceInterface(
+std::unique_ptr<DeviceInterface> createDeviceInterface(
     const std::string device);
 
 } // namespace facebook::torchcodec
