@@ -114,6 +114,8 @@ class TestAudioStreamInfo:
 
 @dataclass
 class TestContainerFile:
+    __test__ = False  # prevents pytest from thinking this is a test class
+
     filename: str
 
     default_stream_index: int

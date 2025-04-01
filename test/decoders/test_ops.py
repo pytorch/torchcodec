@@ -21,10 +21,12 @@ from torchcodec.decoders._core import (
     _test_frame_pts_equality,
     add_audio_stream,
     add_video_stream,
+    create_encoder,
     create_from_bytes,
     create_from_file,
     create_from_file_like,
     create_from_tensor,
+    encode,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -48,6 +50,7 @@ from ..utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    TestContainerFile,
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
@@ -55,7 +58,7 @@ torch._dynamo.config.capture_dynamic_output_shape_ops = True
 INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
-class TestVideoOps:
+class TestVideoDecoderOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -632,7 +635,7 @@ class TestVideoOps:
         )
 
 
-class TestAudioOps:
+class TestAudioDecoderOps:
     @pytest.mark.parametrize(
         "method",
         (
@@ -921,6 +924,34 @@ class TestAudioOps:
         frames_downsampled_to_8000 = get_all_frames(SINE_MONO_S32, sample_rate=8000)
 
         torch.testing.assert_close(frames_downsampled_to_8000, frames_8000_native)
+
+
+class TestAudioEncoderOps:
+
+    def decode(self, source) -> torch.Tensor:
+        if isinstance(source, TestContainerFile):
+            source = str(source.path)
+        else:
+            source = str(source)
+        decoder = create_from_file(source, seek_mode="approximate")
+        add_audio_stream(decoder)
+        frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=None
+        )
+        return frames
+
+    def test_round_trip(self, tmp_path):
+        asset = SINE_MONO_S32
+        source_samples = self.decode(asset)
+
+        output_file = tmp_path / "output.mp3"
+        encoder = create_encoder(
+            sample_rate=asset.sample_rate, filename=str(output_file)
+        )
+        encode(encoder, source_samples)
+
+        round_trip_samples = self.decode(output_file)
+        torch.testing.assert_close(source_samples, round_trip_samples)
 
 
 if __name__ == "__main__":
