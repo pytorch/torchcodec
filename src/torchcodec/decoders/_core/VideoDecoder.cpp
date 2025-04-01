@@ -101,6 +101,8 @@ VideoDecoder::~VideoDecoder() {
     if (device.type() == torch::kCPU) {
     } else if (device.type() == torch::kCUDA) {
       releaseContextOnCuda(device, streamInfo.codecContext.get());
+    } else if (device.type() == torch::kXPU) {
+      releaseContextOnXpu(device, streamInfo.codecContext.get());
     } else {
       TORCH_CHECK(false, "Invalid device type: " + device.str());
     }
@@ -429,10 +431,16 @@ void VideoDecoder::addStream(
 
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
-            .value_or(avCodec));
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (device.type() == torch::kCUDA) {
+      avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+          findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
+              .value_or(avCodec));
+    } else if (device.type() == torch::kXPU) {
+      avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+          findXpuCodec(device, streamInfo.stream->codecpar->codec_id)
+              .value_or(avCodec));
+    }
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
@@ -447,8 +455,12 @@ void VideoDecoder::addStream(
   streamInfo.codecContext->pkt_timebase = streamInfo.stream->time_base;
 
   // TODO_CODE_QUALITY same as above.
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    initializeContextOnCuda(device, codecContext);
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (device.type() == torch::kCUDA) {
+      initializeContextOnCuda(device, codecContext);
+    } else if (device.type() == torch::kXPU) {
+      initializeContextOnXpu(device, codecContext);
+    }
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
@@ -476,7 +488,8 @@ void VideoDecoder::addVideoStream(
     const VideoStreamOptions& videoStreamOptions) {
   TORCH_CHECK(
       videoStreamOptions.device.type() == torch::kCPU ||
-          videoStreamOptions.device.type() == torch::kCUDA,
+          videoStreamOptions.device.type() == torch::kCUDA ||
+          videoStreamOptions.device.type() == torch::kXPU,
       "Invalid device type: " + videoStreamOptions.device.str());
 
   addStream(
@@ -1221,6 +1234,13 @@ VideoDecoder::FrameOutput VideoDecoder::convertAVFrameToFrameOutput(
         avFrame, frameOutput, preAllocatedOutputTensor);
   } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
     convertAVFrameToFrameOutputOnCuda(
+        streamInfo.videoStreamOptions.device,
+        streamInfo.videoStreamOptions,
+        avFrame,
+        frameOutput,
+        preAllocatedOutputTensor);
+  } else if (streamInfo.videoStreamOptions.device.type() == torch::kXPU) {
+    convertAVFrameToFrameOutputOnXpu(
         streamInfo.videoStreamOptions.device,
         streamInfo.videoStreamOptions,
         avFrame,

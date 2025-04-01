@@ -14,6 +14,7 @@ namespace facebook::torchcodec {
   TORCH_CHECK(false, "Unsupported device: " + device.str());
 }
 
+#ifndef ENABLE_CUDA
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
     [[maybe_unused]] const VideoDecoder::VideoStreamOptions& videoStreamOptions,
@@ -40,5 +41,35 @@ std::optional<const AVCodec*> findCudaCodec(
     [[maybe_unused]] const AVCodecID& codecId) {
   throwUnsupportedDeviceError(device);
 }
+#endif // ENABLE_CUDA
+
+#ifndef ENABLE_XPU
+void convertAVFrameToFrameOutputOnXpu(
+    const torch::Device& device,
+    [[maybe_unused]] const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] UniqueAVFrame& avFrame,
+    [[maybe_unused]] VideoDecoder::FrameOutput& frameOutput,
+    [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  throwUnsupportedDeviceError(device);
+}
+
+void initializeContextOnXpu(
+    const torch::Device& device,
+    [[maybe_unused]] AVCodecContext* codecContext) {
+  throwUnsupportedDeviceError(device);
+}
+
+void releaseContextOnXpu(
+    const torch::Device& device,
+    [[maybe_unused]] AVCodecContext* codecContext) {
+  throwUnsupportedDeviceError(device);
+}
+
+std::optional<const AVCodec*> findXpuCodec(
+    const torch::Device& device,
+    [[maybe_unused]] const AVCodecID& codecId) {
+  throwUnsupportedDeviceError(device);
+}
+#endif // ENABLE_XPU
 
 } // namespace facebook::torchcodec
