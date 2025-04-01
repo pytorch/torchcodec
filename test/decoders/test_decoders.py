@@ -285,6 +285,11 @@ class TestVideoDecoder:
                 # See https://github.com/pytorch/torchcodec/issues/428
                 assert_frames_equal(sliced, ref)
 
+    def test_device_instance(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/602
+        decoder = VideoDecoder(NASA_VIDEO.path, device=torch.device("cpu"))
+        assert isinstance(decoder.metadata, VideoStreamMetadata)
+
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_getitem_fails(self, device, seek_mode):
