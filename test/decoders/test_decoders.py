@@ -11,9 +11,8 @@ import pytest
 import torch
 from torchcodec import FrameBatch
 
-from torchcodec.decoders import _core, VideoDecoder, VideoStreamMetadata
-from torchcodec.decoders._audio_decoder import AudioDecoder
-from torchcodec._core._metadata import AudioStreamMetadata
+from torchcodec import _core
+from torchcodec.decoders import  VideoDecoder, VideoStreamMetadata, AudioDecoder, AudioStreamMetadata
 
 from ..utils import (
     assert_frames_equal,

@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from ._audio_decoder import AudioDecoder  # noqa
-from ._core import AudioStreamMetadata, VideoStreamMetadata
+from .._core import AudioStreamMetadata, VideoStreamMetadata
 from ._video_decoder import VideoDecoder  # noqa
 
 SimpleVideoDecoder = VideoDecoder

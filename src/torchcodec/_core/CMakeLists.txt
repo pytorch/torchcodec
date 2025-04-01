@@ -20,7 +20,7 @@ function(make_torchcodec_sublibrary
     set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
     target_include_directories(${library_name}
         PRIVATE
-        ./../../../../
+        ./../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
     )
