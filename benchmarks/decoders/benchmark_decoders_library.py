@@ -15,7 +15,7 @@ import torch
 import torch.utils.benchmark as benchmark
 from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
-from torchcodec.decoders._core import (
+from torchcodec._core import (
     _add_video_stream,
     create_from_file,
     get_frames_at_indices,

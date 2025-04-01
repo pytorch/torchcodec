@@ -12,7 +12,7 @@ import pytest
 
 import torch
 
-from torchcodec.decoders._core import get_ffmpeg_library_versions
+from torchcodec._core import get_ffmpeg_library_versions
 
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are

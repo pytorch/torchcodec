@@ -12,7 +12,7 @@ from typing import List, Optional, Union
 
 import torch
 
-from torchcodec.decoders._core.ops import (
+from torchcodec._core.ops import (
     _get_container_json_metadata,
     _get_stream_json_metadata,
     create_from_file,

@@ -25,7 +25,7 @@ namespace facebook::torchcodec {
 //   https://github.com/pytorch/pytorch/tree/main/aten/src/ATen/native#readme
 TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
-      "torchcodec.decoders._core.ops", "//pytorch/torchcodec:torchcodec");
+      "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");

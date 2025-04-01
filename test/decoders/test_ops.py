@@ -16,7 +16,7 @@ import pytest
 
 import torch
 
-from torchcodec.decoders._core import (
+from torchcodec._core import (
     _add_video_stream,
     _test_frame_pts_equality,
     add_audio_stream,
