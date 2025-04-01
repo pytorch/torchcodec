@@ -23,8 +23,6 @@ class DeviceInterface;
 // Do not call non-const APIs concurrently on the same object.
 class SingleStreamDecoder {
  public:
-  ~SingleStreamDecoder();
-
   // --------------------------------------------------------------------------
   // CONSTRUCTION API
   // --------------------------------------------------------------------------

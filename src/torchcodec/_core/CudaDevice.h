@@ -14,7 +14,7 @@ class CudaDevice : public DeviceInterface {
  public:
   CudaDevice(const torch::Device& device);
 
-  virtual ~CudaDevice(){};
+  virtual ~CudaDevice();
 
   std::optional<const AVCodec*> findCodec(const AVCodecID& codecId) override;
 
@@ -27,7 +27,8 @@ class CudaDevice : public DeviceInterface {
       std::optional<torch::Tensor> preAllocatedOutputTensor =
           std::nullopt) override;
 
-  void releaseContext(AVCodecContext* codecContext) override;
+ private:
+  AVBufferRef* ctx_ = nullptr;
 };
 
 } // namespace facebook::torchcodec

@@ -92,15 +92,6 @@ SingleStreamDecoder::SingleStreamDecoder(
   initializeDecoder();
 }
 
-SingleStreamDecoder::~SingleStreamDecoder() {
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    auto& deviceInterface = streamInfo.deviceInterface;
-    if (deviceInterface) {
-      deviceInterface->releaseContext(streamInfo.codecContext.get());
-    }
-  }
-}
-
 void SingleStreamDecoder::initializeDecoder() {
   TORCH_CHECK(!initialized_, "Attempted double initialization.");
 

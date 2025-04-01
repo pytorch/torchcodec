@@ -46,8 +46,6 @@ class DeviceInterface {
       SingleStreamDecoder::FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
 
-  virtual void releaseContext(AVCodecContext* codecContext) = 0;
-
  protected:
   torch::Device device_;
 };

@@ -53,7 +53,7 @@ torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
 
 void addToCacheIfCacheHasCapacity(
     const torch::Device& device,
-    AVCodecContext* codecContext) {
+    AVBufferRef* hwContext) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
   if (static_cast<int>(deviceIndex) >= MAX_CUDA_GPUS) {
     return;
@@ -64,8 +64,7 @@ void addToCacheIfCacheHasCapacity(
           MAX_CONTEXTS_PER_GPU_IN_CACHE) {
     return;
   }
-  g_cached_hw_device_ctxs[deviceIndex].push_back(codecContext->hw_device_ctx);
-  codecContext->hw_device_ctx = nullptr;
+  g_cached_hw_device_ctxs[deviceIndex].push_back(av_buffer_ref(hwContext));
 }
 
 AVBufferRef* getFromCache(const torch::Device& device) {
@@ -170,17 +169,23 @@ CudaDevice::CudaDevice(const torch::Device& device) : DeviceInterface(device) {
   }
 }
 
-void CudaDevice::releaseContext(AVCodecContext* codecContext) {
-  addToCacheIfCacheHasCapacity(device_, codecContext);
+CudaDevice::~CudaDevice() {
+  if (ctx_) {
+    addToCacheIfCacheHasCapacity(device_, ctx_);
+    av_buffer_unref(&ctx_);
+  }
 }
 
 void CudaDevice::initializeContext(AVCodecContext* codecContext) {
+  TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
+
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
   // This is a dummy tensor to initialize the cuda context.
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
-  codecContext->hw_device_ctx = getCudaContext(device_);
+  ctx_ = getCudaContext(device_);
+  codecContext->hw_device_ctx = av_buffer_ref(ctx_);
   return;
 }
 
