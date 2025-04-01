@@ -2108,19 +2108,21 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  // I think this will use the default. TODO Should let user choose for
-  // compressed formats like mp3.
+  // This will use the default bit rate
+  // TODO-ENCODING Should let user choose for compressed formats like mp3.
   avCodecContext_->bit_rate = 0;
 
-  // TODO A given encoder only supports a finite set of output sample rates.
-  // FFmpeg raises informative error message. Are we happy with that, or do we
-  // run our own checks by checking against avCodec->supported_samplerates?
+  // FFmpeg will raise a reasonably informative error if the desired sample rate
+  // isn't supported by the encoder.
   avCodecContext_->sample_rate = sampleRate_;
 
   // Note: This is the format of the **input** waveform. This doesn't determine
-  // the output. TODO check contiguity of the input wf to ensure that it is
-  // indeed planar.
-  // TODO What if the encoder doesn't support FLTP? Like flac?
+  // the output.
+  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
+  // planar.
+  // TODO-ENCODING If the encoder doesn't support FLTP (like flac), FFmpeg will
+  // raise. We need to handle this, probably converting the format with
+  // libswresample.
   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
 
   AVChannelLayout channel_layout;
@@ -2177,8 +2179,8 @@ void Encoder::encode(const torch::Tensor& wf) {
   auto numBytesPerChannel = wf.sizes()[1] * numBytesPerSample;
 
   TORCH_CHECK(
-      // TODO is this even true / needed? We can probably support more with
-      // non-planar data?
+      // TODO-ENCODING is this even true / needed? We can probably support more
+      // with non-planar data?
       numChannels <= AV_NUM_DATA_POINTERS,
       "Trying to encode ",
       numChannels,
@@ -2208,14 +2210,14 @@ void Encoder::encode(const torch::Tensor& wf) {
           avFrame->data[ch], pWf + ch * numBytesPerChannel, numBytesToEncode);
     }
     pWf += numBytesToEncode;
-    encode_inner_loop(autoAVPacket, avFrame.get());
+    encode_inner_loop(autoAVPacket, avFrame);
 
     avFrame->pts += avFrame->nb_samples;
     numEncodedSamples += numSamplesToEncode;
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 
-  encode_inner_loop(autoAVPacket, nullptr); // flush
+  encode_inner_loop(autoAVPacket, UniqueAVFrame(nullptr)); // flush
 
   ffmpegRet = av_write_trailer(avFormatContext_.get());
   TORCH_CHECK(
@@ -2224,8 +2226,10 @@ void Encoder::encode(const torch::Tensor& wf) {
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 }
 
-void Encoder::encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame) {
-  auto ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame);
+void Encoder::encode_inner_loop(
+    AutoAVPacket& autoAVPacket,
+    const UniqueAVFrame& avFrame) {
+  auto ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Error while sending frame: ",
@@ -2235,7 +2239,7 @@ void Encoder::encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame) {
     ReferenceAVPacket packet(autoAVPacket);
     ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), packet.get());
     if (ffmpegRet == AVERROR(EAGAIN) || ffmpegRet == AVERROR_EOF) {
-      // TODO this is from TorchAudio, probably needed, but not sure.
+      // TODO-ENCODING this is from TorchAudio, probably needed, but not sure.
       //   if (ffmpegRet == AVERROR_EOF) {
       //     ffmpegRet = av_interleaved_write_frame(avFormatContext_.get(),
       //     nullptr); TORCH_CHECK(
@@ -2250,7 +2254,7 @@ void Encoder::encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame) {
         "Error receiving packet: ",
         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
 
-    // TODO why are these 2 lines needed??
+    // TODO-ENCODING why are these 2 lines needed??
     av_packet_rescale_ts(
         packet.get(), avCodecContext_->time_base, avStream_->time_base);
     packet->stream_index = avStream_->index;

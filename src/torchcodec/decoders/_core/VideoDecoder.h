@@ -600,7 +600,9 @@ class Encoder {
   void encode(const torch::Tensor& wf);
 
  private:
-  void encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame);
+  void encode_inner_loop(
+      AutoAVPacket& autoAVPacket,
+      const UniqueAVFrame& avFrame);
 
   UniqueAVFormatContextForEncoding avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
