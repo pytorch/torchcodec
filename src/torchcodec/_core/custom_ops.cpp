@@ -10,8 +10,8 @@
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
-#include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
 

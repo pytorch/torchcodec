@@ -12,8 +12,8 @@
 #include <ostream>
 #include <string_view>
 
-#include "src/torchcodec/decoders/_core/AVIOContextHolder.h"
-#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
+#include "src/torchcodec/_core/AVIOContextHolder.h"
+#include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 

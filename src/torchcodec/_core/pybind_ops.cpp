@@ -9,8 +9,8 @@
 #include <cstdint>
 #include <string>
 
-#include "src/torchcodec/decoders/_core/AVIOFileLikeContext.h"
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/AVIOFileLikeContext.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
 
 namespace py = pybind11;
 
