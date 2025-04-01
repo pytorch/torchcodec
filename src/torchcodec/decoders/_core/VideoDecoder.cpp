@@ -2145,7 +2145,7 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
 }
 
-torch::Tensor Encoder::encode(const torch::Tensor& wf) {
+void Encoder::encode(const torch::Tensor& wf) {
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   avFrame->nb_samples = avCodecContext_->frame_size;
@@ -2222,9 +2222,6 @@ torch::Tensor Encoder::encode(const torch::Tensor& wf) {
       ffmpegRet == AVSUCCESS,
       "Error in: av_write_trailer",
       getFFMPEGErrorStringFromErrorCode(ffmpegRet));
-
-  // TODO handle writing to output uint8 tensor with AVIO logic.
-  return torch::empty({10});
 }
 
 void Encoder::encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame) {

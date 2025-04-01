@@ -29,7 +29,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec.decoders._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def("create_encoder(int sample_rate, str filename) -> Tensor");
-  m.def("encode(Tensor(a!) encoder, Tensor wf) -> Tensor");
+  m.def("encode(Tensor(a!) encoder, Tensor wf) -> ()");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -151,9 +151,9 @@ at::Tensor create_encoder(int64_t sample_rate, std::string_view file_name) {
   return wrapEncoderPointerToTensor(std::move(uniqueEncoder));
 }
 
-at::Tensor encode(at::Tensor& encoder, const at::Tensor& wf) {
+void encode(at::Tensor& encoder, const at::Tensor& wf) {
   auto encoder_ = unwrapTensorToGetEncoder(encoder);
-  return encoder_->encode(wf);
+  encoder_->encode(wf);
 }
 
 at::Tensor create_from_tensor(

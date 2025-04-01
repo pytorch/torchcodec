@@ -597,7 +597,7 @@ class Encoder {
   // TODO doesn't make much sense to pass fileName and the wf tensor in 2
   // different calls. Same with sampleRate.
   Encoder(int sampleRate, std::string_view fileName);
-  torch::Tensor encode(const torch::Tensor& wf);
+  void encode(const torch::Tensor& wf);
 
  private:
   void encode_inner_loop(AutoAVPacket& autoAVPacket, AVFrame* avFrame);
