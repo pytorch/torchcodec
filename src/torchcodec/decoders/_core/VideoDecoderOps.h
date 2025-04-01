@@ -28,13 +28,6 @@ at::Tensor create_from_tensor(
     at::Tensor video_tensor,
     std::optional<std::string_view> seek_mode = std::nullopt);
 
-// This API is C++ only and will not be exposed via custom ops, use
-// videodecoder_create_from_bytes in Python
-at::Tensor create_from_buffer(
-    const void* buffer,
-    size_t length,
-    std::optional<std::string_view> seek_mode = std::nullopt);
-
 // Add a new video stream at `stream_index` using the provided options.
 void add_video_stream(
     at::Tensor& decoder,
@@ -54,6 +47,11 @@ void _add_video_stream(
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt);
+
+void add_audio_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<int64_t> sample_rate = std::nullopt);
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds);
@@ -76,6 +74,12 @@ using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 //   3. Tensor of N durationis in seconds, where each duration is a
 //   single float.
 using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
+// The elements of this tuple are all tensors that represent the concatenation
+// of multiple audio frames:
+//   1. The frames data (concatenated)
+//   2. A single float value for the pts of the first frame, in seconds.
+using OpsAudioFramesOutput = std::tuple<at::Tensor, at::Tensor>;
 
 // Return the frame that is visible at a given timestamp in seconds. Each frame
 // in FFMPEG has a presentation timestamp and a duration. The frame visible at a
@@ -114,6 +118,11 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
     double start_seconds,
     double stop_seconds);
+
+OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
+    at::Tensor& decoder,
+    double start_seconds,
+    std::optional<double> stop_seconds = std::nullopt);
 
 // For testing only. We need to implement this operation as a core library
 // function because what we're testing is round-tripping pts values as

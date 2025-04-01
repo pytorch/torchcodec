@@ -1,10 +1,13 @@
 import pytest
 import torch
-from torchcodec import Frame, FrameBatch
+from torchcodec import AudioSamples, Frame, FrameBatch
 
 
-def test_frame_unpacking():
+def test_unpacking():
     data, pts_seconds, duration_seconds = Frame(torch.rand(3, 4, 5), 2, 3)  # noqa
+    data, pts_seconds, duration_seconds, sample_rate = AudioSamples(
+        torch.rand(2, 4), 2, 3, 16_000
+    )
 
 
 def test_frame_error():
@@ -139,3 +142,20 @@ def test_framebatch_indexing():
     fb_fancy = fb[[[0], [1]]]  # select T=0 and N=1.
     assert isinstance(fb_fancy, FrameBatch)
     assert fb_fancy.data.shape == (1, C, H, W)
+
+
+def test_audio_samples_error():
+    with pytest.raises(ValueError, match="data must be 2-dimensional"):
+        AudioSamples(
+            data=torch.rand(1),
+            pts_seconds=1,
+            duration_seconds=1,
+            sample_rate=16_000,
+        )
+    with pytest.raises(ValueError, match="data must be 2-dimensional"):
+        AudioSamples(
+            data=torch.rand(1, 2, 3),
+            pts_seconds=1,
+            duration_seconds=1,
+            sample_rate=16_000,
+        )

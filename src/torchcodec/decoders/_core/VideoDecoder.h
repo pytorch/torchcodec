@@ -12,6 +12,7 @@
 #include <ostream>
 #include <string_view>
 
+#include "src/torchcodec/decoders/_core/AVIOContextHolder.h"
 #include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -34,11 +35,12 @@ class VideoDecoder {
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // Creates a VideoDecoder from a given buffer. Note that the buffer is not
-  // owned by the VideoDecoder.
+  // Creates a VideoDecoder using the provided AVIOContext inside the
+  // AVIOContextHolder. The AVIOContextHolder is the base class, and the
+  // derived class will have specialized how the custom read, seek and writes
+  // work.
   explicit VideoDecoder(
-      const void* buffer,
-      size_t length,
+      std::unique_ptr<AVIOContextHolder> context,
       SeekMode seekMode = SeekMode::exact);
 
   // --------------------------------------------------------------------------
@@ -59,6 +61,7 @@ class VideoDecoder {
     std::optional<AVCodecID> codecId;
     std::optional<std::string> codecName;
     std::optional<double> durationSeconds;
+    std::optional<double> beginStreamFromHeader;
     std::optional<int64_t> numFrames;
     std::optional<int64_t> numKeyFrames;
     std::optional<double> averageFps;
@@ -77,6 +80,11 @@ class VideoDecoder {
     // Video-only fields derived from the AVCodecContext.
     std::optional<int64_t> width;
     std::optional<int64_t> height;
+
+    // Audio-only fields
+    std::optional<int64_t> sampleRate;
+    std::optional<int64_t> numChannels;
+    std::optional<std::string> sampleFormat;
   };
 
   struct ContainerMetadata {
@@ -116,7 +124,6 @@ class VideoDecoder {
   struct VideoStreamOptions {
     VideoStreamOptions() {}
 
-    explicit VideoStreamOptions(const std::string& optionsString);
     // Number of threads we pass to FFMPEG for decoding.
     // 0 means FFMPEG will choose the number of threads automatically to fully
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
@@ -134,12 +141,16 @@ class VideoDecoder {
     torch::Device device = torch::kCPU;
   };
 
-  struct AudioStreamOptions {};
+  struct AudioStreamOptions {
+    AudioStreamOptions() {}
+
+    std::optional<int> sampleRate;
+  };
 
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStreamDecoder(
+  void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
 
@@ -147,14 +158,18 @@ class VideoDecoder {
   // DECODING AND SEEKING APIs
   // --------------------------------------------------------------------------
 
-  // All public decoding entry points return either a FrameOutput or a
+  // All public video decoding entry points return either a FrameOutput or a
   // FrameBatchOutput.
   // They are the equivalent of the user-facing Frame and FrameBatch classes in
   // Python. They contain RGB decoded frames along with some associated data
   // like PTS and duration.
+  // FrameOutput is also relevant for audio decoding, typically as the output of
+  // getNextFrame(), or as a temporary output variable.
   struct FrameOutput {
-    torch::Tensor data; // 3D: of shape CHW or HWC.
-    int streamIndex;
+    // data shape is:
+    // - 3D (C, H, W) or (H, W, C) for videos
+    // - 2D (numChannels, numSamples) for audio
+    torch::Tensor data;
     double ptsSeconds;
     double durationSeconds;
   };
@@ -168,6 +183,11 @@ class VideoDecoder {
         int64_t numFrames,
         const VideoStreamOptions& videoStreamOptions,
         const StreamMetadata& streamMetadata);
+  };
+
+  struct AudioFramesOutput {
+    torch::Tensor data; // shape is (numChannels, numSamples)
+    double ptsSeconds;
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
@@ -221,6 +241,10 @@ class VideoDecoder {
       double startSeconds,
       double stopSeconds);
 
+  AudioFramesOutput getFramesPlayedInRangeAudio(
+      double startSeconds,
+      std::optional<double> stopSecondsOptional = std::nullopt);
+
   class EndOfFileException : public std::runtime_error {
    public:
     explicit EndOfFileException(const std::string& msg)
@@ -232,23 +256,6 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
   // These are APIs that should be private, but that are effectively exposed for
   // practical reasons, typically for testing purposes.
-
-  // This struct is needed because AVFrame doesn't retain the streamIndex. Only
-  // the AVPacket knows its stream. This is what the low-level private decoding
-  // entry points return. The AVFrameStream is then converted to a FrameOutput
-  // with convertAVFrameToFrameOutput. It should be private, but is currently
-  // used by DeviceInterface.
-  struct AVFrameStream {
-    // The actual decoded output as a unique pointer to an AVFrame.
-    // Usually, this is a YUV frame. It'll be converted to RGB in
-    // convertAVFrameToFrameOutput.
-    UniqueAVFrame avFrame;
-    // The stream index of the decoded frame.
-    int streamIndex;
-
-    explicit AVFrameStream(UniqueAVFrame&& a, int s)
-        : avFrame(std::move(a)), streamIndex(s) {}
-  };
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
   // can move it back to private.
@@ -322,6 +329,8 @@ class VideoDecoder {
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
+    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+
     AVRational timeBase = {};
     UniqueAVCodecContext codecContext;
 
@@ -330,22 +339,20 @@ class VideoDecoder {
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
 
-    // The current position of the cursor in the stream, and associated frame
-    // duration.
+    // TODO since the decoder is single-stream, these should be decoder fields,
+    // not streamInfo fields. And they should be defined right next to
+    // `cursor_`, with joint documentation.
     int64_t lastDecodedAvFramePts = 0;
     int64_t lastDecodedAvFrameDuration = 0;
-    // The desired position of the cursor in the stream. We send frames >=
-    // this pts to the user when they request a frame.
-    // We update this field if the user requested a seek. This typically
-    // corresponds to the decoder's desiredPts_ attribute.
-    int64_t discardFramesBeforePts = INT64_MIN;
     VideoStreamOptions videoStreamOptions;
+    AudioStreamOptions audioStreamOptions;
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
     FilterGraphContext filterGraphContext;
     ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
     UniqueSwsContext swsContext;
+    UniqueSwrContext swrContext;
 
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
@@ -357,15 +364,19 @@ class VideoDecoder {
   // --------------------------------------------------------------------------
 
   void initializeDecoder();
+  void setFFmpegLogLevel();
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  bool canWeAvoidSeeking(int64_t targetPts) const;
+  void setCursor(int64_t pts);
+  void setCursor(double) = delete; // prevent calls with doubles and floats
+  bool canWeAvoidSeeking() const;
 
   void maybeSeekToBeforeDesiredPts();
 
-  AVFrameStream decodeAVFrame(std::function<bool(AVFrame*)> filterFunction);
+  UniqueAVFrame decodeAVFrame(
+      std::function<bool(const UniqueAVFrame&)> filterFunction);
 
   FrameOutput getNextFrameInternal(
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
@@ -373,19 +384,33 @@ class VideoDecoder {
   torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
 
   FrameOutput convertAVFrameToFrameOutput(
-      AVFrameStream& avFrameStream,
+      UniqueAVFrame& avFrame,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
   void convertAVFrameToFrameOutputOnCPU(
-      AVFrameStream& avFrameStream,
+      UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(const AVFrame* avFrame);
+  void convertAudioAVFrameToFrameOutputOnCPU(
+      UniqueAVFrame& srcAVFrame,
+      FrameOutput& frameOutput);
+
+  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
+      const UniqueAVFrame& avFrame);
 
   int convertAVFrameToTensorUsingSwsScale(
-      const AVFrame* avFrame,
+      const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
+
+  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+      const UniqueAVFrame& srcAVFrame,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
+
+  std::optional<torch::Tensor> maybeFlushSwrBuffers();
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
@@ -400,6 +425,13 @@ class VideoDecoder {
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
+
+  void createSwrContext(
+      StreamInfo& streamInfo,
+      AVSampleFormat sourceSampleFormat,
+      AVSampleFormat desiredSampleFormat,
+      int sourceSampleRate,
+      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
@@ -424,6 +456,12 @@ class VideoDecoder {
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
 
+  void addStream(
+      int streamIndex,
+      AVMediaType mediaType,
+      const torch::Device& device = torch::kCPU,
+      std::optional<int> ffmpegThreadCount = std::nullopt);
+
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
   // See
@@ -441,7 +479,8 @@ class VideoDecoder {
   // VALIDATION UTILS
   // --------------------------------------------------------------------------
 
-  void validateActiveStream();
+  void validateActiveStream(
+      std::optional<AVMediaType> avMediaType = std::nullopt);
   void validateScannedAllStreams(const std::string& msg);
   void validateFrameIndex(
       const StreamMetadata& streamMetadata,
@@ -457,13 +496,15 @@ class VideoDecoder {
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
-  // Set when the user wants to seek and stores the desired pts that the user
-  // wants to seek to.
-  std::optional<double> desiredPtsSeconds_;
+
+  bool cursorWasJustSet_ = false;
+  // The desired position of the cursor in the stream. We send frames >= this
+  // pts to the user when they request a frame.
+  int64_t cursor_ = INT64_MIN;
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
   // Stores the AVIOContext for the input buffer.
-  std::unique_ptr<AVIOBytesContext> ioBytesContext_;
+  std::unique_ptr<AVIOContextHolder> avioContextHolder_;
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
@@ -532,7 +573,7 @@ FrameDims getHeightAndWidthFromOptionsOrMetadata(
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
     const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const AVFrame& avFrame);
+    const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
     int height,
@@ -544,6 +585,8 @@ torch::Tensor allocateEmptyHWCTensor(
 std::ostream& operator<<(
     std::ostream& os,
     const VideoDecoder::DecodeStats& stats);
+
+VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode);
 
 class Encoder {
  public:

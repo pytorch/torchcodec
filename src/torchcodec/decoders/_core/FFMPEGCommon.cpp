@@ -48,100 +48,82 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
   return std::string(errorBuffer);
 }
 
-int64_t getDuration(const UniqueAVFrame& frame) {
-  return getDuration(frame.get());
-}
-
-int64_t getDuration(const AVFrame* frame) {
+int64_t getDuration(const UniqueAVFrame& avFrame) {
 #if LIBAVUTIL_VERSION_MAJOR < 58
-  return frame->pkt_duration;
+  return avFrame->pkt_duration;
 #else
-  return frame->duration;
+  return avFrame->duration;
 #endif
 }
 
-AVIOBytesContext::AVIOBytesContext(
-    const void* data,
-    size_t data_size,
-    size_t tempBufferSize) {
-  auto buffer = static_cast<uint8_t*>(av_malloc(tempBufferSize));
-  if (!buffer) {
-    throw std::runtime_error(
-        "Failed to allocate buffer of size " + std::to_string(tempBufferSize));
-  }
-  bufferData_.data = static_cast<const uint8_t*>(data);
-  bufferData_.size = data_size;
-  bufferData_.current = 0;
+int getNumChannels(const UniqueAVFrame& avFrame) {
+#if LIBAVFILTER_VERSION_MAJOR > 8 || \
+    (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
+  return avFrame->ch_layout.nb_channels;
+#else
+  return av_get_channel_layout_nb_channels(avFrame->channel_layout);
+#endif
+}
 
-  avioContext_.reset(avio_alloc_context(
-      buffer,
-      tempBufferSize,
+int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
+#if LIBAVFILTER_VERSION_MAJOR > 8 || \
+    (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
+  return avCodecContext->ch_layout.nb_channels;
+#else
+  return avCodecContext->channels;
+#endif
+}
+
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVFrame& srcAVFrame) {
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  dstAVFrame->ch_layout = srcAVFrame->ch_layout;
+#else
+  dstAVFrame->channel_layout = srcAVFrame->channel_layout;
+#endif
+}
+
+SwrContext* allocateSwrContext(
+    UniqueAVCodecContext& avCodecContext,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate) {
+  SwrContext* swrContext = nullptr;
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  AVChannelLayout layout = avCodecContext->ch_layout;
+  auto status = swr_alloc_set_opts2(
+      &swrContext,
+      &layout,
+      desiredSampleFormat,
+      desiredSampleRate,
+      &layout,
+      sourceSampleFormat,
+      sourceSampleRate,
       0,
-      &bufferData_,
-      &AVIOBytesContext::read,
+      nullptr);
+
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't create SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+#else
+  int64_t layout = static_cast<int64_t>(avCodecContext->channel_layout);
+  swrContext = swr_alloc_set_opts(
       nullptr,
-      &AVIOBytesContext::seek));
-  if (!avioContext_) {
-    av_freep(&buffer);
-    throw std::runtime_error("Failed to allocate AVIOContext");
-  }
-}
+      layout,
+      desiredSampleFormat,
+      desiredSampleRate,
+      layout,
+      sourceSampleFormat,
+      sourceSampleRate,
+      0,
+      nullptr);
+#endif
 
-AVIOBytesContext::~AVIOBytesContext() {
-  if (avioContext_) {
-    av_freep(&avioContext_->buffer);
-  }
-}
-
-AVIOContext* AVIOBytesContext::getAVIO() {
-  return avioContext_.get();
-}
-
-// The signature of this function is defined by FFMPEG.
-int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
-  struct AVIOBufferData* bufferData =
-      static_cast<struct AVIOBufferData*>(opaque);
-  TORCH_CHECK(
-      bufferData->current <= bufferData->size,
-      "Tried to read outside of the buffer: current=",
-      bufferData->current,
-      ", size=",
-      bufferData->size);
-  buf_size =
-      FFMIN(buf_size, static_cast<int>(bufferData->size - bufferData->current));
-  TORCH_CHECK(
-      buf_size >= 0,
-      "Tried to read negative bytes: buf_size=",
-      buf_size,
-      ", size=",
-      bufferData->size,
-      ", current=",
-      bufferData->current);
-  if (!buf_size) {
-    return AVERROR_EOF;
-  }
-  memcpy(buf, bufferData->data + bufferData->current, buf_size);
-  bufferData->current += buf_size;
-  return buf_size;
-}
-
-// The signature of this function is defined by FFMPEG.
-int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
-  AVIOBufferData* bufferData = (AVIOBufferData*)opaque;
-  int64_t ret = -1;
-
-  switch (whence) {
-    case AVSEEK_SIZE:
-      ret = bufferData->size;
-      break;
-    case SEEK_SET:
-      bufferData->current = offset;
-      ret = offset;
-      break;
-    default:
-      break;
-  }
-  return ret;
+  TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
+  return swrContext;
 }
 
 } // namespace facebook::torchcodec

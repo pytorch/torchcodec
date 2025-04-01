@@ -7,7 +7,8 @@ torchcodec.decoders
 .. currentmodule:: torchcodec.decoders
 
 
-For a tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
+For a video decoder tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
+For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_audio_decoding.py`.
 
 
 .. autosummary::
@@ -16,6 +17,7 @@ For a tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
     :template: class.rst
 
     VideoDecoder
+    AudioDecoder
 
 
 .. autosummary::
@@ -24,3 +26,4 @@ For a tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
     :template: dataclass.rst
 
     VideoStreamMetadata
+    AudioStreamMetadata

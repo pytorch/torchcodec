@@ -22,6 +22,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/version.h>
+#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
 
@@ -70,6 +71,8 @@ using UniqueAVIOContext = std::
     unique_ptr<AVIOContext, Deleterp<AVIOContext, void, avio_context_free>>;
 using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
+using UniqueSwrContext =
+    std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
@@ -140,39 +143,21 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 // struct member representing duration has changed across the versions we
 // support.
 int64_t getDuration(const UniqueAVFrame& frame);
-int64_t getDuration(const AVFrame* frame);
+
+int getNumChannels(const UniqueAVFrame& avFrame);
+int getNumChannels(const UniqueAVCodecContext& avCodecContext);
+
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVFrame& srcAVFrame);
+SwrContext* allocateSwrContext(
+    UniqueAVCodecContext& avCodecContext,
+    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate);
 
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
-
-// A struct that holds state for reading bytes from an IO context.
-// We give this to FFMPEG and it will pass it back to us when it needs to read
-// or seek in the memory buffer.
-struct AVIOBufferData {
-  const uint8_t* data;
-  size_t size;
-  size_t current;
-};
-
-// A class that can be used as AVFormatContext's IO context. It reads from a
-// memory buffer that is passed in.
-class AVIOBytesContext {
- public:
-  AVIOBytesContext(const void* data, size_t data_size, size_t tempBufferSize);
-  ~AVIOBytesContext();
-
-  // Returns the AVIOContext that can be passed to FFMPEG.
-  AVIOContext* getAVIO();
-
-  // The signature of this function is defined by FFMPEG.
-  static int read(void* opaque, uint8_t* buf, int buf_size);
-
-  // The signature of this function is defined by FFMPEG.
-  static int64_t seek(void* opaque, int64_t offset, int whence);
-
- private:
-  UniqueAVIOContext avioContext_;
-  struct AVIOBufferData bufferData_;
-};
 
 } // namespace facebook::torchcodec

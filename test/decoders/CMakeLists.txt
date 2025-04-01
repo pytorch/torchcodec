@@ -21,28 +21,16 @@ add_executable(
   VideoDecoderTest.cpp
 )
 
-add_executable(
-  VideoDecoderOpsTest
-  VideoDecoderOpsTest.cpp
-)
-
 target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
+target_include_directories(VideoDecoderTest SYSTEM PRIVATE ${libav_include_dirs})
 target_include_directories(VideoDecoderTest PRIVATE ../../)
-target_include_directories(VideoDecoderOpsTest SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
-target_include_directories(VideoDecoderOpsTest PRIVATE ../../)
 
 target_link_libraries(
   VideoDecoderTest
-  ${libtorchcodec_target_name}
-  GTest::gtest_main
-)
-
-target_link_libraries(
-  VideoDecoderOpsTest
-  ${libtorchcodec_target_name}
+  ${libtorchcodec_library_name}
+  ${libtorchcodec_custom_ops_name}
   GTest::gtest_main
 )
 
 include(GoogleTest)
 gtest_discover_tests(VideoDecoderTest)
-gtest_discover_tests(VideoDecoderOpsTest)

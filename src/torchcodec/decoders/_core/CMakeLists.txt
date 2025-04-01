@@ -3,63 +3,168 @@ project(TorchCodec)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ${TORCH_CXX_FLAGS}")
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
-function(make_torchcodec_library library_name ffmpeg_target)
-    set(
-        sources
-        FFMPEGCommon.h
-        FFMPEGCommon.cpp
-        VideoDecoder.h
-        VideoDecoder.cpp
-        VideoDecoderOps.h
-        VideoDecoderOps.cpp
-        DeviceInterface.h
-    )
-    if(ENABLE_CUDA)
-        list(APPEND sources CudaDevice.cpp)
-    else()
-        list(APPEND sources CPUOnlyDevice.cpp)
-    endif()
-    add_library(${library_name} SHARED ${sources})
-    set_property(TARGET ${library_name} PROPERTY CXX_STANDARD 17)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  ${TORCH_CXX_FLAGS}")
 
-    target_include_directories(
-        ${library_name}
+function(make_torchcodec_sublibrary
+    library_name
+    type
+    sources
+    library_dependencies)
+
+    add_library(${library_name} ${type} ${sources})
+    set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
+    target_include_directories(${library_name}
         PRIVATE
         ./../../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
     )
 
-    set(NEEDED_LIBRARIES ${ffmpeg_target} ${TORCH_LIBRARIES}
-        ${Python3_LIBRARIES})
-    if(ENABLE_CUDA)
-        list(APPEND NEEDED_LIBRARIES
-            ${CUDA_nppi_LIBRARY} ${CUDA_nppicc_LIBRARY} )
-    endif()
+    # Avoid adding the "lib" prefix which we already add explicitly.
+    set_target_properties(${library_name} PROPERTIES PREFIX "")
+
     target_link_libraries(
         ${library_name}
         PUBLIC
-        ${NEEDED_LIBRARIES}
+        ${library_dependencies}
+    )
+endfunction()
+
+function(make_torchcodec_libraries
+    ffmpeg_major_version
+    ffmpeg_target)
+
+    # We create three shared libraries per version of FFmpeg, where the version
+    # is denoted by N:
+    #
+    # 1. libtorchcodec_decoderN.{ext}: Base library which contains the
+    #    implementation of VideoDecoder and everything VideoDecoder needs. On
+    #    Linux, {ext} is so. On Mac, it is dylib.
+    #
+    # 2. libtorchcodec_custom_opsN.{ext}: Implementation of the PyTorch custom
+    #    ops. Depends on libtorchcodec_decoderN.{ext}. On Linux, {ext} is so.
+    #    On Mac, it is dylib.
+    #
+    # 3. libtorchcodec_pybind_opsN.{ext}: Implementation of the pybind11 ops. We
+    #    keep these separate from the PyTorch custom ops because we have to
+    #    load these libraries separately on the Python side. Depends on
+    #    libtorchcodec_decoderN.{ext}. On BOTH Linux and Mac {ext} is so.
+
+    # 1. Create libtorchcodec_decoderN.{ext}.
+    set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
+    set(decoder_sources
+        AVIOContextHolder.cpp
+        FFMPEGCommon.cpp
+        VideoDecoder.cpp
     )
 
-    # We already set the library_name to be libtorchcodecN, so we don't want
-    # cmake to add another "lib" prefix. We do it this way because it makes it
-    # easier to find references to libtorchcodec in the code (e.g. via `git
-    # grep`)
-    set_target_properties(${library_name} PROPERTIES PREFIX "")
+    if(ENABLE_CUDA)
+        list(APPEND decoder_sources CudaDevice.cpp)
+    else()
+        list(APPEND decoder_sources CPUOnlyDevice.cpp)
+    endif()
+
+    set(decoder_library_dependencies
+        ${ffmpeg_target}
+        ${TORCH_LIBRARIES}
+    )
+
+    if(ENABLE_CUDA)
+        list(APPEND decoder_library_dependencies
+            ${CUDA_nppi_LIBRARY}
+            ${CUDA_nppicc_LIBRARY}
+        )
+    endif()
+
+    make_torchcodec_sublibrary(
+        "${decoder_library_name}"
+        SHARED
+        "${decoder_sources}"
+        "${decoder_library_dependencies}"
+    )
+
+    # 2. Create libtorchcodec_custom_opsN.{ext}.
+    set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
+    set(custom_ops_sources
+        AVIOBytesContext.cpp
+        VideoDecoderOps.cpp
+    )
+    set(custom_ops_dependencies
+        ${decoder_library_name}
+        ${Python3_LIBRARIES}
+    )
+    make_torchcodec_sublibrary(
+        "${custom_ops_library_name}"
+        SHARED
+        "${custom_ops_sources}"
+        "${custom_ops_dependencies}"
+    )
+
+    # 3. Create libtorchcodec_pybind_opsN.so.
+    set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
+    set(pybind_ops_sources
+        AVIOFileLikeContext.cpp
+        PyBindOps.cpp
+    )
+    set(pybind_ops_dependencies
+       ${decoder_library_name}
+       pybind11::module # This library dependency makes sure we have the right
+                        # Python libraries included as well as all of the right
+                        # settings so that we can successfully load the shared
+                        # library as a Python module on Mac. If we instead use
+                        # ${Python3_LIBRARIES}, it works on Linux but not on
+                        # Mac.
+    )
+    make_torchcodec_sublibrary(
+        "${pybind_ops_library_name}"
+        MODULE # Note that this not SHARED; otherwise we build the wrong kind
+               # of library on Mac. On Mac, SHARED becomes .dylib and MODULE becomes
+               # a .so. We want pybind11 libraries to become .so. If this is
+               # changed to SHARED, we will be able to succesfully compile a
+               # .dylib, but we will not be able to succesfully import that as
+               # a Python module on Mac.
+        "${pybind_ops_sources}"
+        "${pybind_ops_dependencies}"
+    )
+    # pybind11 limits the visibility of symbols in the shared library to prevent
+    # stray initialization of py::objects. The rest of the object code must
+    # match. See:
+    #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+    target_compile_options(
+        ${pybind_ops_library_name}
+        PUBLIC
+      "-fvisibility=hidden"
+    )
+    # If we don't make sure this flag is set, we run into segfauls at import
+    # time on Mac. See:
+    #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+    target_link_options(
+        ${pybind_ops_library_name}
+        PUBLIC
+        "-undefined dynamic_lookup"
+    )
+
+    # Install all libraries.
+    set(
+        all_libraries
+        ${decoder_library_name}
+        ${custom_ops_library_name}
+        ${pybind_ops_library_name}
+    )
 
     # The install step is invoked within CMakeBuild.build_library() in
-    # setup.py and just copies the built .so files from the temp
+    # setup.py and just copies the built files from the temp
     # cmake/setuptools build folder into the CMAKE_INSTALL_PREFIX folder. We
     # still need to manually pass "DESTINATION ..." for cmake to copy those
     # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
     install(
-        TARGETS ${library_name}
+        TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
     )
 endfunction()
@@ -77,12 +182,10 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
         ${CMAKE_CURRENT_SOURCE_DIR}/fetch_and_expose_non_gpl_ffmpeg_libs.cmake
     )
 
-
-	make_torchcodec_library(libtorchcodec4 ffmpeg4)
-	make_torchcodec_library(libtorchcodec7 ffmpeg7)
-	make_torchcodec_library(libtorchcodec6 ffmpeg6)
-	make_torchcodec_library(libtorchcodec5 ffmpeg5)
-
+    make_torchcodec_libraries(7 ffmpeg7)
+    make_torchcodec_libraries(6 ffmpeg6)
+    make_torchcodec_libraries(4 ffmpeg4)
+    make_torchcodec_libraries(5 ffmpeg5)
 else()
     message(
         STATUS
@@ -98,6 +201,7 @@ else()
         libavformat
         libavcodec
         libavutil
+        libswresample
         libswscale
     )
 
@@ -121,10 +225,12 @@ else()
         )
     endif()
 
-    set(libtorchcodec_target_name libtorchcodec${ffmpeg_major_version})
-    # Make libtorchcodec_target_name available in the parent's scope, for the
-    # test's CMakeLists.txt
-    set(libtorchcodec_target_name ${libtorchcodec_target_name} PARENT_SCOPE)
+    make_torchcodec_libraries(${ffmpeg_major_version} PkgConfig::LIBAV)
 
-    make_torchcodec_library(${libtorchcodec_target_name} PkgConfig::LIBAV)
+    # Expose these values updwards so that the test compilation does not need
+    # to re-figure it out. FIXME: it's not great that we just copy-paste the
+    # library names.
+    set(libtorchcodec_library_name "libtorchcodec_decoder${ffmpeg_major_version}" PARENT_SCOPE)
+    set(libtorchcodec_custom_ops_name "libtorchcodec_custom_ops${ffmpeg_major_version}" PARENT_SCOPE)
+    set(libav_include_dirs ${LIBAV_INCLUDE_DIRS} PARENT_SCOPE)
 endif()

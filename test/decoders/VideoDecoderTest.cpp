@@ -5,6 +5,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
 
 #include <c10/util/Flags.h>
 #include <gtest/gtest.h>
@@ -48,10 +49,12 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       std::ifstream input(filepath, std::ios::binary);
       outputStringStream << input.rdbuf();
       content_ = outputStringStream.str();
+
       void* buffer = content_.data();
-      size_t length = outputStringStream.str().length();
+      size_t length = content_.length();
+      auto contextHolder = std::make_unique<AVIOBytesContext>(buffer, length);
       return std::make_unique<VideoDecoder>(
-          buffer, length, VideoDecoder::SeekMode::approximate);
+          std::move(contextHolder), VideoDecoder::SeekMode::approximate);
     } else {
       return std::make_unique<VideoDecoder>(
           filepath, VideoDecoder::SeekMode::approximate);
@@ -93,8 +96,7 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
 }
 
 TEST(VideoDecoderTest, MissingVideoFileThrowsException) {
-  EXPECT_THROW(
-      VideoDecoder("/this/file/does/not/exist"), std::invalid_argument);
+  EXPECT_THROW(VideoDecoder("/this/file/does/not/exist"), c10::Error);
 }
 
 void dumpTensorToDisk(
@@ -228,9 +230,9 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("dimension_order=NHWC"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.dimensionOrder = "NHWC";
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
@@ -393,9 +395,10 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("color_conversion_library=filtergraph"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.colorConversionLibrary =
+      VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
@@ -410,9 +413,10 @@ TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(
-      bestVideoStreamIndex,
-      VideoDecoder::VideoStreamOptions("color_conversion_library=swscale"));
+  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.colorConversionLibrary =
+      VideoDecoder::ColorConversionLibrary::SWSCALE;
+  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());

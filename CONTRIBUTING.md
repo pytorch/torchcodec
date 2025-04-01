@@ -20,6 +20,7 @@ test locally you will need the following dependencies:
   installation already.
 - cmake
 - pkg-config
+- pybind11
 - FFmpeg
 - PyTorch nightly
 
@@ -29,7 +30,7 @@ Start by installing the **nightly** build of PyTorch following the
 Then, the easiest way to install the rest of the dependencies is to run:
 
 ```bash
-conda install cmake pkg-config ffmpeg -c conda-forge
+conda install cmake pkg-config pybind11 ffmpeg -c conda-forge
 ```
 
 ### Clone and build

@@ -1,5 +1,5 @@
 [project]
-name = "TorchCodec"
+name = "torchcodec"
 description = "A video decoder for PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
