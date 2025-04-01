@@ -12,7 +12,7 @@ namespace facebook::torchcodec {
 
 namespace {
 std::mutex g_interface_mutex;
-std::map<std::string, CreateDeviceInterfaceFn> g_interface_map;
+std::map<torch::DeviceType, CreateDeviceInterfaceFn> g_interface_map;
 
 std::string getDeviceType(const std::string& device) {
   size_t pos = device.find(':');
@@ -25,7 +25,7 @@ std::string getDeviceType(const std::string& device) {
 } // namespace
 
 bool registerDeviceInterface(
-    const std::string deviceType,
+    torch::DeviceType deviceType,
     CreateDeviceInterfaceFn createInterface) {
   std::scoped_lock lock(g_interface_mutex);
   TORCH_CHECK(
@@ -36,15 +36,36 @@ bool registerDeviceInterface(
   return true;
 }
 
-std::unique_ptr<DeviceInterface> createDeviceInterface(
-    const std::string device) {
+torch::Device createTorchDevice(const std::string device) {
   // TODO: remove once DeviceInterface for CPU is implemented
   if (device == "cpu") {
-    return nullptr;
+    return torch::kCPU;
   }
 
   std::scoped_lock lock(g_interface_mutex);
   std::string deviceType = getDeviceType(device);
+  auto deviceInterface = std::find_if(
+      g_interface_map.begin(),
+      g_interface_map.end(),
+      [&](const std::pair<torch::DeviceType, CreateDeviceInterfaceFn>& arg) {
+        return device.rfind(
+                   torch::DeviceTypeName(arg.first, /*lcase*/ true), 0) == 0;
+      });
+  TORCH_CHECK(
+      deviceInterface != g_interface_map.end(), "Unsupported device: ", device);
+
+  return torch::Device(device);
+}
+
+std::unique_ptr<DeviceInterface> createDeviceInterface(
+    const torch::Device& device) {
+  auto deviceType = device.type();
+  // TODO: remove once DeviceInterface for CPU is implemented
+  if (deviceType == torch::kCPU) {
+    return nullptr;
+  }
+
+  std::scoped_lock lock(g_interface_mutex);
   TORCH_CHECK(
       g_interface_map.find(deviceType) != g_interface_map.end(),
       "Unsupported device: ",

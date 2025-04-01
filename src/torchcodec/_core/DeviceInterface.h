@@ -26,7 +26,7 @@ namespace facebook::torchcodec {
 
 class DeviceInterface {
  public:
-  DeviceInterface(const std::string& device) : device_(device) {}
+  DeviceInterface(const torch::Device& device) : device_(device) {}
 
   virtual ~DeviceInterface(){};
 
@@ -53,13 +53,15 @@ class DeviceInterface {
 };
 
 using CreateDeviceInterfaceFn =
-    std::function<DeviceInterface*(const std::string& device)>;
+    std::function<DeviceInterface*(const torch::Device& device)>;
 
 bool registerDeviceInterface(
-    const std::string deviceType,
+    torch::DeviceType deviceType,
     const CreateDeviceInterfaceFn createInterface);
 
+torch::Device createTorchDevice(const std::string device);
+
 std::unique_ptr<DeviceInterface> createDeviceInterface(
-    const std::string device);
+    const torch::Device& device);
 
 } // namespace facebook::torchcodec

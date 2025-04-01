@@ -243,8 +243,7 @@ void _add_video_stream(
     }
   }
   if (device.has_value()) {
-    videoStreamOptions.device =
-        createDeviceInterface(std::string(device.value()));
+    videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

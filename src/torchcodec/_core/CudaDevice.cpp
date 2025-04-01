@@ -16,9 +16,9 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cuda = registerDeviceInterface("cuda", [](const std::string& device) {
-  return new CudaDevice(device);
-});
+bool g_cuda = registerDeviceInterface(
+    torch::kCUDA,
+    [](const torch::Device& device) { return new CudaDevice(device); });
 
 // We reuse cuda contexts across VideoDeoder instances. This is because
 // creating a cuda context is expensive. The cache mechanism is as follows:
@@ -164,7 +164,7 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 }
 } // namespace
 
-CudaDevice::CudaDevice(const std::string& device) : DeviceInterface(device) {
+CudaDevice::CudaDevice(const torch::Device& device) : DeviceInterface(device) {
   if (device_.type() != torch::kCUDA) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }

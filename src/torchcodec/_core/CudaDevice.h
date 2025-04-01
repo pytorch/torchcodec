@@ -12,7 +12,7 @@ namespace facebook::torchcodec {
 
 class CudaDevice : public DeviceInterface {
  public:
-  CudaDevice(const std::string& device);
+  CudaDevice(const torch::Device& device);
 
   virtual ~CudaDevice(){};
 

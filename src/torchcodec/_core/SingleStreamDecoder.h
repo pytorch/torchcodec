@@ -139,7 +139,7 @@ class SingleStreamDecoder {
     std::optional<int> height;
     std::optional<ColorConversionLibrary> colorConversionLibrary;
     // By default we use CPU for decoding for both C++ and python users.
-    std::shared_ptr<DeviceInterface> device;
+    torch::Device device = torch::kCPU;
   };
 
   struct AudioStreamOptions {
@@ -358,6 +358,8 @@ class SingleStreamDecoder {
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
     DecodedFrameContext prevFrameContext;
+
+    std::unique_ptr<DeviceInterface> deviceInterface;
   };
 
   // --------------------------------------------------------------------------
@@ -460,7 +462,7 @@ class SingleStreamDecoder {
   void addStream(
       int streamIndex,
       AVMediaType mediaType,
-      DeviceInterface* device = nullptr,
+      const torch::Device& device = torch::kCPU,
       std::optional<int> ffmpegThreadCount = std::nullopt);
 
   // Returns the "best" stream index for a given media type. The "best" is

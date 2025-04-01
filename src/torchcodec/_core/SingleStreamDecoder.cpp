@@ -94,9 +94,9 @@ SingleStreamDecoder::SingleStreamDecoder(
 
 SingleStreamDecoder::~SingleStreamDecoder() {
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    auto& device = streamInfo.videoStreamOptions.device;
-    if (device) {
-      device->releaseContext(streamInfo.codecContext.get());
+    auto& deviceInterface = streamInfo.deviceInterface;
+    if (deviceInterface) {
+      deviceInterface->releaseContext(streamInfo.codecContext.get());
     }
   }
 }
@@ -386,7 +386,7 @@ torch::Tensor SingleStreamDecoder::getKeyFrameIndices() {
 void SingleStreamDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
-    DeviceInterface* device,
+    const torch::Device& device,
     std::optional<int> ffmpegThreadCount) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
@@ -414,6 +414,7 @@ void SingleStreamDecoder::addStream(
   streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
+  streamInfo.deviceInterface = createDeviceInterface(device);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -425,9 +426,10 @@ void SingleStreamDecoder::addStream(
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (device) {
+    if (streamInfo.deviceInterface) {
       avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-          device->findCodec(streamInfo.stream->codecpar->codec_id)
+          streamInfo.deviceInterface
+              ->findCodec(streamInfo.stream->codecpar->codec_id)
               .value_or(avCodec));
     }
   }
@@ -445,8 +447,8 @@ void SingleStreamDecoder::addStream(
 
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (device) {
-      device->initializeContext(codecContext);
+    if (streamInfo.deviceInterface) {
+      streamInfo.deviceInterface->initializeContext(codecContext);
     }
   }
 
@@ -476,7 +478,7 @@ void SingleStreamDecoder::addVideoStream(
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
-      videoStreamOptions.device.get(),
+      videoStreamOptions.device,
       videoStreamOptions.ffmpegThreadCount);
 
   auto& streamMetadata =
@@ -1217,11 +1219,11 @@ SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (!streamInfo.videoStreamOptions.device) {
+  } else if (!streamInfo.deviceInterface) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (streamInfo.videoStreamOptions.device) {
-    streamInfo.videoStreamOptions.device->convertAVFrameToFrameOutput(
+  } else if (streamInfo.deviceInterface) {
+    streamInfo.deviceInterface->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,
@@ -1564,10 +1566,8 @@ SingleStreamDecoder::FrameBatchOutput::FrameBatchOutput(
       videoStreamOptions, streamMetadata);
   int height = frameDims.height;
   int width = frameDims.width;
-  torch::Device device = (videoStreamOptions.device)
-      ? videoStreamOptions.device->device()
-      : torch::kCPU;
-  data = allocateEmptyHWCTensor(height, width, device, numFrames);
+  data = allocateEmptyHWCTensor(
+      height, width, videoStreamOptions.device, numFrames);
 }
 
 torch::Tensor allocateEmptyHWCTensor(
