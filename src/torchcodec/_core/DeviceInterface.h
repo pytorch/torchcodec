@@ -11,13 +11,13 @@
 #include <stdexcept>
 #include <string>
 #include "FFMPEGCommon.h"
-#include "src/torchcodec/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 namespace facebook::torchcodec {
 
 // Note that all these device functions should only be called if the device is
 // not a CPU device. CPU device functions are already implemented in the
-// VideoDecoder implementation.
+// SingleStreamDecoder implementation.
 // These functions should only be called from within an if block like this:
 // if (device.type() != torch::kCPU) {
 //   deviceFunction(device, ...);
@@ -31,9 +31,9 @@ void initializeContextOnCuda(
 
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
     UniqueAVFrame& avFrame,
-    VideoDecoder::FrameOutput& frameOutput,
+    SingleStreamDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
 
 void releaseContextOnCuda(

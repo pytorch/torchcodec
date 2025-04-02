@@ -11,7 +11,7 @@
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
 #include "src/torchcodec/_core/AVIOBytesContext.h"
-#include "src/torchcodec/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 namespace facebook::torchcodec {
 
@@ -66,21 +66,22 @@ TORCH_LIBRARY(torchcodec_ns, m) {
 namespace {
 
 at::Tensor wrapDecoderPointerToTensor(
-    std::unique_ptr<VideoDecoder> uniqueDecoder) {
-  VideoDecoder* decoder = uniqueDecoder.release();
+    std::unique_ptr<SingleStreamDecoder> uniqueDecoder) {
+  SingleStreamDecoder* decoder = uniqueDecoder.release();
 
   auto deleter = [decoder](void*) { delete decoder; };
-  at::Tensor tensor =
-      at::from_blob(decoder, {sizeof(VideoDecoder*)}, deleter, {at::kLong});
-  auto videoDecoder = static_cast<VideoDecoder*>(tensor.mutable_data_ptr());
+  at::Tensor tensor = at::from_blob(
+      decoder, {sizeof(SingleStreamDecoder*)}, deleter, {at::kLong});
+  auto videoDecoder =
+      static_cast<SingleStreamDecoder*>(tensor.mutable_data_ptr());
   TORCH_CHECK_EQ(videoDecoder, decoder) << "videoDecoder=" << videoDecoder;
   return tensor;
 }
 
-VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
+SingleStreamDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
   void* buffer = tensor.mutable_data_ptr();
-  VideoDecoder* decoder = static_cast<VideoDecoder*>(buffer);
+  SingleStreamDecoder* decoder = static_cast<SingleStreamDecoder*>(buffer);
   return decoder;
 }
 
@@ -92,7 +93,7 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 // under torch.compile().
 using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
-OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
+OpsFrameOutput makeOpsFrameOutput(SingleStreamDecoder::FrameOutput& frame) {
   return std::make_tuple(
       frame.data,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
@@ -111,7 +112,7 @@ OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
 using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
 OpsFrameBatchOutput makeOpsFrameBatchOutput(
-    VideoDecoder::FrameBatchOutput& batch) {
+    SingleStreamDecoder::FrameBatchOutput& batch) {
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
 
@@ -122,7 +123,7 @@ OpsFrameBatchOutput makeOpsFrameBatchOutput(
 using OpsAudioFramesOutput = std::tuple<at::Tensor, at::Tensor>;
 
 OpsAudioFramesOutput makeOpsAudioFramesOutput(
-    VideoDecoder::AudioFramesOutput& audioFrames) {
+    SingleStreamDecoder::AudioFramesOutput& audioFrames) {
   return std::make_tuple(
       audioFrames.data,
       torch::tensor(audioFrames.ptsSeconds, torch::dtype(torch::kFloat64)));
@@ -156,25 +157,25 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
 // Implementations for the operators
 // ==============================
 
-// Create a VideoDecoder from file and wrap the pointer in a tensor.
+// Create a SingleStreamDecoder from file and wrap the pointer in a tensor.
 at::Tensor create_from_file(
     std::string_view filename,
     std::optional<std::string_view> seek_mode = std::nullopt) {
   std::string filenameStr(filename);
 
-  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  std::unique_ptr<VideoDecoder> uniqueDecoder =
-      std::make_unique<VideoDecoder>(filenameStr, realSeek);
+  std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
+      std::make_unique<SingleStreamDecoder>(filenameStr, realSeek);
 
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
-// Create a VideoDecoder from the actual bytes of a video and wrap the pointer
-// in a tensor. The VideoDecoder will decode the provided bytes.
+// Create a SingleStreamDecoder from the actual bytes of a video and wrap the
+// pointer in a tensor. The SingleStreamDecoder will decode the provided bytes.
 at::Tensor create_from_tensor(
     at::Tensor video_tensor,
     std::optional<std::string_view> seek_mode = std::nullopt) {
@@ -185,21 +186,21 @@ at::Tensor create_from_tensor(
   void* data = video_tensor.mutable_data_ptr();
   size_t length = video_tensor.numel();
 
-  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
   auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
 
-  std::unique_ptr<VideoDecoder> uniqueDecoder =
-      std::make_unique<VideoDecoder>(std::move(contextHolder), realSeek);
+  std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
+      std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
 at::Tensor _convert_to_tensor(int64_t decoder_ptr) {
-  auto decoder = reinterpret_cast<VideoDecoder*>(decoder_ptr);
-  std::unique_ptr<VideoDecoder> uniqueDecoder(decoder);
+  auto decoder = reinterpret_cast<SingleStreamDecoder*>(decoder_ptr);
+  std::unique_ptr<SingleStreamDecoder> uniqueDecoder(decoder);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -212,7 +213,7 @@ void _add_video_stream(
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt) {
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
   videoStreamOptions.height = height;
   videoStreamOptions.ffmpegThreadCount = num_threads;
@@ -226,10 +227,10 @@ void _add_video_stream(
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
       videoStreamOptions.colorConversionLibrary =
-          VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+          SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
     } else if (stdColorConversionLibrary == "swscale") {
       videoStreamOptions.colorConversionLibrary =
-          VideoDecoder::ColorConversionLibrary::SWSCALE;
+          SingleStreamDecoder::ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
@@ -276,7 +277,7 @@ void add_audio_stream(
     at::Tensor& decoder,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<int64_t> sample_rate = std::nullopt) {
-  VideoDecoder::AudioStreamOptions audioStreamOptions;
+  SingleStreamDecoder::AudioStreamOptions audioStreamOptions;
   audioStreamOptions.sampleRate = sample_rate;
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
@@ -285,7 +286,8 @@ void add_audio_stream(
 
 // Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds) {
-  auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
+  auto videoDecoder =
+      static_cast<SingleStreamDecoder*>(decoder.mutable_data_ptr());
   videoDecoder->setCursorPtsInSeconds(seconds);
 }
 
@@ -293,10 +295,10 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
 // duration as tensors.
 OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  VideoDecoder::FrameOutput result;
+  SingleStreamDecoder::FrameOutput result;
   try {
     result = videoDecoder->getNextFrame();
-  } catch (const VideoDecoder::EndOfFileException& e) {
+  } catch (const SingleStreamDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
   return makeOpsFrameOutput(result);
@@ -307,10 +309,10 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
 // given timestamp T has T >= PTS and T < PTS + Duration.
 OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  VideoDecoder::FrameOutput result;
+  SingleStreamDecoder::FrameOutput result;
   try {
     result = videoDecoder->getFramePlayedAt(seconds);
-  } catch (const VideoDecoder::EndOfFileException& e) {
+  } catch (const SingleStreamDecoder::EndOfFileException& e) {
     C10_THROW_ERROR(IndexError, e.what());
   }
   return makeOpsFrameOutput(result);
@@ -406,7 +408,7 @@ torch::Tensor _get_key_frame_indices(at::Tensor& decoder) {
 std::string get_json_metadata(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
 
-  VideoDecoder::ContainerMetadata videoMetadata =
+  SingleStreamDecoder::ContainerMetadata videoMetadata =
       videoDecoder->getContainerMetadata();
   auto maybeBestVideoStreamIndex = videoMetadata.bestVideoStreamIndex;
 
