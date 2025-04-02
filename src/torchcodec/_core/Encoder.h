@@ -19,6 +19,7 @@ class Encoder {
   UniqueAVCodecContext avCodecContext_;
   AVStream* avStream_;
 
+  const torch::Tensor wf_;
   // The *output* sample rate. We can't really decide for the user what it
   // should be. Particularly, the sample rate of the input waveform should match
   // this, and that's up to the user. If sample rates don't match, encoding will
@@ -27,6 +28,5 @@ class Encoder {
   // resample the waveform internally to match them, but that's not in scope for
   // an initial version (if at all).
   int sampleRate_;
-  const torch::Tensor wf_;
 };
 } // namespace facebook::torchcodec
