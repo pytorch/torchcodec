@@ -132,8 +132,8 @@ void Encoder::encode() {
         "Couldn't make AVFrame writable: ",
         getFFMPEGErrorStringFromErrorCode(status));
 
-    auto numSamplesToEncode =
-        std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
+    auto numSamplesToEncode = std::min(
+        numSamplesPerFrame, static_cast<long>(numSamples - numEncodedSamples));
     auto numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
     for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
