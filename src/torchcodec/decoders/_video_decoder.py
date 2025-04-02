@@ -8,7 +8,7 @@ import numbers
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
-from torch import device, Tensor
+from torch import device as torch_device, Tensor
 
 from torchcodec import _core as core, Frame, FrameBatch
 from torchcodec.decoders._decoder_utils import (
@@ -71,7 +71,7 @@ class VideoDecoder:
         stream_index: Optional[int] = None,
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
         num_ffmpeg_threads: int = 1,
-        device: Optional[Union[str, device]] = "cpu",
+        device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
     ):
         allowed_seek_modes = ("exact", "approximate")
@@ -92,6 +92,9 @@ class VideoDecoder:
 
         if num_ffmpeg_threads is None:
             raise ValueError(f"{num_ffmpeg_threads = } should be an int.")
+
+        if isinstance(device, torch_device):
+            device = str(device)
 
         core.add_video_stream(
             self._decoder,
