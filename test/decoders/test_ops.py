@@ -940,8 +940,22 @@ class TestAudioEncoderOps:
         )
         return frames
 
-    def test_round_trip(self, tmp_path):
-        asset = SINE_MONO_S32
+    # def test_round_trip(self, tmp_path):
+    #     asset = NASA_AUDIO_MP3
+
+    #     encoded_path = tmp_path / "output.mp3"
+    #     encoder = create_encoder(
+    #         sample_rate=asset.sample_rate, filename=str(encoded_path)
+    #     )
+
+    #     source_samples = self.decode(asset)
+    #     encode(encoder, source_samples)
+
+    #     torch.testing.assert_close(self.decode(encoded_path), source_samples)
+
+    def test_against_cli(self, tmp_path):
+
+        asset = NASA_AUDIO_MP3
 
         encoded_by_ffmpeg = tmp_path / "ffmpeg_output.mp3"
         encoded_by_us = tmp_path / "our_output.mp3"
@@ -951,9 +965,10 @@ class TestAudioEncoderOps:
             "-i",
             str(asset.path),
             # '-vn',
-            # '-ar', '44100',    # Set audio sampling rate
+            # '-ar', '16000',    # Set audio sampling rate
             # '-ac', '2',        # Set number of audio channels
             # '-b:a', '192k',    # Set audio bitrate
+            '-b:a', '0',    # Set audio bitrate
             str(encoded_by_ffmpeg),
         ]
         subprocess.run(command, check=True)
@@ -964,8 +979,6 @@ class TestAudioEncoderOps:
 
         encode(encoder, self.decode(asset))
 
-        print(encoded_by_ffmpeg)
-        print(encoded_by_us)
         from_ffmpeg = self.decode(encoded_by_ffmpeg)
         from_us = self.decode(encoded_by_us)
         torch.testing.assert_close(from_us, from_ffmpeg)

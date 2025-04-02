@@ -10,6 +10,8 @@ namespace facebook::torchcodec {
 
 Encoder::~Encoder() {}
 
+// TODO-ENCODING: disable ffmpeg logs by default
+
 Encoder::Encoder(int sampleRate, std::string_view fileName)
     : sampleRate_(sampleRate) {
   AVFormatContext* avFormatContext = nullptr;
@@ -40,8 +42,8 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
 
   // This will use the default bit rate
   // TODO-ENCODING Should let user choose for compressed formats like mp3.
-  //   avCodecContext_->bit_rate = 0;
-  avCodecContext_->bit_rate = 24000;
+    // avCodecContext_->bit_rate = 64000;
+  avCodecContext_->bit_rate = 0;
 
   // FFmpeg will raise a reasonably informative error if the desired sample rate
   // isn't supported by the encoder.
@@ -134,6 +136,7 @@ void Encoder::encode(const torch::Tensor& wf) {
     auto numSamplesToEncode =
         std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
     auto numBytesToEncode = numSamplesToEncode * numBytesPerSample;
+    avFrame->nb_samples = std::min(static_cast<int64_t>(avCodecContext_->frame_size), numSamplesToEncode);
 
     for (int ch = 0; ch < numChannels; ch++) {
       memcpy(
@@ -160,6 +163,11 @@ void Encoder::encode_inner_loop(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
+//   if (avFrame.get()) {
+//     printf("Sending frame with %d samples\n", avFrame->nb_samples);
+//   } else {
+//     printf("Flushing\n");
+//   }
   TORCH_CHECK(
       status == AVSUCCESS,
       "Error while sending frame: ",
