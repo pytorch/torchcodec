@@ -13,7 +13,7 @@ Encoder::~Encoder() {}
 Encoder::Encoder(int sampleRate, std::string_view fileName)
     : sampleRate_(sampleRate) {
   AVFormatContext* avFormatContext = nullptr;
-  avformat_alloc_output_context2(&avFormatContext, NULL, NULL, fileName.data());
+  avformat_alloc_output_context2(&avFormatContext, nullptr, nullptr, fileName.data());
   TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
   avFormatContext_.reset(avFormatContext);
 
@@ -71,7 +71,7 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   // We're allocating the stream here. Streams are meant to be freed by
   // avformat_free_context(avFormatContext), which we call in the
   // avFormatContext_'s destructor.
-  avStream_ = avformat_new_stream(avFormatContext_.get(), NULL);
+  avStream_ = avformat_new_stream(avFormatContext_.get(), nullptr);
   TORCH_CHECK(avStream_ != nullptr, "Couldn't create new stream.");
   avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
 }
@@ -117,7 +117,7 @@ void Encoder::encode(const torch::Tensor& wf) {
       AV_NUM_DATA_POINTERS,
       " channels per frame.");
 
-  ffmpegRet = avformat_write_header(avFormatContext_.get(), NULL);
+  ffmpegRet = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
       ffmpegRet == AVSUCCESS,
       "Error in avformat_write_header: ",
