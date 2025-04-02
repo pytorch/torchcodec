@@ -94,7 +94,7 @@ void setChannelLayout(
     const UniqueAVCodecContext& avCodecContext) {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   auto status = av_channel_layout_copy(
-      &dstAvFrame->ch_layout, &avCodecContext->ch_layout);
+      &dstAVFrame->ch_layout, &avCodecContext->ch_layout);
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't copy channel layout to avFrame: ",

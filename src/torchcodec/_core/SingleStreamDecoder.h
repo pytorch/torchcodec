@@ -17,12 +17,12 @@
 
 namespace facebook::torchcodec {
 
-// The VideoDecoder class can be used to decode video frames to Tensors.
-// Note that VideoDecoder is not thread-safe.
+// The SingleStreamDecoder class can be used to decode video frames to Tensors.
+// Note that SingleStreamDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
-class VideoDecoder {
+class SingleStreamDecoder {
  public:
-  ~VideoDecoder();
+  ~SingleStreamDecoder();
 
   // --------------------------------------------------------------------------
   // CONSTRUCTION API
@@ -30,16 +30,16 @@ class VideoDecoder {
 
   enum class SeekMode { exact, approximate };
 
-  // Creates a VideoDecoder from the video at videoFilePath.
-  explicit VideoDecoder(
+  // Creates a SingleStreamDecoder from the video at videoFilePath.
+  explicit SingleStreamDecoder(
       const std::string& videoFilePath,
       SeekMode seekMode = SeekMode::exact);
 
-  // Creates a VideoDecoder using the provided AVIOContext inside the
+  // Creates a SingleStreamDecoder using the provided AVIOContext inside the
   // AVIOContextHolder. The AVIOContextHolder is the base class, and the
   // derived class will have specialized how the custom read, seek and writes
   // work.
-  explicit VideoDecoder(
+  explicit SingleStreamDecoder(
       std::unique_ptr<AVIOContextHolder> context,
       SeekMode seekMode = SeekMode::exact);
 
@@ -443,7 +443,7 @@ class VideoDecoder {
   // We build this index by scanning the file in
   // scanFileAndUpdateMetadataAndIndex
   int getKeyFrameIndexForPtsUsingScannedIndex(
-      const std::vector<VideoDecoder::FrameInfo>& keyFrames,
+      const std::vector<SingleStreamDecoder::FrameInfo>& keyFrames,
       int64_t pts) const;
 
   int64_t secondsToIndexLowerBound(double seconds);
@@ -568,11 +568,11 @@ struct FrameDims {
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
-    const VideoDecoder::StreamMetadata& streamMetadata);
+    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const SingleStreamDecoder::StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
     const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
@@ -581,11 +581,11 @@ torch::Tensor allocateEmptyHWCTensor(
     torch::Device device,
     std::optional<int> numFrames = std::nullopt);
 
-// Prints the VideoDecoder::DecodeStats to the ostream.
+// Prints the SingleStreamDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(
     std::ostream& os,
-    const VideoDecoder::DecodeStats& stats);
+    const SingleStreamDecoder::DecodeStats& stats);
 
-VideoDecoder::SeekMode seekModeFromString(std::string_view seekMode);
+SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode);
 
 } // namespace facebook::torchcodec

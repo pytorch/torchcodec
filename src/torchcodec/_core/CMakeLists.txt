@@ -60,7 +60,7 @@ function(make_torchcodec_libraries
     set(decoder_sources
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
-        VideoDecoder.cpp
+        SingleStreamDecoder.cpp
         # TODO: lib name should probably not be "*_decoder*" now that it also
         # contains an encoder
         Encoder.cpp

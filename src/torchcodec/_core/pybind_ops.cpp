@@ -10,7 +10,7 @@
 #include <string>
 
 #include "src/torchcodec/_core/AVIOFileLikeContext.h"
-#include "src/torchcodec/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 namespace py = pybind11;
 
@@ -26,15 +26,15 @@ namespace facebook::torchcodec {
 int64_t create_from_file_like(
     py::object file_like,
     std::optional<std::string_view> seek_mode) {
-  VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
+  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
   auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
 
-  VideoDecoder* decoder =
-      new VideoDecoder(std::move(avioContextHolder), realSeek);
+  SingleStreamDecoder* decoder =
+      new SingleStreamDecoder(std::move(avioContextHolder), realSeek);
   return reinterpret_cast<int64_t>(decoder);
 }
 
