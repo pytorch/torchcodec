@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "src/torchcodec/decoders/_core/AVIOContextHolder.h"
+#include "src/torchcodec/_core/AVIOContextHolder.h"
 
 namespace facebook::torchcodec {
 

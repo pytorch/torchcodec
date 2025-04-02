@@ -7,9 +7,8 @@
 import functools
 
 import pytest
-from torchcodec.decoders import AudioDecoder, VideoDecoder
 
-from torchcodec.decoders._core import (
+from torchcodec._core import (
     AudioStreamMetadata,
     create_from_file,
     get_container_metadata,
@@ -17,6 +16,7 @@ from torchcodec.decoders._core import (
     get_ffmpeg_library_versions,
     VideoStreamMetadata,
 )
+from torchcodec.decoders import AudioDecoder, VideoDecoder
 
 from ..utils import NASA_AUDIO_MP3, NASA_VIDEO
 

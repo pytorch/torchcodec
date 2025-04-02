@@ -4,15 +4,14 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/decoders/_core/VideoDecoderOps.h"
 #include <pybind11/pybind11.h>
 #include <cstdint>
 #include <sstream>
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
-#include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
 
@@ -26,7 +25,7 @@ namespace facebook::torchcodec {
 //   https://github.com/pytorch/pytorch/tree/main/aten/src/ATen/native#readme
 TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
-      "torchcodec.decoders._core.ops", "//pytorch/torchcodec:torchcodec");
+      "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
@@ -85,6 +84,14 @@ VideoDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
   return decoder;
 }
 
+// The elements of this tuple are all tensors that represent a single frame:
+//   1. The frame data, which is a multidimensional tensor.
+//   2. A single float value for the pts in seconds.
+//   3. A single float value for the duration in seconds.
+// The reason we use Tensors for the second and third values is so we can run
+// under torch.compile().
+using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
 OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
   return std::make_tuple(
       frame.data,
@@ -92,10 +99,27 @@ OpsFrameOutput makeOpsFrameOutput(VideoDecoder::FrameOutput& frame) {
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
+// All elements of this tuple are tensors of the same leading dimension. The
+// tuple represents the frames for N total frames, where N is the dimension of
+// each stacked tensor. The elments are:
+//   1. Stacked tensor of data for all N frames. Each frame is also a
+//   multidimensional tensor.
+//   2. Tensor of N pts values in seconds, where each pts is a single
+//   float.
+//   3. Tensor of N durationis in seconds, where each duration is a
+//   single float.
+using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+
 OpsFrameBatchOutput makeOpsFrameBatchOutput(
     VideoDecoder::FrameBatchOutput& batch) {
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
+
+// The elements of this tuple are all tensors that represent the concatenation
+// of multiple audio frames:
+//   1. The frames data (concatenated)
+//   2. A single float value for the pts of the first frame, in seconds.
+using OpsAudioFramesOutput = std::tuple<at::Tensor, at::Tensor>;
 
 OpsAudioFramesOutput makeOpsAudioFramesOutput(
     VideoDecoder::AudioFramesOutput& audioFrames) {
@@ -103,15 +127,39 @@ OpsAudioFramesOutput makeOpsAudioFramesOutput(
       audioFrames.data,
       torch::tensor(audioFrames.ptsSeconds, torch::dtype(torch::kFloat64)));
 }
+
+std::string quoteValue(const std::string& value) {
+  return "\"" + value + "\"";
+}
+
+std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
+  std::stringstream ss;
+  ss << "{\n";
+  auto it = metadataMap.begin();
+  while (it != metadataMap.end()) {
+    ss << "\"" << it->first << "\": " << it->second;
+    ++it;
+    if (it != metadataMap.end()) {
+      ss << ",\n";
+    } else {
+      ss << "\n";
+    }
+  }
+  ss << "}";
+
+  return ss.str();
+}
+
 } // namespace
 
 // ==============================
 // Implementations for the operators
 // ==============================
 
+// Create a VideoDecoder from file and wrap the pointer in a tensor.
 at::Tensor create_from_file(
     std::string_view filename,
-    std::optional<std::string_view> seek_mode) {
+    std::optional<std::string_view> seek_mode = std::nullopt) {
   std::string filenameStr(filename);
 
   VideoDecoder::SeekMode realSeek = VideoDecoder::SeekMode::exact;
@@ -125,9 +173,11 @@ at::Tensor create_from_file(
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
+// Create a VideoDecoder from the actual bytes of a video and wrap the pointer
+// in a tensor. The VideoDecoder will decode the provided bytes.
 at::Tensor create_from_tensor(
     at::Tensor video_tensor,
-    std::optional<std::string_view> seek_mode) {
+    std::optional<std::string_view> seek_mode = std::nullopt) {
   TORCH_CHECK(video_tensor.is_contiguous(), "video_tensor must be contiguous");
   TORCH_CHECK(
       video_tensor.scalar_type() == torch::kUInt8,
@@ -153,33 +203,15 @@ at::Tensor _convert_to_tensor(int64_t decoder_ptr) {
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
-void add_video_stream(
-    at::Tensor& decoder,
-    std::optional<int64_t> width,
-    std::optional<int64_t> height,
-    std::optional<int64_t> num_threads,
-    std::optional<std::string_view> dimension_order,
-    std::optional<int64_t> stream_index,
-    std::optional<std::string_view> device) {
-  _add_video_stream(
-      decoder,
-      width,
-      height,
-      num_threads,
-      dimension_order,
-      stream_index,
-      device);
-}
-
 void _add_video_stream(
     at::Tensor& decoder,
-    std::optional<int64_t> width,
-    std::optional<int64_t> height,
-    std::optional<int64_t> num_threads,
-    std::optional<std::string_view> dimension_order,
-    std::optional<int64_t> stream_index,
-    std::optional<std::string_view> device,
-    std::optional<std::string_view> color_conversion_library) {
+    std::optional<int64_t> width = std::nullopt,
+    std::optional<int64_t> height = std::nullopt,
+    std::optional<int64_t> num_threads = std::nullopt,
+    std::optional<std::string_view> dimension_order = std::nullopt,
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<std::string_view> device = std::nullopt,
+    std::optional<std::string_view> color_conversion_library = std::nullopt) {
   VideoDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
   videoStreamOptions.height = height;
@@ -221,10 +253,29 @@ void _add_video_stream(
   videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
 }
 
+// Add a new video stream at `stream_index` using the provided options.
+void add_video_stream(
+    at::Tensor& decoder,
+    std::optional<int64_t> width = std::nullopt,
+    std::optional<int64_t> height = std::nullopt,
+    std::optional<int64_t> num_threads = std::nullopt,
+    std::optional<std::string_view> dimension_order = std::nullopt,
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<std::string_view> device = std::nullopt) {
+  _add_video_stream(
+      decoder,
+      width,
+      height,
+      num_threads,
+      dimension_order,
+      stream_index,
+      device);
+}
+
 void add_audio_stream(
     at::Tensor& decoder,
-    std::optional<int64_t> stream_index,
-    std::optional<int64_t> sample_rate) {
+    std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<int64_t> sample_rate = std::nullopt) {
   VideoDecoder::AudioStreamOptions audioStreamOptions;
   audioStreamOptions.sampleRate = sample_rate;
 
@@ -232,11 +283,14 @@ void add_audio_stream(
   videoDecoder->addAudioStream(stream_index.value_or(-1), audioStreamOptions);
 }
 
+// Seek to a particular presentation timestamp in the video in seconds.
 void seek_to_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = static_cast<VideoDecoder*>(decoder.mutable_data_ptr());
   videoDecoder->setCursorPtsInSeconds(seconds);
 }
 
+// Get the next frame from the video as a tuple that has the frame data, pts and
+// duration as tensors.
 OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::FrameOutput result;
@@ -248,6 +302,9 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   return makeOpsFrameOutput(result);
 }
 
+// Return the frame that is visible at a given timestamp in seconds. Each frame
+// in FFMPEG has a presentation timestamp and a duration. The frame visible at a
+// given timestamp T has T >= PTS and T < PTS + Duration.
 OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   VideoDecoder::FrameOutput result;
@@ -259,12 +316,14 @@ OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   return makeOpsFrameOutput(result);
 }
 
+// Return the frame that is visible at a given index in the video.
 OpsFrameOutput get_frame_at_index(at::Tensor& decoder, int64_t frame_index) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFrameAtIndex(frame_index);
   return makeOpsFrameOutput(result);
 }
 
+// Return the frames at given indices for a given stream
 OpsFrameBatchOutput get_frames_at_indices(
     at::Tensor& decoder,
     at::IntArrayRef frame_indices) {
@@ -275,16 +334,19 @@ OpsFrameBatchOutput get_frames_at_indices(
   return makeOpsFrameBatchOutput(result);
 }
 
+// Return the frames inside a range as a single stacked Tensor. The range is
+// defined as [start, stop).
 OpsFrameBatchOutput get_frames_in_range(
     at::Tensor& decoder,
     int64_t start,
     int64_t stop,
-    std::optional<int64_t> step) {
+    std::optional<int64_t> step = std::nullopt) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result = videoDecoder->getFramesInRange(start, stop, step.value_or(1));
   return makeOpsFrameBatchOutput(result);
 }
 
+// Return the frames at given ptss for a given stream
 OpsFrameBatchOutput get_frames_by_pts(
     at::Tensor& decoder,
     at::ArrayRef<double> timestamps) {
@@ -294,6 +356,9 @@ OpsFrameBatchOutput get_frames_by_pts(
   return makeOpsFrameBatchOutput(result);
 }
 
+// Return the frames inside the range as a single stacked Tensor. The range is
+// defined as [start_seconds, stop_seconds). The frames are stacked in pts
+// order.
 OpsFrameBatchOutput get_frames_by_pts_in_range(
     at::Tensor& decoder,
     double start_seconds,
@@ -307,35 +372,22 @@ OpsFrameBatchOutput get_frames_by_pts_in_range(
 OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
     at::Tensor& decoder,
     double start_seconds,
-    std::optional<double> stop_seconds) {
+    std::optional<double> stop_seconds = std::nullopt) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto result =
       videoDecoder->getFramesPlayedInRangeAudio(start_seconds, stop_seconds);
   return makeOpsAudioFramesOutput(result);
 }
 
-std::string quoteValue(const std::string& value) {
-  return "\"" + value + "\"";
-}
-
-std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
-  std::stringstream ss;
-  ss << "{\n";
-  auto it = metadataMap.begin();
-  while (it != metadataMap.end()) {
-    ss << "\"" << it->first << "\": " << it->second;
-    ++it;
-    if (it != metadataMap.end()) {
-      ss << ",\n";
-    } else {
-      ss << "\n";
-    }
-  }
-  ss << "}";
-
-  return ss.str();
-}
-
+// For testing only. We need to implement this operation as a core library
+// function because what we're testing is round-tripping pts values as
+// double-precision floating point numbers from C++ to Python and back to C++.
+// We want to make sure that the value is preserved exactly, bit-for-bit, during
+// this process.
+//
+// Returns true if for the given decoder, the pts
+// value when converted to seconds as a double is exactly pts_seconds_to_test.
+// Returns false otherwise.
 bool _test_frame_pts_equality(
     at::Tensor& decoder,
     int64_t frame_index,
@@ -350,6 +402,7 @@ torch::Tensor _get_key_frame_indices(at::Tensor& decoder) {
   return videoDecoder->getKeyFrameIndices();
 }
 
+// Get the metadata from the video as a string.
 std::string get_json_metadata(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
 
@@ -418,6 +471,7 @@ std::string get_json_metadata(at::Tensor& decoder) {
   return mapToJson(metadataMap);
 }
 
+// Get the container metadata as a string.
 std::string get_container_json_metadata(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
 
@@ -448,6 +502,7 @@ std::string get_container_json_metadata(at::Tensor& decoder) {
   return mapToJson(map);
 }
 
+// Get the stream metadata as a string.
 std::string get_stream_json_metadata(
     at::Tensor& decoder,
     int64_t stream_index) {
@@ -519,6 +574,8 @@ std::string get_stream_json_metadata(
   return mapToJson(map);
 }
 
+// Returns version information about the various FFMPEG libraries that are
+// loaded in the program's address space.
 std::string _get_json_ffmpeg_library_versions() {
   std::stringstream ss;
   ss << "{\n";
@@ -545,6 +602,10 @@ std::string _get_json_ffmpeg_library_versions() {
   return ss.str();
 }
 
+// Scans video packets to get more accurate metadata like frame count, exact
+// keyframe positions, etc. Exact keyframe positions are useful for efficient
+// accurate seeking. Note that this function reads the entire video but it does
+// not decode frames. Reading a video file is much cheaper than decoding it.
 void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->scanFileAndUpdateMetadataAndIndex();

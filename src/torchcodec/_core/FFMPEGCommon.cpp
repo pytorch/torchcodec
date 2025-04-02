@@ -4,7 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/decoders/_core/FFMPEGCommon.h"
+#include "src/torchcodec/_core/FFMPEGCommon.h"
 
 #include <c10/util/Exception.h>
 

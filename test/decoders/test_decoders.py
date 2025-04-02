@@ -9,11 +9,14 @@ import contextlib
 import numpy
 import pytest
 import torch
-from torchcodec import FrameBatch
 
-from torchcodec.decoders import _core, VideoDecoder, VideoStreamMetadata
-from torchcodec.decoders._audio_decoder import AudioDecoder
-from torchcodec.decoders._core._metadata import AudioStreamMetadata
+from torchcodec import _core, FrameBatch
+from torchcodec.decoders import (
+    AudioDecoder,
+    AudioStreamMetadata,
+    VideoDecoder,
+    VideoStreamMetadata,
+)
 
 from ..utils import (
     assert_frames_equal,
@@ -284,6 +287,11 @@ class TestVideoDecoder:
                 # TODO: remove the "if".
                 # See https://github.com/pytorch/torchcodec/issues/428
                 assert_frames_equal(sliced, ref)
+
+    def test_device_instance(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/602
+        decoder = VideoDecoder(NASA_VIDEO.path, device=torch.device("cpu"))
+        assert isinstance(decoder.metadata, VideoStreamMetadata)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
