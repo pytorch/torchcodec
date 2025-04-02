@@ -11,6 +11,7 @@
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
 #include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
