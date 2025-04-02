@@ -60,7 +60,7 @@ function(make_torchcodec_libraries
     set(decoder_sources
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
-        VideoDecoder.cpp
+        SingleStreamDecoder.cpp
     )
 
     if(ENABLE_CUDA)

@@ -4,8 +4,8 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/_core/VideoDecoder.h"
 #include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 #include <c10/util/Flags.h>
 #include <gtest/gtest.h>
@@ -39,9 +39,9 @@ std::string getResourcePath(const std::string& filename) {
   return filepath;
 }
 
-class VideoDecoderTest : public testing::TestWithParam<bool> {
+class SingleStreamDecoderTest : public testing::TestWithParam<bool> {
  protected:
-  std::unique_ptr<VideoDecoder> createDecoderFromPath(
+  std::unique_ptr<SingleStreamDecoder> createDecoderFromPath(
       const std::string& filepath,
       bool useMemoryBuffer) {
     if (useMemoryBuffer) {
@@ -53,22 +53,23 @@ class VideoDecoderTest : public testing::TestWithParam<bool> {
       void* buffer = content_.data();
       size_t length = content_.length();
       auto contextHolder = std::make_unique<AVIOBytesContext>(buffer, length);
-      return std::make_unique<VideoDecoder>(
-          std::move(contextHolder), VideoDecoder::SeekMode::approximate);
+      return std::make_unique<SingleStreamDecoder>(
+          std::move(contextHolder), SingleStreamDecoder::SeekMode::approximate);
     } else {
-      return std::make_unique<VideoDecoder>(
-          filepath, VideoDecoder::SeekMode::approximate);
+      return std::make_unique<SingleStreamDecoder>(
+          filepath, SingleStreamDecoder::SeekMode::approximate);
     }
   }
 
   std::string content_;
 };
 
-TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
+TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> decoder =
+  std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
+  SingleStreamDecoder::ContainerMetadata metadata =
+      decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
 #if LIBAVFORMAT_VERSION_MAJOR >= 60
@@ -95,8 +96,8 @@ TEST_P(VideoDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
 }
 
-TEST(VideoDecoderTest, MissingVideoFileThrowsException) {
-  EXPECT_THROW(VideoDecoder("/this/file/does/not/exist"), c10::Error);
+TEST(SingleStreamDecoderTest, MissingVideoFileThrowsException) {
+  EXPECT_THROW(SingleStreamDecoder("/this/file/does/not/exist"), c10::Error);
 }
 
 void dumpTensorToDisk(
@@ -139,15 +140,16 @@ double computeAverageCosineSimilarity(
 // TEST(DecoderOptionsTest, ConvertsFromStringToOptions) {
 //   std::string optionsString =
 //       "ffmpeg_thread_count=3,dimension_order=NCHW,width=100,height=120";
-//   VideoDecoder::DecoderOptions options =
-//       VideoDecoder::DecoderOptions(optionsString);
+//   SingleStreamDecoder::DecoderOptions options =
+//       SingleStreamDecoder::DecoderOptions(optionsString);
 //   EXPECT_EQ(options.ffmpegThreadCount, 3);
 // }
 
-TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
+TEST(SingleStreamDecoderTest, RespectsWidthAndHeightFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> decoder = std::make_unique<VideoDecoder>(path);
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  std::unique_ptr<SingleStreamDecoder> decoder =
+      std::make_unique<SingleStreamDecoder>(path);
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = 100;
   videoStreamOptions.height = 120;
   decoder->addVideoStream(-1, videoStreamOptions);
@@ -155,19 +157,20 @@ TEST(VideoDecoderTest, RespectsWidthAndHeightFromOptions) {
   EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
 }
 
-TEST(VideoDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
+TEST(SingleStreamDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> decoder = std::make_unique<VideoDecoder>(path);
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  std::unique_ptr<SingleStreamDecoder> decoder =
+      std::make_unique<SingleStreamDecoder>(path);
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStream(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrame().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
 
-TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
+TEST_P(SingleStreamDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStream(-1);
   auto output = ourDecoder->getNextFrame();
@@ -201,9 +204,9 @@ TEST_P(VideoDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   }
 }
 
-TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
+TEST_P(SingleStreamDecoderTest, DecodesFramesInABatchInNCHW) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
@@ -223,14 +226,14 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNCHW) {
   EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
-TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
+TEST_P(SingleStreamDecoderTest, DecodesFramesInABatchInNHWC) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   // Frame with index 180 corresponds to timestamp 6.006.
@@ -248,9 +251,9 @@ TEST_P(VideoDecoderTest, DecodesFramesInABatchInNHWC) {
   EXPECT_TRUE(torch::equal(tensor[1], tensorTime6FromFFMPEG));
 }
 
-TEST_P(VideoDecoderTest, SeeksCloseToEof) {
+TEST_P(SingleStreamDecoderTest, SeeksCloseToEof) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStream(-1);
   ourDecoder->setCursorPtsInSeconds(388388. / 30'000);
@@ -261,9 +264,9 @@ TEST_P(VideoDecoderTest, SeeksCloseToEof) {
   EXPECT_THROW(ourDecoder->getNextFrame(), std::exception);
 }
 
-TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
+TEST_P(SingleStreamDecoderTest, GetsFramePlayedAtTimestamp) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStream(-1);
   auto output = ourDecoder->getFramePlayedAt(6.006);
@@ -291,9 +294,9 @@ TEST_P(VideoDecoderTest, GetsFramePlayedAtTimestamp) {
   EXPECT_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
 }
 
-TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
+TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<VideoDecoder> ourDecoder =
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
   ourDecoder->addVideoStream(-1);
   ourDecoder->setCursorPtsInSeconds(6.0);
@@ -386,47 +389,48 @@ TEST_P(VideoDecoderTest, SeeksToFrameWithSpecificPts) {
   }
 }
 
-TEST_P(VideoDecoderTest, PreAllocatedTensorFilterGraph) {
+TEST_P(SingleStreamDecoderTest, PreAllocatedTensorFilterGraph) {
   std::string path = getResourcePath("nasa_13013.mp4");
   auto preAllocatedOutputTensor = torch::empty({270, 480, 3}, {torch::kUInt8});
 
-  std::unique_ptr<VideoDecoder> ourDecoder =
-      VideoDecoderTest::createDecoderFromPath(path, GetParam());
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
+      SingleStreamDecoderTest::createDecoderFromPath(path, GetParam());
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.colorConversionLibrary =
-      VideoDecoder::ColorConversionLibrary::FILTERGRAPH;
+      SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 
-TEST_P(VideoDecoderTest, PreAllocatedTensorSwscale) {
+TEST_P(SingleStreamDecoderTest, PreAllocatedTensorSwscale) {
   std::string path = getResourcePath("nasa_13013.mp4");
   auto preAllocatedOutputTensor = torch::empty({270, 480, 3}, {torch::kUInt8});
 
-  std::unique_ptr<VideoDecoder> ourDecoder =
-      VideoDecoderTest::createDecoderFromPath(path, GetParam());
+  std::unique_ptr<SingleStreamDecoder> ourDecoder =
+      SingleStreamDecoderTest::createDecoderFromPath(path, GetParam());
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  VideoDecoder::VideoStreamOptions videoStreamOptions;
+  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
   videoStreamOptions.colorConversionLibrary =
-      VideoDecoder::ColorConversionLibrary::SWSCALE;
+      SingleStreamDecoder::ColorConversionLibrary::SWSCALE;
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
 }
 
-TEST_P(VideoDecoderTest, GetAudioMetadata) {
+TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4.audio.mp3");
-  std::unique_ptr<VideoDecoder> decoder =
+  std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  VideoDecoder::ContainerMetadata metadata = decoder->getContainerMetadata();
+  SingleStreamDecoder::ContainerMetadata metadata =
+      decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 1);
   EXPECT_EQ(metadata.numVideoStreams, 0);
   EXPECT_EQ(metadata.allStreamMetadata.size(), 1);
@@ -436,6 +440,9 @@ TEST_P(VideoDecoderTest, GetAudioMetadata) {
   EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
 }
 
-INSTANTIATE_TEST_SUITE_P(FromFileAndMemory, VideoDecoderTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(
+    FromFileAndMemory,
+    SingleStreamDecoderTest,
+    testing::Bool());
 
 } // namespace facebook::torchcodec
