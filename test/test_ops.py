@@ -39,7 +39,7 @@ from torchcodec._core import (
     seek_to_pts,
 )
 
-from ..utils import (
+from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
     NASA_AUDIO,

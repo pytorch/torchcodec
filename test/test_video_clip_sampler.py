@@ -10,7 +10,7 @@ from torchcodec._samplers import (
     VideoClipSampler,
 )
 
-from ..utils import NASA_VIDEO
+from .utils import NASA_VIDEO
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,7 @@ from torchcodec.decoders import (
     VideoStreamMetadata,
 )
 
-from ..utils import (
+from .utils import (
     assert_frames_equal,
     AV1_VIDEO,
     cpu_and_cuda,
