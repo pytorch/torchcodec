@@ -13,19 +13,20 @@ Encoder::~Encoder() {}
 Encoder::Encoder(int sampleRate, std::string_view fileName)
     : sampleRate_(sampleRate) {
   AVFormatContext* avFormatContext = nullptr;
-  avformat_alloc_output_context2(&avFormatContext, nullptr, nullptr, fileName.data());
+  avformat_alloc_output_context2(
+      &avFormatContext, nullptr, nullptr, fileName.data());
   TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
   avFormatContext_.reset(avFormatContext);
 
   TORCH_CHECK(
       !(avFormatContext->oformat->flags & AVFMT_NOFILE),
       "AVFMT_NOFILE is set. We only support writing to a file.");
-  auto ffmpegRet =
+  auto status =
       avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
   TORCH_CHECK(
-      ffmpegRet >= 0,
+      status >= 0,
       "avio_open failed: ",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 
   // We use the AVFormatContext's default codec for that
   // specificavcodec_parameters_from_context format/container.
@@ -39,7 +40,8 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
 
   // This will use the default bit rate
   // TODO-ENCODING Should let user choose for compressed formats like mp3.
-  avCodecContext_->bit_rate = 0;
+  //   avCodecContext_->bit_rate = 0;
+  avCodecContext_->bit_rate = 24000;
 
   // FFmpeg will raise a reasonably informative error if the desired sample rate
   // isn't supported by the encoder.
@@ -58,9 +60,8 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   av_channel_layout_default(&channel_layout, 2);
   avCodecContext_->ch_layout = channel_layout;
 
-  ffmpegRet = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
-  TORCH_CHECK(
-      ffmpegRet == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+  status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
+  TORCH_CHECK(status == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(status));
 
   TORCH_CHECK(
       avCodecContext_->frame_size > 0,
@@ -83,18 +84,18 @@ void Encoder::encode(const torch::Tensor& wf) {
   avFrame->format = avCodecContext_->sample_fmt;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
-  auto ffmpegRet =
+  auto status =
       av_channel_layout_copy(&avFrame->ch_layout, &avCodecContext_->ch_layout);
   TORCH_CHECK(
-      ffmpegRet == AVSUCCESS,
+      status == AVSUCCESS,
       "Couldn't copy channel layout to avFrame: ",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 
-  ffmpegRet = av_frame_get_buffer(avFrame.get(), 0);
+  status = av_frame_get_buffer(avFrame.get(), 0);
   TORCH_CHECK(
-      ffmpegRet == AVSUCCESS,
+      status == AVSUCCESS,
       "Couldn't allocate avFrame's buffers: ",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 
   AutoAVPacket autoAVPacket;
 
@@ -117,18 +118,18 @@ void Encoder::encode(const torch::Tensor& wf) {
       AV_NUM_DATA_POINTERS,
       " channels per frame.");
 
-  ffmpegRet = avformat_write_header(avFormatContext_.get(), nullptr);
+  status = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
-      ffmpegRet == AVSUCCESS,
+      status == AVSUCCESS,
       "Error in avformat_write_header: ",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 
   while (numEncodedSamples < numSamples) {
-    ffmpegRet = av_frame_make_writable(avFrame.get());
+    status = av_frame_make_writable(avFrame.get());
     TORCH_CHECK(
-        ffmpegRet == AVSUCCESS,
+        status == AVSUCCESS,
         "Couldn't make AVFrame writable: ",
-        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+        getFFMPEGErrorStringFromErrorCode(status));
 
     auto numSamplesToEncode =
         std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
@@ -148,52 +149,51 @@ void Encoder::encode(const torch::Tensor& wf) {
 
   encode_inner_loop(autoAVPacket, UniqueAVFrame(nullptr)); // flush
 
-  ffmpegRet = av_write_trailer(avFormatContext_.get());
+  status = av_write_trailer(avFormatContext_.get());
   TORCH_CHECK(
-      ffmpegRet == AVSUCCESS,
+      status == AVSUCCESS,
       "Error in: av_write_trailer",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 }
 
 void Encoder::encode_inner_loop(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
-  auto ffmpegRet = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
+  auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
-      ffmpegRet == AVSUCCESS,
+      status == AVSUCCESS,
       "Error while sending frame: ",
-      getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      getFFMPEGErrorStringFromErrorCode(status));
 
-  while (ffmpegRet >= 0) {
+  while (status >= 0) {
     ReferenceAVPacket packet(autoAVPacket);
-    ffmpegRet = avcodec_receive_packet(avCodecContext_.get(), packet.get());
-    if (ffmpegRet == AVERROR(EAGAIN) || ffmpegRet == AVERROR_EOF) {
+    status = avcodec_receive_packet(avCodecContext_.get(), packet.get());
+    if (status == AVERROR(EAGAIN) || status == AVERROR_EOF) {
       // TODO-ENCODING this is from TorchAudio, probably needed, but not sure.
-      //   if (ffmpegRet == AVERROR_EOF) {
-      //     ffmpegRet = av_interleaved_write_frame(avFormatContext_.get(),
+      //   if (status == AVERROR_EOF) {
+      //     status = av_interleaved_write_frame(avFormatContext_.get(),
       //     nullptr); TORCH_CHECK(
-      //         ffmpegRet == AVSUCCESS,
+      //         status == AVSUCCESS,
       //         "Failed to flush packet ",
-      //         getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+      //         getFFMPEGErrorStringFromErrorCode(status));
       //   }
       return;
     }
     TORCH_CHECK(
-        ffmpegRet >= 0,
+        status >= 0,
         "Error receiving packet: ",
-        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+        getFFMPEGErrorStringFromErrorCode(status));
 
     // TODO-ENCODING why are these 2 lines needed??
     av_packet_rescale_ts(
         packet.get(), avCodecContext_->time_base, avStream_->time_base);
     packet->stream_index = avStream_->index;
 
-    ffmpegRet =
-        av_interleaved_write_frame(avFormatContext_.get(), packet.get());
+    status = av_interleaved_write_frame(avFormatContext_.get(), packet.get());
     TORCH_CHECK(
-        ffmpegRet == AVSUCCESS,
+        status == AVSUCCESS,
         "Error in av_interleaved_write_frame: ",
-        getFFMPEGErrorStringFromErrorCode(ffmpegRet));
+        getFFMPEGErrorStringFromErrorCode(status));
   }
 }
 } // namespace facebook::torchcodec

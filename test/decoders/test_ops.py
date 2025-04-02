@@ -942,16 +942,33 @@ class TestAudioEncoderOps:
 
     def test_round_trip(self, tmp_path):
         asset = SINE_MONO_S32
-        source_samples = self.decode(asset)
 
-        output_file = tmp_path / "output.mp3"
+        encoded_by_ffmpeg = tmp_path / "ffmpeg_output.mp3"
+        encoded_by_us = tmp_path / "our_output.mp3"
+
+        command = [
+            "ffmpeg",
+            "-i",
+            str(asset.path),
+            # '-vn',
+            # '-ar', '44100',    # Set audio sampling rate
+            # '-ac', '2',        # Set number of audio channels
+            # '-b:a', '192k',    # Set audio bitrate
+            str(encoded_by_ffmpeg),
+        ]
+        subprocess.run(command, check=True)
+
         encoder = create_encoder(
-            sample_rate=asset.sample_rate, filename=str(output_file)
+            sample_rate=asset.sample_rate, filename=str(encoded_by_us)
         )
-        encode(encoder, source_samples)
 
-        round_trip_samples = self.decode(output_file)
-        torch.testing.assert_close(source_samples, round_trip_samples)
+        encode(encoder, self.decode(asset))
+
+        print(encoded_by_ffmpeg)
+        print(encoded_by_us)
+        from_ffmpeg = self.decode(encoded_by_ffmpeg)
+        from_us = self.decode(encoded_by_us)
+        torch.testing.assert_close(from_us, from_ffmpeg)
 
 
 if __name__ == "__main__":
