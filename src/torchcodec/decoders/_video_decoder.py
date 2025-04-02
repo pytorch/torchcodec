@@ -10,8 +10,7 @@ from typing import Literal, Optional, Tuple, Union
 
 from torch import device, Tensor
 
-from torchcodec import Frame, FrameBatch
-from torchcodec.decoders import _core as core
+from torchcodec import _core as core, Frame, FrameBatch
 from torchcodec.decoders._decoder_utils import (
     create_decoder,
     ERROR_REPORTING_INSTRUCTIONS,

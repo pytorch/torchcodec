@@ -4,7 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -13,7 +13,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include "src/torchcodec/decoders/_core/DeviceInterface.h"
+#include "src/torchcodec/_core/DeviceInterface.h"
 #include "torch/types.h"
 
 extern "C" {

@@ -1,5 +1,5 @@
 #include <torch/types.h>
-#include "src/torchcodec/decoders/_core/DeviceInterface.h"
+#include "src/torchcodec/_core/DeviceInterface.h"
 
 namespace facebook::torchcodec {
 

@@ -11,10 +11,10 @@ from torchvision.io.image import write_png
 
 print(f"{torchcodec.__version__ = }")
 
-decoder = torchcodec.decoders._core.create_from_file(
+decoder = torchcodec._core.create_from_file(
     str(Path(__file__).parent / "../resources/nasa_13013.mp4")
 )
-torchcodec.decoders._core.scan_all_streams_to_update_metadata(decoder)
-torchcodec.decoders._core.add_video_stream(decoder, stream_index=3)
-frame, _, _ = torchcodec.decoders._core.get_frame_at_index(decoder, frame_index=180)
+torchcodec._core.scan_all_streams_to_update_metadata(decoder)
+torchcodec._core.add_video_stream(decoder, stream_index=3)
+frame, _, _ = torchcodec._core.get_frame_at_index(decoder, frame_index=180)
 write_png(frame, "frame180.png")

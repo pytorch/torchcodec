@@ -4,8 +4,8 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
-#include "src/torchcodec/decoders/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/AVIOBytesContext.h"
 
 #include <c10/util/Flags.h>
 #include <gtest/gtest.h>
