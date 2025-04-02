@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include "FFMPEGCommon.h"
-#include "src/torchcodec/decoders/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/VideoDecoder.h"
 
 namespace facebook::torchcodec {
 

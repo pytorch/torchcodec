@@ -9,11 +9,14 @@ import contextlib
 import numpy
 import pytest
 import torch
-from torchcodec import FrameBatch
 
-from torchcodec.decoders import _core, VideoDecoder, VideoStreamMetadata
-from torchcodec.decoders._audio_decoder import AudioDecoder
-from torchcodec.decoders._core._metadata import AudioStreamMetadata
+from torchcodec import _core, FrameBatch
+from torchcodec.decoders import (
+    AudioDecoder,
+    AudioStreamMetadata,
+    VideoDecoder,
+    VideoStreamMetadata,
+)
 
 from ..utils import (
     assert_frames_equal,

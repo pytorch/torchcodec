@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Union
 
 from torch import Tensor
-from torchcodec.decoders import _core as core
+from torchcodec import _core as core
 
 ERROR_REPORTING_INSTRUCTIONS = """
 This should never happen. Please report an issue following the steps in

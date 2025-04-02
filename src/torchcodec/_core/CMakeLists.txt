@@ -21,7 +21,7 @@ function(make_torchcodec_sublibrary
     set_target_properties(${library_name} PROPERTIES CXX_STANDARD 17)
     target_include_directories(${library_name}
         PRIVATE
-        ./../../../../
+        ./../../../
         "${TORCH_INSTALL_PREFIX}/include"
         ${Python3_INCLUDE_DIRS}
     )
@@ -93,7 +93,7 @@ function(make_torchcodec_libraries
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
     set(custom_ops_sources
         AVIOBytesContext.cpp
-        VideoDecoderOps.cpp
+        custom_ops.cpp
     )
     set(custom_ops_dependencies
         ${decoder_library_name}
@@ -110,7 +110,7 @@ function(make_torchcodec_libraries
     set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
     set(pybind_ops_sources
         AVIOFileLikeContext.cpp
-        PyBindOps.cpp
+        pybind_ops.cpp
     )
     set(pybind_ops_dependencies
        ${decoder_library_name}
