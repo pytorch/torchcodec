@@ -17,10 +17,19 @@ Encoder::Encoder(
     int sampleRate,
     std::string_view fileName)
     : wf_(wf), sampleRate_(sampleRate) {
+  TORCH_CHECK(
+      wf_.dtype() == torch::kFloat32,
+      "waveform must have float32 dtype, got ",
+      wf_.dtype());
+  TORCH_CHECK(
+      wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
   AVFormatContext* avFormatContext = nullptr;
   avformat_alloc_output_context2(
       &avFormatContext, nullptr, nullptr, fileName.data());
-  TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
+  TORCH_CHECK(
+      avFormatContext != nullptr,
+      "Couldn't allocate AVFormatContext. ",
+      "Check the desired extension?");
   avFormatContext_.reset(avFormatContext);
 
   // TODO-ENCODING: Should also support encoding into bytes (use
@@ -51,8 +60,6 @@ Encoder::Encoder(
   // TODO-ENCODING Should also let user choose for compressed formats like mp3.
   avCodecContext_->bit_rate = 0;
 
-  // FFmpeg will raise a reasonably informative error if the desired sample rate
-  // isn't supported by the encoder.
   avCodecContext_->sample_rate = sampleRate_;
 
   // Note: This is the format of the **input** waveform. This doesn't determine

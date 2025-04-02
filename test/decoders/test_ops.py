@@ -1011,6 +1011,37 @@ class TestAudioEncoderOps:
         )
         return frames
 
+    def test_bad_input(self, tmp_path):
+
+        valid_output_file = str(tmp_path / ".mp3")
+
+        with pytest.raises(RuntimeError, match="must have float32 dtype, got int"):
+            create_encoder(
+                wf=torch.arange(10, dtype=torch.int),
+                sample_rate=10,
+                filename=valid_output_file,
+            )
+        with pytest.raises(RuntimeError, match="must have 2 dimensions, got 1"):
+            create_encoder(wf=torch.rand(3), sample_rate=10, filename=valid_output_file)
+
+        with pytest.raises(RuntimeError, match="No such file or directory"):
+            create_encoder(
+                wf=torch.rand(10, 10), sample_rate=10, filename="./bad/path.mp3"
+            )
+        with pytest.raises(RuntimeError, match="Check the desired extension"):
+            create_encoder(
+                wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
+            )
+
+        # TODO-ENCODING: raise more informative error message when sample rate
+        # isn't supported
+        with pytest.raises(RuntimeError, match="Invalid argument"):
+            create_encoder(
+                wf=self.decode(NASA_AUDIO_MP3),
+                sample_rate=10,
+                filename=valid_output_file,
+            )
+
     def test_round_trip(self, tmp_path):
         # Check that decode(encode(samples)) == samples
         asset = NASA_AUDIO_MP3
