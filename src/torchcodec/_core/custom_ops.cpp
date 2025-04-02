@@ -28,8 +28,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
-  m.def("create_encoder(int sample_rate, str filename) -> Tensor");
-  m.def("encode(Tensor(a!) encoder, Tensor wf) -> ()");
+  m.def("create_encoder(Tensor wf, int sample_rate, str filename) -> Tensor");
+  m.def("encode(Tensor(a!) encoder) -> ()");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -194,15 +194,18 @@ at::Tensor create_from_file(
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
-at::Tensor create_encoder(int64_t sample_rate, std::string_view file_name) {
+at::Tensor create_encoder(
+    const at::Tensor wf,
+    int64_t sample_rate,
+    std::string_view file_name) {
   std::unique_ptr<Encoder> uniqueEncoder =
-      std::make_unique<Encoder>(static_cast<int>(sample_rate), file_name);
+      std::make_unique<Encoder>(wf, static_cast<int>(sample_rate), file_name);
   return wrapEncoderPointerToTensor(std::move(uniqueEncoder));
 }
 
-void encode(at::Tensor& encoder, const at::Tensor& wf) {
+void encode(at::Tensor& encoder) {
   auto encoder_ = unwrapTensorToGetEncoder(encoder);
-  encoder_->encode(wf);
+  encoder_->encode();
 }
 
 // Create a VideoDecoder from the actual bytes of a video and wrap the pointer

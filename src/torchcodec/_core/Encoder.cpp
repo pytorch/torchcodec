@@ -12,14 +12,19 @@ Encoder::~Encoder() {}
 
 // TODO-ENCODING: disable ffmpeg logs by default
 
-Encoder::Encoder(int sampleRate, std::string_view fileName)
-    : sampleRate_(sampleRate) {
+Encoder::Encoder(
+    const torch::Tensor wf,
+    int sampleRate,
+    std::string_view fileName)
+    : wf_(wf), sampleRate_(sampleRate) {
   AVFormatContext* avFormatContext = nullptr;
   avformat_alloc_output_context2(
       &avFormatContext, nullptr, nullptr, fileName.data());
   TORCH_CHECK(avFormatContext != nullptr, "Couldn't allocate AVFormatContext.");
   avFormatContext_.reset(avFormatContext);
 
+  // TODO-ENCODING: Should also support encoding into bytes (use
+  // AVIOBytesContext)
   TORCH_CHECK(
       !(avFormatContext->oformat->flags & AVFMT_NOFILE),
       "AVFMT_NOFILE is set. We only support writing to a file.");
@@ -31,7 +36,7 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
       getFFMPEGErrorStringFromErrorCode(status));
 
   // We use the AVFormatContext's default codec for that
-  // specificavcodec_parameters_from_context format/container.
+  // specific format/container.
   const AVCodec* avCodec =
       avcodec_find_encoder(avFormatContext_->oformat->audio_codec);
   TORCH_CHECK(avCodec != nullptr, "Codec not found");
@@ -40,9 +45,10 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  // This will use the default bit rate
-  // TODO-ENCODING Should let user choose for compressed formats like mp3.
-    // avCodecContext_->bit_rate = 64000;
+  // TODO-ENCODING I think this sets the bit rate to the minimum supported.
+  // That's not what the ffmpeg CLI would choose by default, so we should try to
+  // do the same.
+  // TODO-ENCODING Should also let user choose for compressed formats like mp3.
   avCodecContext_->bit_rate = 0;
 
   // FFmpeg will raise a reasonably informative error if the desired sample rate
@@ -58,8 +64,19 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   // libswresample.
   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
 
+  auto numChannels = wf_.sizes()[0];
+  TORCH_CHECK(
+      // TODO-ENCODING is this even true / needed? We can probably support more
+      // with non-planar data?
+      numChannels <= AV_NUM_DATA_POINTERS,
+      "Trying to encode ",
+      numChannels,
+      " channels, but FFmpeg only supports ",
+      AV_NUM_DATA_POINTERS,
+      " channels per frame.");
+
   AVChannelLayout channel_layout;
-  av_channel_layout_default(&channel_layout, 2);
+  av_channel_layout_default(&channel_layout, numChannels);
   avCodecContext_->ch_layout = channel_layout;
 
   status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
@@ -79,7 +96,7 @@ Encoder::Encoder(int sampleRate, std::string_view fileName)
   avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
 }
 
-void Encoder::encode(const torch::Tensor& wf) {
+void Encoder::encode() {
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   avFrame->nb_samples = avCodecContext_->frame_size;
@@ -101,24 +118,13 @@ void Encoder::encode(const torch::Tensor& wf) {
 
   AutoAVPacket autoAVPacket;
 
-  uint8_t* pWf = static_cast<uint8_t*>(wf.data_ptr());
-  auto numChannels = wf.sizes()[0];
-  auto numSamples = wf.sizes()[1]; // per channel
+  uint8_t* pwf = static_cast<uint8_t*>(wf_.data_ptr());
+  auto numSamples = wf_.sizes()[1]; // per channel
   auto numEncodedSamples = 0; // per channel
   auto numSamplesPerFrame =
       static_cast<long>(avCodecContext_->frame_size); // per channel
-  auto numBytesPerSample = wf.element_size();
-  auto numBytesPerChannel = wf.sizes()[1] * numBytesPerSample;
-
-  TORCH_CHECK(
-      // TODO-ENCODING is this even true / needed? We can probably support more
-      // with non-planar data?
-      numChannels <= AV_NUM_DATA_POINTERS,
-      "Trying to encode ",
-      numChannels,
-      " channels, but FFmpeg only supports ",
-      AV_NUM_DATA_POINTERS,
-      " channels per frame.");
+  auto numBytesPerSample = wf_.element_size();
+  auto numBytesPerChannel = numSamples * numBytesPerSample;
 
   status = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
@@ -136,16 +142,22 @@ void Encoder::encode(const torch::Tensor& wf) {
     auto numSamplesToEncode =
         std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
     auto numBytesToEncode = numSamplesToEncode * numBytesPerSample;
-    avFrame->nb_samples = std::min(static_cast<int64_t>(avCodecContext_->frame_size), numSamplesToEncode);
 
-    for (int ch = 0; ch < numChannels; ch++) {
+    for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
       memcpy(
-          avFrame->data[ch], pWf + ch * numBytesPerChannel, numBytesToEncode);
+          avFrame->data[ch], pwf + ch * numBytesPerChannel, numBytesToEncode);
     }
-    pWf += numBytesToEncode;
+    pwf += numBytesToEncode;
+
+    // Above, we set the AVFrame's .nb_samples to AVCodecContext.frame_size so
+    // that the frame buffers are allocated to a big enough size. Here, we reset
+    // it to the exact number of samples that need to be encoded, otherwise the
+    // encoded frame would contain more samples than necessary and our results
+    // wouldn't match the ffmpeg CLI.
+    avFrame->nb_samples = numSamplesToEncode;
     encode_inner_loop(autoAVPacket, avFrame);
 
-    avFrame->pts += avFrame->nb_samples;
+    avFrame->pts += numSamplesToEncode;
     numEncodedSamples += numSamplesToEncode;
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
@@ -163,11 +175,6 @@ void Encoder::encode_inner_loop(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
-//   if (avFrame.get()) {
-//     printf("Sending frame with %d samples\n", avFrame->nb_samples);
-//   } else {
-//     printf("Flushing\n");
-//   }
   TORCH_CHECK(
       status == AVSUCCESS,
       "Error while sending frame: ",

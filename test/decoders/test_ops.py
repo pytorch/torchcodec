@@ -940,48 +940,55 @@ class TestAudioEncoderOps:
         )
         return frames
 
-    # def test_round_trip(self, tmp_path):
-    #     asset = NASA_AUDIO_MP3
-
-    #     encoded_path = tmp_path / "output.mp3"
-    #     encoder = create_encoder(
-    #         sample_rate=asset.sample_rate, filename=str(encoded_path)
-    #     )
-
-    #     source_samples = self.decode(asset)
-    #     encode(encoder, source_samples)
-
-    #     torch.testing.assert_close(self.decode(encoded_path), source_samples)
-
-    def test_against_cli(self, tmp_path):
-
+    def test_round_trip(self, tmp_path):
+        # Check that decode(encode(samples)) == samples
         asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset)
+
+        encoded_path = tmp_path / "output.mp3"
+        encoder = create_encoder(
+            wf=source_samples, sample_rate=asset.sample_rate, filename=str(encoded_path)
+        )
+        encode(encoder)
+
+        # TODO-ENCODING: tol should be stricter. We need to increase the encoded
+        # bitrate, and / or encode into a lossless format.
+        torch.testing.assert_close(
+            self.decode(encoded_path), source_samples, rtol=0, atol=0.07
+        )
+
+    # TODO-ENCODING: test more encoding formats
+    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
+    def test_against_cli(self, asset, tmp_path):
+        # Encodes samples with our encoder and with the FFmpeg CLI, and checks
+        # that both decoded outputs are equal
 
         encoded_by_ffmpeg = tmp_path / "ffmpeg_output.mp3"
         encoded_by_us = tmp_path / "our_output.mp3"
 
-        command = [
-            "ffmpeg",
-            "-i",
-            str(asset.path),
-            # '-vn',
-            # '-ar', '16000',    # Set audio sampling rate
-            # '-ac', '2',        # Set number of audio channels
-            # '-b:a', '192k',    # Set audio bitrate
-            '-b:a', '0',    # Set audio bitrate
-            str(encoded_by_ffmpeg),
-        ]
-        subprocess.run(command, check=True)
-
-        encoder = create_encoder(
-            sample_rate=asset.sample_rate, filename=str(encoded_by_us)
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-i",
+                str(asset.path),
+                "-b:a",
+                "0",  # bitrate hardcoded to 0, see corresponding TODO.
+                str(encoded_by_ffmpeg),
+            ],
+            capture_output=True,
+            check=True,
         )
 
-        encode(encoder, self.decode(asset))
+        encoder = create_encoder(
+            wf=self.decode(asset),
+            sample_rate=asset.sample_rate,
+            filename=str(encoded_by_us),
+        )
+        encode(encoder)
 
-        from_ffmpeg = self.decode(encoded_by_ffmpeg)
-        from_us = self.decode(encoded_by_us)
-        torch.testing.assert_close(from_us, from_ffmpeg)
+        torch.testing.assert_close(
+            self.decode(encoded_by_ffmpeg), self.decode(encoded_by_us)
+        )
 
 
 if __name__ == "__main__":

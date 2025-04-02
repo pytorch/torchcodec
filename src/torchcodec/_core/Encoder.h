@@ -7,12 +7,8 @@ class Encoder {
  public:
   ~Encoder();
 
-  // TODO Are we OK passing a string_view to the constructor?
-  // TODO fileName should be optional.
-  // TODO doesn't make much sense to pass fileName and the wf tensor in 2
-  // different calls. Same with sampleRate.
-  Encoder(int sampleRate, std::string_view fileName);
-  void encode(const torch::Tensor& wf);
+  Encoder(const torch::Tensor wf, int sampleRate, std::string_view fileName);
+  void encode();
 
  private:
   void encode_inner_loop(
@@ -31,5 +27,6 @@ class Encoder {
   // resample the waveform internally to match them, but that's not in scope for
   // an initial version (if at all).
   int sampleRate_;
+  const torch::Tensor wf_;
 };
 } // namespace facebook::torchcodec
