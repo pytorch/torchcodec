@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import io
 import os
 from functools import partial
 
@@ -924,6 +925,76 @@ class TestAudioDecoderOps:
         frames_downsampled_to_8000 = get_all_frames(SINE_MONO_S32, sample_rate=8000)
 
         torch.testing.assert_close(frames_downsampled_to_8000, frames_8000_native)
+
+    @pytest.mark.parametrize("buffering", (0, 1024))
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_file_like_decoding(self, buffering, device):
+        # Test to ensure that seeks and reads are actually going through the
+        # methods on the IO object.
+        #
+        # Note that we do not check the number of reads in this test past the
+        # initialization step. That is because the number of reads that FFmpeg
+        # issues is dependent on the size of the internal buffer, the amount of
+        # data per frame and the size of the video file. We can't control
+        # the size of the buffer from the Python layer and we don't know the
+        # amount of data per frame. We also can't know the amount of data per
+        # frame from first principles, because it is data-depenent.
+        class FileOpCounter(io.RawIOBase):
+
+            def __init__(self, file: io.RawIOBase):
+                self._file = file
+                self.num_seeks = 0
+                self.num_reads = 0
+
+            def read(self, size: int) -> bytes:
+                self.num_reads += 1
+                return self._file.read(size)
+
+            def seek(self, offset: int, whence: int) -> bytes:
+                self.num_seeks += 1
+                return self._file.seek(offset, whence)
+
+        file_counter = FileOpCounter(
+            open(NASA_VIDEO.path, mode="rb", buffering=buffering)
+        )
+        decoder = create_from_file_like(file_counter, "approximate")
+        add_video_stream(decoder, device=device)
+
+        frame0, *_ = get_next_frame(decoder)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        assert_frames_equal(frame0, reference_frame0.to(device))
+
+        # We don't assert the actual number of reads and seeks because that is
+        # dependent on both the size of the internal buffers on the C++ side and
+        # how much is read during initialization. Note that we still decode
+        # several frames at startup to improve metadata accuracy.
+        assert file_counter.num_seeks > 0
+        assert file_counter.num_reads > 0
+
+        initialization_seeks = file_counter.num_seeks
+
+        seek_to_pts(decoder, 12.979633)
+
+        frame_last, *_ = get_next_frame(decoder)
+        reference_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
+        assert_frames_equal(frame_last, reference_frame_last.to(device))
+
+        assert file_counter.num_seeks > initialization_seeks
+
+        last_frame_seeks = file_counter.num_seeks
+
+        # We're smart enough to avoid seeks within key frames and our test
+        # files have very few keyframes. However, we can force a seek by
+        # requesting a backwards seek.
+        seek_to_pts(decoder, 6.0)
+
+        frame_time6, *_ = get_next_frame(decoder)
+        reference_frame_time6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS
+        )
+        assert_frames_equal(frame_time6, reference_frame_time6.to(device))
+
+        assert file_counter.num_seeks > last_frame_seeks
 
 
 class TestAudioEncoderOps:
