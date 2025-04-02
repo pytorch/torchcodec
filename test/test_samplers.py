@@ -19,7 +19,7 @@ from torchcodec.samplers._common import _POLICY_FUNCTIONS
 from torchcodec.samplers._index_based import _build_all_clips_indices
 from torchcodec.samplers._time_based import _build_all_clips_timestamps
 
-from ..utils import assert_frames_equal, NASA_VIDEO
+from .utils import assert_frames_equal, NASA_VIDEO
 
 
 def _assert_output_type_and_shapes(
