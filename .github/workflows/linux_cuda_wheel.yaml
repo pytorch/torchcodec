@@ -135,9 +135,6 @@ jobs:
           # aren't present there.
           rm -r src/
           ls
-      - name: Smoke test
-        run: |
-          ${CONDA_RUN} python test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
           ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -v --tb=short
