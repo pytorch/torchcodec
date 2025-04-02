@@ -147,6 +147,14 @@ int64_t getDuration(const UniqueAVFrame& frame);
 int getNumChannels(const UniqueAVFrame& avFrame);
 int getNumChannels(const UniqueAVCodecContext& avCodecContext);
 
+void setDefaultChannelLayout(
+    UniqueAVCodecContext& avCodecContext,
+    int numChannels);
+
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVCodecContext& avCodecContext);
+
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
     const UniqueAVFrame& srcAVFrame);

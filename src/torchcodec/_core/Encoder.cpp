@@ -64,7 +64,7 @@ Encoder::Encoder(
   // libswresample.
   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
 
-  auto numChannels = wf_.sizes()[0];
+  int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
       // TODO-ENCODING is this even true / needed? We can probably support more
       // with non-planar data?
@@ -75,9 +75,7 @@ Encoder::Encoder(
       AV_NUM_DATA_POINTERS,
       " channels per frame.");
 
-  AVChannelLayout channel_layout;
-  av_channel_layout_default(&channel_layout, numChannels);
-  avCodecContext_->ch_layout = channel_layout;
+  setDefaultChannelLayout(avCodecContext_, numChannels);
 
   status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(status == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(status));
@@ -103,14 +101,9 @@ void Encoder::encode() {
   avFrame->format = avCodecContext_->sample_fmt;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
-  auto status =
-      av_channel_layout_copy(&avFrame->ch_layout, &avCodecContext_->ch_layout);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't copy channel layout to avFrame: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+  setChannelLayout(avFrame, avCodecContext_);
 
-  status = av_frame_get_buffer(avFrame.get(), 0);
+  auto status = av_frame_get_buffer(avFrame.get(), 0);
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't allocate avFrame's buffers: ",

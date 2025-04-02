@@ -74,6 +74,38 @@ int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
 #endif
 }
 
+void setDefaultChannelLayout(
+    UniqueAVCodecContext& avCodecContext,
+    int numChannels) {
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  AVChannelLayout channel_layout;
+  av_channel_layout_default(&channel_layout, numChannels);
+  avCodecContext->ch_layout = channel_layout;
+
+#else
+  uint64_t channel_layout = av_get_default_channel_layout(numChannels);
+  avCodecContext->channel_layout = channel_layout;
+  avCodecContext->channels = numChannels;
+#endif
+}
+
+void setChannelLayout(
+    UniqueAVFrame& dstAVFrame,
+    const UniqueAVCodecContext& avCodecContext) {
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  auto status = av_channel_layout_copy(
+      &dstAvFrame->ch_layout, &avCodecContext->ch_layout);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't copy channel layout to avFrame: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+#else
+  dstAVFrame->channel_layout = avCodecContext->channel_layout;
+  dstAVFrame->channels = avCodecContext->channels;
+
+#endif
+}
+
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
     const UniqueAVFrame& srcAVFrame) {
