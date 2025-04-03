@@ -3,21 +3,25 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
-class Encoder {
+class AudioEncoder {
  public:
-  ~Encoder();
+  ~AudioEncoder();
 
-  Encoder(const torch::Tensor wf, int sampleRate, std::string_view fileName);
+  AudioEncoder(
+      const torch::Tensor wf,
+      int sampleRate,
+      std::string_view fileName);
   void encode();
 
  private:
-  void encode_inner_loop(
+  void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& avFrame);
+  void flushBuffers();
 
-  UniqueAVFormatContextForEncoding avFormatContext_;
+  UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
-  AVStream* avStream_;
+  int streamIndex_;
 
   const torch::Tensor wf_;
   // The *output* sample rate. We can't really decide for the user what it

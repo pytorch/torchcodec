@@ -1,18 +1,13 @@
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-}
-
 namespace facebook::torchcodec {
 
-Encoder::~Encoder() {}
+AudioEncoder::~AudioEncoder() {}
 
 // TODO-ENCODING: disable ffmpeg logs by default
 
-Encoder::Encoder(
+AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
     std::string_view fileName)
@@ -24,12 +19,13 @@ Encoder::Encoder(
   TORCH_CHECK(
       wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
   AVFormatContext* avFormatContext = nullptr;
-  avformat_alloc_output_context2(
+  auto status = avformat_alloc_output_context2(
       &avFormatContext, nullptr, nullptr, fileName.data());
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
-      "Check the desired extension?");
+      "Check the desired extension? ",
+      getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
   // TODO-ENCODING: Should also support encoding into bytes (use
@@ -37,8 +33,7 @@ Encoder::Encoder(
   TORCH_CHECK(
       !(avFormatContext->oformat->flags & AVFMT_NOFILE),
       "AVFMT_NOFILE is set. We only support writing to a file.");
-  auto status =
-      avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
+  status = avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
   TORCH_CHECK(
       status >= 0,
       "avio_open failed: ",
@@ -85,7 +80,10 @@ Encoder::Encoder(
   setDefaultChannelLayout(avCodecContext_, numChannels);
 
   status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
-  TORCH_CHECK(status == AVSUCCESS, getFFMPEGErrorStringFromErrorCode(status));
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "avcodec_open2 failed: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   TORCH_CHECK(
       avCodecContext_->frame_size > 0,
@@ -96,12 +94,18 @@ Encoder::Encoder(
   // We're allocating the stream here. Streams are meant to be freed by
   // avformat_free_context(avFormatContext), which we call in the
   // avFormatContext_'s destructor.
-  avStream_ = avformat_new_stream(avFormatContext_.get(), nullptr);
-  TORCH_CHECK(avStream_ != nullptr, "Couldn't create new stream.");
-  avcodec_parameters_from_context(avStream_->codecpar, avCodecContext_.get());
+  AVStream* avStream = avformat_new_stream(avFormatContext_.get(), nullptr);
+  TORCH_CHECK(avStream != nullptr, "Couldn't create new stream.");
+  status = avcodec_parameters_from_context(
+      avStream->codecpar, avCodecContext_.get());
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "avcodec_parameters_from_context failed: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  streamIndex_ = avStream->index;
 }
 
-void Encoder::encode() {
+void AudioEncoder::encode() {
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   avFrame->nb_samples = avCodecContext_->frame_size;
@@ -119,12 +123,11 @@ void Encoder::encode() {
   AutoAVPacket autoAVPacket;
 
   uint8_t* pwf = static_cast<uint8_t*>(wf_.data_ptr());
-  auto numSamples = wf_.sizes()[1]; // per channel
-  auto numEncodedSamples = 0; // per channel
-  auto numSamplesPerFrame =
-      static_cast<long>(avCodecContext_->frame_size); // per channel
-  auto numBytesPerSample = wf_.element_size();
-  auto numBytesPerChannel = numSamples * numBytesPerSample;
+  int numSamples = static_cast<int>(wf_.sizes()[1]); // per channel
+  int numEncodedSamples = 0; // per channel
+  int numSamplesPerFrame = avCodecContext_->frame_size; // per channel
+  int numBytesPerSample = wf_.element_size();
+  int numBytesPerChannel = numSamples * numBytesPerSample;
 
   status = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
@@ -139,12 +142,12 @@ void Encoder::encode() {
         "Couldn't make AVFrame writable: ",
         getFFMPEGErrorStringFromErrorCode(status));
 
-    auto numSamplesToEncode = std::min(
-        numSamplesPerFrame, static_cast<long>(numSamples - numEncodedSamples));
-    auto numBytesToEncode = numSamplesToEncode * numBytesPerSample;
+    int numSamplesToEncode =
+        std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
+    int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
     for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
-      memcpy(
+      std::memcpy(
           avFrame->data[ch], pwf + ch * numBytesPerChannel, numBytesToEncode);
     }
     pwf += numBytesToEncode;
@@ -155,14 +158,14 @@ void Encoder::encode() {
     // encoded frame would contain more samples than necessary and our results
     // wouldn't match the ffmpeg CLI.
     avFrame->nb_samples = numSamplesToEncode;
-    encode_inner_loop(autoAVPacket, avFrame);
+    encodeInnerLoop(autoAVPacket, avFrame);
 
-    avFrame->pts += numSamplesToEncode;
+    avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
     numEncodedSamples += numSamplesToEncode;
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 
-  encode_inner_loop(autoAVPacket, UniqueAVFrame(nullptr)); // flush
+  flushBuffers();
 
   status = av_write_trailer(avFormatContext_.get());
   TORCH_CHECK(
@@ -171,7 +174,7 @@ void Encoder::encode() {
       getFFMPEGErrorStringFromErrorCode(status));
 }
 
-void Encoder::encode_inner_loop(
+void AudioEncoder::encodeInnerLoop(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
@@ -199,10 +202,7 @@ void Encoder::encode_inner_loop(
         "Error receiving packet: ",
         getFFMPEGErrorStringFromErrorCode(status));
 
-    // TODO-ENCODING why are these 2 lines needed??
-    av_packet_rescale_ts(
-        packet.get(), avCodecContext_->time_base, avStream_->time_base);
-    packet->stream_index = avStream_->index;
+    packet->stream_index = streamIndex_;
 
     status = av_interleaved_write_frame(avFormatContext_.get(), packet.get());
     TORCH_CHECK(
@@ -210,5 +210,10 @@ void Encoder::encode_inner_loop(
         "Error in av_interleaved_write_frame: ",
         getFFMPEGErrorStringFromErrorCode(status));
   }
+}
+
+void AudioEncoder::flushBuffers() {
+  AutoAVPacket autoAVPacket;
+  encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec

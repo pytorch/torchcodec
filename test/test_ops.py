@@ -22,12 +22,12 @@ from torchcodec._core import (
     _test_frame_pts_equality,
     add_audio_stream,
     add_video_stream,
-    create_encoder,
+    create_audio_encoder,
     create_from_bytes,
     create_from_file,
     create_from_file_like,
     create_from_tensor,
-    encode,
+    encode_audio,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -1088,27 +1088,29 @@ class TestAudioEncoderOps:
         valid_output_file = str(tmp_path / ".mp3")
 
         with pytest.raises(RuntimeError, match="must have float32 dtype, got int"):
-            create_encoder(
+            create_audio_encoder(
                 wf=torch.arange(10, dtype=torch.int),
                 sample_rate=10,
                 filename=valid_output_file,
             )
         with pytest.raises(RuntimeError, match="must have 2 dimensions, got 1"):
-            create_encoder(wf=torch.rand(3), sample_rate=10, filename=valid_output_file)
+            create_audio_encoder(
+                wf=torch.rand(3), sample_rate=10, filename=valid_output_file
+            )
 
         with pytest.raises(RuntimeError, match="No such file or directory"):
-            create_encoder(
+            create_audio_encoder(
                 wf=torch.rand(10, 10), sample_rate=10, filename="./bad/path.mp3"
             )
         with pytest.raises(RuntimeError, match="Check the desired extension"):
-            create_encoder(
+            create_audio_encoder(
                 wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
             )
 
         # TODO-ENCODING: raise more informative error message when sample rate
         # isn't supported
         with pytest.raises(RuntimeError, match="Invalid argument"):
-            create_encoder(
+            create_audio_encoder(
                 wf=self.decode(NASA_AUDIO_MP3),
                 sample_rate=10,
                 filename=valid_output_file,
@@ -1120,10 +1122,10 @@ class TestAudioEncoderOps:
         source_samples = self.decode(asset)
 
         encoded_path = tmp_path / "output.mp3"
-        encoder = create_encoder(
+        encoder = create_audio_encoder(
             wf=source_samples, sample_rate=asset.sample_rate, filename=str(encoded_path)
         )
-        encode(encoder)
+        encode_audio(encoder)
 
         # TODO-ENCODING: tol should be stricter. We need to increase the encoded
         # bitrate, and / or encode into a lossless format.
@@ -1153,12 +1155,12 @@ class TestAudioEncoderOps:
             check=True,
         )
 
-        encoder = create_encoder(
+        encoder = create_audio_encoder(
             wf=self.decode(asset),
             sample_rate=asset.sample_rate,
             filename=str(encoded_by_us),
         )
-        encode(encoder)
+        encode_audio(encoder)
 
         torch.testing.assert_close(
             self.decode(encoded_by_ffmpeg), self.decode(encoded_by_us)

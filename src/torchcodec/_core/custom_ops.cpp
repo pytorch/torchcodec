@@ -28,8 +28,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.impl_abstract_pystub(
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
-  m.def("create_encoder(Tensor wf, int sample_rate, str filename) -> Tensor");
-  m.def("encode(Tensor(a!) encoder) -> ()");
+  m.def(
+      "create_audio_encoder(Tensor wf, int sample_rate, str filename) -> Tensor");
+  m.def("encode_audio(Tensor(a!) encoder) -> ()");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -384,35 +385,42 @@ OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
   return makeOpsAudioFramesOutput(result);
 }
 
-at::Tensor wrapEncoderPointerToTensor(std::unique_ptr<Encoder> uniqueEncoder) {
-  Encoder* encoder = uniqueEncoder.release();
+at::Tensor wrapAudioEncoderPointerToTensor(
+    std::unique_ptr<AudioEncoder> uniqueAudioEncoder) {
+  AudioEncoder* encoder = uniqueAudioEncoder.release();
 
   auto deleter = [encoder](void*) { delete encoder; };
   at::Tensor tensor =
-      at::from_blob(encoder, {sizeof(Encoder)}, deleter, {at::kLong});
-  auto encoder_ = static_cast<Encoder*>(tensor.mutable_data_ptr());
-  TORCH_CHECK_EQ(encoder_, encoder) << "Encoder=" << encoder_;
+      at::from_blob(encoder, {sizeof(AudioEncoder*)}, deleter, {at::kLong});
+  auto encoder_ = static_cast<AudioEncoder*>(tensor.mutable_data_ptr());
+  TORCH_CHECK_EQ(encoder_, encoder) << "AudioEncoder=" << encoder_;
   return tensor;
 }
 
-Encoder* unwrapTensorToGetEncoder(at::Tensor& tensor) {
+AudioEncoder* unwrapTensorToGetAudioEncoder(at::Tensor& tensor) {
   TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
   void* buffer = tensor.mutable_data_ptr();
-  Encoder* encoder = static_cast<Encoder*>(buffer);
+  AudioEncoder* encoder = static_cast<AudioEncoder*>(buffer);
   return encoder;
 }
 
-at::Tensor create_encoder(
+at::Tensor create_audio_encoder(
     const at::Tensor wf,
     int64_t sample_rate,
     std::string_view file_name) {
-  std::unique_ptr<Encoder> uniqueEncoder =
-      std::make_unique<Encoder>(wf, static_cast<int>(sample_rate), file_name);
-  return wrapEncoderPointerToTensor(std::move(uniqueEncoder));
+  TORCH_CHECK(
+      sample_rate <= std::numeric_limits<int>::max(),
+      "sample_rate=",
+      sample_rate,
+      " is too large to be cast to an int.");
+  std::unique_ptr<AudioEncoder> uniqueAudioEncoder =
+      std::make_unique<AudioEncoder>(
+          wf, static_cast<int>(sample_rate), file_name);
+  return wrapAudioEncoderPointerToTensor(std::move(uniqueAudioEncoder));
 }
 
-void encode(at::Tensor& encoder) {
-  auto encoder_ = unwrapTensorToGetEncoder(encoder);
+void encode_audio(at::Tensor& encoder) {
+  auto encoder_ = unwrapTensorToGetAudioEncoder(encoder);
   encoder_->encode();
 }
 
@@ -650,7 +658,7 @@ void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
-  m.impl("create_encoder", &create_encoder);
+  m.impl("create_audio_encoder", &create_audio_encoder);
   m.impl("create_from_tensor", &create_from_tensor);
   m.impl("_convert_to_tensor", &_convert_to_tensor);
   m.impl(
@@ -658,7 +666,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
 }
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
-  m.impl("encode", &encode);
+  m.impl("encode_audio", &encode_audio);
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
   m.impl("_add_video_stream", &_add_video_stream);
