@@ -126,7 +126,7 @@ void AudioEncoder::encode() {
   int numSamples = static_cast<int>(wf_.sizes()[1]); // per channel
   int numEncodedSamples = 0; // per channel
   int numSamplesPerFrame = avCodecContext_->frame_size; // per channel
-  int numBytesPerSample = wf_.element_size();
+  int numBytesPerSample = static_cast<int>(wf_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
   status = avformat_write_header(avFormatContext_.get(), nullptr);
