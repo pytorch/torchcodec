@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import io
 import numbers
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
@@ -21,10 +22,13 @@ class VideoDecoder:
     """A single-stream video decoder.
 
     Args:
-        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.
+        source (str, ``Pathlib.path``,
+                ``io.RawIOBase``, ``io.BufferedReader``,
+                bytes, or ``torch.Tensor``): The source of the video:
 
             - If ``str``: a local path or a URL to a video file.
             - If ``Pathlib.path``: a path to a local video file.
+            - If ``io.RawIOBase`` or ``io.BufferedReader``: a file-like object that refers to a video file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
         stream_index (int, optional): Specifies which stream in the video to decode frames from.
             Note that this index is absolute across all media types. If left unspecified, then
@@ -66,7 +70,7 @@ class VideoDecoder:
 
     def __init__(
         self,
-        source: Union[str, Path, bytes, Tensor],
+        source: Union[str, Path, io.RawIOBase, io.BufferedReader, bytes, Tensor],
         *,
         stream_index: Optional[int] = None,
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",

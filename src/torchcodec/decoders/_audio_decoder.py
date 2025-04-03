@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import io
 from pathlib import Path
 from typing import Optional, Union
 
@@ -25,10 +26,13 @@ class AudioDecoder:
     Returned samples are float samples normalized in [-1, 1]
 
     Args:
-        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the audio:
+        source (str, ``Pathlib.path``,
+                ``io.RawIOBase``, ``io.BufferedReader``,
+                bytes, or ``torch.Tensor``): The source of the audio:
 
             - If ``str``: a local path or a URL to a video or audio file.
             - If ``Pathlib.path``: a path to a local video or audio file.
+            - If ``io.RawIOBase`` or ``io.BufferedReader``: a file-like object that refers to a audio file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded audio data.
         stream_index (int, optional): Specifies which stream in the file to decode samples from.
             Note that this index is absolute across all media types. If left unspecified, then
@@ -45,7 +49,7 @@ class AudioDecoder:
 
     def __init__(
         self,
-        source: Union[str, Path, bytes, Tensor],
+        source: Union[str, Path, io.RawIOBase, io.BufferedReader, bytes, Tensor],
         *,
         stream_index: Optional[int] = None,
         sample_rate: Optional[int] = None,
