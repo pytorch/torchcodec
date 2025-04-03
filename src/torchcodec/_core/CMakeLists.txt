@@ -61,6 +61,9 @@ function(make_torchcodec_libraries
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
         SingleStreamDecoder.cpp
+        # TODO: lib name should probably not be "*_decoder*" now that it also
+        # contains an encoder
+        Encoder.cpp
     )
 
     if(ENABLE_CUDA)

@@ -91,6 +91,12 @@ load_torchcodec_shared_libraries()
 create_from_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_file.default
 )
+create_audio_encoder = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns.create_audio_encoder.default
+)
+encode_audio = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns.encode_audio.default
+)
 create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
 )
@@ -152,6 +158,18 @@ def create_from_file_like(
 # ==============================
 @register_fake("torchcodec_ns::create_from_file")
 def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::create_audio_encoder")
+def create_audio_encoder_abstract(
+    wf: torch.Tensor, sample_rate: int, filename: str
+) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::encode_audio")
+def encode_audio_abstract(encoder: torch.Tensor) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
