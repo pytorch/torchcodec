@@ -122,9 +122,6 @@ jobs:
           # aren't present there.
           rm -r src/
           ls
-      - name: Smoke test
-        run: |
-          python -X faulthandler test/decoders/manual_smoke_test.py
       - name: Run Python tests
         run: |
           pytest test -vvv

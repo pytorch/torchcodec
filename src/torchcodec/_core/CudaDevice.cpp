@@ -6,7 +6,7 @@
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
-#include "src/torchcodec/_core/VideoDecoder.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>
@@ -20,9 +20,11 @@ namespace {
 // creating a cuda context is expensive. The cache mechanism is as follows:
 // 1. There is a cache of size MAX_CONTEXTS_PER_GPU_IN_CACHE cuda contexts for
 //    each GPU.
-// 2. When we destroy a VideoDecoder instance we release the cuda context to
+// 2. When we destroy a SingleStreamDecoder instance we release the cuda context
+// to
 //    the cache if the cache is not full.
-// 3. When we create a VideoDecoder instance we try to get a cuda context from
+// 3. When we create a SingleStreamDecoder instance we try to get a cuda context
+// from
 //    the cache. If the cache is empty we create a new cuda context.
 
 // Pytorch can only handle up to 128 GPUs.
@@ -189,9 +191,9 @@ void initializeContextOnCuda(
 
 void convertAVFrameToFrameOutputOnCuda(
     const torch::Device& device,
-    const VideoDecoder::VideoStreamOptions& videoStreamOptions,
+    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
     UniqueAVFrame& avFrame,
-    VideoDecoder::FrameOutput& frameOutput,
+    SingleStreamDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,

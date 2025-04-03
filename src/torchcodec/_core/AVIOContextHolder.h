@@ -32,7 +32,7 @@ namespace facebook::torchcodec {
 //      createAVIOContext(), ideally in their constructor.
 //  3. A generic handle for those that just need to manage having access to an
 //     AVIOContext, but aren't necessarily concerned with how it was customized:
-//     typically, the VideoDecoder.
+//     typically, the SingleStreamDecoder.
 class AVIOContextHolder {
  public:
   virtual ~AVIOContextHolder();
