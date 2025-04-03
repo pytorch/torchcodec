@@ -41,7 +41,7 @@ from torchcodec._core import (
     seek_to_pts,
 )
 
-from ..utils import (
+from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
     NASA_AUDIO,
@@ -995,6 +995,78 @@ class TestAudioDecoderOps:
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
         assert file_counter.num_seeks > last_frame_seeks
+
+    def test_file_like_method_check_fails(self):
+        class ReadMethodMissing:
+            def seek(self, offset: int, whence: int) -> bytes:
+                return bytes()
+
+        with pytest.raises(RuntimeError, match="must implement a read method"):
+            create_from_file_like(ReadMethodMissing(), "approximate")
+
+        class SeekMethodMissing:
+            def read(self, size: int) -> bytes:
+                return bytes()
+
+        with pytest.raises(RuntimeError, match="must implement a seek method"):
+            create_from_file_like(SeekMethodMissing(), "approximate")
+
+        class ReadMethodWrongSignature:
+            def __init__(self, file: io.RawIOBase):
+                self._file = file
+
+            # io.RawIOBase says we should accept a single int; wrong signature on purpose
+            def read(self) -> bytes:
+                return bytes()
+
+            def seek(self, offset: int, whence: int) -> bytes:
+                return self._file.seeK(offset, whence)
+
+        with pytest.raises(
+            TypeError, match="takes 1 positional argument but 2 were given"
+        ):
+            create_from_file_like(
+                ReadMethodWrongSignature(open(NASA_VIDEO.path, mode="rb", buffering=0)),
+                "approximate",
+            )
+
+        class SeekMethodWrongSignature:
+            def __init__(self, file: io.RawIOBase):
+                self._file = file
+
+            def read(self, size: int) -> bytes:
+                return self._file.read(size)
+
+            # io.RawIOBase says we should accept two ints; wrong signature on purpose
+            def seek(self, offset: int) -> bytes:
+                return bytes()
+
+        with pytest.raises(
+            TypeError, match="takes 2 positional arguments but 3 were given"
+        ):
+            create_from_file_like(
+                SeekMethodWrongSignature(open(NASA_VIDEO.path, mode="rb", buffering=0)),
+                "approximate",
+            )
+
+    def test_file_like_read_fails(self):
+        class BadReader(io.RawIOBase):
+
+            def __init__(self, file: io.RawIOBase):
+                self._file = file
+
+            def read(self, size: int) -> bytes:
+                # We intentionally read more than requested.
+                return self._file.read(size + 10)
+
+            def seek(self, offset: int, whence: int) -> bytes:
+                return self._file.seek(offset, whence)
+
+        with pytest.raises(RuntimeError, match="does not conform to read protocol"):
+            create_from_file_like(
+                BadReader(open(NASA_VIDEO.path, mode="rb", buffering=0)),
+                "approximate",
+            )
 
 
 class TestAudioEncoderOps:

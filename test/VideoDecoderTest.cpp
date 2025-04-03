@@ -34,7 +34,7 @@ std::string getResourcePath(const std::string& filename) {
 #else
   std::filesystem::path dirPath = std::filesystem::path(__FILE__);
   std::string filepath =
-      dirPath.parent_path().string() + "/../resources/" + filename;
+      dirPath.parent_path().string() + "/resources/" + filename;
 #endif
   return filepath;
 }
