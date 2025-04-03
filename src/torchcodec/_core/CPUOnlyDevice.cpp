@@ -7,39 +7,39 @@ namespace facebook::torchcodec {
 // So all functions will throw an error because they should only be called if
 // the device is not CPU.
 
-[[noreturn]] void throwUnsupportedDeviceError(const torch::Device& device) {
+[[noreturn]] void throw_unsupported_device_error(const torch::Device& device) {
   TORCH_CHECK(
       device.type() != torch::kCPU,
       "Device functions should only be called if the device is not CPU.")
   TORCH_CHECK(false, "Unsupported device: " + device.str());
 }
 
-void convertAVFrameToFrameOutputOnCuda(
+void convert_avframe_to_frame_output_on_cuda(
     const torch::Device& device,
     [[maybe_unused]] const SingleStreamDecoder::VideoStreamOptions&
-        videoStreamOptions,
-    [[maybe_unused]] UniqueAVFrame& avFrame,
-    [[maybe_unused]] SingleStreamDecoder::FrameOutput& frameOutput,
-    [[maybe_unused]] std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  throwUnsupportedDeviceError(device);
+        video_stream_options,
+    [[maybe_unused]] UniqueAVFrame& avframe,
+    [[maybe_unused]] SingleStreamDecoder::FrameOutput& frame_output,
+    [[maybe_unused]] std::optional<torch::Tensor> pre_allocated_output_tensor) {
+  throw_unsupported_device_error(device);
 }
 
-void initializeContextOnCuda(
+void initialize_context_on_cuda(
     const torch::Device& device,
-    [[maybe_unused]] AVCodecContext* codecContext) {
-  throwUnsupportedDeviceError(device);
+    [[maybe_unused]] AVCodecContext* codec_context) {
+  throw_unsupported_device_error(device);
 }
 
-void releaseContextOnCuda(
+void release_context_on_cuda(
     const torch::Device& device,
-    [[maybe_unused]] AVCodecContext* codecContext) {
-  throwUnsupportedDeviceError(device);
+    [[maybe_unused]] AVCodecContext* codec_context) {
+  throw_unsupported_device_error(device);
 }
 
-std::optional<const AVCodec*> findCudaCodec(
+std::optional<const AVCodec*> find_cuda_codec(
     const torch::Device& device,
-    [[maybe_unused]] const AVCodecID& codecId) {
-  throwUnsupportedDeviceError(device);
+    [[maybe_unused]] const AVCodecID& codec_id) {
+  throw_unsupported_device_error(device);
 }
 
 } // namespace facebook::torchcodec

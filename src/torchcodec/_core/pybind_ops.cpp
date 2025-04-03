@@ -19,22 +19,24 @@ namespace facebook::torchcodec {
 // In principle, this should be able to return a tensor. But when we try that,
 // we run into the bug reported here:
 //
-//   https://github.com/pytorch/pytorch/issues/136664
+// https://github.com/pytorch/pytorch/issues/136664
 //
 // So we instead launder the pointer through an int, and then use a conversion
 // function on the custom ops side to launder that int into a tensor.
 int64_t create_from_file_like(
     py::object file_like,
     std::optional<std::string_view> seek_mode) {
-  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
+  SingleStreamDecoder::SeekMode real_seek =
+      SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
-    realSeek = seekModeFromString(seek_mode.value());
+    real_seek = seek_mode_from_string(seek_mode.value());
   }
 
-  auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
+  auto avio_context_holder =
+      std::make_unique<_avio_file_like_context>(file_like);
 
   SingleStreamDecoder* decoder =
-      new SingleStreamDecoder(std::move(avioContextHolder), realSeek);
+      new SingleStreamDecoder(std::move(avioContextHolder), real_seek);
   return reinterpret_cast<int64_t>(decoder);
 }
 

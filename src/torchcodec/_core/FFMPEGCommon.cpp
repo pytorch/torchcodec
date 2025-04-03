@@ -10,120 +10,120 @@
 
 namespace facebook::torchcodec {
 
-AutoAVPacket::AutoAVPacket() : avPacket_(av_packet_alloc()) {
-  TORCH_CHECK(avPacket_ != nullptr, "Couldn't allocate avPacket.");
+AutoAVPacket::AutoAVPacket() : avpacket_(avpacket_alloc()) {
+  TORCH_CHECK(avPacket_ != nullptr, "Couldn't allocate avpacket.");
 }
 
 AutoAVPacket::~AutoAVPacket() {
-  av_packet_free(&avPacket_);
+  avpacket_free(&avpacket_);
 }
 
 ReferenceAVPacket::ReferenceAVPacket(AutoAVPacket& shared)
-    : avPacket_(shared.avPacket_) {}
+    : avpacket_(shared.avpacket_) {}
 
 ReferenceAVPacket::~ReferenceAVPacket() {
-  av_packet_unref(avPacket_);
+  avpacket_unref(avpacket_);
 }
 
 AVPacket* ReferenceAVPacket::get() {
-  return avPacket_;
+  return avpacket_;
 }
 
 AVPacket* ReferenceAVPacket::operator->() {
-  return avPacket_;
+  return avpacket_;
 }
 
 AVCodecOnlyUseForCallingAVFindBestStream
-makeAVCodecOnlyUseForCallingAVFindBestStream(const AVCodec* codec) {
+make_avcodec_only_use_for_calling_avfind_best_stream(const AVCodec* codec) {
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(59, 18, 100)
-  return const_cast<AVCodec*>(codec);
+  return const_cast<_avcodec*>(codec);
 #else
   return codec;
 #endif
 }
 
-std::string getFFMPEGErrorStringFromErrorCode(int errorCode) {
-  char errorBuffer[AV_ERROR_MAX_STRING_SIZE] = {0};
-  av_strerror(errorCode, errorBuffer, AV_ERROR_MAX_STRING_SIZE);
-  return std::string(errorBuffer);
+std::string get_ffmpeg_error_string_from_error_code(int error_code) {
+  char error_buffer[AV_ERROR_MAX_STRING_SIZE] = {0};
+  av_strerror(error_code, error_buffer, AV_ERROR_MAX_STRING_SIZE);
+  return std::string(error_buffer);
 }
 
-int64_t getDuration(const UniqueAVFrame& avFrame) {
+int64_t get_duration(const UniqueAVFrame& avframe) {
 #if LIBAVUTIL_VERSION_MAJOR < 58
-  return avFrame->pkt_duration;
+  return avframe->pkt_duration;
 #else
-  return avFrame->duration;
+  return avframe->duration;
 #endif
 }
 
-int getNumChannels(const UniqueAVFrame& avFrame) {
+int get_num_channels(const UniqueAVFrame& avframe) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
-  return avFrame->ch_layout.nb_channels;
+  return avframe->ch_layout.nb_channels;
 #else
-  return av_get_channel_layout_nb_channels(avFrame->channel_layout);
+  return av_get_channel_layout_nb_channels(avframe->channel_layout);
 #endif
 }
 
-int getNumChannels(const UniqueAVCodecContext& avCodecContext) {
+int get_num_channels(const UniqueAVCodecContext& av_codec_context) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
-  return avCodecContext->ch_layout.nb_channels;
+  return av_codec_context->ch_layout.nb_channels;
 #else
-  return avCodecContext->channels;
+  return av_codec_context->channels;
 #endif
 }
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVFrame& srcAVFrame) {
+void set_channel_layout(
+    UniqueAVFrame& dst_avframe,
+    const UniqueAVFrame& src_avframe) {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  dstAVFrame->ch_layout = srcAVFrame->ch_layout;
+  dst_avframe->ch_layout = src_avframe->ch_layout;
 #else
-  dstAVFrame->channel_layout = srcAVFrame->channel_layout;
+  dst_avframe->channel_layout = src_avframe->channel_layout;
 #endif
 }
 
-SwrContext* allocateSwrContext(
-    UniqueAVCodecContext& avCodecContext,
-    AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate) {
-  SwrContext* swrContext = nullptr;
+SwrContext* allocate_swr_context(
+    UniqueAVCodecContext& av_codec_context,
+    AVSampleFormat source_sample_format,
+    AVSampleFormat desired_sample_format,
+    int source_sample_rate,
+    int desired_sample_rate) {
+  SwrContext* swr_context = nullptr;
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  AVChannelLayout layout = avCodecContext->ch_layout;
+  AVChannelLayout layout = av_codec_context->ch_layout;
   auto status = swr_alloc_set_opts2(
       &swrContext,
       &layout,
-      desiredSampleFormat,
-      desiredSampleRate,
+      desired_sample_format,
+      desired_sample_rate,
       &layout,
-      sourceSampleFormat,
-      sourceSampleRate,
+      source_sample_format,
+      source_sample_rate,
       0,
       nullptr);
 
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't create SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+      get_ffmpeg_error_string_from_error_code(status));
 #else
-  int64_t layout = static_cast<int64_t>(avCodecContext->channel_layout);
-  swrContext = swr_alloc_set_opts(
+  int64_t layout = static_cast<int64_t>(av_codec_context->channel_layout);
+  swr_context = swr_alloc_set_opts(
       nullptr,
       layout,
-      desiredSampleFormat,
-      desiredSampleRate,
+      desired_sample_format,
+      desired_sample_rate,
       layout,
-      sourceSampleFormat,
-      sourceSampleRate,
+      source_sample_format,
+      source_sample_rate,
       0,
       nullptr);
 #endif
 
-  TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
-  return swrContext;
+  TORCH_CHECK(swrContext != nullptr, "Couldn't create swr_context");
+  return swr_context;
 }
 
 } // namespace facebook::torchcodec

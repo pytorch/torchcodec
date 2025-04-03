@@ -76,22 +76,22 @@ using UniqueSwrContext =
 //
 // AutoAVPacket autoAVPacket; // <-- malloc for AVPacket happens here
 // while(...){
-//   ReferenceAVPacket packet(autoAVPacket);
-//   av_read_frame(..., packet.get());  <-- av_packet_ref() called by FFmpeg
-// } <-- av_packet_unref() called here
+// ReferenceAVPacket packet(autoAVPacket);
+// av_read_frame(..., packet.get()); <-- avpacket_ref() called by FFmpeg
+// } <-- avpacket_unref() called here
 //
 // This achieves a few desirable things:
 // - Memory allocation of the underlying AVPacket happens only once, when
-//   autoAVPacket is created.
-// - av_packet_free() is called when autoAVPacket gets out of scope
-// - av_packet_unref() is automatically called when needed, i.e. at the end of
-//   each loop iteration (or when hitting break / continue). This prevents the
-//   risk of us forgetting to call it.
+// autoAVPacket is created.
+// - avpacket_free() is called when autoAVPacket gets out of scope
+// - avpacket_unref() is automatically called when needed, i.e. at the end of
+// each loop iteration (or when hitting break / continue). This prevents the
+// risk of us forgetting to call it.
 class AutoAVPacket {
   friend class ReferenceAVPacket;
 
  private:
-  AVPacket* avPacket_;
+  AVPacket* avpacket_;
 
  public:
   AutoAVPacket();
@@ -102,7 +102,7 @@ class AutoAVPacket {
 
 class ReferenceAVPacket {
  private:
-  AVPacket* avPacket_;
+  AVPacket* avpacket_;
 
  public:
   explicit ReferenceAVPacket(AutoAVPacket& shared);
@@ -127,34 +127,34 @@ using AVCodecOnlyUseForCallingAVFindBestStream = const AVCodec*;
 #endif
 
 AVCodecOnlyUseForCallingAVFindBestStream
-makeAVCodecOnlyUseForCallingAVFindBestStream(const AVCodec* codec);
+make_avcodec_only_use_for_calling_avfind_best_stream(const AVCodec* codec);
 
 // Success code from FFMPEG is just a 0. We define it to make the code more
 // readable.
 const int AVSUCCESS = 0;
 
 // Returns the FFMPEG error as a string using the provided `errorCode`.
-std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
+std::string get_ffmpeg_error_string_from_error_code(int error_code);
 
 // Returns duration from the frame. Abstracted into a function because the
 // struct member representing duration has changed across the versions we
 // support.
-int64_t getDuration(const UniqueAVFrame& frame);
+int64_t get_duration(const UniqueAVFrame& frame);
 
-int getNumChannels(const UniqueAVFrame& avFrame);
-int getNumChannels(const UniqueAVCodecContext& avCodecContext);
+int get_num_channels(const UniqueAVFrame& avframe);
+int get_num_channels(const UniqueAVCodecContext& av_codec_context);
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVFrame& srcAVFrame);
-SwrContext* allocateSwrContext(
-    UniqueAVCodecContext& avCodecContext,
-    AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate);
+void set_channel_layout(
+    UniqueAVFrame& dst_avframe,
+    const UniqueAVFrame& src_avframe);
+SwrContext* allocate_swr_context(
+    UniqueAVCodecContext& av_codec_context,
+    AVSampleFormat source_sample_format,
+    AVSampleFormat desired_sample_format,
+    int source_sample_rate,
+    int desired_sample_rate);
 
 // Returns true if sws_scale can handle unaligned data.
-bool canSwsScaleHandleUnalignedData();
+bool can_sws_scale_handle_unaligned_data();
 
 } // namespace facebook::torchcodec

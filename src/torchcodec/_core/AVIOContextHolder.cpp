@@ -9,24 +9,24 @@
 
 namespace facebook::torchcodec {
 
-void AVIOContextHolder::createAVIOContext(
+void AVIOContextHolder::create_avio_context(
     AVIOReadFunction read,
     AVIOSeekFunction seek,
-    void* heldData,
-    int bufferSize) {
+    void* held_data,
+    int buffer_size) {
   TORCH_CHECK(
-      bufferSize > 0,
-      "Buffer size must be greater than 0; is " + std::to_string(bufferSize));
-  auto buffer = static_cast<uint8_t*>(av_malloc(bufferSize));
+      buffer_size > 0,
+      "Buffer size must be greater than 0; is " + std::to_string(buffer_size));
+  auto buffer = static_cast<uint8_t*>(av_malloc(buffer_size));
   TORCH_CHECK(
       buffer != nullptr,
-      "Failed to allocate buffer of size " + std::to_string(bufferSize));
+      "Failed to allocate buffer of size " + std::to_string(buffer_size));
 
-  avioContext_.reset(avio_alloc_context(
+  avio_context_.reset(avio_alloc_context(
       buffer,
-      bufferSize,
+      buffer_size,
       0,
-      heldData,
+      held_data,
       read,
       nullptr, // write function; not supported yet
       seek));
@@ -39,12 +39,12 @@ void AVIOContextHolder::createAVIOContext(
 
 AVIOContextHolder::~AVIOContextHolder() {
   if (avioContext_) {
-    av_freep(&avioContext_->buffer);
+    av_freep(&avio_context_->buffer);
   }
 }
 
-AVIOContext* AVIOContextHolder::getAVIOContext() {
-  return avioContext_.get();
+AVIOContext* AVIOContextHolder::get_avio_context() {
+  return avio_context_.get();
 }
 
 } // namespace facebook::torchcodec

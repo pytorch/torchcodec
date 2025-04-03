@@ -20,28 +20,28 @@ namespace facebook::torchcodec {
 // SingleStreamDecoder implementation.
 // These functions should only be called from within an if block like this:
 // if (device.type() != torch::kCPU) {
-//   deviceFunction(device, ...);
+// deviceFunction(device, ...);
 // }
 
 // Initialize the hardware device that is specified in `device`. Some builds
 // support CUDA and others only support CPU.
-void initializeContextOnCuda(
+void initialize_context_on_cuda(
     const torch::Device& device,
-    AVCodecContext* codecContext);
+    AVCodecContext* codec_context);
 
-void convertAVFrameToFrameOutputOnCuda(
+void convert_avframe_to_frame_output_on_cuda(
     const torch::Device& device,
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    UniqueAVFrame& avFrame,
-    SingleStreamDecoder::FrameOutput& frameOutput,
-    std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+    const SingleStreamDecoder::VideoStreamOptions& video_stream_options,
+    UniqueAVFrame& avframe,
+    SingleStreamDecoder::FrameOutput& frame_output,
+    std::optional<torch::Tensor> pre_allocated_output_tensor = std::nullopt);
 
-void releaseContextOnCuda(
+void release_context_on_cuda(
     const torch::Device& device,
-    AVCodecContext* codecContext);
+    AVCodecContext* codec_context);
 
-std::optional<const AVCodec*> findCudaCodec(
+std::optional<const AVCodec*> find_cuda_codec(
     const torch::Device& device,
-    const AVCodecID& codecId);
+    const AVCodecID& codec_id);
 
 } // namespace facebook::torchcodec

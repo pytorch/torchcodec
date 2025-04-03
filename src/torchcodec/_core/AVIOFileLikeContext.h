@@ -19,7 +19,7 @@ namespace facebook::torchcodec {
 // and seek calls back up to the methods on the Python object.
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
-  explicit AVIOFileLikeContext(py::object fileLike);
+  explicit AVIOFileLikeContext(py::object file_like);
 
  private:
   static int read(void* opaque, uint8_t* buf, int buf_size);
@@ -32,7 +32,7 @@ class AVIOFileLikeContext : public AVIOContextHolder {
   // we'd have to ensure whatever enclosing scope holds the object has the GIL,
   // and that's, at least, hard. For all of the common pitfalls, see:
   //
-  //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
+  // https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
   //
   // We maintain a reference to the file-like object because the file-like
   // object that was created on the Python side must live as long as our
@@ -48,7 +48,7 @@ class AVIOFileLikeContext : public AVIOContextHolder {
   };
 
   using UniquePyObject = std::unique_ptr<py::object, PyObjectDeleter>;
-  UniquePyObject fileLike_;
+  UniquePyObject file_like_;
 };
 
 } // namespace facebook::torchcodec

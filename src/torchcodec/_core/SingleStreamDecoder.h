@@ -32,16 +32,16 @@ class SingleStreamDecoder {
 
   // Creates a SingleStreamDecoder from the video at videoFilePath.
   explicit SingleStreamDecoder(
-      const std::string& videoFilePath,
-      SeekMode seekMode = SeekMode::exact);
+      const std::string& video_file_path,
+      SeekMode seek_mode = SeekMode::exact);
 
   // Creates a SingleStreamDecoder using the provided AVIOContext inside the
   // AVIOContextHolder. The AVIOContextHolder is the base class, and the
   // derived class will have specialized how the custom read, seek and writes
   // work.
   explicit SingleStreamDecoder(
-      std::unique_ptr<AVIOContextHolder> context,
-      SeekMode seekMode = SeekMode::exact);
+      std::unique_ptr<AVIOContext_holder> context,
+      SeekMode seek_mode = SeekMode::exact);
 
   // --------------------------------------------------------------------------
   // VIDEO METADATA QUERY API
@@ -50,64 +50,64 @@ class SingleStreamDecoder {
   // Updates the metadata of the video to accurate values obtained by scanning
   // the contents of the video file. Also updates each StreamInfo's index, i.e.
   // the allFrames and keyFrames vectors.
-  void scanFileAndUpdateMetadataAndIndex();
+  void scan_file_and_update_metadata_and_index();
 
   struct StreamMetadata {
     // Common (video and audio) fields derived from the AVStream.
-    int streamIndex;
+    int stream_index;
     // See this link for what various values are available:
     // https://ffmpeg.org/doxygen/trunk/group__lavu__misc.html#ga9a84bba4713dfced21a1a56163be1f48
-    AVMediaType mediaType;
-    std::optional<AVCodecID> codecId;
-    std::optional<std::string> codecName;
-    std::optional<double> durationSeconds;
-    std::optional<double> beginStreamFromHeader;
-    std::optional<int64_t> numFrames;
-    std::optional<int64_t> numKeyFrames;
-    std::optional<double> averageFps;
-    std::optional<double> bitRate;
+    AVMediaType media_type;
+    std::optional<_avcodec_i_d> codec_id;
+    std::optional<std::string> codec_name;
+    std::optional<double> duration_seconds;
+    std::optional<double> begin_stream_from_header;
+    std::optional<int64_t> num_frames;
+    std::optional<int64_t> num_key_frames;
+    std::optional<double> average_fps;
+    std::optional<double> bit_rate;
 
     // More accurate duration, obtained by scanning the file.
     // These presentation timestamps are in time base.
-    std::optional<int64_t> minPtsFromScan;
-    std::optional<int64_t> maxPtsFromScan;
+    std::optional<int64_t> min_pts_from_scan;
+    std::optional<int64_t> max_pts_from_scan;
     // These presentation timestamps are in seconds.
-    std::optional<double> minPtsSecondsFromScan;
-    std::optional<double> maxPtsSecondsFromScan;
+    std::optional<double> min_pts_seconds_from_scan;
+    std::optional<double> max_pts_seconds_from_scan;
     // This can be useful for index-based seeking.
-    std::optional<int64_t> numFramesFromScan;
+    std::optional<int64_t> num_frames_from_scan;
 
     // Video-only fields derived from the AVCodecContext.
     std::optional<int64_t> width;
     std::optional<int64_t> height;
 
     // Audio-only fields
-    std::optional<int64_t> sampleRate;
-    std::optional<int64_t> numChannels;
-    std::optional<std::string> sampleFormat;
+    std::optional<int64_t> sample_rate;
+    std::optional<int64_t> num_channels;
+    std::optional<std::string> sample_format;
   };
 
   struct ContainerMetadata {
-    std::vector<StreamMetadata> allStreamMetadata;
-    int numAudioStreams = 0;
-    int numVideoStreams = 0;
+    std::vector<_stream_metadata> all_stream_metadata;
+    int num_audio_streams = 0;
+    int num_video_streams = 0;
     // Note that this is the container-level duration, which is usually the max
     // of all stream durations available in the container.
-    std::optional<double> durationSeconds;
+    std::optional<double> duration_seconds;
     // Total BitRate level information at the container level in bit/s
-    std::optional<double> bitRate;
+    std::optional<double> bit_rate;
     // If set, this is the index to the default audio stream.
-    std::optional<int> bestAudioStreamIndex;
+    std::optional<int> best_audio_stream_index;
     // If set, this is the index to the default video stream.
-    std::optional<int> bestVideoStreamIndex;
+    std::optional<int> best_video_stream_index;
   };
 
   // Returns the metadata for the container.
-  ContainerMetadata getContainerMetadata() const;
+  ContainerMetadata get_container_metadata() const;
 
   // Returns the key frame indices as a tensor. The tensor is 1D and contains
   // int64 values, where each value is the frame index for a key frame.
-  torch::Tensor getKeyFrameIndices();
+  torch::Tensor get_key_frame_indices();
 
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
@@ -128,15 +128,15 @@ class SingleStreamDecoder {
     // 0 means FFMPEG will choose the number of threads automatically to fully
     // utilize all cores. If not set, it will be the default FFMPEG behavior for
     // the given codec.
-    std::optional<int> ffmpegThreadCount;
+    std::optional<int> ffmpeg_thread_count;
     // Currently the dimension order can be either NHWC or NCHW.
     // H=height, W=width, C=channel.
-    std::string dimensionOrder = "NCHW";
+    std::string dimension_order = "NCHW";
     // The output height and width of the frame. If not specified, the output
     // is the same as the original video.
     std::optional<int> width;
     std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary;
+    std::optional<_color_conversion_library> color_conversion_library;
     // By default we use CPU for decoding for both C++ and python users.
     torch::Device device = torch::kCPU;
   };
@@ -144,15 +144,15 @@ class SingleStreamDecoder {
   struct AudioStreamOptions {
     AudioStreamOptions() {}
 
-    std::optional<int> sampleRate;
+    std::optional<int> sample_rate;
   };
 
-  void addVideoStream(
-      int streamIndex,
-      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
-  void addAudioStream(
-      int streamIndex,
-      const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
+  void add_video_stream(
+      int stream_index,
+      const VideoStreamOptions& video_stream_options = VideoStreamOptions());
+  void add_audio_stream(
+      int stream_index,
+      const AudioStreamOptions& audio_stream_options = AudioStreamOptions());
 
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
@@ -170,45 +170,47 @@ class SingleStreamDecoder {
     // - 3D (C, H, W) or (H, W, C) for videos
     // - 2D (numChannels, numSamples) for audio
     torch::Tensor data;
-    double ptsSeconds;
-    double durationSeconds;
+    double pts_seconds;
+    double duration_seconds;
   };
 
   struct FrameBatchOutput {
     torch::Tensor data; // 4D: of shape NCHW or NHWC.
-    torch::Tensor ptsSeconds; // 1D of shape (N,)
-    torch::Tensor durationSeconds; // 1D of shape (N,)
+    torch::Tensor pts_seconds; // 1D of shape (N,)
+    torch::Tensor duration_seconds; // 1D of shape (N,)
 
     explicit FrameBatchOutput(
-        int64_t numFrames,
-        const VideoStreamOptions& videoStreamOptions,
-        const StreamMetadata& streamMetadata);
+        int64_t num_frames,
+        const VideoStreamOptions& video_stream_options,
+        const StreamMetadata& stream_metadata);
   };
 
   struct AudioFramesOutput {
-    torch::Tensor data; // shape is (numChannels, numSamples)
-    double ptsSeconds;
+    torch::Tensor data; // shape is (numChannels, num_samples)
+    double pts_seconds;
   };
 
   // Places the cursor at the first frame on or after the position in seconds.
   // Calling getNextFrame() will return the first frame at
   // or after this position.
-  void setCursorPtsInSeconds(double seconds);
+  void set_cursor_pts_in_seconds(double seconds);
 
   // Decodes the frame where the current cursor position is. It also advances
   // the cursor to the next frame.
-  FrameOutput getNextFrame();
+  FrameOutput get_next_frame();
 
-  FrameOutput getFrameAtIndex(int64_t frameIndex);
+  FrameOutput get_frame_at_index(int64_t frame_index);
 
   // Returns frames at the given indices for a given stream as a single stacked
   // Tensor.
-  FrameBatchOutput getFramesAtIndices(const std::vector<int64_t>& frameIndices);
+  FrameBatchOutput get_frames_at_indices(
+      const std::vector<int64_t>& frame_indices);
 
   // Returns frames within a given range. The range is defined by [start, stop).
   // The values retrieved from the range are: [start, start+step,
   // start+(2*step), start+(3*step), ..., stop). The default for step is 1.
-  FrameBatchOutput getFramesInRange(int64_t start, int64_t stop, int64_t step);
+  FrameBatchOutput
+  get_frames_in_range(int64_t start, int64_t stop, int64_t step);
 
   // Decodes the first frame in any added stream that is visible at a given
   // timestamp. Frames in the video have a presentation timestamp and a
@@ -216,9 +218,9 @@ class SingleStreamDecoder {
   // duration of 1.0s, it will be visible in the timestamp range [5.0, 6.0).
   // i.e. it will be returned when this function is called with seconds=5.0 or
   // seconds=5.999, etc.
-  FrameOutput getFramePlayedAt(double seconds);
+  FrameOutput get_frame_played_at(double seconds);
 
-  FrameBatchOutput getFramesPlayedAt(const std::vector<double>& timestamps);
+  FrameBatchOutput get_frames_played_at(const std::vector<double>& timestamps);
 
   // Returns frames within a given pts range. The range is defined by
   // [startSeconds, stopSeconds) with respect to the pts values for frames. The
@@ -236,14 +238,14 @@ class SingleStreamDecoder {
   //
   // Valid values for startSeconds and stopSeconds are:
   //
-  //   [minPtsSecondsFromScan, maxPtsSecondsFromScan)
-  FrameBatchOutput getFramesPlayedInRange(
-      double startSeconds,
-      double stopSeconds);
+  // [minPtsSecondsFromScan, maxPtsSecondsFromScan)
+  FrameBatchOutput get_frames_played_in_range(
+      double start_seconds,
+      double stop_seconds);
 
-  AudioFramesOutput getFramesPlayedInRangeAudio(
-      double startSeconds,
-      std::optional<double> stopSecondsOptional = std::nullopt);
+  AudioFramesOutput get_frames_played_in_range_audio(
+      double start_seconds,
+      std::optional<double> stop_seconds_optional = std::nullopt);
 
   class EndOfFileException : public std::runtime_error {
    public:
@@ -259,27 +261,27 @@ class SingleStreamDecoder {
 
   // Once getFrameAtIndex supports the preAllocatedOutputTensor parameter, we
   // can move it back to private.
-  FrameOutput getFrameAtIndexInternal(
-      int64_t frameIndex,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  FrameOutput get_frame_at_index_internal(
+      int64_t frame_index,
+      std::optional<torch::Tensor> pre_allocated_output_tensor = std::nullopt);
 
   // Exposed for _test_frame_pts_equality, which is used to test non-regression
   // of pts resolution (64 to 32 bit floats)
-  double getPtsSecondsForFrame(int64_t frameIndex);
+  double get_pts_seconds_for_frame(int64_t frame_index);
 
   // Exposed for performance testing.
   struct DecodeStats {
-    int64_t numSeeksAttempted = 0;
-    int64_t numSeeksDone = 0;
-    int64_t numSeeksSkipped = 0;
-    int64_t numPacketsRead = 0;
-    int64_t numPacketsSentToDecoder = 0;
-    int64_t numFramesReceivedByDecoder = 0;
-    int64_t numFlushes = 0;
+    int64_t num_seeks_attempted = 0;
+    int64_t num_seeks_done = 0;
+    int64_t num_seeks_skipped = 0;
+    int64_t num_packets_read = 0;
+    int64_t num_packets_sent_to_decoder = 0;
+    int64_t num_frames_received_by_decoder = 0;
+    int64_t num_flushes = 0;
   };
 
-  DecodeStats getDecodeStats() const;
-  void resetDecodeStats();
+  DecodeStats get_decode_stats() const;
+  void reset_decode_stats();
 
  private:
   // --------------------------------------------------------------------------
@@ -296,171 +298,171 @@ class SingleStreamDecoder {
     // typically done during pts -> index conversions).
     // TODO: This field is unset (left to the default) for entries in the
     // keyFrames vec!
-    int64_t nextPts = INT64_MAX;
+    int64_t next_pts = INT64_MAX;
 
     // Note that frameIndex is ALWAYS the index into all of the frames in that
     // stream, even when the FrameInfo is part of the key frame index. Given a
     // FrameInfo for a key frame, the frameIndex allows us to know which frame
     // that is in the stream.
-    int64_t frameIndex = 0;
+    int64_t frame_index = 0;
 
     // Indicates whether a frame is a key frame. It may appear redundant as it's
     // only true for FrameInfos in the keyFrames index, but it is needed to
     // correctly map frames between allFrames and keyFrames during the scan.
-    bool isKeyFrame = false;
+    bool is_key_frame = false;
   };
 
   struct FilterGraphContext {
-    UniqueAVFilterGraph filterGraph;
-    AVFilterContext* sourceContext = nullptr;
-    AVFilterContext* sinkContext = nullptr;
+    UniqueAVFilterGraph filter_graph;
+    AVFilterContext* source_context = nullptr;
+    AVFilterContext* sink_context = nullptr;
   };
 
   struct DecodedFrameContext {
-    int decodedWidth;
-    int decodedHeight;
-    AVPixelFormat decodedFormat;
-    int expectedWidth;
-    int expectedHeight;
+    int decoded_width;
+    int decoded_height;
+    AVPixelFormat decoded_format;
+    int expected_width;
+    int expected_height;
     bool operator==(const DecodedFrameContext&);
     bool operator!=(const DecodedFrameContext&);
   };
 
   struct StreamInfo {
-    int streamIndex = -1;
+    int stream_index = -1;
     AVStream* stream = nullptr;
-    AVMediaType avMediaType = AVMEDIA_TYPE_UNKNOWN;
+    AVMediaType av_media_type = AVMEDIA_TYPE_UNKNOWN;
 
-    AVRational timeBase = {};
-    UniqueAVCodecContext codecContext;
+    AVRational time_base = {};
+    UniqueAVCodecContext codec_context;
 
     // The FrameInfo indices we built when scanFileAndUpdateMetadataAndIndex was
     // called.
-    std::vector<FrameInfo> keyFrames;
-    std::vector<FrameInfo> allFrames;
+    std::vector<_frame_info> key_frames;
+    std::vector<_frame_info> all_frames;
 
     // TODO since the decoder is single-stream, these should be decoder fields,
     // not streamInfo fields. And they should be defined right next to
     // `cursor_`, with joint documentation.
-    int64_t lastDecodedAvFramePts = 0;
-    int64_t lastDecodedAvFrameDuration = 0;
-    VideoStreamOptions videoStreamOptions;
-    AudioStreamOptions audioStreamOptions;
+    int64_t last_decoded_avframe_pts = 0;
+    int64_t last_decoded_avframe_duration = 0;
+    VideoStreamOptions video_stream_options;
+    AudioStreamOptions audio_stream_options;
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
-    FilterGraphContext filterGraphContext;
-    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
-    UniqueSwsContext swsContext;
-    UniqueSwrContext swrContext;
+    FilterGraphContext filter_graph_context;
+    ColorConversionLibrary color_conversion_library = FILTERGRAPH;
+    UniqueSwsContext sws_context;
+    UniqueSwrContext swr_context;
 
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
-    DecodedFrameContext prevFrameContext;
+    DecodedFrameContext prev_frame_context;
   };
 
   // --------------------------------------------------------------------------
   // INITIALIZERS
   // --------------------------------------------------------------------------
 
-  void initializeDecoder();
-  void setFFmpegLogLevel();
+  void initialize_decoder();
+  void set_ffmpeg_log_level();
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------
 
-  void setCursor(int64_t pts);
-  void setCursor(double) = delete; // prevent calls with doubles and floats
-  bool canWeAvoidSeeking() const;
+  void set_cursor(int64_t pts);
+  void set_cursor(double) = delete; // prevent calls with doubles and floats
+  bool can_we_avoid_seeking() const;
 
-  void maybeSeekToBeforeDesiredPts();
+  void maybe_seek_to_before_desired_pts();
 
-  UniqueAVFrame decodeAVFrame(
-      std::function<bool(const UniqueAVFrame&)> filterFunction);
+  UniqueAVFrame decode_avframe(
+      std::function<bool(const UniqueAVFrame&)> filter_function);
 
-  FrameOutput getNextFrameInternal(
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  FrameOutput get_next_frame_internal(
+      std::optional<torch::Tensor> pre_allocated_output_tensor = std::nullopt);
 
-  torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwcTensor);
+  torch::Tensor maybePermuteHWC2CHW(torch::Tensor& hwc_tensor);
 
-  FrameOutput convertAVFrameToFrameOutput(
-      UniqueAVFrame& avFrame,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  FrameOutput convert_avframe_to_frame_output(
+      UniqueAVFrame& avframe,
+      std::optional<torch::Tensor> pre_allocated_output_tensor = std::nullopt);
 
-  void convertAVFrameToFrameOutputOnCPU(
-      UniqueAVFrame& avFrame,
-      FrameOutput& frameOutput,
-      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  void convert_avframe_to_frame_output_on_c_p_u(
+      UniqueAVFrame& avframe,
+      FrameOutput& frame_output,
+      std::optional<torch::Tensor> pre_allocated_output_tensor = std::nullopt);
 
-  void convertAudioAVFrameToFrameOutputOnCPU(
-      UniqueAVFrame& srcAVFrame,
-      FrameOutput& frameOutput);
+  void convert_audio_avframe_to_frame_output_on_c_p_u(
+      UniqueAVFrame& src_avframe,
+      FrameOutput& frame_output);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      const UniqueAVFrame& avFrame);
+  torch::Tensor convert_avframe_to_tensor_using_filter_graph(
+      const UniqueAVFrame& avframe);
 
-  int convertAVFrameToTensorUsingSwsScale(
-      const UniqueAVFrame& avFrame,
-      torch::Tensor& outputTensor);
+  int convert_avframe_to_tensor_using_sws_scale(
+      const UniqueAVFrame& avframe,
+      torch::Tensor& output_tensor);
 
-  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
-      const UniqueAVFrame& srcAVFrame,
-      AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat,
-      int sourceSampleRate,
-      int desiredSampleRate);
+  UniqueAVFrame convert_audio_avframe_sample_format_and_sample_rate(
+      const UniqueAVFrame& src_avframe,
+      AVSampleFormat source_sample_format,
+      AVSampleFormat desired_sample_format,
+      int source_sample_rate,
+      int desired_sample_rate);
 
-  std::optional<torch::Tensor> maybeFlushSwrBuffers();
+  std::optional<torch::Tensor> maybe_flush_swr_buffers();
 
   // --------------------------------------------------------------------------
   // COLOR CONVERSION LIBRARIES HANDLERS CREATION
   // --------------------------------------------------------------------------
 
-  void createFilterGraph(
-      StreamInfo& streamInfo,
-      int expectedOutputHeight,
-      int expectedOutputWidth);
+  void create_filter_graph(
+      StreamInfo& stream_info,
+      int expected_output_height,
+      int expected_output_width);
 
-  void createSwsContext(
-      StreamInfo& streamInfo,
-      const DecodedFrameContext& frameContext,
+  void create_sws_context(
+      StreamInfo& stream_info,
+      const DecodedFrameContext& frame_context,
       const enum AVColorSpace colorspace);
 
-  void createSwrContext(
-      StreamInfo& streamInfo,
-      AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat,
-      int sourceSampleRate,
-      int desiredSampleRate);
+  void create_swr_context(
+      StreamInfo& stream_info,
+      AVSampleFormat source_sample_format,
+      AVSampleFormat desired_sample_format,
+      int source_sample_rate,
+      int desired_sample_rate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
   // --------------------------------------------------------------------------
 
-  int getKeyFrameIndexForPts(int64_t pts) const;
+  int get_key_frame_index_for_pts(int64_t pts) const;
 
   // Returns the key frame index of the presentation timestamp using our index.
   // We build this index by scanning the file in
   // scanFileAndUpdateMetadataAndIndex
-  int getKeyFrameIndexForPtsUsingScannedIndex(
-      const std::vector<SingleStreamDecoder::FrameInfo>& keyFrames,
+  int get_key_frame_index_for_pts_using_scanned_index(
+      const std::vector<_single_stream_decoder::_frame_info>& key_frames,
       int64_t pts) const;
 
-  int64_t secondsToIndexLowerBound(double seconds);
+  int64_t seconds_to_index_lower_bound(double seconds);
 
-  int64_t secondsToIndexUpperBound(double seconds);
+  int64_t seconds_to_index_upper_bound(double seconds);
 
-  int64_t getPts(int64_t frameIndex);
+  int64_t get_pts(int64_t frame_index);
 
   // --------------------------------------------------------------------------
   // STREAM AND METADATA APIS
   // --------------------------------------------------------------------------
 
-  void addStream(
-      int streamIndex,
-      AVMediaType mediaType,
+  void add_stream(
+      int stream_index,
+      AVMediaType media_type,
       const torch::Device& device = torch::kCPU,
-      std::optional<int> ffmpegThreadCount = std::nullopt);
+      std::optional<int> ffmpeg_thread_count = std::nullopt);
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
@@ -469,44 +471,44 @@ class SingleStreamDecoder {
   // for more details about the heuristics.
   // Returns the key frame index of the presentation timestamp using FFMPEG's
   // index. Note that this index may be truncated for some files.
-  int getBestStreamIndex(AVMediaType mediaType);
+  int get_best_stream_index(_avmedia_type media_type);
 
-  int64_t getNumFrames(const StreamMetadata& streamMetadata);
-  double getMinSeconds(const StreamMetadata& streamMetadata);
-  double getMaxSeconds(const StreamMetadata& streamMetadata);
+  int64_t get_num_frames(const StreamMetadata& stream_metadata);
+  double get_min_seconds(const StreamMetadata& stream_metadata);
+  double get_max_seconds(const StreamMetadata& stream_metadata);
 
   // --------------------------------------------------------------------------
   // VALIDATION UTILS
   // --------------------------------------------------------------------------
 
-  void validateActiveStream(
-      std::optional<AVMediaType> avMediaType = std::nullopt);
-  void validateScannedAllStreams(const std::string& msg);
-  void validateFrameIndex(
-      const StreamMetadata& streamMetadata,
-      int64_t frameIndex);
+  void validate_active_stream(
+      std::optional<_avmedia_type> av_media_type = std::nullopt);
+  void validate_scanned_all_streams(const std::string& msg);
+  void validate_frame_index(
+      const StreamMetadata& stream_metadata,
+      int64_t frame_index);
 
   // --------------------------------------------------------------------------
   // ATTRIBUTES
   // --------------------------------------------------------------------------
 
-  SeekMode seekMode_;
-  ContainerMetadata containerMetadata_;
-  UniqueAVFormatContext formatContext_;
-  std::map<int, StreamInfo> streamInfos_;
+  SeekMode seek_mode_;
+  ContainerMetadata container_metadata_;
+  UniqueAVFormatContext format_context_;
+  std::map<int, StreamInfo> stream_infos_;
   const int NO_ACTIVE_STREAM = -2;
-  int activeStreamIndex_ = NO_ACTIVE_STREAM;
+  int active_stream_index_ = NO_ACTIVE_STREAM;
 
-  bool cursorWasJustSet_ = false;
+  bool cursor_was_just_set_ = false;
   // The desired position of the cursor in the stream. We send frames >= this
   // pts to the user when they request a frame.
   int64_t cursor_ = INT64_MIN;
   // Stores various internal decoding stats.
-  DecodeStats decodeStats_;
+  DecodeStats decode_stats_;
   // Stores the AVIOContext for the input buffer.
-  std::unique_ptr<AVIOContextHolder> avioContextHolder_;
+  std::unique_ptr<AVIOContext_holder> avio_context_holder_;
   // Whether or not we have already scanned all streams to update the metadata.
-  bool scannedAllStreams_ = false;
+  bool scanned_all_streams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
 };
@@ -527,19 +529,19 @@ class SingleStreamDecoder {
 // *decreasing order of accuracy*, we use the following sources for determining
 // height and width:
 // - getHeightAndWidthFromResizedAVFrame(). This is the height and width of the
-//   AVframe, *post*-resizing. This is only used for single-frame decoding APIs,
-//   on CPU, with filtergraph.
+// AVframe, *post*-resizing. This is only used for single-frame decoding APIs,
+// on CPU, with filtergraph.
 // - getHeightAndWidthFromOptionsOrAVFrame(). This is the height and width from
-//   the user-specified options if they exist, or the height and width of the
-//   AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
-//   our code or within FFmpeg code, this should be exactly the same as
-//   getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
-//   decoding APIs, on CPU with swscale, and on GPU.
+// the user-specified options if they exist, or the height and width of the
+// AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
+// our code or within FFmpeg code, this should be exactly the same as
+// getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
+// decoding APIs, on CPU with swscale, and on GPU.
 // - getHeightAndWidthFromOptionsOrMetadata(). This is the height and width from
-//   the user-specified options if they exist, or the height and width form the
-//   stream metadata, which itself got its value from the CodecContext, when the
-//   stream was added. This is used by batch decoding APIs, for both GPU and
-//   CPU.
+// the user-specified options if they exist, or the height and width form the
+// stream metadata, which itself got its value from the CodecContext, when the
+// stream was added. This is used by batch decoding APIs, for both GPU and
+// CPU.
 //
 // The source of truth for height and width really is the (resized) AVFrame: it
 // comes from the decoded ouptut of FFmpeg. The info from the metadata (i.e.
@@ -565,27 +567,28 @@ struct FrameDims {
 
 // There's nothing preventing you from calling this on a non-resized frame, but
 // please don't.
-FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
+FrameDims get_height_and_width_from_resized_avframe(
+    const AVFrame& resized_avframe);
 
-FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    const SingleStreamDecoder::StreamMetadata& streamMetadata);
+FrameDims get_height_and_width_from_options_or_metadata(
+    const SingleStreamDecoder::VideoStreamOptions& video_stream_options,
+    const SingleStreamDecoder::StreamMetadata& stream_metadata);
 
-FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    const UniqueAVFrame& avFrame);
+FrameDims get_height_and_width_from_options_or_avframe(
+    const SingleStreamDecoder::VideoStreamOptions& video_stream_options,
+    const UniqueAVFrame& avframe);
 
-torch::Tensor allocateEmptyHWCTensor(
+torch::Tensor allocate_empty_h_w_c_tensor(
     int height,
     int width,
     torch::Device device,
-    std::optional<int> numFrames = std::nullopt);
+    std::optional<int> num_frames = std::nullopt);
 
 // Prints the SingleStreamDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(
     std::ostream& os,
     const SingleStreamDecoder::DecodeStats& stats);
 
-SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode);
+SingleStreamDecoder::SeekMode seek_mode_from_string(std::string_view seek_mode);
 
 } // namespace facebook::torchcodec

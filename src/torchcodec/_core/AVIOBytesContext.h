@@ -14,7 +14,7 @@ namespace facebook::torchcodec {
 // functions then traverse the bytes in memory.
 class AVIOBytesContext : public AVIOContextHolder {
  public:
-  explicit AVIOBytesContext(const void* data, int64_t dataSize);
+  explicit AVIOBytesContext(const void* data, int64_t data_size);
 
  private:
   struct DataContext {
@@ -26,7 +26,7 @@ class AVIOBytesContext : public AVIOContextHolder {
   static int read(void* opaque, uint8_t* buf, int buf_size);
   static int64_t seek(void* opaque, int64_t offset, int whence);
 
-  DataContext dataContext_;
+  DataContext data_context_;
 };
 
 } // namespace facebook::torchcodec
