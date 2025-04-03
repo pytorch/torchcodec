@@ -35,7 +35,7 @@ def create_decoder(
         return core.create_from_tensor(source, seek_mode)
     elif isinstance(source, io.TextIOBase):
         raise TypeError(
-            "source is of type io.TextIOBase; did you forget to specify binary reading?"
+            "source is for reading text, likely from open(..., 'r'). Try with 'rb' for binary reading?"
         )
     elif hasattr(source, "read") and hasattr(source, "seek"):
         # This check must be after checking for text-based reading. Also placing
@@ -46,5 +46,7 @@ def create_decoder(
 
     raise TypeError(
         f"Unknown source type: {type(source)}. "
-        "Supported types are str, Path, io.RawIOBase, io.BufferedReader, bytes and Tensor."
+        "Supported types are str, Path, bytes, Tensor and file-like objects with "
+        "read(self, size: int) -> bytes and "
+        "seek(self, offset: int, whence: int) -> bytes methods."
     )
