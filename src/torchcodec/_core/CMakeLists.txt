@@ -60,6 +60,7 @@ function(make_torchcodec_libraries
     set(decoder_sources
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
+	DeviceInterface.cpp
         SingleStreamDecoder.cpp
         # TODO: lib name should probably not be "*_decoder*" now that it also
         # contains an encoder
@@ -68,8 +69,6 @@ function(make_torchcodec_libraries
 
     if(ENABLE_CUDA)
         list(APPEND decoder_sources CudaDevice.cpp)
-    else()
-        list(APPEND decoder_sources CPUOnlyDevice.cpp)
     endif()
 
     set(decoder_library_dependencies
