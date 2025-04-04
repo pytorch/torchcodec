@@ -405,7 +405,8 @@ void SingleStreamDecoder::addStream(
   streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
-  streamInfo.deviceInterface = createDeviceInterface(device);
+
+  deviceInterface = createDeviceInterface(device);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -417,10 +418,9 @@ void SingleStreamDecoder::addStream(
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (streamInfo.deviceInterface) {
+    if (deviceInterface) {
       avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-          streamInfo.deviceInterface
-              ->findCodec(streamInfo.stream->codecpar->codec_id)
+          deviceInterface->findCodec(streamInfo.stream->codecpar->codec_id)
               .value_or(avCodec));
     }
   }
@@ -438,8 +438,8 @@ void SingleStreamDecoder::addStream(
 
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (streamInfo.deviceInterface) {
-      streamInfo.deviceInterface->initializeContext(codecContext);
+    if (deviceInterface) {
+      deviceInterface->initializeContext(codecContext);
     }
   }
 
@@ -1210,11 +1210,11 @@ SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (!streamInfo.deviceInterface) {
+  } else if (!deviceInterface) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (streamInfo.deviceInterface) {
-    streamInfo.deviceInterface->convertAVFrameToFrameOutput(
+  } else if (deviceInterface) {
+    deviceInterface->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,

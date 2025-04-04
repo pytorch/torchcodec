@@ -356,8 +356,6 @@ class SingleStreamDecoder {
     // Used to know whether a new FilterGraphContext or UniqueSwsContext should
     // be created before decoding a new frame.
     DecodedFrameContext prevFrameContext;
-
-    std::unique_ptr<DeviceInterface> deviceInterface;
   };
 
   // --------------------------------------------------------------------------
@@ -494,6 +492,7 @@ class SingleStreamDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
+  std::unique_ptr<DeviceInterface> deviceInterface;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
