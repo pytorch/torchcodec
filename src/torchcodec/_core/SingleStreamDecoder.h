@@ -13,12 +13,12 @@
 #include <string_view>
 
 #include "src/torchcodec/_core/AVIOContextHolder.h"
+#include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/Frame.h"
 #include "src/torchcodec/_core/Stream.h"
 
 namespace facebook::torchcodec {
-class DeviceInterface;
 
 // The SingleStreamDecoder class can be used to decode video frames to Tensors.
 // Note that SingleStreamDecoder is not thread-safe.

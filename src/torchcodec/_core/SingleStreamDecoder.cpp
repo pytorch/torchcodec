@@ -13,7 +13,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include "src/torchcodec/_core/DeviceInterface.h"
 #include "torch/types.h"
 
 extern "C" {
