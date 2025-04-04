@@ -12,8 +12,8 @@
 #include <stdexcept>
 #include <string>
 #include "FFMPEGCommon.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
-#include "src/torchcodec/_core/StreamOptions.h"
+#include "src/torchcodec/_core/Frame.h"
+#include "src/torchcodec/_core/Stream.h"
 
 namespace facebook::torchcodec {
 
@@ -44,7 +44,7 @@ class DeviceInterface {
   virtual void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       UniqueAVFrame& avFrame,
-      SingleStreamDecoder::FrameOutput& frameOutput,
+      FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
 
  protected:

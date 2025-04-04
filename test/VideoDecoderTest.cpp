@@ -69,8 +69,7 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  SingleStreamDecoder::ContainerMetadata metadata =
-      decoder->getContainerMetadata();
+  ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
 #if LIBAVFORMAT_VERSION_MAJOR >= 60
@@ -429,8 +428,7 @@ TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4.audio.mp3");
   std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  SingleStreamDecoder::ContainerMetadata metadata =
-      decoder->getContainerMetadata();
+  ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 1);
   EXPECT_EQ(metadata.numVideoStreams, 0);
   EXPECT_EQ(metadata.allStreamMetadata.size(), 1);

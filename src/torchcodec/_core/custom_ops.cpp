@@ -98,7 +98,7 @@ SingleStreamDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
 // under torch.compile().
 using OpsFrameOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
-OpsFrameOutput makeOpsFrameOutput(SingleStreamDecoder::FrameOutput& frame) {
+OpsFrameOutput makeOpsFrameOutput(FrameOutput& frame) {
   return std::make_tuple(
       frame.data,
       torch::tensor(frame.ptsSeconds, torch::dtype(torch::kFloat64)),
@@ -116,8 +116,7 @@ OpsFrameOutput makeOpsFrameOutput(SingleStreamDecoder::FrameOutput& frame) {
 //   single float.
 using OpsFrameBatchOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
 
-OpsFrameBatchOutput makeOpsFrameBatchOutput(
-    SingleStreamDecoder::FrameBatchOutput& batch) {
+OpsFrameBatchOutput makeOpsFrameBatchOutput(FrameBatchOutput& batch) {
   return std::make_tuple(batch.data, batch.ptsSeconds, batch.durationSeconds);
 }
 
@@ -127,8 +126,7 @@ OpsFrameBatchOutput makeOpsFrameBatchOutput(
 //   2. A single float value for the pts of the first frame, in seconds.
 using OpsAudioFramesOutput = std::tuple<at::Tensor, at::Tensor>;
 
-OpsAudioFramesOutput makeOpsAudioFramesOutput(
-    SingleStreamDecoder::AudioFramesOutput& audioFrames) {
+OpsAudioFramesOutput makeOpsAudioFramesOutput(AudioFramesOutput& audioFrames) {
   return std::make_tuple(
       audioFrames.data,
       torch::tensor(audioFrames.ptsSeconds, torch::dtype(torch::kFloat64)));
@@ -291,7 +289,7 @@ void seek_to_pts(at::Tensor& decoder, double seconds) {
 // duration as tensors.
 OpsFrameOutput get_next_frame(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  SingleStreamDecoder::FrameOutput result;
+  FrameOutput result;
   try {
     result = videoDecoder->getNextFrame();
   } catch (const SingleStreamDecoder::EndOfFileException& e) {
@@ -305,7 +303,7 @@ OpsFrameOutput get_next_frame(at::Tensor& decoder) {
 // given timestamp T has T >= PTS and T < PTS + Duration.
 OpsFrameOutput get_frame_at_pts(at::Tensor& decoder, double seconds) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  SingleStreamDecoder::FrameOutput result;
+  FrameOutput result;
   try {
     result = videoDecoder->getFramePlayedAt(seconds);
   } catch (const SingleStreamDecoder::EndOfFileException& e) {
@@ -443,8 +441,7 @@ torch::Tensor _get_key_frame_indices(at::Tensor& decoder) {
 std::string get_json_metadata(at::Tensor& decoder) {
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
 
-  SingleStreamDecoder::ContainerMetadata videoMetadata =
-      videoDecoder->getContainerMetadata();
+  ContainerMetadata videoMetadata = videoDecoder->getContainerMetadata();
   auto maybeBestVideoStreamIndex = videoMetadata.bestVideoStreamIndex;
 
   std::map<std::string, std::string> metadataMap;
