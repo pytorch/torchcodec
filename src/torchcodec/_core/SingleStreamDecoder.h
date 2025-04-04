@@ -492,7 +492,7 @@ class SingleStreamDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
-  std::unique_ptr<DeviceInterface> deviceInterface;
+  std::unique_ptr<DeviceInterface> deviceInterface_;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;

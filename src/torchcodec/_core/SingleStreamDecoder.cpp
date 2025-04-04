@@ -406,7 +406,7 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface = createDeviceInterface(device);
+  deviceInterface_ = createDeviceInterface(device);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -418,9 +418,9 @@ void SingleStreamDecoder::addStream(
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (deviceInterface) {
+    if (deviceInterface_) {
       avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-          deviceInterface->findCodec(streamInfo.stream->codecpar->codec_id)
+          deviceInterface_->findCodec(streamInfo.stream->codecpar->codec_id)
               .value_or(avCodec));
     }
   }
@@ -438,8 +438,8 @@ void SingleStreamDecoder::addStream(
 
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (deviceInterface) {
-      deviceInterface->initializeContext(codecContext);
+    if (deviceInterface_) {
+      deviceInterface_->initializeContext(codecContext);
     }
   }
 
@@ -1210,11 +1210,11 @@ SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (!deviceInterface) {
+  } else if (!deviceInterface_) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (deviceInterface) {
-    deviceInterface->convertAVFrameToFrameOutput(
+  } else if (deviceInterface_) {
+    deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,
