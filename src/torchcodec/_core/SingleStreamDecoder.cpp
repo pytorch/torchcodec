@@ -1443,7 +1443,7 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     auto numBytesPerChannel = numSamples * av_get_bytes_per_sample(format);
     for (auto channel = 0; channel < numChannels;
          ++channel, outputChannelData += numBytesPerChannel) {
-      memcpy(
+      std::memcpy(
           outputChannelData,
           avFrame->extended_data[channel],
           numBytesPerChannel);

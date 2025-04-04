@@ -22,10 +22,12 @@ from torchcodec._core import (
     _test_frame_pts_equality,
     add_audio_stream,
     add_video_stream,
+    create_audio_encoder,
     create_from_bytes,
     create_from_file,
     create_from_file_like,
     create_from_tensor,
+    encode_audio,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -49,6 +51,7 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    TestContainerFile,
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
@@ -56,7 +59,7 @@ torch._dynamo.config.capture_dynamic_output_shape_ops = True
 INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
-class TestVideoOps:
+class TestVideoDecoderOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
@@ -633,7 +636,7 @@ class TestVideoOps:
         )
 
 
-class TestAudioOps:
+class TestAudioDecoderOps:
     @pytest.mark.parametrize(
         "method",
         (
@@ -1064,6 +1067,104 @@ class TestAudioOps:
                 BadReader(open(NASA_VIDEO.path, mode="rb", buffering=0)),
                 "approximate",
             )
+
+
+class TestAudioEncoderOps:
+
+    def decode(self, source) -> torch.Tensor:
+        if isinstance(source, TestContainerFile):
+            source = str(source.path)
+        else:
+            source = str(source)
+        decoder = create_from_file(source, seek_mode="approximate")
+        add_audio_stream(decoder)
+        frames, *_ = get_frames_by_pts_in_range_audio(
+            decoder, start_seconds=0, stop_seconds=None
+        )
+        return frames
+
+    def test_bad_input(self, tmp_path):
+
+        valid_output_file = str(tmp_path / ".mp3")
+
+        with pytest.raises(RuntimeError, match="must have float32 dtype, got int"):
+            create_audio_encoder(
+                wf=torch.arange(10, dtype=torch.int),
+                sample_rate=10,
+                filename=valid_output_file,
+            )
+        with pytest.raises(RuntimeError, match="must have 2 dimensions, got 1"):
+            create_audio_encoder(
+                wf=torch.rand(3), sample_rate=10, filename=valid_output_file
+            )
+
+        with pytest.raises(RuntimeError, match="No such file or directory"):
+            create_audio_encoder(
+                wf=torch.rand(10, 10), sample_rate=10, filename="./bad/path.mp3"
+            )
+        with pytest.raises(RuntimeError, match="Check the desired extension"):
+            create_audio_encoder(
+                wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
+            )
+
+        # TODO-ENCODING: raise more informative error message when sample rate
+        # isn't supported
+        with pytest.raises(RuntimeError, match="Invalid argument"):
+            create_audio_encoder(
+                wf=self.decode(NASA_AUDIO_MP3),
+                sample_rate=10,
+                filename=valid_output_file,
+            )
+
+    def test_round_trip(self, tmp_path):
+        # Check that decode(encode(samples)) == samples
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset)
+
+        encoded_path = tmp_path / "output.mp3"
+        encoder = create_audio_encoder(
+            wf=source_samples, sample_rate=asset.sample_rate, filename=str(encoded_path)
+        )
+        encode_audio(encoder)
+
+        # TODO-ENCODING: tol should be stricter. We need to increase the encoded
+        # bitrate, and / or encode into a lossless format.
+        torch.testing.assert_close(
+            self.decode(encoded_path), source_samples, rtol=0, atol=0.07
+        )
+
+    # TODO-ENCODING: test more encoding formats
+    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
+    def test_against_cli(self, asset, tmp_path):
+        # Encodes samples with our encoder and with the FFmpeg CLI, and checks
+        # that both decoded outputs are equal
+
+        encoded_by_ffmpeg = tmp_path / "ffmpeg_output.mp3"
+        encoded_by_us = tmp_path / "our_output.mp3"
+
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-i",
+                str(asset.path),
+                "-b:a",
+                "0",  # bitrate hardcoded to 0, see corresponding TODO.
+                str(encoded_by_ffmpeg),
+            ],
+            capture_output=True,
+            check=True,
+        )
+
+        encoder = create_audio_encoder(
+            wf=self.decode(asset),
+            sample_rate=asset.sample_rate,
+            filename=str(encoded_by_us),
+        )
+        encode_audio(encoder)
+
+        torch.testing.assert_close(
+            self.decode(encoded_by_ffmpeg), self.decode(encoded_by_us)
+        )
 
 
 if __name__ == "__main__":

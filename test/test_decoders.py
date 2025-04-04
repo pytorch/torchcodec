@@ -45,18 +45,48 @@ class TestDecoder:
             (AudioDecoder, NASA_AUDIO_MP3),
         ),
     )
-    @pytest.mark.parametrize("source_kind", ("str", "path", "tensor", "bytes"))
+    @pytest.mark.parametrize(
+        "source_kind",
+        (
+            "str",
+            "path",
+            "file_like_rawio",
+            "file_like_bufferedio",
+            "file_like_custom",
+            "bytes",
+            "tensor",
+        ),
+    )
     def test_create(self, Decoder, asset, source_kind):
         if source_kind == "str":
             source = str(asset.path)
         elif source_kind == "path":
             source = asset.path
-        elif source_kind == "tensor":
-            source = asset.to_tensor()
+        elif source_kind == "file_like_rawio":
+            source = open(asset.path, mode="rb", buffering=0)
+        elif source_kind == "file_like_bufferedio":
+            source = open(asset.path, mode="rb", buffering=4096)
+        elif source_kind == "file_like_custom":
+            # This class purposefully does not inherit from io.RawIOBase or
+            # io.BufferedReader. We are testing the case when users pass an
+            # object that has the right methods but is an arbitrary type.
+            class CustomReader:
+                def __init__(self, file):
+                    self._file = file
+
+                def read(self, size: int) -> bytes:
+                    return self._file.read(size)
+
+                def seek(self, offset: int, whence: int) -> bytes:
+                    return self._file.seek(offset, whence)
+
+            source = CustomReader(open(asset.path, mode="rb", buffering=0))
         elif source_kind == "bytes":
             path = str(asset.path)
             with open(path, "rb") as f:
                 source = f.read()
+        elif source_kind == "tensor":
+            source = asset.to_tensor()
         else:
             raise ValueError("Oops, double check the parametrization of this test!")
 
@@ -75,6 +105,11 @@ class TestDecoder:
         # stream index that does exist, but it's not audio or video
         with pytest.raises(ValueError, match="No valid stream found"):
             Decoder(NASA_VIDEO.path, stream_index=2)
+
+        # user mistakenly forgets to specify binary reading when creating a file
+        # like object from open()
+        with pytest.raises(TypeError, match="binary reading?"):
+            Decoder(open(NASA_VIDEO.path, "r"))
 
 
 class TestVideoDecoder:
