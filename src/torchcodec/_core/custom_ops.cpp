@@ -218,7 +218,7 @@ void _add_video_stream(
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt) {
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
+  VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
   videoStreamOptions.height = height;
   videoStreamOptions.ffmpegThreadCount = num_threads;
@@ -232,10 +232,10 @@ void _add_video_stream(
     std::string stdColorConversionLibrary{color_conversion_library.value()};
     if (stdColorConversionLibrary == "filtergraph") {
       videoStreamOptions.colorConversionLibrary =
-          SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
+          ColorConversionLibrary::FILTERGRAPH;
     } else if (stdColorConversionLibrary == "swscale") {
       videoStreamOptions.colorConversionLibrary =
-          SingleStreamDecoder::ColorConversionLibrary::SWSCALE;
+          ColorConversionLibrary::SWSCALE;
     } else {
       throw std::runtime_error(
           "Invalid color_conversion_library=" + stdColorConversionLibrary +
@@ -273,7 +273,7 @@ void add_audio_stream(
     at::Tensor& decoder,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<int64_t> sample_rate = std::nullopt) {
-  SingleStreamDecoder::AudioStreamOptions audioStreamOptions;
+  AudioStreamOptions audioStreamOptions;
   audioStreamOptions.sampleRate = sample_rate;
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);

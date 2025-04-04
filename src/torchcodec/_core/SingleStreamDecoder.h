@@ -14,6 +14,7 @@
 
 #include "src/torchcodec/_core/AVIOContextHolder.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
+#include "src/torchcodec/_core/StreamOptions.h"
 
 namespace facebook::torchcodec {
 class DeviceInterface;
@@ -111,40 +112,6 @@ class SingleStreamDecoder {
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
-
-  enum ColorConversionLibrary {
-    // TODO: Add an AUTO option later.
-    // Use the libavfilter library for color conversion.
-    FILTERGRAPH,
-    // Use the libswscale library for color conversion.
-    SWSCALE
-  };
-
-  struct VideoStreamOptions {
-    VideoStreamOptions() {}
-
-    // Number of threads we pass to FFMPEG for decoding.
-    // 0 means FFMPEG will choose the number of threads automatically to fully
-    // utilize all cores. If not set, it will be the default FFMPEG behavior for
-    // the given codec.
-    std::optional<int> ffmpegThreadCount;
-    // Currently the dimension order can be either NHWC or NCHW.
-    // H=height, W=width, C=channel.
-    std::string dimensionOrder = "NCHW";
-    // The output height and width of the frame. If not specified, the output
-    // is the same as the original video.
-    std::optional<int> width;
-    std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary;
-    // By default we use CPU for decoding for both C++ and python users.
-    torch::Device device = torch::kCPU;
-  };
-
-  struct AudioStreamOptions {
-    AudioStreamOptions() {}
-
-    std::optional<int> sampleRate;
-  };
 
   void addVideoStream(
       int streamIndex,
@@ -568,11 +535,11 @@ struct FrameDims {
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const SingleStreamDecoder::StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(

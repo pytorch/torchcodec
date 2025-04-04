@@ -190,7 +190,7 @@ void CudaDevice::initializeContext(AVCodecContext* codecContext) {
 }
 
 void CudaDevice::convertAVFrameToFrameOutput(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     UniqueAVFrame& avFrame,
     SingleStreamDecoder::FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {

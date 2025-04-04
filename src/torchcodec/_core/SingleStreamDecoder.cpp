@@ -501,9 +501,8 @@ void SingleStreamDecoder::addVideoStream(
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   // so we fall back to filtergraph if the width is not a multiple of 32.
-  auto defaultLibrary = (width % 32 == 0)
-      ? SingleStreamDecoder::ColorConversionLibrary::SWSCALE
-      : SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
+  auto defaultLibrary = (width % 32 == 0) ? ColorConversionLibrary::SWSCALE
+                                          : ColorConversionLibrary::FILTERGRAPH;
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
@@ -2047,7 +2046,7 @@ FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
 }
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const SingleStreamDecoder::StreamMetadata& streamMetadata) {
   return FrameDims(
       videoStreamOptions.height.value_or(*streamMetadata.height),
@@ -2055,7 +2054,7 @@ FrameDims getHeightAndWidthFromOptionsOrMetadata(
 }
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const UniqueAVFrame& avFrame) {
   return FrameDims(
       videoStreamOptions.height.value_or(avFrame->height),
