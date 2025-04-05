@@ -7,6 +7,7 @@
 #pragma once
 
 #include <torch/types.h>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -23,25 +24,42 @@ namespace facebook::torchcodec {
 //   deviceFunction(device, ...);
 // }
 
-// Initialize the hardware device that is specified in `device`. Some builds
-// support CUDA and others only support CPU.
-void initializeContextOnCuda(
-    const torch::Device& device,
-    AVCodecContext* codecContext);
+class DeviceInterface {
+ public:
+  DeviceInterface(const torch::Device& device) : device_(device) {}
 
-void convertAVFrameToFrameOutputOnCuda(
-    const torch::Device& device,
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    UniqueAVFrame& avFrame,
-    SingleStreamDecoder::FrameOutput& frameOutput,
-    std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt);
+  virtual ~DeviceInterface(){};
 
-void releaseContextOnCuda(
-    const torch::Device& device,
-    AVCodecContext* codecContext);
+  torch::Device& device() {
+    return device_;
+  };
 
-std::optional<const AVCodec*> findCudaCodec(
-    const torch::Device& device,
-    const AVCodecID& codecId);
+  virtual std::optional<const AVCodec*> findCodec(const AVCodecID& codecId) = 0;
+
+  // Initialize the hardware device that is specified in `device`. Some builds
+  // support CUDA and others only support CPU.
+  virtual void initializeContext(AVCodecContext* codecContext) = 0;
+
+  virtual void convertAVFrameToFrameOutput(
+      const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+      UniqueAVFrame& avFrame,
+      SingleStreamDecoder::FrameOutput& frameOutput,
+      std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
+
+ protected:
+  torch::Device device_;
+};
+
+using CreateDeviceInterfaceFn =
+    std::function<DeviceInterface*(const torch::Device& device)>;
+
+bool registerDeviceInterface(
+    torch::DeviceType deviceType,
+    const CreateDeviceInterfaceFn createInterface);
+
+torch::Device createTorchDevice(const std::string device);
+
+std::unique_ptr<DeviceInterface> createDeviceInterface(
+    const torch::Device& device);
 
 } // namespace facebook::torchcodec

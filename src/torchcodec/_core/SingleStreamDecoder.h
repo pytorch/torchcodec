@@ -16,14 +16,13 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
+class DeviceInterface;
 
 // The SingleStreamDecoder class can be used to decode video frames to Tensors.
 // Note that SingleStreamDecoder is not thread-safe.
 // Do not call non-const APIs concurrently on the same object.
 class SingleStreamDecoder {
  public:
-  ~SingleStreamDecoder();
-
   // --------------------------------------------------------------------------
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
@@ -493,6 +492,7 @@ class SingleStreamDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
+  std::unique_ptr<DeviceInterface> deviceInterface;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;

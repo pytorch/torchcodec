@@ -92,18 +92,6 @@ SingleStreamDecoder::SingleStreamDecoder(
   initializeDecoder();
 }
 
-SingleStreamDecoder::~SingleStreamDecoder() {
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    auto& device = streamInfo.videoStreamOptions.device;
-    if (device.type() == torch::kCPU) {
-    } else if (device.type() == torch::kCUDA) {
-      releaseContextOnCuda(device, streamInfo.codecContext.get());
-    } else {
-      TORCH_CHECK(false, "Invalid device type: " + device.str());
-    }
-  }
-}
-
 void SingleStreamDecoder::initializeDecoder() {
   TORCH_CHECK(!initialized_, "Attempted double initialization.");
 
@@ -418,6 +406,8 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
+  deviceInterface = createDeviceInterface(device);
+
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
       streamInfo.stream->codecpar->codec_type == mediaType,
@@ -427,10 +417,12 @@ void SingleStreamDecoder::addStream(
 
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-        findCudaCodec(device, streamInfo.stream->codecpar->codec_id)
-            .value_or(avCodec));
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (deviceInterface) {
+      avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
+          deviceInterface->findCodec(streamInfo.stream->codecpar->codec_id)
+              .value_or(avCodec));
+    }
   }
 
   AVCodecContext* codecContext = avcodec_alloc_context3(avCodec);
@@ -445,8 +437,10 @@ void SingleStreamDecoder::addStream(
   streamInfo.codecContext->pkt_timebase = streamInfo.stream->time_base;
 
   // TODO_CODE_QUALITY same as above.
-  if (mediaType == AVMEDIA_TYPE_VIDEO && device.type() == torch::kCUDA) {
-    initializeContextOnCuda(device, codecContext);
+  if (mediaType == AVMEDIA_TYPE_VIDEO) {
+    if (deviceInterface) {
+      deviceInterface->initializeContext(codecContext);
+    }
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
@@ -472,11 +466,6 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions) {
-  TORCH_CHECK(
-      videoStreamOptions.device.type() == torch::kCPU ||
-          videoStreamOptions.device.type() == torch::kCUDA,
-      "Invalid device type: " + videoStreamOptions.device.str());
-
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
@@ -1221,20 +1210,15 @@ SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCPU) {
+  } else if (!deviceInterface) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (streamInfo.videoStreamOptions.device.type() == torch::kCUDA) {
-    convertAVFrameToFrameOutputOnCuda(
-        streamInfo.videoStreamOptions.device,
+  } else if (deviceInterface) {
+    deviceInterface->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,
         preAllocatedOutputTensor);
-  } else {
-    TORCH_CHECK(
-        false,
-        "Invalid device type: " + streamInfo.videoStreamOptions.device.str());
   }
   return frameOutput;
 }
