@@ -7,6 +7,7 @@
 #pragma once
 
 #include <torch/types.h>
+#include "src/torchcodec/_core/Metadata.h"
 #include "src/torchcodec/_core/Stream.h"
 
 namespace facebook::torchcodec {
