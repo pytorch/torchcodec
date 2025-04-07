@@ -13,7 +13,7 @@
 #include <string>
 #include "FFMPEGCommon.h"
 #include "src/torchcodec/_core/Frame.h"
-#include "src/torchcodec/_core/Stream.h"
+#include "src/torchcodec/_core/StreamOptions.h"
 
 namespace facebook::torchcodec {
 

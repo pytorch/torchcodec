@@ -16,7 +16,7 @@
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/Frame.h"
-#include "src/torchcodec/_core/Stream.h"
+#include "src/torchcodec/_core/StreamOptions.h"
 
 namespace facebook::torchcodec {
 

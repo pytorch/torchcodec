@@ -8,7 +8,7 @@
 
 #include <torch/types.h>
 #include "src/torchcodec/_core/Metadata.h"
-#include "src/torchcodec/_core/Stream.h"
+#include "src/torchcodec/_core/StreamOptions.h"
 
 namespace facebook::torchcodec {
 
