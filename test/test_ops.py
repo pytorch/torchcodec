@@ -1142,7 +1142,7 @@ class TestAudioEncoderOps:
 
     # TODO-ENCODING: test more encoding formats
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
-    @pytest.mark.parametrize("bit_rate", (None, 0, 1, 44_100))
+    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
     def test_against_cli(self, asset, bit_rate, tmp_path):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
@@ -1151,12 +1151,9 @@ class TestAudioEncoderOps:
         encoded_by_us = tmp_path / "our_output.mp3"
 
         subprocess.run(
-            [
-                "ffmpeg",
-                "-i",
-                str(asset.path),
-                "-b:a",
-                f"{bit_rate or 0}",  # None == 0 (for now!)
+            ["ffmpeg", "-i", str(asset.path)]
+            + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
+            + [
                 str(encoded_by_ffmpeg),
             ],
             capture_output=True,
