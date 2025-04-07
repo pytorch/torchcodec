@@ -13,10 +13,12 @@
 #include <string_view>
 
 #include "src/torchcodec/_core/AVIOContextHolder.h"
+#include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
+#include "src/torchcodec/_core/Frame.h"
+#include "src/torchcodec/_core/StreamOptions.h"
 
 namespace facebook::torchcodec {
-class DeviceInterface;
 
 // The SingleStreamDecoder class can be used to decode video frames to Tensors.
 // Note that SingleStreamDecoder is not thread-safe.
@@ -51,56 +53,6 @@ class SingleStreamDecoder {
   // the allFrames and keyFrames vectors.
   void scanFileAndUpdateMetadataAndIndex();
 
-  struct StreamMetadata {
-    // Common (video and audio) fields derived from the AVStream.
-    int streamIndex;
-    // See this link for what various values are available:
-    // https://ffmpeg.org/doxygen/trunk/group__lavu__misc.html#ga9a84bba4713dfced21a1a56163be1f48
-    AVMediaType mediaType;
-    std::optional<AVCodecID> codecId;
-    std::optional<std::string> codecName;
-    std::optional<double> durationSeconds;
-    std::optional<double> beginStreamFromHeader;
-    std::optional<int64_t> numFrames;
-    std::optional<int64_t> numKeyFrames;
-    std::optional<double> averageFps;
-    std::optional<double> bitRate;
-
-    // More accurate duration, obtained by scanning the file.
-    // These presentation timestamps are in time base.
-    std::optional<int64_t> minPtsFromScan;
-    std::optional<int64_t> maxPtsFromScan;
-    // These presentation timestamps are in seconds.
-    std::optional<double> minPtsSecondsFromScan;
-    std::optional<double> maxPtsSecondsFromScan;
-    // This can be useful for index-based seeking.
-    std::optional<int64_t> numFramesFromScan;
-
-    // Video-only fields derived from the AVCodecContext.
-    std::optional<int64_t> width;
-    std::optional<int64_t> height;
-
-    // Audio-only fields
-    std::optional<int64_t> sampleRate;
-    std::optional<int64_t> numChannels;
-    std::optional<std::string> sampleFormat;
-  };
-
-  struct ContainerMetadata {
-    std::vector<StreamMetadata> allStreamMetadata;
-    int numAudioStreams = 0;
-    int numVideoStreams = 0;
-    // Note that this is the container-level duration, which is usually the max
-    // of all stream durations available in the container.
-    std::optional<double> durationSeconds;
-    // Total BitRate level information at the container level in bit/s
-    std::optional<double> bitRate;
-    // If set, this is the index to the default audio stream.
-    std::optional<int> bestAudioStreamIndex;
-    // If set, this is the index to the default video stream.
-    std::optional<int> bestVideoStreamIndex;
-  };
-
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
@@ -112,40 +64,6 @@ class SingleStreamDecoder {
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
 
-  enum ColorConversionLibrary {
-    // TODO: Add an AUTO option later.
-    // Use the libavfilter library for color conversion.
-    FILTERGRAPH,
-    // Use the libswscale library for color conversion.
-    SWSCALE
-  };
-
-  struct VideoStreamOptions {
-    VideoStreamOptions() {}
-
-    // Number of threads we pass to FFMPEG for decoding.
-    // 0 means FFMPEG will choose the number of threads automatically to fully
-    // utilize all cores. If not set, it will be the default FFMPEG behavior for
-    // the given codec.
-    std::optional<int> ffmpegThreadCount;
-    // Currently the dimension order can be either NHWC or NCHW.
-    // H=height, W=width, C=channel.
-    std::string dimensionOrder = "NCHW";
-    // The output height and width of the frame. If not specified, the output
-    // is the same as the original video.
-    std::optional<int> width;
-    std::optional<int> height;
-    std::optional<ColorConversionLibrary> colorConversionLibrary;
-    // By default we use CPU for decoding for both C++ and python users.
-    torch::Device device = torch::kCPU;
-  };
-
-  struct AudioStreamOptions {
-    AudioStreamOptions() {}
-
-    std::optional<int> sampleRate;
-  };
-
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
@@ -156,38 +74,6 @@ class SingleStreamDecoder {
   // --------------------------------------------------------------------------
   // DECODING AND SEEKING APIs
   // --------------------------------------------------------------------------
-
-  // All public video decoding entry points return either a FrameOutput or a
-  // FrameBatchOutput.
-  // They are the equivalent of the user-facing Frame and FrameBatch classes in
-  // Python. They contain RGB decoded frames along with some associated data
-  // like PTS and duration.
-  // FrameOutput is also relevant for audio decoding, typically as the output of
-  // getNextFrame(), or as a temporary output variable.
-  struct FrameOutput {
-    // data shape is:
-    // - 3D (C, H, W) or (H, W, C) for videos
-    // - 2D (numChannels, numSamples) for audio
-    torch::Tensor data;
-    double ptsSeconds;
-    double durationSeconds;
-  };
-
-  struct FrameBatchOutput {
-    torch::Tensor data; // 4D: of shape NCHW or NHWC.
-    torch::Tensor ptsSeconds; // 1D of shape (N,)
-    torch::Tensor durationSeconds; // 1D of shape (N,)
-
-    explicit FrameBatchOutput(
-        int64_t numFrames,
-        const VideoStreamOptions& videoStreamOptions,
-        const StreamMetadata& streamMetadata);
-  };
-
-  struct AudioFramesOutput {
-    torch::Tensor data; // shape is (numChannels, numSamples)
-    double ptsSeconds;
-  };
 
   // Places the cursor at the first frame on or after the position in seconds.
   // Calling getNextFrame() will return the first frame at
@@ -492,7 +378,7 @@ class SingleStreamDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
-  std::unique_ptr<DeviceInterface> deviceInterface;
+  std::unique_ptr<DeviceInterface> deviceInterface_;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
@@ -568,11 +454,11 @@ struct FrameDims {
 FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    const SingleStreamDecoder::StreamMetadata& streamMetadata);
+    const VideoStreamOptions& videoStreamOptions,
+    const StreamMetadata& streamMetadata);
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const UniqueAVFrame& avFrame);
 
 torch::Tensor allocateEmptyHWCTensor(
