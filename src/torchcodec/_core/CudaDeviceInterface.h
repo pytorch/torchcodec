@@ -10,11 +10,11 @@
 
 namespace facebook::torchcodec {
 
-class CudaDevice : public DeviceInterface {
+class CudaDeviceInterface : public DeviceInterface {
  public:
-  CudaDevice(const torch::Device& device);
+  CudaDeviceInterface(const torch::Device& device);
 
-  virtual ~CudaDevice();
+  virtual ~CudaDeviceInterface();
 
   std::optional<const AVCodec*> findCodec(const AVCodecID& codecId) override;
 
