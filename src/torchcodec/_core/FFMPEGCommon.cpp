@@ -5,6 +5,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/_core/FFMPEGCommon.h"
+#include <cstdlib>
 
 #include <c10/util/Exception.h>
 
@@ -156,6 +157,39 @@ SwrContext* allocateSwrContext(
 
   TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
   return swrContext;
+}
+
+void setFFmpegLogLevel() {
+  auto logLevel = AV_LOG_QUIET;
+  const char* logLevelEnv = std::getenv("TORCHCODEC_FFMPEG_LOG_LEVEL");
+  if (logLevelEnv != nullptr) {
+    if (std::strcmp(logLevelEnv, "QUIET") == 0) {
+      logLevel = AV_LOG_QUIET;
+    } else if (std::strcmp(logLevelEnv, "PANIC") == 0) {
+      logLevel = AV_LOG_PANIC;
+    } else if (std::strcmp(logLevelEnv, "FATAL") == 0) {
+      logLevel = AV_LOG_FATAL;
+    } else if (std::strcmp(logLevelEnv, "ERROR") == 0) {
+      logLevel = AV_LOG_ERROR;
+    } else if (std::strcmp(logLevelEnv, "WARNING") == 0) {
+      logLevel = AV_LOG_WARNING;
+    } else if (std::strcmp(logLevelEnv, "INFO") == 0) {
+      logLevel = AV_LOG_INFO;
+    } else if (std::strcmp(logLevelEnv, "VERBOSE") == 0) {
+      logLevel = AV_LOG_VERBOSE;
+    } else if (std::strcmp(logLevelEnv, "DEBUG") == 0) {
+      logLevel = AV_LOG_DEBUG;
+    } else if (std::strcmp(logLevelEnv, "TRACE") == 0) {
+      logLevel = AV_LOG_TRACE;
+    } else {
+      TORCH_CHECK(
+          false,
+          "Invalid TORCHCODEC_FFMPEG_LOG_LEVEL: ",
+          logLevelEnv,
+          ". Use e.g. 'QUIET', 'PANIC', 'VERBOSE', etc.");
+    }
+  }
+  av_log_set_level(logLevel);
 }
 
 } // namespace facebook::torchcodec
