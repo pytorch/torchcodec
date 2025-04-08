@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -15,12 +17,12 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
       return;
     }
   }
-  std::string supportedRates;
+  std::stringstream supportedRates;
   for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
     if (i > 0) {
-      supportedRates += ", ";
+      supportedRates << ", ";
     }
-    supportedRates += std::to_string(avCodec.supported_samplerates[i]);
+    supportedRates << avCodec.supported_samplerates[i];
   }
 
   TORCH_CHECK(
@@ -28,7 +30,7 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
       "invalid sample rate=",
       sampleRate,
       ". Supported sample rate values are: ",
-      supportedRates);
+      supportedRates.str());
 }
 
 } // namespace
