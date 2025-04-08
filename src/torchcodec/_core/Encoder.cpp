@@ -100,6 +100,7 @@ AudioEncoder::AudioEncoder(
   // raise. We need to handle this, probably converting the format with
   // libswresample.
   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
+  //   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_S16;
 
   int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
@@ -120,12 +121,6 @@ AudioEncoder::AudioEncoder(
       "avcodec_open2 failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  TORCH_CHECK(
-      avCodecContext_->frame_size > 0,
-      "frame_size is ",
-      avCodecContext_->frame_size,
-      ". Cannot encode. This should probably never happen?");
-
   // We're allocating the stream here. Streams are meant to be freed by
   // avformat_free_context(avFormatContext), which we call in the
   // avFormatContext_'s destructor.
@@ -143,7 +138,10 @@ AudioEncoder::AudioEncoder(
 void AudioEncoder::encode() {
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
-  avFrame->nb_samples = avCodecContext_->frame_size;
+  //  Default to 256 like in torchaudio
+  int numSamplesAllocatedPerFrame =
+      avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
+  avFrame->nb_samples = numSamplesAllocatedPerFrame;
   avFrame->format = avCodecContext_->sample_fmt;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
@@ -160,7 +158,6 @@ void AudioEncoder::encode() {
   uint8_t* pwf = static_cast<uint8_t*>(wf_.data_ptr());
   int numSamples = static_cast<int>(wf_.sizes()[1]); // per channel
   int numEncodedSamples = 0; // per channel
-  int numSamplesPerFrame = avCodecContext_->frame_size; // per channel
   int numBytesPerSample = static_cast<int>(wf_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
@@ -178,7 +175,7 @@ void AudioEncoder::encode() {
         getFFMPEGErrorStringFromErrorCode(status));
 
     int numSamplesToEncode =
-        std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
+        std::min(numSamplesAllocatedPerFrame, numSamples - numEncodedSamples);
     int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
     for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
