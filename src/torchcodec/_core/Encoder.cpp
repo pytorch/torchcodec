@@ -37,8 +37,6 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
 
 AudioEncoder::~AudioEncoder() {}
 
-// TODO-ENCODING: disable ffmpeg logs by default
-
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
@@ -51,6 +49,8 @@ AudioEncoder::AudioEncoder(
       wf_.dtype());
   TORCH_CHECK(
       wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
+
+  setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   auto status = avformat_alloc_output_context2(
       &avFormatContext, nullptr, nullptr, fileName.data());

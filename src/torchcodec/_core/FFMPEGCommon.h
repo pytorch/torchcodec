@@ -168,4 +168,6 @@ SwrContext* allocateSwrContext(
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
 
+void setFFmpegLogLevel();
+
 } // namespace facebook::torchcodec

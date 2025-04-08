@@ -158,4 +158,38 @@ SwrContext* allocateSwrContext(
   return swrContext;
 }
 
+void setFFmpegLogLevel() {
+  auto logLevel = AV_LOG_QUIET;
+  const char* logLevelEnvPtr = std::getenv("TORCHCODEC_FFMPEG_LOG_LEVEL");
+  if (logLevelEnvPtr != nullptr) {
+    std::string logLevelEnv(logLevelEnvPtr);
+    if (logLevelEnv == "QUIET") {
+      logLevel = AV_LOG_QUIET;
+    } else if (logLevelEnv == "PANIC") {
+      logLevel = AV_LOG_PANIC;
+    } else if (logLevelEnv == "FATAL") {
+      logLevel = AV_LOG_FATAL;
+    } else if (logLevelEnv == "ERROR") {
+      logLevel = AV_LOG_ERROR;
+    } else if (logLevelEnv == "WARNING") {
+      logLevel = AV_LOG_WARNING;
+    } else if (logLevelEnv == "INFO") {
+      logLevel = AV_LOG_INFO;
+    } else if (logLevelEnv == "VERBOSE") {
+      logLevel = AV_LOG_VERBOSE;
+    } else if (logLevelEnv == "DEBUG") {
+      logLevel = AV_LOG_DEBUG;
+    } else if (logLevelEnv == "TRACE") {
+      logLevel = AV_LOG_TRACE;
+    } else {
+      TORCH_CHECK(
+          false,
+          "Invalid TORCHCODEC_FFMPEG_LOG_LEVEL: ",
+          logLevelEnv,
+          ". Use e.g. 'QUIET', 'PANIC', 'VERBOSE', etc.");
+    }
+  }
+  av_log_set_level(logLevel);
+}
+
 } // namespace facebook::torchcodec
