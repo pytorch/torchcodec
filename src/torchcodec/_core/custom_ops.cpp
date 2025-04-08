@@ -29,7 +29,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
-      "create_audio_encoder(Tensor wf, int sample_rate, str filename) -> Tensor");
+      "create_audio_encoder(Tensor wf, int sample_rate, str filename, int? bit_rate=None) -> Tensor");
   m.def("encode_audio(Tensor(a!) encoder) -> ()");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
@@ -396,7 +396,8 @@ AudioEncoder* unwrapTensorToGetAudioEncoder(at::Tensor& tensor) {
 at::Tensor create_audio_encoder(
     const at::Tensor wf,
     int64_t sample_rate,
-    std::string_view file_name) {
+    std::string_view file_name,
+    std::optional<int64_t> bit_rate = std::nullopt) {
   TORCH_CHECK(
       sample_rate <= std::numeric_limits<int>::max(),
       "sample_rate=",
@@ -404,7 +405,7 @@ at::Tensor create_audio_encoder(
       " is too large to be cast to an int.");
   std::unique_ptr<AudioEncoder> uniqueAudioEncoder =
       std::make_unique<AudioEncoder>(
-          wf, static_cast<int>(sample_rate), file_name);
+          wf, static_cast<int>(sample_rate), file_name, bit_rate);
   return wrapAudioEncoderPointerToTensor(std::move(uniqueAudioEncoder));
 }
 
