@@ -13,7 +13,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include "src/torchcodec/_core/DeviceInterface.h"
 #include "torch/types.h"
 
 extern "C" {
@@ -350,8 +349,7 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   scannedAllStreams_ = true;
 }
 
-SingleStreamDecoder::ContainerMetadata
-SingleStreamDecoder::getContainerMetadata() const {
+ContainerMetadata SingleStreamDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
 
@@ -406,7 +404,7 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface = createDeviceInterface(device);
+  deviceInterface_ = createDeviceInterface(device);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -418,9 +416,9 @@ void SingleStreamDecoder::addStream(
   // TODO_CODE_QUALITY it's pretty meh to have a video-specific logic within
   // addStream() which is supposed to be generic
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (deviceInterface) {
+    if (deviceInterface_) {
       avCodec = makeAVCodecOnlyUseForCallingAVFindBestStream(
-          deviceInterface->findCodec(streamInfo.stream->codecpar->codec_id)
+          deviceInterface_->findCodec(streamInfo.stream->codecpar->codec_id)
               .value_or(avCodec));
     }
   }
@@ -438,8 +436,8 @@ void SingleStreamDecoder::addStream(
 
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
-    if (deviceInterface) {
-      deviceInterface->initializeContext(codecContext);
+    if (deviceInterface_) {
+      deviceInterface_->initializeContext(codecContext);
     }
   }
 
@@ -501,9 +499,8 @@ void SingleStreamDecoder::addVideoStream(
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   // so we fall back to filtergraph if the width is not a multiple of 32.
-  auto defaultLibrary = (width % 32 == 0)
-      ? SingleStreamDecoder::ColorConversionLibrary::SWSCALE
-      : SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
+  auto defaultLibrary = (width % 32 == 0) ? ColorConversionLibrary::SWSCALE
+                                          : ColorConversionLibrary::FILTERGRAPH;
 
   streamInfo.colorConversionLibrary =
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
@@ -539,7 +536,7 @@ void SingleStreamDecoder::addAudioStream(
 // HIGH-LEVEL DECODING ENTRY-POINTS
 // --------------------------------------------------------------------------
 
-SingleStreamDecoder::FrameOutput SingleStreamDecoder::getNextFrame() {
+FrameOutput SingleStreamDecoder::getNextFrame() {
   auto output = getNextFrameInternal();
   if (streamInfos_[activeStreamIndex_].avMediaType == AVMEDIA_TYPE_VIDEO) {
     output.data = maybePermuteHWC2CHW(output.data);
@@ -547,7 +544,7 @@ SingleStreamDecoder::FrameOutput SingleStreamDecoder::getNextFrame() {
   return output;
 }
 
-SingleStreamDecoder::FrameOutput SingleStreamDecoder::getNextFrameInternal(
+FrameOutput SingleStreamDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
   UniqueAVFrame avFrame = decodeAVFrame(
@@ -555,14 +552,13 @@ SingleStreamDecoder::FrameOutput SingleStreamDecoder::getNextFrameInternal(
   return convertAVFrameToFrameOutput(avFrame, preAllocatedOutputTensor);
 }
 
-SingleStreamDecoder::FrameOutput SingleStreamDecoder::getFrameAtIndex(
-    int64_t frameIndex) {
+FrameOutput SingleStreamDecoder::getFrameAtIndex(int64_t frameIndex) {
   auto frameOutput = getFrameAtIndexInternal(frameIndex);
   frameOutput.data = maybePermuteHWC2CHW(frameOutput.data);
   return frameOutput;
 }
 
-SingleStreamDecoder::FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
+FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
     int64_t frameIndex,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
@@ -577,7 +573,7 @@ SingleStreamDecoder::FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
   return getNextFrameInternal(preAllocatedOutputTensor);
 }
 
-SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
+FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
     const std::vector<int64_t>& frameIndices) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
@@ -636,7 +632,7 @@ SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
   return frameBatchOutput;
 }
 
-SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesInRange(
+FrameBatchOutput SingleStreamDecoder::getFramesInRange(
     int64_t start,
     int64_t stop,
     int64_t step) {
@@ -670,8 +666,7 @@ SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesInRange(
   return frameBatchOutput;
 }
 
-SingleStreamDecoder::FrameOutput SingleStreamDecoder::getFramePlayedAt(
-    double seconds) {
+FrameOutput SingleStreamDecoder::getFramePlayedAt(double seconds) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   double frameStartTime =
@@ -711,7 +706,7 @@ SingleStreamDecoder::FrameOutput SingleStreamDecoder::getFramePlayedAt(
   return frameOutput;
 }
 
-SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesPlayedAt(
+FrameBatchOutput SingleStreamDecoder::getFramesPlayedAt(
     const std::vector<double>& timestamps) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
 
@@ -741,8 +736,7 @@ SingleStreamDecoder::FrameBatchOutput SingleStreamDecoder::getFramesPlayedAt(
   return getFramesAtIndices(frameIndices);
 }
 
-SingleStreamDecoder::FrameBatchOutput
-SingleStreamDecoder::getFramesPlayedInRange(
+FrameBatchOutput SingleStreamDecoder::getFramesPlayedInRange(
     double startSeconds,
     double stopSeconds) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
@@ -875,8 +869,7 @@ SingleStreamDecoder::getFramesPlayedInRange(
 // [2] If you're brave and curious, you can read the long "Seek offset for
 // audio" note in https://github.com/pytorch/torchcodec/pull/507/files, which
 // sums up past (and failed) attemps at working around this issue.
-SingleStreamDecoder::AudioFramesOutput
-SingleStreamDecoder::getFramesPlayedInRangeAudio(
+AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
     double startSeconds,
     std::optional<double> stopSecondsOptional) {
   validateActiveStream(AVMEDIA_TYPE_AUDIO);
@@ -1196,8 +1189,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
 // AVFRAME <-> FRAME OUTPUT CONVERSION
 // --------------------------------------------------------------------------
 
-SingleStreamDecoder::FrameOutput
-SingleStreamDecoder::convertAVFrameToFrameOutput(
+FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // Convert the frame to tensor.
@@ -1210,11 +1202,11 @@ SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (!deviceInterface) {
+  } else if (!deviceInterface_) {
     convertAVFrameToFrameOutputOnCPU(
         avFrame, frameOutput, preAllocatedOutputTensor);
-  } else if (deviceInterface) {
-    deviceInterface->convertAVFrameToFrameOutput(
+  } else if (deviceInterface_) {
+    deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         avFrame,
         frameOutput,
@@ -1547,7 +1539,7 @@ std::optional<torch::Tensor> SingleStreamDecoder::maybeFlushSwrBuffers() {
 // OUTPUT ALLOCATION AND SHAPE CONVERSION
 // --------------------------------------------------------------------------
 
-SingleStreamDecoder::FrameBatchOutput::FrameBatchOutput(
+FrameBatchOutput::FrameBatchOutput(
     int64_t numFrames,
     const VideoStreamOptions& videoStreamOptions,
     const StreamMetadata& streamMetadata)
@@ -2047,15 +2039,15 @@ FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame) {
 }
 
 FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
-    const SingleStreamDecoder::StreamMetadata& streamMetadata) {
+    const VideoStreamOptions& videoStreamOptions,
+    const StreamMetadata& streamMetadata) {
   return FrameDims(
       videoStreamOptions.height.value_or(*streamMetadata.height),
       videoStreamOptions.width.value_or(*streamMetadata.width));
 }
 
 FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+    const VideoStreamOptions& videoStreamOptions,
     const UniqueAVFrame& avFrame) {
   return FrameDims(
       videoStreamOptions.height.value_or(avFrame->height),

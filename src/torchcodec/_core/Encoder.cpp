@@ -1,7 +1,39 @@
+#include <sstream>
+
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
 namespace facebook::torchcodec {
+
+namespace {
+
+void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
+  if (avCodec.supported_samplerates == nullptr) {
+    return;
+  }
+
+  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
+    if (sampleRate == avCodec.supported_samplerates[i]) {
+      return;
+    }
+  }
+  std::stringstream supportedRates;
+  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
+    if (i > 0) {
+      supportedRates << ", ";
+    }
+    supportedRates << avCodec.supported_samplerates[i];
+  }
+
+  TORCH_CHECK(
+      false,
+      "invalid sample rate=",
+      sampleRate,
+      ". Supported sample rate values are: ",
+      supportedRates.str());
+}
+
+} // namespace
 
 AudioEncoder::~AudioEncoder() {}
 
@@ -10,8 +42,9 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::string_view fileName)
-    : wf_(wf), sampleRate_(sampleRate) {
+    std::string_view fileName,
+    std::optional<int64_t> bit_rate)
+    : wf_(wf) {
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
@@ -49,13 +82,15 @@ AudioEncoder::AudioEncoder(
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  // TODO-ENCODING I think this sets the bit rate to the minimum supported.
-  // That's not what the ffmpeg CLI would choose by default, so we should try to
-  // do the same.
-  // TODO-ENCODING Should also let user choose for compressed formats like mp3.
-  avCodecContext_->bit_rate = 0;
+  if (bit_rate.has_value()) {
+    TORCH_CHECK(*bit_rate >= 0, "bit_rate=", *bit_rate, " must be >= 0.");
+  }
+  // bit_rate=None defaults to 0, which is what the FFmpeg CLI seems to use as
+  // well when "-b:a" isn't specified.
+  avCodecContext_->bit_rate = bit_rate.value_or(0);
 
-  avCodecContext_->sample_rate = sampleRate_;
+  validateSampleRate(*avCodec, sampleRate);
+  avCodecContext_->sample_rate = sampleRate;
 
   // Note: This is the format of the **input** waveform. This doesn't determine
   // the output.

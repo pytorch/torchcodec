@@ -1107,13 +1107,18 @@ class TestAudioEncoderOps:
                 wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
             )
 
-        # TODO-ENCODING: raise more informative error message when sample rate
-        # isn't supported
-        with pytest.raises(RuntimeError, match="Invalid argument"):
+        with pytest.raises(RuntimeError, match="invalid sample rate=10"):
             create_audio_encoder(
                 wf=self.decode(NASA_AUDIO_MP3),
                 sample_rate=10,
                 filename=valid_output_file,
+            )
+        with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
+            create_audio_encoder(
+                wf=self.decode(NASA_AUDIO_MP3),
+                sample_rate=NASA_AUDIO_MP3.sample_rate,
+                filename=valid_output_file,
+                bit_rate=-1,  # bad
             )
 
     def test_round_trip(self, tmp_path):
@@ -1127,15 +1132,16 @@ class TestAudioEncoderOps:
         )
         encode_audio(encoder)
 
-        # TODO-ENCODING: tol should be stricter. We need to increase the encoded
-        # bitrate, and / or encode into a lossless format.
+        # TODO-ENCODING: tol should be stricter. We probably need to encode
+        # into a lossless format.
         torch.testing.assert_close(
             self.decode(encoded_path), source_samples, rtol=0, atol=0.07
         )
 
     # TODO-ENCODING: test more encoding formats
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
-    def test_against_cli(self, asset, tmp_path):
+    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
+    def test_against_cli(self, asset, bit_rate, tmp_path):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
 
@@ -1143,12 +1149,9 @@ class TestAudioEncoderOps:
         encoded_by_us = tmp_path / "our_output.mp3"
 
         subprocess.run(
-            [
-                "ffmpeg",
-                "-i",
-                str(asset.path),
-                "-b:a",
-                "0",  # bitrate hardcoded to 0, see corresponding TODO.
+            ["ffmpeg", "-i", str(asset.path)]
+            + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
+            + [
                 str(encoded_by_ffmpeg),
             ],
             capture_output=True,
@@ -1159,6 +1162,7 @@ class TestAudioEncoderOps:
             wf=self.decode(asset),
             sample_rate=asset.sample_rate,
             filename=str(encoded_by_us),
+            bit_rate=bit_rate,
         )
         encode_audio(encoder)
 
