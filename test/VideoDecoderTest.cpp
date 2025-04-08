@@ -5,7 +5,6 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "src/torchcodec/_core/AVIOBytesContext.h"
-#include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 #include <c10/util/Flags.h>
@@ -69,8 +68,7 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  SingleStreamDecoder::ContainerMetadata metadata =
-      decoder->getContainerMetadata();
+  ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 2);
   EXPECT_EQ(metadata.numVideoStreams, 2);
 #if LIBAVFORMAT_VERSION_MAJOR >= 60
@@ -150,7 +148,7 @@ TEST(SingleStreamDecoderTest, RespectsWidthAndHeightFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
       std::make_unique<SingleStreamDecoder>(path);
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
+  VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = 100;
   videoStreamOptions.height = 120;
   decoder->addVideoStream(-1, videoStreamOptions);
@@ -162,7 +160,7 @@ TEST(SingleStreamDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
       std::make_unique<SingleStreamDecoder>(path);
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
+  VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   decoder->addVideoStream(-1, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrame().data;
@@ -234,7 +232,7 @@ TEST_P(SingleStreamDecoderTest, DecodesFramesInABatchInNHWC) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
+  VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   // Frame with index 180 corresponds to timestamp 6.006.
@@ -399,9 +397,9 @@ TEST_P(SingleStreamDecoderTest, PreAllocatedTensorFilterGraph) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
+  VideoStreamOptions videoStreamOptions;
   videoStreamOptions.colorConversionLibrary =
-      SingleStreamDecoder::ColorConversionLibrary::FILTERGRAPH;
+      ColorConversionLibrary::FILTERGRAPH;
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
@@ -417,9 +415,8 @@ TEST_P(SingleStreamDecoderTest, PreAllocatedTensorSwscale) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  SingleStreamDecoder::VideoStreamOptions videoStreamOptions;
-  videoStreamOptions.colorConversionLibrary =
-      SingleStreamDecoder::ColorConversionLibrary::SWSCALE;
+  VideoStreamOptions videoStreamOptions;
+  videoStreamOptions.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
   ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
@@ -430,8 +427,7 @@ TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
   std::string path = getResourcePath("nasa_13013.mp4.audio.mp3");
   std::unique_ptr<SingleStreamDecoder> decoder =
       createDecoderFromPath(path, GetParam());
-  SingleStreamDecoder::ContainerMetadata metadata =
-      decoder->getContainerMetadata();
+  ContainerMetadata metadata = decoder->getContainerMetadata();
   EXPECT_EQ(metadata.numAudioStreams, 1);
   EXPECT_EQ(metadata.numVideoStreams, 0);
   EXPECT_EQ(metadata.allStreamMetadata.size(), 1);

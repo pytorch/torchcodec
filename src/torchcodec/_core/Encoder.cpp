@@ -8,7 +8,8 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::string_view fileName)
+    std::string_view fileName,
+    std::optional<int64_t> bit_rate)
     : wf_(wf), sampleRate_(sampleRate) {
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
@@ -49,11 +50,12 @@ AudioEncoder::AudioEncoder(
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  // TODO-ENCODING I think this sets the bit rate to the minimum supported.
-  // That's not what the ffmpeg CLI would choose by default, so we should try to
-  // do the same.
-  // TODO-ENCODING Should also let user choose for compressed formats like mp3.
-  avCodecContext_->bit_rate = 0;
+  if (bit_rate.has_value()) {
+    TORCH_CHECK(*bit_rate >= 0, "bit_rate=", *bit_rate, " must be >= 0.");
+  }
+  // bit_rate=None defaults to 0, which is what the FFmpeg CLI seems to use as
+  // well when "-b:a" isn't specified.
+  avCodecContext_->bit_rate = bit_rate.value_or(0);
 
   avCodecContext_->sample_rate = sampleRate_;
 

@@ -4,7 +4,7 @@
 #include <torch/types.h>
 #include <mutex>
 
-#include "src/torchcodec/_core/CudaDevice.h"
+#include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
@@ -16,9 +16,10 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cuda = registerDeviceInterface(
-    torch::kCUDA,
-    [](const torch::Device& device) { return new CudaDevice(device); });
+bool g_cuda =
+    registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
+      return new CudaDeviceInterface(device);
+    });
 
 // We reuse cuda contexts across VideoDeoder instances. This is because
 // creating a cuda context is expensive. The cache mechanism is as follows:
@@ -163,20 +164,21 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 }
 } // namespace
 
-CudaDevice::CudaDevice(const torch::Device& device) : DeviceInterface(device) {
+CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
+    : DeviceInterface(device) {
   if (device_.type() != torch::kCUDA) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }
 }
 
-CudaDevice::~CudaDevice() {
+CudaDeviceInterface::~CudaDeviceInterface() {
   if (ctx_) {
     addToCacheIfCacheHasCapacity(device_, ctx_);
     av_buffer_unref(&ctx_);
   }
 }
 
-void CudaDevice::initializeContext(AVCodecContext* codecContext) {
+void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg
@@ -189,10 +191,10 @@ void CudaDevice::initializeContext(AVCodecContext* codecContext) {
   return;
 }
 
-void CudaDevice::convertAVFrameToFrameOutput(
-    const SingleStreamDecoder::VideoStreamOptions& videoStreamOptions,
+void CudaDeviceInterface::convertAVFrameToFrameOutput(
+    const VideoStreamOptions& videoStreamOptions,
     UniqueAVFrame& avFrame,
-    SingleStreamDecoder::FrameOutput& frameOutput,
+    FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
@@ -263,7 +265,8 @@ void CudaDevice::convertAVFrameToFrameOutput(
 // we have to do this because of an FFmpeg bug where hardware decoding is not
 // appropriately set, so we just go off and find the matching codec for the CUDA
 // device
-std::optional<const AVCodec*> CudaDevice::findCodec(const AVCodecID& codecId) {
+std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
+    const AVCodecID& codecId) {
   void* i = nullptr;
   const AVCodec* codec = nullptr;
   while ((codec = av_codec_iterate(&i)) != nullptr) {
