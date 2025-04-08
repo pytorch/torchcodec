@@ -1107,9 +1107,7 @@ class TestAudioEncoderOps:
                 wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
             )
 
-        # TODO-ENCODING: raise more informative error message when sample rate
-        # isn't supported
-        with pytest.raises(RuntimeError, match="Invalid argument"):
+        with pytest.raises(RuntimeError, match="invalid sample rate=10"):
             create_audio_encoder(
                 wf=self.decode(NASA_AUDIO_MP3),
                 sample_rate=10,

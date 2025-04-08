@@ -1,7 +1,39 @@
+#include <sstream>
+
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
 namespace facebook::torchcodec {
+
+namespace {
+
+void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
+  if (avCodec.supported_samplerates == nullptr) {
+    return;
+  }
+
+  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
+    if (sampleRate == avCodec.supported_samplerates[i]) {
+      return;
+    }
+  }
+  std::stringstream supportedRates;
+  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
+    if (i > 0) {
+      supportedRates << ", ";
+    }
+    supportedRates << avCodec.supported_samplerates[i];
+  }
+
+  TORCH_CHECK(
+      false,
+      "invalid sample rate=",
+      sampleRate,
+      ". Supported sample rate values are: ",
+      supportedRates.str());
+}
+
+} // namespace
 
 AudioEncoder::~AudioEncoder() {}
 
@@ -12,7 +44,7 @@ AudioEncoder::AudioEncoder(
     int sampleRate,
     std::string_view fileName,
     std::optional<int64_t> bit_rate)
-    : wf_(wf), sampleRate_(sampleRate) {
+    : wf_(wf) {
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
@@ -57,7 +89,8 @@ AudioEncoder::AudioEncoder(
   // well when "-b:a" isn't specified.
   avCodecContext_->bit_rate = bit_rate.value_or(0);
 
-  avCodecContext_->sample_rate = sampleRate_;
+  validateSampleRate(*avCodec, sampleRate);
+  avCodecContext_->sample_rate = sampleRate;
 
   // Note: This is the format of the **input** waveform. This doesn't determine
   // the output.
