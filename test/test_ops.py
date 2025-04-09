@@ -1139,8 +1139,9 @@ class TestAudioEncoderOps:
         )
         encode_audio(encoder)
 
+        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
-            self.decode(encoded_path), source_samples, rtol=0, atol=1e-4
+            self.decode(encoded_path), source_samples, rtol=rtol, atol=atol
         )
 
     @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
@@ -1157,8 +1158,6 @@ class TestAudioEncoderOps:
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
         encoded_by_us = tmp_path / f"our_output.{output_format}"
 
-        # Note: output format may be different from ours, e.g. FFmpeg CLI would
-        # choose s32 while our current heuristic may choose s16.
         subprocess.run(
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
@@ -1177,11 +1176,12 @@ class TestAudioEncoderOps:
         )
         encode_audio(encoder)
 
+        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
             self.decode(encoded_by_ffmpeg),
             self.decode(encoded_by_us),
-            rtol=0,
-            atol=1e-4,
+            rtol=rtol,
+            atol=atol,
         )
 
 

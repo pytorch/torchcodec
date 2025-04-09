@@ -133,25 +133,38 @@ AudioEncoder::AudioEncoder(
 }
 
 AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
-  // Find a sample format that the encoder supports. If FLTP is supported then
-  // we use that, since this is the expected format of the input waveform.
-  // Otherwise, we'll need to convert the waveform before passing it to the
-  // encoder. Right now, the output format we'll choose is just the first format
-  // in the `sample_fmts` list that the AVCodec defines. Eventually, we may
-  // allow the user to choose.
-  // TODO-ENCODING: a better default would probably be to choose the highest
-  // available precision
+  // Find a sample format that the encoder supports. We prefer using FLT[P],
+  // since this is the format of the input waveform. If FLTP isn't supported
+  // then we'll need to convert the AVFrame's format. Our heuristic is to encode
+  // into the format with the highest resolution.
   if (avCodec.sample_fmts == nullptr) {
     // Can't really validate anything in this case, best we can do is hope that
     // FLTP is supported by the encoder. If not, FFmpeg will raise.
     return AV_SAMPLE_FMT_FLTP;
   }
 
-  for (auto i = 0; avCodec.sample_fmts[i] != -1; ++i) {
-    if (avCodec.sample_fmts[i] == AV_SAMPLE_FMT_FLTP) {
-      return AV_SAMPLE_FMT_FLTP;
+  std::vector<AVSampleFormat> preferredFormatsOrder = {
+      AV_SAMPLE_FMT_FLTP,
+      AV_SAMPLE_FMT_FLT,
+      AV_SAMPLE_FMT_DBLP,
+      AV_SAMPLE_FMT_DBL,
+      AV_SAMPLE_FMT_S64P,
+      AV_SAMPLE_FMT_S64,
+      AV_SAMPLE_FMT_S32P,
+      AV_SAMPLE_FMT_S32,
+      AV_SAMPLE_FMT_S16P,
+      AV_SAMPLE_FMT_S16,
+      AV_SAMPLE_FMT_U8P,
+      AV_SAMPLE_FMT_U8};
+
+  for (AVSampleFormat preferredFormat : preferredFormatsOrder) {
+    for (auto i = 0; avCodec.sample_fmts[i] != -1; ++i) {
+      if (avCodec.sample_fmts[i] == preferredFormat) {
+        return preferredFormat;
+      }
     }
   }
+  // Should never happen, but just in case
   return avCodec.sample_fmts[0];
 }
 
