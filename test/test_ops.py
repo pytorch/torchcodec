@@ -44,6 +44,7 @@ from torchcodec._core import (
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
+    in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
@@ -1139,6 +1140,7 @@ class TestAudioEncoderOps:
         )
 
     # TODO-ENCODING: test more encoding formats
+    @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
     def test_against_cli(self, asset, bit_rate, tmp_path):
