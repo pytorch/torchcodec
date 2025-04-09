@@ -1402,12 +1402,12 @@ UniqueAVFrame SingleStreamDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
   auto& streamInfo = streamInfos_[activeStreamIndex_];
 
   if (!streamInfo.swrContext) {
-    createSwrContext(
-        streamInfo,
+    streamInfo.swrContext.reset(createSwrContext(
+        streamInfo.codecContext,
         sourceSampleFormat,
         desiredSampleFormat,
         sourceSampleRate,
-        desiredSampleRate);
+        desiredSampleRate));
   }
 
   UniqueAVFrame convertedAVFrame(av_frame_alloc());
@@ -1735,14 +1735,14 @@ void SingleStreamDecoder::createSwsContext(
   streamInfo.swsContext.reset(swsContext);
 }
 
-void SingleStreamDecoder::createSwrContext(
-    StreamInfo& streamInfo,
+SwrContext* SingleStreamDecoder::createSwrContext(
+    UniqueAVCodecContext& avCodecContext,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
     int desiredSampleRate) {
   auto swrContext = allocateSwrContext(
-      streamInfo.codecContext,
+      avCodecContext,
       sourceSampleFormat,
       desiredSampleFormat,
       sourceSampleRate,
@@ -1756,7 +1756,8 @@ void SingleStreamDecoder::createSwrContext(
       ". If the error says 'Invalid argument', it's likely that you are using "
       "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
       "valid scenarios. Try to upgrade FFmpeg?");
-  streamInfo.swrContext.reset(swrContext);
+  //   streamInfo.swrContext.reset(swrContext);
+  return swrContext;
 }
 
 // --------------------------------------------------------------------------
