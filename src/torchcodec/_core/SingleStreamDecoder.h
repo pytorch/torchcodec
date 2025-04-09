@@ -288,8 +288,8 @@ class SingleStreamDecoder {
       torch::Tensor& outputTensor);
 
   UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+      const UniqueSwrContext& swrContext,
       const UniqueAVFrame& srcAVFrame,
-      AVSampleFormat sourceSampleFormat,
       AVSampleFormat desiredSampleFormat,
       int sourceSampleRate,
       int desiredSampleRate);

@@ -1345,10 +1345,10 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       static_cast<AVSampleFormat>(srcAVFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   int sourceSampleRate = srcAVFrame->sample_rate;
   int desiredSampleRate =
-      streamInfos_[activeStreamIndex_].audioStreamOptions.sampleRate.value_or(
-          sourceSampleRate);
+      streamInfo.audioStreamOptions.sampleRate.value_or(sourceSampleRate);
 
   bool mustConvert =
       (sourceSampleFormat != desiredSampleFormat ||
@@ -1356,9 +1356,18 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   UniqueAVFrame convertedAVFrame;
   if (mustConvert) {
+    if (!streamInfo.swrContext) {
+      streamInfo.swrContext.reset(createSwrContext(
+          streamInfo.codecContext,
+          sourceSampleFormat,
+          desiredSampleFormat,
+          sourceSampleRate,
+          desiredSampleRate));
+    }
+
     convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+        streamInfo.swrContext,
         srcAVFrame,
-        sourceSampleFormat,
         desiredSampleFormat,
         sourceSampleRate,
         desiredSampleRate);
@@ -1394,22 +1403,11 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 }
 
 UniqueAVFrame SingleStreamDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
+    const UniqueSwrContext& swrContext,
     const UniqueAVFrame& srcAVFrame,
-    AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
     int desiredSampleRate) {
-  auto& streamInfo = streamInfos_[activeStreamIndex_];
-
-  if (!streamInfo.swrContext) {
-    streamInfo.swrContext.reset(createSwrContext(
-        streamInfo.codecContext,
-        sourceSampleFormat,
-        desiredSampleFormat,
-        sourceSampleRate,
-        desiredSampleRate));
-  }
-
   UniqueAVFrame convertedAVFrame(av_frame_alloc());
   TORCH_CHECK(
       convertedAVFrame,
@@ -1428,7 +1426,7 @@ UniqueAVFrame SingleStreamDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
     // output samples, but empirically `av_rescale_rnd()` seems to provide a
     // tighter bound.
     convertedAVFrame->nb_samples = av_rescale_rnd(
-        swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
+        swr_get_delay(swrContext.get(), sourceSampleRate) +
             srcAVFrame->nb_samples,
         desiredSampleRate,
         sourceSampleRate,
@@ -1444,7 +1442,7 @@ UniqueAVFrame SingleStreamDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
       getFFMPEGErrorStringFromErrorCode(status));
 
   auto numConvertedSamples = swr_convert(
-      streamInfo.swrContext.get(),
+      swrContext.get(),
       convertedAVFrame->data,
       convertedAVFrame->nb_samples,
       static_cast<const uint8_t**>(
