@@ -195,22 +195,6 @@ class SingleStreamDecoder {
     bool isKeyFrame = false;
   };
 
-  struct FilterGraphContext {
-    UniqueAVFilterGraph filterGraph;
-    AVFilterContext* sourceContext = nullptr;
-    AVFilterContext* sinkContext = nullptr;
-  };
-
-  struct DecodedFrameContext {
-    int decodedWidth;
-    int decodedHeight;
-    AVPixelFormat decodedFormat;
-    int expectedWidth;
-    int expectedHeight;
-    bool operator==(const DecodedFrameContext&);
-    bool operator!=(const DecodedFrameContext&);
-  };
-
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
@@ -234,14 +218,7 @@ class SingleStreamDecoder {
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
-    FilterGraphContext filterGraphContext;
-    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
-    UniqueSwsContext swsContext;
     UniqueSwrContext swrContext;
-
-    // Used to know whether a new FilterGraphContext or UniqueSwsContext should
-    // be created before decoding a new frame.
-    DecodedFrameContext prevFrameContext;
   };
 
   // --------------------------------------------------------------------------
@@ -288,20 +265,6 @@ class SingleStreamDecoder {
       torch::Tensor& outputTensor);
 
   std::optional<torch::Tensor> maybeFlushSwrBuffers();
-
-  // --------------------------------------------------------------------------
-  // COLOR CONVERSION LIBRARIES HANDLERS CREATION
-  // --------------------------------------------------------------------------
-
-  void createFilterGraph(
-      StreamInfo& streamInfo,
-      int expectedOutputHeight,
-      int expectedOutputWidth);
-
-  void createSwsContext(
-      StreamInfo& streamInfo,
-      const DecodedFrameContext& frameContext,
-      const enum AVColorSpace colorspace);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS

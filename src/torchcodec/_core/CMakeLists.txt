@@ -68,6 +68,7 @@ function(make_torchcodec_libraries
         AVIOBytesContext.cpp
         FFMPEGCommon.cpp
         DeviceInterface.cpp
+        CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
         # TODO: lib name should probably not be "*_decoder*" now that it also
         # contains an encoder
