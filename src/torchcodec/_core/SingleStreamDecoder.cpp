@@ -1735,31 +1735,6 @@ void SingleStreamDecoder::createSwsContext(
   streamInfo.swsContext.reset(swsContext);
 }
 
-SwrContext* SingleStreamDecoder::createSwrContext(
-    UniqueAVCodecContext& avCodecContext,
-    AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate) {
-  auto swrContext = allocateSwrContext(
-      avCodecContext,
-      sourceSampleFormat,
-      desiredSampleFormat,
-      sourceSampleRate,
-      desiredSampleRate);
-
-  auto status = swr_init(swrContext);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't initialize SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status),
-      ". If the error says 'Invalid argument', it's likely that you are using "
-      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
-      "valid scenarios. Try to upgrade FFmpeg?");
-  //   streamInfo.swrContext.reset(swrContext);
-  return swrContext;
-}
-
 // --------------------------------------------------------------------------
 // PTS <-> INDEX CONVERSIONS
 // --------------------------------------------------------------------------

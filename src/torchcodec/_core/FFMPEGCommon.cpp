@@ -116,16 +116,17 @@ void setChannelLayout(
 #endif
 }
 
-SwrContext* allocateSwrContext(
+SwrContext* createSwrContext(
     UniqueAVCodecContext& avCodecContext,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
     int desiredSampleRate) {
   SwrContext* swrContext = nullptr;
+  int status = AVSUCCESS;
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   AVChannelLayout layout = avCodecContext->ch_layout;
-  auto status = swr_alloc_set_opts2(
+  status = swr_alloc_set_opts2(
       &swrContext,
       &layout,
       desiredSampleFormat,
@@ -155,6 +156,14 @@ SwrContext* allocateSwrContext(
 #endif
 
   TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
+  status = swr_init(swrContext);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't initialize SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status),
+      ". If the error says 'Invalid argument', it's likely that you are using "
+      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
+      "valid scenarios. Try to upgrade FFmpeg?");
   return swrContext;
 }
 

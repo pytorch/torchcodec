@@ -310,13 +310,6 @@ class SingleStreamDecoder {
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
 
-  SwrContext* createSwrContext(
-      UniqueAVCodecContext& avCodecContext,
-      AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat,
-      int sourceSampleRate,
-      int desiredSampleRate);
-
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
   // --------------------------------------------------------------------------

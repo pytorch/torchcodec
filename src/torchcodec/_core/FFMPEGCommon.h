@@ -158,7 +158,7 @@ void setChannelLayout(
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
     const UniqueAVFrame& srcAVFrame);
-SwrContext* allocateSwrContext(
+SwrContext* createSwrContext(
     UniqueAVCodecContext& avCodecContext,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
