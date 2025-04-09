@@ -9,6 +9,7 @@ TorchCodec is how you turn those videos into data.
 
 We achieve these capabilities through:
 
+
 * Pythonic APIs that mirror Python and PyTorch conventions.
 * Relying on [FFmpeg](https://www.ffmpeg.org/) to do the decoding. TorchCodec
   uses the version of FFmpeg you already have installed. FFmpeg is a mature
