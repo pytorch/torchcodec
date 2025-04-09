@@ -26,13 +26,14 @@ class AudioEncoder {
  private:
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& avFrame);
+      const UniqueAVFrame& srcAVFrame);
   void flushBuffers();
   AVSampleFormat findOutputSampleFormat(const AVCodec& avCodec);
 
   UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
   int streamIndex_;
+  UniqueSwrContext swrContext_;
 
   const torch::Tensor wf_;
 };

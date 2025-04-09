@@ -96,9 +96,6 @@ AudioEncoder::AudioEncoder(
   // may need to convert the wf into a supported output sample format, which is
   // what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findOutputSampleFormat(*avCodec);
-  printf(
-      "Will be using: %s\n",
-      av_get_sample_fmt_name(avCodecContext_->sample_fmt));
 
   // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
   // planar (fltp).
@@ -143,6 +140,8 @@ AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
   // encoder. Right now, the output format we'll choose is just the first format
   // in the `sample_fmts` list that the AVCodec defines. Eventually, we may
   // allow the user to choose.
+  // TODO-ENCODING: a better default would probably be to choose the highest
+  // available precision
   if (avCodec.sample_fmts == nullptr) {
     // Can't really validate anything in this case, best we can do is hope that
     // FLTP is supported by the encoder. If not, FFmpeg will raise.
@@ -164,7 +163,7 @@ void AudioEncoder::encode() {
   int numSamplesAllocatedPerFrame =
       avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
   avFrame->nb_samples = numSamplesAllocatedPerFrame;
-  avFrame->format = avCodecContext_->sample_fmt;
+  avFrame->format = AV_SAMPLE_FMT_FLTP;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
   setChannelLayout(avFrame, avCodecContext_);
@@ -230,7 +229,29 @@ void AudioEncoder::encode() {
 
 void AudioEncoder::encodeInnerLoop(
     AutoAVPacket& autoAVPacket,
-    const UniqueAVFrame& avFrame) {
+    const UniqueAVFrame& srcAVFrame) {
+  bool mustConvert =
+      (avCodecContext_->sample_fmt != AV_SAMPLE_FMT_FLTP &&
+       srcAVFrame != nullptr);
+  UniqueAVFrame convertedAVFrame;
+  if (mustConvert) {
+    if (!swrContext_) {
+      swrContext_.reset(createSwrContext(
+          avCodecContext_,
+          AV_SAMPLE_FMT_FLTP,
+          avCodecContext_->sample_fmt,
+          srcAVFrame->sample_rate, // No sample rate conversion
+          srcAVFrame->sample_rate));
+    }
+    convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+        swrContext_,
+        srcAVFrame,
+        avCodecContext_->sample_fmt,
+        srcAVFrame->sample_rate, // No sample rate conversion
+        srcAVFrame->sample_rate);
+  }
+  const UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
+
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       status == AVSUCCESS,
@@ -267,6 +288,9 @@ void AudioEncoder::encodeInnerLoop(
 }
 
 void AudioEncoder::flushBuffers() {
+  // We flush the main FFmpeg buffers, but not swresample buffers. Flushing
+  // swresample is only necessary when converting sample rates, which we don't
+  // do for encoding.
   AutoAVPacket autoAVPacket;
   encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
 }
