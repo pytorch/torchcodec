@@ -92,15 +92,16 @@ AudioEncoder::AudioEncoder(
   validateSampleRate(*avCodec, sampleRate);
   avCodecContext_->sample_rate = sampleRate;
 
-  // Note: This is the format of the **input** waveform. This doesn't determine
-  // the output.
+  // Input waveform is expected to be FLTP. Not all encoders support FLTP, so we
+  // may need to convert the wf into a supported output sample format, which is
+  // what the `.sample_fmt` defines.
+  avCodecContext_->sample_fmt = findOutputSampleFormat(*avCodec);
+  printf(
+      "Will be using: %s\n",
+      av_get_sample_fmt_name(avCodecContext_->sample_fmt));
+
   // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
-  // planar.
-  // TODO-ENCODING If the encoder doesn't support FLTP (like flac), FFmpeg will
-  // raise. We need to handle this, probably converting the format with
-  // libswresample.
-  avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
-  //   avCodecContext_->sample_fmt = AV_SAMPLE_FMT_S16;
+  // planar (fltp).
 
   int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
@@ -133,6 +134,27 @@ AudioEncoder::AudioEncoder(
       "avcodec_parameters_from_context failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
+}
+
+AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
+  // Find a sample format that the encoder supports. If FLTP is supported then
+  // we use that, since this is the expected format of the input waveform.
+  // Otherwise, we'll need to convert the waveform before passing it to the
+  // encoder. Right now, the output format we'll choose is just the first format
+  // in the `sample_fmts` list that the AVCodec defines. Eventually, we may
+  // allow the user to choose.
+  if (avCodec.sample_fmts == nullptr) {
+    // Can't really validate anything in this case, best we can do is hope that
+    // FLTP is supported by the encoder. If not, FFmpeg will raise.
+    return AV_SAMPLE_FMT_FLTP;
+  }
+
+  for (auto i = 0; avCodec.sample_fmts[i] != -1; ++i) {
+    if (avCodec.sample_fmts[i] == AV_SAMPLE_FMT_FLTP) {
+      return AV_SAMPLE_FMT_FLTP;
+    }
+  }
+  return avCodec.sample_fmts[0];
 }
 
 void AudioEncoder::encode() {

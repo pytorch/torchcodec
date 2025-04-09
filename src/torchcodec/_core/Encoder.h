@@ -28,6 +28,7 @@ class AudioEncoder {
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& avFrame);
   void flushBuffers();
+  AVSampleFormat findOutputSampleFormat(const AVCodec& avCodec);
 
   UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
