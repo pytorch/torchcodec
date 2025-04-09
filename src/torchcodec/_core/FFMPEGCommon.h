@@ -165,6 +165,13 @@ SwrContext* createSwrContext(
     int sourceSampleRate,
     int desiredSampleRate);
 
+UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+    const UniqueSwrContext& swrContext,
+    const UniqueAVFrame& srcAVFrame,
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate);
+
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
 
