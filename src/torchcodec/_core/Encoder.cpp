@@ -249,6 +249,14 @@ void AudioEncoder::encodeInnerLoop(
         avCodecContext_->sample_fmt,
         srcAVFrame->sample_rate, // No sample rate conversion
         srcAVFrame->sample_rate);
+    TORCH_CHECK(
+        convertedAVFrame->nb_samples == srcAVFrame->nb_samples,
+        "convertedAVFrame->nb_samples=",
+        convertedAVFrame->nb_samples,
+        " differs from ",
+        "srcAVFrame->nb_samples=",
+        srcAVFrame->nb_samples,
+        "This is unexpected, please report on the TorchCodec bug tracker.");
   }
   const UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
 
