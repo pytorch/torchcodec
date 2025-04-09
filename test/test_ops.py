@@ -44,6 +44,7 @@ from torchcodec._core import (
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
+    get_ffmpeg_major_version,
     in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
@@ -1125,6 +1126,10 @@ class TestAudioEncoderOps:
     @pytest.mark.parametrize("output_format", ("wav", "flac"))
     def test_round_trip(self, output_format, tmp_path):
         # Check that decode(encode(samples)) == samples on lossless formats
+
+        if get_ffmpeg_major_version() == 4 and output_format == "wav":
+            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+
         asset = NASA_AUDIO_MP3
         source_samples = self.decode(asset)
 
@@ -1145,6 +1150,9 @@ class TestAudioEncoderOps:
     def test_against_cli(self, asset, bit_rate, output_format, tmp_path):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
+
+        if get_ffmpeg_major_version() == 4 and output_format == "wav":
+            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
 
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
         encoded_by_us = tmp_path / f"our_output.{output_format}"
