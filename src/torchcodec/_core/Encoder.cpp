@@ -47,6 +47,8 @@ AudioEncoder::AudioEncoder(
       wf_.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
       wf_.dtype());
+  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
+  // planar (fltp).
   TORCH_CHECK(
       wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
 
@@ -96,9 +98,6 @@ AudioEncoder::AudioEncoder(
   // may need to convert the wf into a supported output sample format, which is
   // what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findOutputSampleFormat(*avCodec);
-
-  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
-  // planar (fltp).
 
   int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
