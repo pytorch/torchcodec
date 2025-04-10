@@ -8,7 +8,8 @@ find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 function(make_torchcodec_sublibrary
     library_name
@@ -60,11 +61,13 @@ function(make_torchcodec_libraries
     set(decoder_sources
         AVIOContextHolder.cpp
         FFMPEGCommon.cpp
-	DeviceInterface.cpp
+	    DeviceInterface.cpp
         SingleStreamDecoder.cpp
         # TODO: lib name should probably not be "*_decoder*" now that it also
         # contains an encoder
         Encoder.cpp
+        # TODO-Encoding remove from here. Should only be needed in custom_ops.cpp
+        AVIOBytesContext.cpp
     )
 
     if(ENABLE_CUDA)

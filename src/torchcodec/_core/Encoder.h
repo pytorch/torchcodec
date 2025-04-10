@@ -1,5 +1,6 @@
 #pragma once
 #include <torch/types.h>
+#include "src/torchcodec/_core/AVIOBytesContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -19,9 +20,11 @@ class AudioEncoder {
       // match this, and that's up to the user. If sample rates don't match,
       // encoding will still work but audio will be distorted.
       int sampleRate,
-      std::string_view fileName,
+      std::optional<std::string_view> fileName,
+      std::optional<std::string_view> formatName,
       std::optional<int64_t> bit_rate = std::nullopt);
   void encode();
+  torch::Tensor encodeToTensor();
 
  private:
   void encodeInnerLoop(
@@ -36,5 +39,8 @@ class AudioEncoder {
   UniqueSwrContext swrContext_;
 
   const torch::Tensor wf_;
+
+  // Stores the AVIOContext for the output tensor buffer.
+  std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
 };
 } // namespace facebook::torchcodec
