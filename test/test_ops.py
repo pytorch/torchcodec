@@ -22,12 +22,12 @@ from torchcodec._core import (
     _test_frame_pts_equality,
     add_audio_stream,
     add_video_stream,
-    create_audio_encoder,
     create_from_bytes,
     create_from_file,
     create_from_file_like,
     create_from_tensor,
-    encode_audio,
+    encode_audio_to_file,
+    encode_audio_to_tensor,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -1074,11 +1074,15 @@ class TestAudioDecoderOps:
 class TestAudioEncoderOps:
 
     def decode(self, source) -> torch.Tensor:
-        if isinstance(source, TestContainerFile):
-            source = str(source.path)
+        if isinstance(source, torch.Tensor):
+            decoder = create_from_tensor(source, seek_mode="approximate")
         else:
-            source = str(source)
-        decoder = create_from_file(source, seek_mode="approximate")
+            if isinstance(source, TestContainerFile):
+                source = str(source.path)
+            else:
+                source = str(source)
+            decoder = create_from_file(source, seek_mode="approximate")
+
         add_audio_stream(decoder)
         frames, *_ = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=0, stop_seconds=None
@@ -1090,41 +1094,44 @@ class TestAudioEncoderOps:
         valid_output_file = str(tmp_path / ".mp3")
 
         with pytest.raises(RuntimeError, match="must have float32 dtype, got int"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=torch.arange(10, dtype=torch.int),
                 sample_rate=10,
                 filename=valid_output_file,
             )
         with pytest.raises(RuntimeError, match="must have 2 dimensions, got 1"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=torch.rand(3), sample_rate=10, filename=valid_output_file
             )
 
         with pytest.raises(RuntimeError, match="No such file or directory"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=torch.rand(10, 10), sample_rate=10, filename="./bad/path.mp3"
             )
         with pytest.raises(RuntimeError, match="Check the desired extension"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
             )
 
         with pytest.raises(RuntimeError, match="invalid sample rate=10"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=self.decode(NASA_AUDIO_MP3),
                 sample_rate=10,
                 filename=valid_output_file,
             )
         with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
-            create_audio_encoder(
+            encode_audio_to_file(
                 wf=self.decode(NASA_AUDIO_MP3),
                 sample_rate=NASA_AUDIO_MP3.sample_rate,
                 filename=valid_output_file,
                 bit_rate=-1,  # bad
             )
 
+    @pytest.mark.parametrize(
+        "encode_method", (encode_audio_to_file, encode_audio_to_tensor)
+    )
     @pytest.mark.parametrize("output_format", ("wav", "flac"))
-    def test_round_trip(self, output_format, tmp_path):
+    def test_round_trip(self, encode_method, output_format, tmp_path):
         # Check that decode(encode(samples)) == samples on lossless formats
 
         if get_ffmpeg_major_version() == 4 and output_format == "wav":
@@ -1133,15 +1140,24 @@ class TestAudioEncoderOps:
         asset = NASA_AUDIO_MP3
         source_samples = self.decode(asset)
 
-        encoded_path = tmp_path / f"output.{output_format}"
-        encoder = create_audio_encoder(
-            wf=source_samples, sample_rate=asset.sample_rate, filename=str(encoded_path)
-        )
-        encode_audio(encoder)
+        if encode_method is encode_audio_to_file:
+            encoded_path = tmp_path / f"output.{output_format}"
+            encode_audio_to_file(
+                wf=source_samples,
+                sample_rate=asset.sample_rate,
+                filename=str(encoded_path),
+            )
+            encoded_source = encoded_path
+        else:
+            encoded_source = encode_audio_to_tensor(
+                wf=source_samples, sample_rate=asset.sample_rate, format=output_format
+            )
+            assert encoded_source.dtype == torch.uint8
+            assert encoded_source.ndim == 1
 
         rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
-            self.decode(encoded_path), source_samples, rtol=rtol, atol=atol
+            self.decode(encoded_source), source_samples, rtol=rtol, atol=atol
         )
 
     @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
@@ -1156,7 +1172,6 @@ class TestAudioEncoderOps:
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
 
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
-        encoded_by_us = tmp_path / f"our_output.{output_format}"
 
         subprocess.run(
             ["ffmpeg", "-i", str(asset.path)]
@@ -1168,13 +1183,13 @@ class TestAudioEncoderOps:
             check=True,
         )
 
-        encoder = create_audio_encoder(
+        encoded_by_us = tmp_path / f"our_output.{output_format}"
+        encode_audio_to_file(
             wf=self.decode(asset),
             sample_rate=asset.sample_rate,
             filename=str(encoded_by_us),
             bit_rate=bit_rate,
         )
-        encode_audio(encoder)
 
         rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
@@ -1182,6 +1197,32 @@ class TestAudioEncoderOps:
             self.decode(encoded_by_us),
             rtol=rtol,
             atol=atol,
+        )
+
+    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
+    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
+    @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
+    def test_tensor_against_file(self, asset, bit_rate, output_format, tmp_path):
+        if get_ffmpeg_major_version() == 4 and output_format == "wav":
+            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+
+        encoded_file = tmp_path / f"our_output.{output_format}"
+        encode_audio_to_file(
+            wf=self.decode(asset),
+            sample_rate=asset.sample_rate,
+            filename=str(encoded_file),
+            bit_rate=bit_rate,
+        )
+
+        encoded_tensor = encode_audio_to_tensor(
+            wf=self.decode(asset),
+            sample_rate=asset.sample_rate,
+            format=output_format,
+            bit_rate=bit_rate,
+        )
+
+        torch.testing.assert_close(
+            self.decode(encoded_file), self.decode(encoded_tensor)
         )
 
 

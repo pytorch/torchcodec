@@ -11,6 +11,7 @@ namespace facebook::torchcodec {
 
 void AVIOContextHolder::createAVIOContext(
     AVIOReadFunction read,
+    AVIOWriteFunction write,
     AVIOSeekFunction seek,
     void* heldData,
     int bufferSize) {
@@ -22,13 +23,17 @@ void AVIOContextHolder::createAVIOContext(
       buffer != nullptr,
       "Failed to allocate buffer of size " + std::to_string(bufferSize));
 
+  TORCH_CHECK(
+      (seek != nullptr) && ((write != nullptr) ^ (read != nullptr)),
+      "seek method must be defined, and either write or read must be defined. "
+      "But not both!")
   avioContext_.reset(avio_alloc_context(
       buffer,
       bufferSize,
-      0,
+      /*write_flag=*/write != nullptr,
       heldData,
       read,
-      nullptr, // write function; not supported yet
+      write,
       seek));
 
   if (!avioContext_) {

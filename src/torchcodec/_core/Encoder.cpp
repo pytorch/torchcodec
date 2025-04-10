@@ -1,5 +1,6 @@
 #include <sstream>
 
+#include "src/torchcodec/_core/AVIOBytesContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -40,9 +41,13 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::string_view fileName,
+    std::optional<std::string_view> fileName,
+    std::optional<std::string_view> formatName,
     std::optional<int64_t> bit_rate)
     : wf_(wf) {
+  TORCH_CHECK(
+      fileName.has_value() ^ formatName.has_value(),
+      "Pass one of filename OR format, not both.");
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
@@ -54,8 +59,14 @@ AudioEncoder::AudioEncoder(
 
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
-  auto status = avformat_alloc_output_context2(
-      &avFormatContext, nullptr, nullptr, fileName.data());
+  int status = AVSUCCESS;
+  if (fileName.has_value()) {
+    status = avformat_alloc_output_context2(
+        &avFormatContext, nullptr, nullptr, fileName->data());
+  } else {
+    status = avformat_alloc_output_context2(
+        &avFormatContext, nullptr, formatName->data(), nullptr);
+  }
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
@@ -63,16 +74,17 @@ AudioEncoder::AudioEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
-  // TODO-ENCODING: Should also support encoding into bytes (use
-  // AVIOBytesContext)
-  TORCH_CHECK(
-      !(avFormatContext->oformat->flags & AVFMT_NOFILE),
-      "AVFMT_NOFILE is set. We only support writing to a file.");
-  status = avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
-  TORCH_CHECK(
-      status >= 0,
-      "avio_open failed: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+  if (fileName.has_value()) {
+    status =
+        avio_open(&avFormatContext_->pb, fileName->data(), AVIO_FLAG_WRITE);
+    TORCH_CHECK(
+        status >= 0,
+        "avio_open failed: ",
+        getFFMPEGErrorStringFromErrorCode(status));
+  } else {
+    avioContextHolder_ = std::make_unique<AVIOToTensorContext>();
+    avFormatContext->pb = avioContextHolder_->getAVIOContext();
+  }
 
   // We use the AVFormatContext's default codec for that
   // specific format/container.
@@ -168,7 +180,18 @@ AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
   return avCodec.sample_fmts[0];
 }
 
+torch::Tensor AudioEncoder::encodeToTensor() {
+  TORCH_CHECK(
+      avioContextHolder_ != nullptr,
+      "Cannot encode to tensor, avio context doesn't exist.");
+  encode();
+  return avioContextHolder_->getOutputTensor();
+}
+
 void AudioEncoder::encode() {
+  // TODO-ENCODING: Need to check, but consecutive calls to encode() are
+  // probably invalid. We can address this once we (re)design the public and
+  // private encoding APIs.
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   //  Default to 256 like in torchaudio
