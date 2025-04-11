@@ -1,5 +1,6 @@
 #include <sstream>
 
+#include "src/torchcodec/_core/AVIOBytesContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -40,20 +41,32 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::string_view fileName,
+    std::optional<std::string_view> fileName,
+    std::optional<std::string_view> formatName,
     std::optional<int64_t> bit_rate)
     : wf_(wf) {
+  TORCH_CHECK(
+      fileName.has_value() ^ formatName.has_value(),
+      "Pass one of filename OR format, not both.");
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
       wf_.dtype());
+  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
+  // planar (fltp).
   TORCH_CHECK(
       wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
 
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
-  auto status = avformat_alloc_output_context2(
-      &avFormatContext, nullptr, nullptr, fileName.data());
+  int status = AVSUCCESS;
+  if (fileName.has_value()) {
+    status = avformat_alloc_output_context2(
+        &avFormatContext, nullptr, nullptr, fileName->data());
+  } else {
+    status = avformat_alloc_output_context2(
+        &avFormatContext, nullptr, formatName->data(), nullptr);
+  }
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
@@ -61,16 +74,17 @@ AudioEncoder::AudioEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
-  // TODO-ENCODING: Should also support encoding into bytes (use
-  // AVIOBytesContext)
-  TORCH_CHECK(
-      !(avFormatContext->oformat->flags & AVFMT_NOFILE),
-      "AVFMT_NOFILE is set. We only support writing to a file.");
-  status = avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
-  TORCH_CHECK(
-      status >= 0,
-      "avio_open failed: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+  if (fileName.has_value()) {
+    status =
+        avio_open(&avFormatContext_->pb, fileName->data(), AVIO_FLAG_WRITE);
+    TORCH_CHECK(
+        status >= 0,
+        "avio_open failed: ",
+        getFFMPEGErrorStringFromErrorCode(status));
+  } else {
+    avioContextHolder_ = std::make_unique<AVIOToTensorContext>();
+    avFormatContext->pb = avioContextHolder_->getAVIOContext();
+  }
 
   // We use the AVFormatContext's default codec for that
   // specific format/container.
@@ -92,14 +106,10 @@ AudioEncoder::AudioEncoder(
   validateSampleRate(*avCodec, sampleRate);
   avCodecContext_->sample_rate = sampleRate;
 
-  // Note: This is the format of the **input** waveform. This doesn't determine
-  // the output.
-  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
-  // planar.
-  // TODO-ENCODING If the encoder doesn't support FLTP (like flac), FFmpeg will
-  // raise. We need to handle this, probably converting the format with
-  // libswresample.
-  avCodecContext_->sample_fmt = AV_SAMPLE_FMT_FLTP;
+  // Input waveform is expected to be FLTP. Not all encoders support FLTP, so we
+  // may need to convert the wf into a supported output sample format, which is
+  // what the `.sample_fmt` defines.
+  avCodecContext_->sample_fmt = findOutputSampleFormat(*avCodec);
 
   int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
@@ -120,12 +130,6 @@ AudioEncoder::AudioEncoder(
       "avcodec_open2 failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  TORCH_CHECK(
-      avCodecContext_->frame_size > 0,
-      "frame_size is ",
-      avCodecContext_->frame_size,
-      ". Cannot encode. This should probably never happen?");
-
   // We're allocating the stream here. Streams are meant to be freed by
   // avformat_free_context(avFormatContext), which we call in the
   // avFormatContext_'s destructor.
@@ -140,11 +144,61 @@ AudioEncoder::AudioEncoder(
   streamIndex_ = avStream->index;
 }
 
+AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
+  // Find a sample format that the encoder supports. We prefer using FLT[P],
+  // since this is the format of the input waveform. If FLTP isn't supported
+  // then we'll need to convert the AVFrame's format. Our heuristic is to encode
+  // into the format with the highest resolution.
+  if (avCodec.sample_fmts == nullptr) {
+    // Can't really validate anything in this case, best we can do is hope that
+    // FLTP is supported by the encoder. If not, FFmpeg will raise.
+    return AV_SAMPLE_FMT_FLTP;
+  }
+
+  std::vector<AVSampleFormat> preferredFormatsOrder = {
+      AV_SAMPLE_FMT_FLTP,
+      AV_SAMPLE_FMT_FLT,
+      AV_SAMPLE_FMT_DBLP,
+      AV_SAMPLE_FMT_DBL,
+      AV_SAMPLE_FMT_S64P,
+      AV_SAMPLE_FMT_S64,
+      AV_SAMPLE_FMT_S32P,
+      AV_SAMPLE_FMT_S32,
+      AV_SAMPLE_FMT_S16P,
+      AV_SAMPLE_FMT_S16,
+      AV_SAMPLE_FMT_U8P,
+      AV_SAMPLE_FMT_U8};
+
+  for (AVSampleFormat preferredFormat : preferredFormatsOrder) {
+    for (auto i = 0; avCodec.sample_fmts[i] != -1; ++i) {
+      if (avCodec.sample_fmts[i] == preferredFormat) {
+        return preferredFormat;
+      }
+    }
+  }
+  // Should never happen, but just in case
+  return avCodec.sample_fmts[0];
+}
+
+torch::Tensor AudioEncoder::encodeToTensor() {
+  TORCH_CHECK(
+      avioContextHolder_ != nullptr,
+      "Cannot encode to tensor, avio context doesn't exist.");
+  encode();
+  return avioContextHolder_->getOutputTensor();
+}
+
 void AudioEncoder::encode() {
+  // TODO-ENCODING: Need to check, but consecutive calls to encode() are
+  // probably invalid. We can address this once we (re)design the public and
+  // private encoding APIs.
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
-  avFrame->nb_samples = avCodecContext_->frame_size;
-  avFrame->format = avCodecContext_->sample_fmt;
+  //  Default to 256 like in torchaudio
+  int numSamplesAllocatedPerFrame =
+      avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
+  avFrame->nb_samples = numSamplesAllocatedPerFrame;
+  avFrame->format = AV_SAMPLE_FMT_FLTP;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
   setChannelLayout(avFrame, avCodecContext_);
@@ -160,7 +214,6 @@ void AudioEncoder::encode() {
   uint8_t* pwf = static_cast<uint8_t*>(wf_.data_ptr());
   int numSamples = static_cast<int>(wf_.sizes()[1]); // per channel
   int numEncodedSamples = 0; // per channel
-  int numSamplesPerFrame = avCodecContext_->frame_size; // per channel
   int numBytesPerSample = static_cast<int>(wf_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
@@ -178,7 +231,7 @@ void AudioEncoder::encode() {
         getFFMPEGErrorStringFromErrorCode(status));
 
     int numSamplesToEncode =
-        std::min(numSamplesPerFrame, numSamples - numEncodedSamples);
+        std::min(numSamplesAllocatedPerFrame, numSamples - numEncodedSamples);
     int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
     for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
@@ -211,7 +264,37 @@ void AudioEncoder::encode() {
 
 void AudioEncoder::encodeInnerLoop(
     AutoAVPacket& autoAVPacket,
-    const UniqueAVFrame& avFrame) {
+    const UniqueAVFrame& srcAVFrame) {
+  bool mustConvert =
+      (avCodecContext_->sample_fmt != AV_SAMPLE_FMT_FLTP &&
+       srcAVFrame != nullptr);
+  UniqueAVFrame convertedAVFrame;
+  if (mustConvert) {
+    if (!swrContext_) {
+      swrContext_.reset(createSwrContext(
+          avCodecContext_,
+          AV_SAMPLE_FMT_FLTP,
+          avCodecContext_->sample_fmt,
+          srcAVFrame->sample_rate, // No sample rate conversion
+          srcAVFrame->sample_rate));
+    }
+    convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+        swrContext_,
+        srcAVFrame,
+        avCodecContext_->sample_fmt,
+        srcAVFrame->sample_rate, // No sample rate conversion
+        srcAVFrame->sample_rate);
+    TORCH_CHECK(
+        convertedAVFrame->nb_samples == srcAVFrame->nb_samples,
+        "convertedAVFrame->nb_samples=",
+        convertedAVFrame->nb_samples,
+        " differs from ",
+        "srcAVFrame->nb_samples=",
+        srcAVFrame->nb_samples,
+        "This is unexpected, please report on the TorchCodec bug tracker.");
+  }
+  const UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
+
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       status == AVSUCCESS,
@@ -248,6 +331,9 @@ void AudioEncoder::encodeInnerLoop(
 }
 
 void AudioEncoder::flushBuffers() {
+  // We flush the main FFmpeg buffers, but not swresample buffers. Flushing
+  // swresample is only necessary when converting sample rates, which we don't
+  // do for encoding.
   AutoAVPacket autoAVPacket;
   encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
 }

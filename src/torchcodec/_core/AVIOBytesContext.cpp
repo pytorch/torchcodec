@@ -13,7 +13,7 @@ AVIOBytesContext::AVIOBytesContext(const void* data, int64_t dataSize)
     : dataContext_{static_cast<const uint8_t*>(data), dataSize, 0} {
   TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
   TORCH_CHECK(dataSize > 0, "Video data size must be positive");
-  createAVIOContext(&read, &seek, &dataContext_);
+  createAVIOContext(&read, nullptr, &seek, &dataContext_);
 }
 
 // The signature of this function is defined by FFMPEG.
@@ -65,6 +65,48 @@ int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
   }
 
   return ret;
+}
+
+AVIOToTensorContext::AVIOToTensorContext()
+    : dataContext_{torch::empty({OUTPUT_TENSOR_SIZE}, {torch::kUInt8}), 0} {
+  createAVIOContext(nullptr, &write, &seek, &dataContext_);
+}
+
+// The signature of this function is defined by FFMPEG.
+int AVIOToTensorContext::write(void* opaque, uint8_t* buf, int buf_size) {
+  auto dataContext = static_cast<DataContext*>(opaque);
+  TORCH_CHECK(
+      dataContext->current + buf_size <= OUTPUT_TENSOR_SIZE,
+      "Can't encode more, output tensor needs to be re-allocated and this isn't supported yet.");
+  uint8_t* outputTensorData = dataContext->outputTensor.data_ptr<uint8_t>();
+  std::memcpy(outputTensorData + dataContext->current, buf, buf_size);
+  dataContext->current += static_cast<int64_t>(buf_size);
+  return buf_size;
+}
+
+// The signature of this function is defined by FFMPEG.
+int64_t AVIOToTensorContext::seek(void* opaque, int64_t offset, int whence) {
+  auto dataContext = static_cast<DataContext*>(opaque);
+  int64_t ret = -1;
+
+  switch (whence) {
+    case AVSEEK_SIZE:
+      ret = dataContext->outputTensor.numel();
+      break;
+    case SEEK_SET:
+      dataContext->current = offset;
+      ret = offset;
+      break;
+    default:
+      break;
+  }
+
+  return ret;
+}
+
+torch::Tensor AVIOToTensorContext::getOutputTensor() {
+  return dataContext_.outputTensor.narrow(
+      /*dim=*/0, /*start=*/0, /*length=*/dataContext_.current);
 }
 
 } // namespace facebook::torchcodec
