@@ -48,6 +48,7 @@ def bench(f, average_over=20, warmup=2):
     med = times.median().item()
     print(f"{med = :.2f}ms +- {std:.2f}")
 
+
 # %%
 # Performance: downloading first versus streaming
 # -----------------------------------------------
@@ -94,6 +95,7 @@ print()
 # this to avoid scanning the entire video during initialization, which would
 # require downloading the entire video even if we only want to decode the first
 # frame. See :ref:`sphx_glr_generated_examples_approximate_mode.py` for more.
+
 
 def decode_from_existing_download():
     decoder = VideoDecoder(
@@ -145,6 +147,7 @@ print()
 # `Filesystem interfaces for Python <https://filesystem-spec.readthedocs.io/en/latest/?badge=latest>`_.
 
 import fsspec
+
 
 def stream_while_decode():
     # The `client_kwargs` are passed down to the aiohttp module's client
