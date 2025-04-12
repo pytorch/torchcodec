@@ -216,7 +216,7 @@ print("Decoding the first frame required "
       f"{file_op_counter.num_seeks - init_seeks} additional seeks.")
 
 # %%
-# Performance: local file path versus local file-like object
+# Performance: local file path vs. local file-like object
 # ----------------------------------------------------------
 #
 
