@@ -72,7 +72,6 @@ decoder = VideoDecoder(pre_downloaded_raw_video_bytes)
 
 print(f"Video size in MB: {len(pre_downloaded_raw_video_bytes) / 1024 / 1024}")
 print(decoder.metadata)
-print()
 
 # %%
 # We can see that the video is about 253 MB, has the resolution 1920x1080, is
@@ -132,7 +131,6 @@ print()
 
 print("Direct url to FFmpeg:")
 bench(direct_url_to_ffmpeg)
-print()
 
 # %%
 # Decoding the already downloaded video is clearly the fastest. Having to
@@ -161,7 +159,6 @@ def stream_while_decode():
 
 print("Stream while decode: ")
 bench(stream_while_decode)
-print()
 
 # %%
 # Streaming the data through a file-like object is about 4.3x faster than
@@ -217,7 +214,6 @@ first_frame = counter_decoder[0]
 print("Decoding the first frame required "
       f"{file_op_counter.num_reads - init_reads} additional reads and "
       f"{file_op_counter.num_seeks - init_seeks} additional seeks.")
-print()
 
 # %%
 # Performance: local file path versus local file-like object
@@ -242,7 +238,6 @@ print()
 
 print("Decode from existing open file object:")
 bench(decode_from_existing_open_file_object)
-print()
 
 # %%
 import shutil
