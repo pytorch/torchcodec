@@ -50,8 +50,8 @@ def bench(f, average_over=20, warmup=2):
 
 
 # %%
-# Performance: downloading first versus streaming
-# -----------------------------------------------
+# Performance: downloading first vs. streaming
+# --------------------------------------------
 #
 # We are going to investigate the cost of having to download an entire video
 # before decoding any frames versus being able to stream the video's data
@@ -138,7 +138,7 @@ print()
 # Decoding the already downloaded video is clearly the fastest. Having to
 # download the entire video each time we want to decode just the first frame
 # is over 4x slower than decoding an existing video. Providing a direct URL
-# is much better, as its about 2.5x faster than downloding the video first.
+# is much better, as its about 2.5x faster than downloading the video first.
 #
 # We can do better, and the way how is to use a file-like object which
 # implements its own read and seek methods that only download data from a URL as
