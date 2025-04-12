@@ -116,16 +116,17 @@ void setChannelLayout(
 #endif
 }
 
-SwrContext* allocateSwrContext(
+SwrContext* createSwrContext(
     UniqueAVCodecContext& avCodecContext,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
     int desiredSampleRate) {
   SwrContext* swrContext = nullptr;
+  int status = AVSUCCESS;
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   AVChannelLayout layout = avCodecContext->ch_layout;
-  auto status = swr_alloc_set_opts2(
+  status = swr_alloc_set_opts2(
       &swrContext,
       &layout,
       desiredSampleFormat,
@@ -155,7 +156,75 @@ SwrContext* allocateSwrContext(
 #endif
 
   TORCH_CHECK(swrContext != nullptr, "Couldn't create swrContext");
+  status = swr_init(swrContext);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't initialize SwrContext: ",
+      getFFMPEGErrorStringFromErrorCode(status),
+      ". If the error says 'Invalid argument', it's likely that you are using "
+      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
+      "valid scenarios. Try to upgrade FFmpeg?");
   return swrContext;
+}
+
+UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+    const UniqueSwrContext& swrContext,
+    const UniqueAVFrame& srcAVFrame,
+    AVSampleFormat desiredSampleFormat,
+    int sourceSampleRate,
+    int desiredSampleRate) {
+  UniqueAVFrame convertedAVFrame(av_frame_alloc());
+  TORCH_CHECK(
+      convertedAVFrame,
+      "Could not allocate frame for sample format conversion.");
+
+  setChannelLayout(convertedAVFrame, srcAVFrame);
+  convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
+  convertedAVFrame->sample_rate = desiredSampleRate;
+  if (sourceSampleRate != desiredSampleRate) {
+    // Note that this is an upper bound on the number of output samples.
+    // `swr_convert()` will likely not fill convertedAVFrame with that many
+    // samples if sample rate conversion is needed. It will buffer the last few
+    // ones because those require future samples. That's also why we reset
+    // nb_samples after the call to `swr_convert()`.
+    // We could also use `swr_get_out_samples()` to determine the number of
+    // output samples, but empirically `av_rescale_rnd()` seems to provide a
+    // tighter bound.
+    convertedAVFrame->nb_samples = av_rescale_rnd(
+        swr_get_delay(swrContext.get(), sourceSampleRate) +
+            srcAVFrame->nb_samples,
+        desiredSampleRate,
+        sourceSampleRate,
+        AV_ROUND_UP);
+  } else {
+    convertedAVFrame->nb_samples = srcAVFrame->nb_samples;
+  }
+
+  auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Could not allocate frame buffers for sample format conversion: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  auto numConvertedSamples = swr_convert(
+      swrContext.get(),
+      convertedAVFrame->data,
+      convertedAVFrame->nb_samples,
+      static_cast<const uint8_t**>(
+          const_cast<const uint8_t**>(srcAVFrame->data)),
+      srcAVFrame->nb_samples);
+  // numConvertedSamples can be 0 if we're downsampling by a great factor and
+  // the first frame doesn't contain a lot of samples. It should be handled
+  // properly by the caller.
+  TORCH_CHECK(
+      numConvertedSamples >= 0,
+      "Error in swr_convert: ",
+      getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
+
+  // See comment above about nb_samples
+  convertedAVFrame->nb_samples = numConvertedSamples;
+
+  return convertedAVFrame;
 }
 
 void setFFmpegLogLevel() {

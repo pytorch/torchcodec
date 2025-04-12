@@ -41,7 +41,7 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
     std::string_view fileName,
-    std::optional<int64_t> bit_rate)
+    std::optional<int64_t> bitRate)
     : wf_(wf) {
   TORCH_CHECK(
       wf_.dtype() == torch::kFloat32,
@@ -82,12 +82,12 @@ AudioEncoder::AudioEncoder(
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  if (bit_rate.has_value()) {
-    TORCH_CHECK(*bit_rate >= 0, "bit_rate=", *bit_rate, " must be >= 0.");
+  if (bitRate.has_value()) {
+    TORCH_CHECK(*bitRate >= 0, "bit_rate=", *bitRate, " must be >= 0.");
   }
   // bit_rate=None defaults to 0, which is what the FFmpeg CLI seems to use as
   // well when "-b:a" isn't specified.
-  avCodecContext_->bit_rate = bit_rate.value_or(0);
+  avCodecContext_->bit_rate = bitRate.value_or(0);
 
   validateSampleRate(*avCodec, sampleRate);
   avCodecContext_->sample_rate = sampleRate;
