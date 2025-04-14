@@ -68,7 +68,11 @@ int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
 }
 
 AVIOToTensorContext::AVIOToTensorContext()
-    : dataContext_{torch::empty({INITIAL_TENSOR_SIZE}, {torch::kUInt8}), 0} {
+    : dataContext_{
+          torch::empty(
+              {AVIOToTensorContext::INITIAL_TENSOR_SIZE},
+              {torch::kUInt8}),
+          0} {
   createAVIOContext(nullptr, &write, &seek, &dataContext_);
 }
 
@@ -78,9 +82,10 @@ int AVIOToTensorContext::write(void* opaque, const uint8_t* buf, int buf_size) {
 
   if (dataContext->current + buf_size > dataContext->outputTensor.numel()) {
     TORCH_CHECK(
-        dataContext->outputTensor.numel() * 2 <= MAX_TENSOR_SIZE,
+        dataContext->outputTensor.numel() * 2 <=
+            AVIOToTensorContext::MAX_TENSOR_SIZE,
         "We tried to allocate an output encoded tensor larger than ",
-        MAX_TENSOR_SIZE,
+        AVIOToTensorContext::MAX_TENSOR_SIZE,
         " bytes. If you think this should be supported, please report.");
 
     // We double the size of the outpout tensor. Calling cat() may not be the
