@@ -85,6 +85,9 @@ int AVIOToTensorContext::write(void* opaque, uint8_t* buf, int buf_size) {
 }
 
 // The signature of this function is defined by FFMPEG.
+// Note: This `seek()` implementation is very similar to that of
+// AVIOBytesContext. We could consider merging both classes, or do some kind of
+// refac, but this doesn't seem worth it ATM.
 int64_t AVIOToTensorContext::seek(void* opaque, int64_t offset, int whence) {
   auto dataContext = static_cast<DataContext*>(opaque);
   int64_t ret = -1;

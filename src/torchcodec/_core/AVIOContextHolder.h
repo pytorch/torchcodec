@@ -21,7 +21,7 @@ namespace facebook::torchcodec {
 //      AVIOContext, we need to provide four things:
 //        1. A read callback function, for decoding.
 //        2. A seek callback function, for decoding and encoding.
-//        3. A write callback function, for encoding>
+//        3. A write callback function, for encoding.
 //        4. A pointer to some context object that has the same lifetime as the
 //           AVIOContext itself. This context object holds the custom state that
 //           tracks the custom behavior of reading, seeking and writing. It is

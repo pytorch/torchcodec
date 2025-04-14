@@ -11,8 +11,8 @@
 
 namespace facebook::torchcodec {
 
-// Enables users to pass in the entire video as bytes. Our read and seek
-// functions then traverse the bytes in memory.
+// For Decoding: enables users to pass in the entire video or audio as bytes.
+// Our read and seek functions then traverse the bytes in memory.
 class AVIOBytesContext : public AVIOContextHolder {
  public:
   explicit AVIOBytesContext(const void* data, int64_t dataSize);
@@ -30,15 +30,13 @@ class AVIOBytesContext : public AVIOContextHolder {
   DataContext dataContext_;
 };
 
+// For Encoding: used to encode into an output uint8 (bytes) tensor.
 class AVIOToTensorContext : public AVIOContextHolder {
  public:
   explicit AVIOToTensorContext();
   torch::Tensor getOutputTensor();
 
  private:
-  // Should this class be tensor-aware? Or should we just store a uint8* buffer
-  // instead of the tensor? If it's not tensor-aware it means we need to do the
-  // (re)allocation outside of it. Same for the call to narrow().
   struct DataContext {
     torch::Tensor outputTensor;
     int64_t current;
@@ -46,6 +44,7 @@ class AVIOToTensorContext : public AVIOContextHolder {
 
   static const int OUTPUT_TENSOR_SIZE = 5'000'000; // TODO-ENCODING handle this
   static int write(void* opaque, uint8_t* buf, int buf_size);
+  // We need to expose seek() for some formats like mp3.
   static int64_t seek(void* opaque, int64_t offset, int whence);
 
   DataContext dataContext_;
