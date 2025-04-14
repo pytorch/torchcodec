@@ -80,7 +80,8 @@ AVIOToTensorContext::AVIOToTensorContext()
 int AVIOToTensorContext::write(void* opaque, const uint8_t* buf, int buf_size) {
   auto dataContext = static_cast<DataContext*>(opaque);
 
-  if (dataContext->current + buf_size > dataContext->outputTensor.numel()) {
+  int64_t bufSize = static_cast<int64_t>(buf_size);
+  if (dataContext->current + bufSize > dataContext->outputTensor.numel()) {
     TORCH_CHECK(
         dataContext->outputTensor.numel() * 2 <=
             AVIOToTensorContext::MAX_TENSOR_SIZE,
@@ -95,13 +96,13 @@ int AVIOToTensorContext::write(void* opaque, const uint8_t* buf, int buf_size) {
   }
 
   TORCH_CHECK(
-      dataContext->current + buf_size <= dataContext->outputTensor.numel(),
+      dataContext->current + bufSize <= dataContext->outputTensor.numel(),
       "Re-allocation of the output tensor didn't work. ",
       "This should not happen, please report on TorchCodec bug tracker");
 
   uint8_t* outputTensorData = dataContext->outputTensor.data_ptr<uint8_t>();
-  std::memcpy(outputTensorData + dataContext->current, buf, buf_size);
-  dataContext->current += static_cast<int64_t>(buf_size);
+  std::memcpy(outputTensorData + dataContext->current, buf, bufSize);
+  dataContext->current += bufSize;
   return buf_size;
 }
 
