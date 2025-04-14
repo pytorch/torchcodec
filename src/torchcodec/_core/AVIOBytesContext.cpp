@@ -73,7 +73,7 @@ AVIOToTensorContext::AVIOToTensorContext()
 }
 
 // The signature of this function is defined by FFMPEG.
-int AVIOToTensorContext::write(void* opaque, uint8_t* buf, int buf_size) {
+int AVIOToTensorContext::write(void* opaque, const uint8_t* buf, int buf_size) {
   auto dataContext = static_cast<DataContext*>(opaque);
 
   if (dataContext->current + buf_size > dataContext->outputTensor.numel()) {

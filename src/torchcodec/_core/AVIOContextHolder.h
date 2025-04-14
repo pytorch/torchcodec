@@ -46,7 +46,7 @@ class AVIOContextHolder {
 
   // These signatures are defined by FFmpeg.
   using AVIOReadFunction = int (*)(void*, uint8_t*, int);
-  using AVIOWriteFunction = int (*)(void*, uint8_t*, int);
+  using AVIOWriteFunction = int (*)(void*, const uint8_t*, int);
   using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
 
   // Deriving classes should call this function in their constructor.

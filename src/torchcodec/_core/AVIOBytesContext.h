@@ -44,7 +44,7 @@ class AVIOToTensorContext : public AVIOContextHolder {
 
   static const int INITIAL_TENSOR_SIZE = 10'000'000; // 10MB
   static const int MAX_TENSOR_SIZE = 320'000'000; // 320 MB
-  static int write(void* opaque, uint8_t* buf, int buf_size);
+  static int write(void* opaque, const uint8_t* buf, int buf_size);
   // We need to expose seek() for some formats like mp3.
   static int64_t seek(void* opaque, int64_t offset, int whence);
 
