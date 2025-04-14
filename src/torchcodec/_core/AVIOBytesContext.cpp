@@ -68,16 +68,32 @@ int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
 }
 
 AVIOToTensorContext::AVIOToTensorContext()
-    : dataContext_{torch::empty({OUTPUT_TENSOR_SIZE}, {torch::kUInt8}), 0} {
+    : dataContext_{torch::empty({INITIAL_TENSOR_SIZE}, {torch::kUInt8}), 0} {
   createAVIOContext(nullptr, &write, &seek, &dataContext_);
 }
 
 // The signature of this function is defined by FFMPEG.
 int AVIOToTensorContext::write(void* opaque, uint8_t* buf, int buf_size) {
   auto dataContext = static_cast<DataContext*>(opaque);
+
+  if (dataContext->current + buf_size > dataContext->outputTensor.numel()) {
+    TORCH_CHECK(
+        dataContext->outputTensor.numel() * 2 <= MAX_TENSOR_SIZE,
+        "We tried to allocate an output encoded tensor larger than ",
+        MAX_TENSOR_SIZE,
+        " bytes. If you think this should be supported, please report.");
+
+    // We double the size of the outpout tensor. Calling cat() may not be the
+    // most efficient, but it's simple.
+    dataContext->outputTensor =
+        torch::cat({dataContext->outputTensor, dataContext->outputTensor});
+  }
+
   TORCH_CHECK(
-      dataContext->current + buf_size <= OUTPUT_TENSOR_SIZE,
-      "Can't encode more, output tensor needs to be re-allocated and this isn't supported yet.");
+      dataContext->current + buf_size <= dataContext->outputTensor.numel(),
+      "Re-allocation of the output tensor didn't work. ",
+      "This should not happen, please report on TorchCodec bug tracker");
+
   uint8_t* outputTensorData = dataContext->outputTensor.data_ptr<uint8_t>();
   std::memcpy(outputTensorData + dataContext->current, buf, buf_size);
   dataContext->current += static_cast<int64_t>(buf_size);

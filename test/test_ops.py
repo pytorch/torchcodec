@@ -1224,6 +1224,23 @@ class TestAudioEncoderOps:
             self.decode(encoded_file), self.decode(encoded_tensor)
         )
 
+    def test_encode_to_tensor_long_output(self):
+        # Check that we support re-allocating the output tensor when the encoded
+        # data is large.
+        samples = torch.rand(1, int(1e7))
+        encoded_tensor = encode_audio_to_tensor(
+            wf=samples,
+            sample_rate=16_000,
+            format="flac",
+            bit_rate=44_000,
+        )
+        # Note: this should be in sync with its C++ counterpart for the test to
+        # be meaningful.
+        INITIAL_TENSOR_SIZE = 10_000_000
+        assert encoded_tensor.numel() > INITIAL_TENSOR_SIZE
+
+        torch.testing.assert_close(self.decode(encoded_tensor), samples)
+
 
 if __name__ == "__main__":
     pytest.main()
