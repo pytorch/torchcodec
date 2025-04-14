@@ -23,7 +23,7 @@ AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  createAVIOContext(&read, &seek, &fileLike_);
+  createAVIOContext(&read, nullptr, &seek, &fileLike_);
 }
 
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
