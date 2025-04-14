@@ -33,6 +33,44 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
       supportedRates.str());
 }
 
+static const std::vector<AVSampleFormat> preferredFormatsOrder = {
+    AV_SAMPLE_FMT_FLTP,
+    AV_SAMPLE_FMT_FLT,
+    AV_SAMPLE_FMT_DBLP,
+    AV_SAMPLE_FMT_DBL,
+    AV_SAMPLE_FMT_S64P,
+    AV_SAMPLE_FMT_S64,
+    AV_SAMPLE_FMT_S32P,
+    AV_SAMPLE_FMT_S32,
+    AV_SAMPLE_FMT_S16P,
+    AV_SAMPLE_FMT_S16,
+    AV_SAMPLE_FMT_U8P,
+    AV_SAMPLE_FMT_U8};
+
+AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
+  // Find a sample format that the encoder supports. We prefer using FLT[P],
+  // since this is the format of the input waveform. If FLTP isn't supported
+  // then we'll need to convert the AVFrame's format. Our heuristic is to encode
+  // into the format with the highest resolution.
+  if (avCodec.sample_fmts == nullptr) {
+    // Can't really validate anything in this case, best we can do is hope that
+    // FLTP is supported by the encoder. If not, FFmpeg will raise.
+    return AV_SAMPLE_FMT_FLTP;
+  }
+
+  for (AVSampleFormat preferredFormat : preferredFormatsOrder) {
+    for (int i = 0; avCodec.sample_fmts[i] != -1; ++i) {
+      if (avCodec.sample_fmts[i] == preferredFormat) {
+        return preferredFormat;
+      }
+    }
+  }
+  // We should always find a match in preferredFormatsOrder, so we should always
+  // return earlier. But in the event that a future FFmpeg version defines an
+  // additional sample format that isn't in preferredFormatsOrder, we fallback:
+  return avCodec.sample_fmts[0];
+}
+
 } // namespace
 
 AudioEncoder::~AudioEncoder() {}
@@ -97,7 +135,7 @@ AudioEncoder::AudioEncoder(
   // Input waveform is expected to be FLTP. Not all encoders support FLTP, so we
   // may need to convert the wf into a supported output sample format, which is
   // what the `.sample_fmt` defines.
-  avCodecContext_->sample_fmt = findOutputSampleFormat(*avCodec);
+  avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
   int numChannels = static_cast<int>(wf_.sizes()[0]);
   TORCH_CHECK(
@@ -130,42 +168,6 @@ AudioEncoder::AudioEncoder(
       "avcodec_parameters_from_context failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
-}
-
-AVSampleFormat AudioEncoder::findOutputSampleFormat(const AVCodec& avCodec) {
-  // Find a sample format that the encoder supports. We prefer using FLT[P],
-  // since this is the format of the input waveform. If FLTP isn't supported
-  // then we'll need to convert the AVFrame's format. Our heuristic is to encode
-  // into the format with the highest resolution.
-  if (avCodec.sample_fmts == nullptr) {
-    // Can't really validate anything in this case, best we can do is hope that
-    // FLTP is supported by the encoder. If not, FFmpeg will raise.
-    return AV_SAMPLE_FMT_FLTP;
-  }
-
-  std::vector<AVSampleFormat> preferredFormatsOrder = {
-      AV_SAMPLE_FMT_FLTP,
-      AV_SAMPLE_FMT_FLT,
-      AV_SAMPLE_FMT_DBLP,
-      AV_SAMPLE_FMT_DBL,
-      AV_SAMPLE_FMT_S64P,
-      AV_SAMPLE_FMT_S64,
-      AV_SAMPLE_FMT_S32P,
-      AV_SAMPLE_FMT_S32,
-      AV_SAMPLE_FMT_S16P,
-      AV_SAMPLE_FMT_S16,
-      AV_SAMPLE_FMT_U8P,
-      AV_SAMPLE_FMT_U8};
-
-  for (AVSampleFormat preferredFormat : preferredFormatsOrder) {
-    for (auto i = 0; avCodec.sample_fmts[i] != -1; ++i) {
-      if (avCodec.sample_fmts[i] == preferredFormat) {
-        return preferredFormat;
-      }
-    }
-  }
-  // Should never happen, but just in case
-  return avCodec.sample_fmts[0];
 }
 
 void AudioEncoder::encode() {
