@@ -1172,7 +1172,6 @@ class TestAudioEncoderOps:
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
 
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
-
         subprocess.run(
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])

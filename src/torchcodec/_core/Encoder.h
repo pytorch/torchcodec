@@ -22,7 +22,7 @@ class AudioEncoder {
       int sampleRate,
       std::optional<std::string_view> fileName,
       std::optional<std::string_view> formatName,
-      std::optional<int64_t> bit_rate = std::nullopt);
+      std::optional<int64_t> bitRate = std::nullopt);
   void encode();
   torch::Tensor encodeToTensor();
 
@@ -31,7 +31,6 @@ class AudioEncoder {
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& srcAVFrame);
   void flushBuffers();
-  AVSampleFormat findOutputSampleFormat(const AVCodec& avCodec);
 
   UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
