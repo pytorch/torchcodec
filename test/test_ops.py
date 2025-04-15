@@ -44,6 +44,7 @@ from torchcodec._core import (
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
+    get_ffmpeg_major_version,
     in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
@@ -1122,33 +1123,40 @@ class TestAudioEncoderOps:
                 bit_rate=-1,  # bad
             )
 
-    def test_round_trip(self, tmp_path):
-        # Check that decode(encode(samples)) == samples
+    @pytest.mark.parametrize("output_format", ("wav", "flac"))
+    def test_round_trip(self, output_format, tmp_path):
+        # Check that decode(encode(samples)) == samples on lossless formats
+
+        if get_ffmpeg_major_version() == 4 and output_format == "wav":
+            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+
         asset = NASA_AUDIO_MP3
         source_samples = self.decode(asset)
 
-        encoded_path = tmp_path / "output.mp3"
+        encoded_path = tmp_path / f"output.{output_format}"
         encoder = create_audio_encoder(
             wf=source_samples, sample_rate=asset.sample_rate, filename=str(encoded_path)
         )
         encode_audio(encoder)
 
-        # TODO-ENCODING: tol should be stricter. We probably need to encode
-        # into a lossless format.
+        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
-            self.decode(encoded_path), source_samples, rtol=0, atol=0.07
+            self.decode(encoded_path), source_samples, rtol=rtol, atol=atol
         )
 
-    # TODO-ENCODING: test more encoding formats
     @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
-    def test_against_cli(self, asset, bit_rate, tmp_path):
+    @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
+    def test_against_cli(self, asset, bit_rate, output_format, tmp_path):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
 
-        encoded_by_ffmpeg = tmp_path / "ffmpeg_output.mp3"
-        encoded_by_us = tmp_path / "our_output.mp3"
+        if get_ffmpeg_major_version() == 4 and output_format == "wav":
+            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+
+        encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
+        encoded_by_us = tmp_path / f"our_output.{output_format}"
 
         subprocess.run(
             ["ffmpeg", "-i", str(asset.path)]
@@ -1168,8 +1176,12 @@ class TestAudioEncoderOps:
         )
         encode_audio(encoder)
 
+        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
         torch.testing.assert_close(
-            self.decode(encoded_by_ffmpeg), self.decode(encoded_by_us)
+            self.decode(encoded_by_ffmpeg),
+            self.decode(encoded_by_us),
+            rtol=rtol,
+            atol=atol,
         )
 
 
