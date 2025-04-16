@@ -6,7 +6,6 @@
 
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>
@@ -16,9 +15,10 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cuda =
-    registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
-      return new CudaDeviceInterface(device);
+bool g_cuda = registerDeviceInterface(
+    torch::kCUDA,
+    [](const torch::Device& device, const AVRational& timeBase) {
+      return new CudaDeviceInterface(device, timeBase);
     });
 
 // We reuse cuda contexts across VideoDeoder instances. This is because
@@ -164,8 +164,10 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 }
 } // namespace
 
-CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
-    : DeviceInterface(device) {
+CudaDeviceInterface::CudaDeviceInterface(
+    const torch::Device& device,
+    const AVRational& timeBase)
+    : DeviceInterface(device, timeBase) {
   if (device_.type() != torch::kCUDA) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }
