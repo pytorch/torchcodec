@@ -6,7 +6,6 @@
 
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>

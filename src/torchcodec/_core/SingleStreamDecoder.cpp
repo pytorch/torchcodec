@@ -1453,27 +1453,6 @@ FrameBatchOutput::FrameBatchOutput(
       height, width, videoStreamOptions.device, numFrames);
 }
 
-torch::Tensor allocateEmptyHWCTensor(
-    int height,
-    int width,
-    torch::Device device,
-    std::optional<int> numFrames) {
-  auto tensorOptions = torch::TensorOptions()
-                           .dtype(torch::kUInt8)
-                           .layout(torch::kStrided)
-                           .device(device);
-  TORCH_CHECK(height > 0, "height must be > 0, got: ", height);
-  TORCH_CHECK(width > 0, "width must be > 0, got: ", width);
-  if (numFrames.has_value()) {
-    auto numFramesValue = numFrames.value();
-    TORCH_CHECK(
-        numFramesValue >= 0, "numFrames must be >= 0, got: ", numFramesValue);
-    return torch::empty({numFramesValue, height, width, 3}, tensorOptions);
-  } else {
-    return torch::empty({height, width, 3}, tensorOptions);
-  }
-}
-
 // Returns a [N]CHW *view* of a [N]HWC input tensor, if the options require so.
 // The [N] leading batch-dimension is optional i.e. the input tensor can be 3D
 // or 4D.

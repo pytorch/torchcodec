@@ -67,6 +67,7 @@ function(make_torchcodec_libraries
         AVIOContextHolder.cpp
         AVIOBytesContext.cpp
         FFMPEGCommon.cpp
+        Frame.cpp
         DeviceInterface.cpp
         CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
