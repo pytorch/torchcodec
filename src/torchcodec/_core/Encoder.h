@@ -20,18 +20,19 @@ class AudioEncoder {
       // encoding will still work but audio will be distorted.
       int sampleRate,
       std::string_view fileName,
-      std::optional<int64_t> bit_rate = std::nullopt);
+      std::optional<int64_t> bitRate = std::nullopt);
   void encode();
 
  private:
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& avFrame);
+      const UniqueAVFrame& srcAVFrame);
   void flushBuffers();
 
   UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
   int streamIndex_;
+  UniqueSwrContext swrContext_;
 
   const torch::Tensor wf_;
 };

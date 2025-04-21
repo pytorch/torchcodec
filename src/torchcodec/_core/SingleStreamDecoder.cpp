@@ -1345,10 +1345,10 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       static_cast<AVSampleFormat>(srcAVFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   int sourceSampleRate = srcAVFrame->sample_rate;
   int desiredSampleRate =
-      streamInfos_[activeStreamIndex_].audioStreamOptions.sampleRate.value_or(
-          sourceSampleRate);
+      streamInfo.audioStreamOptions.sampleRate.value_or(sourceSampleRate);
 
   bool mustConvert =
       (sourceSampleFormat != desiredSampleFormat ||
@@ -1356,9 +1356,18 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
 
   UniqueAVFrame convertedAVFrame;
   if (mustConvert) {
+    if (!streamInfo.swrContext) {
+      streamInfo.swrContext.reset(createSwrContext(
+          streamInfo.codecContext,
+          sourceSampleFormat,
+          desiredSampleFormat,
+          sourceSampleRate,
+          desiredSampleRate));
+    }
+
     convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+        streamInfo.swrContext,
         srcAVFrame,
-        sourceSampleFormat,
         desiredSampleFormat,
         sourceSampleRate,
         desiredSampleRate);
@@ -1391,77 +1400,6 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
           numBytesPerChannel);
     }
   }
-}
-
-UniqueAVFrame SingleStreamDecoder::convertAudioAVFrameSampleFormatAndSampleRate(
-    const UniqueAVFrame& srcAVFrame,
-    AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate) {
-  auto& streamInfo = streamInfos_[activeStreamIndex_];
-
-  if (!streamInfo.swrContext) {
-    createSwrContext(
-        streamInfo,
-        sourceSampleFormat,
-        desiredSampleFormat,
-        sourceSampleRate,
-        desiredSampleRate);
-  }
-
-  UniqueAVFrame convertedAVFrame(av_frame_alloc());
-  TORCH_CHECK(
-      convertedAVFrame,
-      "Could not allocate frame for sample format conversion.");
-
-  setChannelLayout(convertedAVFrame, srcAVFrame);
-  convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
-  convertedAVFrame->sample_rate = desiredSampleRate;
-  if (sourceSampleRate != desiredSampleRate) {
-    // Note that this is an upper bound on the number of output samples.
-    // `swr_convert()` will likely not fill convertedAVFrame with that many
-    // samples if sample rate conversion is needed. It will buffer the last few
-    // ones because those require future samples. That's also why we reset
-    // nb_samples after the call to `swr_convert()`.
-    // We could also use `swr_get_out_samples()` to determine the number of
-    // output samples, but empirically `av_rescale_rnd()` seems to provide a
-    // tighter bound.
-    convertedAVFrame->nb_samples = av_rescale_rnd(
-        swr_get_delay(streamInfo.swrContext.get(), sourceSampleRate) +
-            srcAVFrame->nb_samples,
-        desiredSampleRate,
-        sourceSampleRate,
-        AV_ROUND_UP);
-  } else {
-    convertedAVFrame->nb_samples = srcAVFrame->nb_samples;
-  }
-
-  auto status = av_frame_get_buffer(convertedAVFrame.get(), 0);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Could not allocate frame buffers for sample format conversion: ",
-      getFFMPEGErrorStringFromErrorCode(status));
-
-  auto numConvertedSamples = swr_convert(
-      streamInfo.swrContext.get(),
-      convertedAVFrame->data,
-      convertedAVFrame->nb_samples,
-      static_cast<const uint8_t**>(
-          const_cast<const uint8_t**>(srcAVFrame->data)),
-      srcAVFrame->nb_samples);
-  // numConvertedSamples can be 0 if we're downsampling by a great factor and
-  // the first frame doesn't contain a lot of samples. It should be handled
-  // properly by the caller.
-  TORCH_CHECK(
-      numConvertedSamples >= 0,
-      "Error in swr_convert: ",
-      getFFMPEGErrorStringFromErrorCode(numConvertedSamples));
-
-  // See comment above about nb_samples
-  convertedAVFrame->nb_samples = numConvertedSamples;
-
-  return convertedAVFrame;
 }
 
 std::optional<torch::Tensor> SingleStreamDecoder::maybeFlushSwrBuffers() {
@@ -1733,30 +1671,6 @@ void SingleStreamDecoder::createSwsContext(
   TORCH_CHECK(ret != -1, "sws_setColorspaceDetails returned -1");
 
   streamInfo.swsContext.reset(swsContext);
-}
-
-void SingleStreamDecoder::createSwrContext(
-    StreamInfo& streamInfo,
-    AVSampleFormat sourceSampleFormat,
-    AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate) {
-  auto swrContext = allocateSwrContext(
-      streamInfo.codecContext,
-      sourceSampleFormat,
-      desiredSampleFormat,
-      sourceSampleRate,
-      desiredSampleRate);
-
-  auto status = swr_init(swrContext);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't initialize SwrContext: ",
-      getFFMPEGErrorStringFromErrorCode(status),
-      ". If the error says 'Invalid argument', it's likely that you are using "
-      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
-      "valid scenarios. Try to upgrade FFmpeg?");
-  streamInfo.swrContext.reset(swrContext);
 }
 
 // --------------------------------------------------------------------------

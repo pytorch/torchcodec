@@ -287,13 +287,6 @@ class SingleStreamDecoder {
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
-      const UniqueAVFrame& srcAVFrame,
-      AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat,
-      int sourceSampleRate,
-      int desiredSampleRate);
-
   std::optional<torch::Tensor> maybeFlushSwrBuffers();
 
   // --------------------------------------------------------------------------
@@ -309,13 +302,6 @@ class SingleStreamDecoder {
       StreamInfo& streamInfo,
       const DecodedFrameContext& frameContext,
       const enum AVColorSpace colorspace);
-
-  void createSwrContext(
-      StreamInfo& streamInfo,
-      AVSampleFormat sourceSampleFormat,
-      AVSampleFormat desiredSampleFormat,
-      int sourceSampleRate,
-      int desiredSampleRate);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
