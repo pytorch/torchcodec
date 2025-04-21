@@ -13,7 +13,10 @@ In this example, we will show how to decode streaming data. That is, when files
 do not reside locally, we will show how to only download the data segments that
 are needed to decode the frames you care about. We accomplish this capability
 with Python
-`file-like objects <https://docs.python.org/3/glossary.html#term-file-like-object>`_."""
+`file-like objects <https://docs.python.org/3/glossary.html#term-file-like-object>`_.
+Our example uses a video file, so we use the :class:`~torchcodec.decoders.VideoDecoder`
+class to decode it. But all of the lessons here also apply to audio files and the
+:class:`~torchcodec.decoders.AudioDecoder` class."""
 
 # %%
 # First, a bit of boilerplate. We define two functions: one to download content
@@ -70,7 +73,7 @@ nasa_url = "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/N
 pre_downloaded_raw_video_bytes = get_url_content(nasa_url)
 decoder = VideoDecoder(pre_downloaded_raw_video_bytes)
 
-print(f"Video size in MB: {len(pre_downloaded_raw_video_bytes) / 1024 / 1024}")
+print(f"Video size in MB: {len(pre_downloaded_raw_video_bytes) // 1024 // 1024}")
 print(decoder.metadata)
 
 # %%
@@ -143,6 +146,9 @@ bench(direct_url_to_ffmpeg)
 # needed. Rather than implementing our own, we can use such objects from the
 # `fsspec <https://github.com/fsspec/filesystem_spec>`_ module that provides
 # `Filesystem interfaces for Python <https://filesystem-spec.readthedocs.io/en/latest/?badge=latest>`_.
+# Note that using these capabilities from the `fsspec` library also requires the
+# `aiohttp <https://docs.aiohttp.org/en/stable/>`_ module. You can install both with
+# `pip install fsspec aiohttp`.
 
 import fsspec
 
@@ -152,8 +158,8 @@ def stream_while_decode():
     # session; we need to indicate that we need to trust the environment
     # settings for proxy configuration. Depending on your environment, you may
     # not need this setting.
-    with fsspec.open(nasa_url, client_kwargs={'trust_env': True}) as file:
-        decoder = VideoDecoder(file, seek_mode="approximate")
+    with fsspec.open(nasa_url, client_kwargs={'trust_env': True}) as file_like:
+        decoder = VideoDecoder(file_like, seek_mode="approximate")
         return decoder[0]
 
 
