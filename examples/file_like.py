@@ -16,7 +16,7 @@ with Python
 `file-like objects <https://docs.python.org/3/glossary.html#term-file-like-object>`_.
 Our example uses a video file, so we use the :class:`~torchcodec.decoders.VideoDecoder`
 class to decode it. But all of the lessons here also apply to audio files and the
-:class:`~torchcodec.decoders.AudioDecoder` class."""
+:class:`~torchcodec.decoders.AudioDecoder` class as well."""
 
 # %%
 # First, a bit of boilerplate. We define two functions: one to download content
@@ -146,9 +146,9 @@ bench(direct_url_to_ffmpeg)
 # needed. Rather than implementing our own, we can use such objects from the
 # `fsspec <https://github.com/fsspec/filesystem_spec>`_ module that provides
 # `Filesystem interfaces for Python <https://filesystem-spec.readthedocs.io/en/latest/?badge=latest>`_.
-# Note that using these capabilities from the `fsspec` library also requires the
+# Note that using these capabilities from the fsspec` library also requires the
 # `aiohttp <https://docs.aiohttp.org/en/stable/>`_ module. You can install both with
-# `pip install fsspec aiohttp`.
+# ``pip install fsspec aiohttp``.
 
 import fsspec
 
@@ -179,17 +179,32 @@ bench(stream_while_decode)
 # %%
 # How it works
 # ------------
+# In Python, a `file-like object <https://docs.python.org/3/glossary.html#term-file-like-object>`_
+# is any object that exposes special methods for reading, writing and seeking.
+# While such methods are obviously file oriented, it's not required that
+# a file-like object is backed by an actual file. As far as Python is concerned,
+# if an object acts like a file, it's a file. This is a powerful concept, as
+# it enables libraries that read or write data to assume a file-like interface.
+# Other libraries that present novel resources can then be easily used by
+# providing a file-like wrapper for their resource.
 #
+# For our case, we only need the read and seek methods for decoding. The exact
+# method signature needed is in the example below. Rather than wrap a novel
+# resource, we demonstrate this capability by wrapping an actual file while
+# counting how often each method is called.
 
 from pathlib import Path
 import tempfile
 
+# Create a local file to interact with.
 temp_dir = tempfile.mkdtemp()
 nasa_video_path = Path(temp_dir) / "nasa_video.mp4"
 with open(nasa_video_path, "wb") as f:
     f.write(pre_downloaded_raw_video_bytes)
 
 
+# A file-like class that is backed by an actual file, but it intercepts reads
+# and seeks to maintain counts.
 class FileOpCounter:
     def __init__(self, file):
         self._file = file
@@ -205,6 +220,9 @@ class FileOpCounter:
         return self._file.seek(offset, whence)
 
 
+# Let's now get a file-like object from our class defined above, providing it a
+# reference to the file we created. We pass our file-like object to the decoder
+# rather than the file itself.
 file_op_counter = FileOpCounter(open(nasa_video_path, "rb"))
 counter_decoder = VideoDecoder(file_op_counter, seek_mode="approximate")
 
@@ -222,9 +240,34 @@ print("Decoding the first frame required "
       f"{file_op_counter.num_seeks - init_seeks} additional seeks.")
 
 # %%
-# Performance: local file path vs. local file-like object
-# ----------------------------------------------------------
+# While we defined a simple class primarily for demonstration, it's actually
+# useful for diagnosing how much reading and seeking are required for different
+# decoding operations. We've also introduced a mystery that we should answer:
+# why does *initializing* the decoder take more reads and seeks than decoding
+# the first frame? The answer is that in our decoder implementation, we're
+# actually calling a special
+# `FFmpeg function <https://ffmpeg.org/doxygen/6.1/group__lavf__decoding.html#gad42172e27cddafb81096939783b157bb>`_
+# that decodes the first few frames to return more robust metadata.
 #
+# It's also worth noting that the Python file-like interface is only half of
+# the story. FFmpeg also has its own mechanism for directing reads and seeks
+# during decoding to user-define functions. TorchCodec does the work of
+# connecting the Python methods you define to FFmpeg. All you have to do is
+# define your methods in Python, and TorchCodec handles the rest.
+
+# %%
+# Performance: local file path vs. local file-like object
+# -------------------------------------------------------
+#
+# Since we have a local file defined, let's do a bonus performance test. We now
+# have two means of providing a local file to TorchCodec:
+#
+#   1. Through a path, where TorchCodec will then do the work of opening the
+#      local file at that path.
+#   2. Through a file-like object, where you open the file yourself and provide
+#      the file-like object to TorchCodec.
+#
+# An obvious question is: which is faster? The code below tests that question.
 
 
 def decode_from_existing_file_path():
@@ -246,6 +289,14 @@ print("Decode from existing open file object:")
 bench(decode_from_existing_open_file_object)
 
 # %%
+# Thankfully, the answer is both means of decoding from a local file take about
+# the same amount of time. This result means that in your own code, you can use
+# whichever method is more convienient. What this result implies is that the
+# cost of actually reading and copying data dominates the cost of calling Python
+# methods while decoding.
+
+# %%
+# Finally, let's clean up the local resources we created.
 import shutil
 shutil.rmtree(temp_dir)
 # %%
