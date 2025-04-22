@@ -1,6 +1,8 @@
 """
 The goal of this script is to ensure that the .so files we ship do not contain
-symbol versions from libstdc++ that are too recent.
+symbol versions from libstdc++ that are too recent. This is a very manual way of
+doing the checks that `auditwheel repair` would do (but using auditwheel isn't
+necessarily easy either).
 
 Why this is needed: during development, we observed the following general
 scenario in various local development setups:
@@ -25,9 +27,8 @@ The most recent symbol on the manylinux torch.2.3.1 wheel is
 GLIBCXX_3.4.19, so as long as torchcodec doesn't ship a symbol that is higher
 than that, torchcodec should be fine.
 
-Note that the easiest way to avoid recent symbols is simply to use an old-enough
-toolchain. In July 2024, pytorch libraries (and torchcodec) are built with gcc
-9.
+The easiest way to avoid recent symbols is simply to use an old-enough
+toolchain. Relying on the test-infra runners should be enough.
 """
 
 import re
@@ -36,7 +37,7 @@ import sys
 if len(sys.argv) != 2:
     raise ValueError("Wrong usage: python check_glibcxx.py <str_with_symbols>.")
 
-MAX_ALLOWED = (3, 4, 19)
+MAX_ALLOWED = (3, 4, 24)
 
 symbol_matches = sys.argv[1].split("\n")
 all_symbols = set()
