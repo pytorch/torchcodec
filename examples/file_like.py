@@ -138,8 +138,8 @@ bench(direct_url_to_ffmpeg)
 # %%
 # Decoding the already downloaded video is clearly the fastest. Having to
 # download the entire video each time we want to decode just the first frame
-# is over 4x slower than decoding an existing video. Providing a direct URL
-# is much better, as its about 2.5x faster than downloading the video first.
+# is many times slower than decoding an existing video. Providing a direct URL
+# is much better, but we're still probably downloading more than we need to.
 #
 # We can do better, and the way how is to use a file-like object which
 # implements its own read and seek methods that only download data from a URL as
@@ -167,8 +167,8 @@ print("Stream while decode: ")
 bench(stream_while_decode)
 
 # %%
-# Streaming the data through a file-like object is about 4.3x faster than
-# downloading the video first. And not only is it about 1.7x faster than
+# Streaming the data through a file-like object is much faster than
+# downloading the video first. And not only is it also faster than
 # providing a direct URL, it's more general. :class:`~torchcodec.decoders.VideoDecoder` supports
 # direct URLs because the underlying FFmpeg functions support them. But the
 # kinds of protocols supported are determined by what that version of FFmpeg
