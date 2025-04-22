@@ -32,8 +32,9 @@ class AudioDecoder:
             - If ``Pathlib.path``: a path to a local video or audio file.
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded audio data.
             - If file-like object: we read video data from the object on demand. The object must
-              expose the methods ``read(self, size: int) -> bytes`` and
-              ``seek(self, offset: int, whence: int) -> bytes``. Read more in TODO_FILE_LIKE_TUTORIAL.
+              expose the methods `read(self, size: int) -> bytes` and
+              `seek(self, offset: int, whence: int) -> bytes`. Read more in:
+              :ref:`sphx_glr_generated_examples_file_like.py`.
         stream_index (int, optional): Specifies which stream in the file to decode samples from.
             Note that this index is absolute across all media types. If left unspecified, then
             the :term:`best stream` is used.
