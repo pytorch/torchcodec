@@ -146,9 +146,9 @@ bench(direct_url_to_ffmpeg)
 # needed. Rather than implementing our own, we can use such objects from the
 # `fsspec <https://github.com/fsspec/filesystem_spec>`_ module that provides
 # `Filesystem interfaces for Python <https://filesystem-spec.readthedocs.io/en/latest/?badge=latest>`_.
-# Note that using these capabilities from the fsspec` library also requires the
+# Note that using these capabilities from the fsspec library also requires the
 # `aiohttp <https://docs.aiohttp.org/en/stable/>`_ module. You can install both with
-# ``pip install fsspec aiohttp``.
+# `pip install fsspec aiohttp`.
 
 import fsspec
 
@@ -251,21 +251,22 @@ print("Decoding the first frame required "
 #
 # It's also worth noting that the Python file-like interface is only half of
 # the story. FFmpeg also has its own mechanism for directing reads and seeks
-# during decoding to user-define functions. TorchCodec does the work of
+# during decoding to user-define functions. The
+# :class:`~torchcodec.decoders.VideoDecoder` object does the work of
 # connecting the Python methods you define to FFmpeg. All you have to do is
-# define your methods in Python, and TorchCodec handles the rest.
+# define your methods in Python, and we do the rest.
 
 # %%
 # Performance: local file path vs. local file-like object
 # -------------------------------------------------------
 #
 # Since we have a local file defined, let's do a bonus performance test. We now
-# have two means of providing a local file to TorchCodec:
+# have two means of providing a local file to :class:`~torchcodec.decoders.VideoDecoder`:
 #
-#   1. Through a path, where TorchCodec will then do the work of opening the
-#      local file at that path.
-#   2. Through a file-like object, where you open the file yourself and provide
-#      the file-like object to TorchCodec.
+#   1. Through a *path*, where the :class:`~torchcodec.decoders.VideoDecoder`
+#      object will then do the work of opening the local file at that path.
+#   2. Through a *file-like object*, where you open the file yourself and provide
+#      the file-like object to :class:`~torchcodec.decoders.VideoDecoder`.
 #
 # An obvious question is: which is faster? The code below tests that question.
 
@@ -276,8 +277,8 @@ def decode_from_existing_file_path():
 
 
 def decode_from_existing_open_file_object():
-    with open(nasa_video_path, "rb") as f:
-        decoder = VideoDecoder(f, seek_mode="approximate")
+    with open(nasa_video_path, "rb") as file:
+        decoder = VideoDecoder(file, seek_mode="approximate")
         return decoder[0]
 
 
