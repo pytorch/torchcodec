@@ -42,7 +42,7 @@ jobs:
         run: |
           # Note that we're installing stable - this is for running a script where we're a normal PyTorch
           # user, not for building TorhCodec.
-          python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install numpy pillow
 
       - name: Check out repo
