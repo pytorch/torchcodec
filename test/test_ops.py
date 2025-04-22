@@ -1070,6 +1070,49 @@ class TestAudioDecoderOps:
                 "approximate",
             )
 
+    @pytest.mark.parametrize("how_much_to_read", ("half", "minus_10"))
+    def test_file_like_read_less_than_requested(self, how_much_to_read):
+        # Check that reading fewer bytes than requested still works. FFmpeg will
+        # figure out how to get the necessary bytes.
+        class FileLike:
+            def __init__(self, file):
+                self._file = file
+
+            def read(self, size: int) -> bytes:
+                if how_much_to_read == "half":
+                    size = size // 2
+                elif how_much_to_read == "minus_10":
+                    size = size - 10
+                else:
+                    raise ValueError("Check parametrization of this test!")
+
+                return self._file.read(size)
+
+            def seek(self, offset: int, whence: int) -> bytes:
+                return self._file.seek(offset, whence)
+
+        decoder_file_like = create_from_file_like(
+            FileLike(open(NASA_VIDEO.path, mode="rb", buffering=0))
+        )
+        add_video_stream(decoder_file_like)
+
+        decoder_reference = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder_reference)
+
+        torch.manual_seed(0)
+        indices = torch.randint(
+            0, len(NASA_VIDEO.frames[NASA_VIDEO.default_stream_index]), size=(50,)
+        ).tolist()
+
+        frames_file_like, *_ = get_frames_at_indices(
+            decoder_file_like, frame_indices=indices
+        )
+        frames_references, *_ = get_frames_at_indices(
+            decoder_reference, frame_indices=indices
+        )
+
+        torch.testing.assert_close(frames_file_like, frames_references)
+
 
 class TestAudioEncoderOps:
 
