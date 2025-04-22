@@ -35,7 +35,7 @@ def get_url_content(url):
     return response.content
 
 
-def bench(f, average_over=20, warmup=2):
+def bench(f, average_over=10, warmup=2):
     for _ in range(warmup):
         f()
 
