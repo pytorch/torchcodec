@@ -261,14 +261,14 @@ void setFFmpegLogLevel() {
   av_log_set_level(logLevel);
 }
 
-AVIOContext* AVIOAllocContext(
+AVIOContext* avioAllocContext(
     uint8_t* buffer,
     int buffer_size,
     int write_flag,
     void* opaque,
-    int (*read_packet)(void* opaque, uint8_t* buf, int buf_size),
-    int (*write_packet)(void* opaque, const uint8_t* buf, int buf_size),
-    int64_t (*seek)(void* opaque, int64_t offset, int whence)) {
+    AVIOReadFunction read_packet,
+    AVIOWriteFunction write_packet,
+    AVIOSeekFunction seek) {
   return avio_alloc_context(
       buffer,
       buffer_size,
@@ -279,7 +279,7 @@ AVIOContext* AVIOAllocContext(
 #if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
       write_packet,
 #else
-      reinterpret_cast<int (*)(void*, uint8_t*, int)>(write_packet),
+      reinterpret_cast<AVIOWriteFunctionOld>(write_packet),
 #endif
       seek);
 }

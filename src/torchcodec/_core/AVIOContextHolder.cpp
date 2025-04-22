@@ -27,7 +27,7 @@ void AVIOContextHolder::createAVIOContext(
       (seek != nullptr) && ((write != nullptr) ^ (read != nullptr)),
       "seek method must be defined, and either write or read must be defined. "
       "But not both!")
-  avioContext_.reset(AVIOAllocContext(
+  avioContext_.reset(avioAllocContext(
       buffer,
       bufferSize,
       /*write_flag=*/write != nullptr,
