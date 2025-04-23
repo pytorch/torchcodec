@@ -109,7 +109,7 @@ jobs:
         run: ${CONDA_RUN} python -m pip install --upgrade pip
       - name: Install PyTorch
         run: |
-          ${CONDA_RUN} python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+          ${CONDA_RUN} python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu${{ env.cuda_version_without_periods }}
           ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
       - name: Install torchcodec from the wheel
         run: |
