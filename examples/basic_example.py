@@ -93,6 +93,16 @@ print(f"{every_twenty_frame.dtype = }")
 # :class:`~torchcodec.decoders.VideoDecoder`. Frames are always of
 # ``torch.uint8`` dtype.
 #
+# .. note::
+#
+#     If you need to decode multiple frames, we recommend using the batch
+#     methods instead, since they are faster:
+#     :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,
+#     :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,
+#     :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`, and
+#     :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`. They
+#     are described below.
+
 
 plot(first_frame, "First frame")
 

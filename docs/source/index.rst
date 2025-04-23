@@ -1,10 +1,10 @@
 Welcome to the TorchCodec documentation!
 ========================================
 
-TorchCodec is a Python library for decoding videos into PyTorch tensors, on CPU
-and CUDA GPU. It aims to be fast, easy to use, and well integrated into the
-PyTorch ecosystem. If you want to use PyTorch to train ML models on videos,
-TorchCodec is how you turn those videos into data.
+TorchCodec is a Python library for decoding video and audio data into PyTorch
+tensors, on CPU and CUDA GPU. It aims to be fast, easy to use, and well
+integrated into the PyTorch ecosystem. If you want to use PyTorch to train ML
+models on videos and audio, TorchCodec is how you turn these into data.
 
 We achieve these capabilities through:
 
@@ -36,12 +36,12 @@ We achieve these capabilities through:
         A simple video decoding example
 
      .. grid-item-card:: :octicon:`file-code;1em`
-        Clip sampling
+        Audio Decoding
         :img-top: _static/img/card-background.svg
-        :link: generated_examples/sampling.html
+        :link: generated_examples/audio_decoding.html
         :link-type: url
 
-        How to sample regular and random clips from a video
+        A simple audio decoding example
 
      .. grid-item-card:: :octicon:`file-code;1em`
         GPU decoding
@@ -50,6 +50,22 @@ We achieve these capabilities through:
         :link-type: url
 
         A simple example demonstrating CUDA GPU decoding
+
+     .. grid-item-card:: :octicon:`file-code;1em`
+        Streaming video
+        :img-top: _static/img/card-background.svg
+        :link: generated_examples/file_like.html
+        :link-type: url
+
+        How to efficiently decode videos from the cloud
+
+     .. grid-item-card:: :octicon:`file-code;1em`
+        Clip sampling
+        :img-top: _static/img/card-background.svg
+        :link: generated_examples/sampling.html
+        :link-type: url
+
+        How to sample regular and random clips from a video
 
 .. note::
 
