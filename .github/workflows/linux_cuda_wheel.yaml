@@ -66,10 +66,10 @@ jobs:
           # PR.
           # For the actual release we should add that label and change this to
           # include more python versions.
-        python-version: ['3.9']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         cuda-version: ['11.8', '12.6', '12.8']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+        ffmpeg-version-for-tests: ['4.4.2', '5', '6', '7']
 
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
