@@ -104,7 +104,6 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install --pre torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
           # Ideally we would find a way to get those dependencies from pyproject.toml
           python -m pip install numpy pytest pillow
 
