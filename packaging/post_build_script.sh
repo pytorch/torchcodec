@@ -37,14 +37,13 @@ assert_not_in_wheel $wheel_path "^doc"
 assert_not_in_wheel $wheel_path "^benchmarks"
 assert_not_in_wheel $wheel_path "^packaging"
 
-# TODO: Put this back with higher upper bound of version symbol.
-#if [[ "$unamestr" == 'Linux' ]]; then
-#    # See invoked python script below for details about this check.
-#    extracted_wheel_dir=$(mktemp -d)
-#    unzip -q $wheel_path -d $extracted_wheel_dir
-#    symbols_matches=$(find $extracted_wheel_dir | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.)
-#    python packaging/check_glibcxx.py "$symbols_matches"
-#fi
+if [[ "$unamestr" == 'Linux' ]]; then
+   # See invoked python script below for details about this check.
+   extracted_wheel_dir=$(mktemp -d)
+   unzip -q $wheel_path -d $extracted_wheel_dir
+   symbols_matches=$(find $extracted_wheel_dir | grep ".so$" | xargs objdump --syms | grep GLIBCXX_3.4.)
+   python packaging/check_glibcxx.py "$symbols_matches"
+fi
 
 echo "ls dist"
 ls dist
