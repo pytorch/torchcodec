@@ -48,7 +48,7 @@ pip install -e ".[dev]" --no-build-isolation -vv
 
 ### Running unit tests
 
-To run python tests run (please make sure `torchvision` is installed):
+To run python tests run:
 
 ```bash
 pytest test -vvv
