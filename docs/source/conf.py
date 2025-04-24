@@ -57,6 +57,36 @@ extensions = [
     "sphinx_copybutton",
 ]
 
+
+class CustomGalleryExampleSortKey:
+    # This class defines the order in which our examples appear in
+    # https://pytorch.org/torchcodec/stable/generated_examples/index.html
+    # They would otherwise be sorted alphabetically.
+    #
+    # See https://sphinx-gallery.github.io/stable/configuration.html#sorting-gallery-examples
+    # and https://github.com/sphinx-gallery/sphinx-gallery/blob/master/sphinx_gallery/sorting.py
+    def __init__(self, src_dir):
+        self.src_dir = src_dir
+
+    order = [
+        "basic_example.py",
+        "audio_decoding.py",
+        "basic_cuda_example.py",
+        "file_like.py",
+        "approximate_mode.py",
+        "sampling.py",
+    ]
+
+    def __call__(self, filename):
+        try:
+            return self.order.index(filename)
+        except ValueError as e:
+            raise ValueError(
+                "Looks like you added an example in the examples/ folder?"
+                "You need to specify its order in docs/source/conf.py. Look for CustomGalleryExampleSortKey."
+            ) from e
+
+
 sphinx_gallery_conf = {
     "examples_dirs": "../../examples/",  # path to your example scripts
     "gallery_dirs": "generated_examples",  # path to where to save gallery generated output
@@ -64,6 +94,7 @@ sphinx_gallery_conf = {
     "backreferences_dir": "gen_modules/backreferences",
     "doc_module": ("torchcodec",),
     "remove_config_comments": True,
+    "within_subsection_order": CustomGalleryExampleSortKey,
 }
 
 # We override sphinx-gallery's example header to prevent sphinx-gallery from

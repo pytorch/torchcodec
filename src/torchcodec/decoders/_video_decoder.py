@@ -150,6 +150,15 @@ class VideoDecoder:
     def __getitem__(self, key: Union[numbers.Integral, slice]) -> Tensor:
         """Return frame or frames as tensors, at the given index or range.
 
+        .. note::
+
+            If you need to decode multiple frames, we recommend using the batch
+            methods instead, since they are faster:
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`, and
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.
+
         Args:
             key(int or slice): The index or range of frame(s) to retrieve.
 
@@ -170,6 +179,15 @@ class VideoDecoder:
 
     def get_frame_at(self, index: int) -> Frame:
         """Return a single frame at the given index.
+
+        .. note::
+
+            If you need to decode multiple frames, we recommend using the batch
+            methods instead, since they are faster:
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.
 
         Args:
             index (int): The index of the frame to retrieve.
@@ -193,13 +211,6 @@ class VideoDecoder:
 
     def get_frames_at(self, indices: list[int]) -> FrameBatch:
         """Return frames at the given indices.
-
-        .. note::
-
-            Calling this method is more efficient that repeated individual calls
-            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at`. This
-            method makes sure not to decode the same frame twice, and also
-            avoids "backwards seek" operations, which are slow.
 
         Args:
             indices (list of int): The indices of the frames to retrieve.
@@ -252,6 +263,15 @@ class VideoDecoder:
     def get_frame_played_at(self, seconds: float) -> Frame:
         """Return a single frame played at the given timestamp in seconds.
 
+        .. note::
+
+            If you need to decode multiple frames, we recommend using the batch
+            methods instead, since they are faster:
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`,
+            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.
+
         Args:
             seconds (float): The time stamp in seconds when the frame is played.
 
@@ -275,13 +295,6 @@ class VideoDecoder:
 
     def get_frames_played_at(self, seconds: list[float]) -> FrameBatch:
         """Return frames played at the given timestamps in seconds.
-
-        .. note::
-
-            Calling this method is more efficient that repeated individual calls
-            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at`.
-            This method makes sure not to decode the same frame twice, and also
-            avoids "backwards seek" operations, which are slow.
 
         Args:
             seconds (list of float): The timestamps in seconds when the frames are played.
