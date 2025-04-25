@@ -136,6 +136,7 @@ The following table indicates the compatibility between versions of
 | `torchcodec`       | `torch`            | Python              |
 | ------------------ | ------------------ | ------------------- |
 | `main` / `nightly` | `main` / `nightly` | `>=3.9`, `<=3.13`   |
+| `0.3`              | `2.7`              | `>=3.9`, `<=3.13`   |
 | `0.2`              | `2.6`              | `>=3.9`, `<=3.13`   |
 | `0.1`              | `2.5`              | `>=3.9`, `<=3.12`   |
 | `0.0.3`            | `2.4`              | `>=3.8`, `<=3.12`   |
@@ -209,15 +210,6 @@ encoded with libx264 and yuv420p pixel format. All decoders, except for TorchVis
 
 For TorchCodec, the "approx" label means that it was using [approximate mode](https://pytorch.org/torchcodec/stable/generated_examples/approximate_mode.html)
 for seeking.
-
-## Planned future work
-
-We are actively working on the following features:
-
-- [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
-
-Let us know if you have any feature requests by [opening an
-issue](https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=feature-request.yml)!
 
 ## Contributing
 
