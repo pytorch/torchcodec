@@ -211,15 +211,6 @@ encoded with libx264 and yuv420p pixel format. All decoders, except for TorchVis
 For TorchCodec, the "approx" label means that it was using [approximate mode](https://pytorch.org/torchcodec/stable/generated_examples/approximate_mode.html)
 for seeking.
 
-## Planned future work
-
-We are actively working on the following features:
-
-- [Audio decoding](https://github.com/pytorch/torchcodec/issues/85)
-
-Let us know if you have any feature requests by [opening an
-issue](https://github.com/pytorch/torchcodec/issues/new?assignees=&labels=&projects=&template=feature-request.yml)!
-
 ## Contributing
 
 We welcome contributions to TorchCodec! Please see our [contributing
