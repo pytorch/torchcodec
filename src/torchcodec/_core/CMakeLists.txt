@@ -8,7 +8,13 @@ find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror ${TORCH_CXX_FLAGS}")
+if(DEFINED TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR AND TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR)
+    set(TORCHCODEC_WERROR_OPTION "")
+else()
+    set(TORCHCODEC_WERROR_OPTION "-Werror")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 
 function(make_torchcodec_sublibrary
     library_name
@@ -149,7 +155,7 @@ function(make_torchcodec_libraries
     target_link_options(
         ${pybind_ops_library_name}
         PUBLIC
-        "-undefined dynamic_lookup"
+        "LINKER:-undefined,dynamic_lookup"
     )
 
     # Install all libraries.
