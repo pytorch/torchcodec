@@ -148,7 +148,7 @@ function(make_torchcodec_libraries
     target_link_options(
         ${pybind_ops_library_name}
         PUBLIC
-        "-undefined dynamic_lookup"
+        "LINKER:-undefined,dynamic_lookup"
     )
 
     # Install all libraries.
