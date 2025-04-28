@@ -19,17 +19,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO put back 6.1.1. See
-        # https://github.com/pytorch/torchcodec/issues/518
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3
       - name: Setup conda env
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          miniconda-version: "latest"
+          # Using miniforge instead of miniconda ensures that the default
+          # conda channel is conda-forge instead of main/default. This ensures
+          # ABI consistency between dependencies:
+          # https://conda-forge.org/docs/user/transitioning_from_defaults/
+          miniforge-version: latest
           activate-environment: test
           python-version: '3.12'
       - name: Update pip
