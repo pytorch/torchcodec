@@ -852,7 +852,7 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
 
   if (stopSecondsOptional.has_value() && startSeconds == *stopSecondsOptional) {
     // For consistency with video
-    auto numChannels = getNumChannels(streamInfo.codecContext);
+    int numChannels = getNumChannels(streamInfo.codecContext);
     return AudioFramesOutput{torch::empty({numChannels, 0}), 0.0};
   }
 
