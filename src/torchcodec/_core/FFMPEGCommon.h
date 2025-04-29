@@ -177,4 +177,19 @@ bool canSwsScaleHandleUnalignedData();
 
 void setFFmpegLogLevel();
 
+// These signatures are defined by FFmpeg.
+using AVIOReadFunction = int (*)(void*, uint8_t*, int);
+using AVIOWriteFunction = int (*)(void*, const uint8_t*, int); // FFmpeg >= 7
+using AVIOWriteFunctionOld = int (*)(void*, uint8_t*, int); // FFmpeg < 7
+using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
+
+AVIOContext* avioAllocContext(
+    uint8_t* buffer,
+    int buffer_size,
+    int write_flag,
+    void* opaque,
+    AVIOReadFunction read_packet,
+    AVIOWriteFunction write_packet,
+    AVIOSeekFunction seek);
+
 } // namespace facebook::torchcodec

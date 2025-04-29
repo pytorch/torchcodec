@@ -1,5 +1,6 @@
 #pragma once
 #include <torch/types.h>
+#include "src/torchcodec/_core/AVIOBytesContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
@@ -21,9 +22,19 @@ class AudioEncoder {
       int sampleRate,
       std::string_view fileName,
       std::optional<int64_t> bitRate = std::nullopt);
+  AudioEncoder(
+      const torch::Tensor wf,
+      int sampleRate,
+      std::string_view formatName,
+      std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+      std::optional<int64_t> bitRate = std::nullopt);
   void encode();
+  torch::Tensor encodeToTensor();
 
  private:
+  void initializeEncoder(
+      int sampleRate,
+      std::optional<int64_t> bitRate = std::nullopt);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& srcAVFrame);
@@ -35,5 +46,8 @@ class AudioEncoder {
   UniqueSwrContext swrContext_;
 
   const torch::Tensor wf_;
+
+  // Stores the AVIOContext for the output tensor buffer.
+  std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
 };
 } // namespace facebook::torchcodec
