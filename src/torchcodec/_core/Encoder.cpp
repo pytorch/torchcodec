@@ -208,9 +208,12 @@ torch::Tensor AudioEncoder::encodeToTensor() {
 }
 
 void AudioEncoder::encode() {
-  // TODO-ENCODING: Need to check, but consecutive calls to encode() are
-  // probably invalid. We can address this once we (re)design the public and
-  // private encoding APIs.
+  // To be on the safe side we enforce that encode() can only be called once on
+  // an encoder object. Whether this is actually necessary is unknown, so this
+  // may be relaxed if needed.
+  TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
+  encodeWasCalled_ = true;
+
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   //  Default to 256 like in torchaudio
