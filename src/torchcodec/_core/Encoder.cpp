@@ -8,6 +8,17 @@ namespace facebook::torchcodec {
 
 namespace {
 
+torch::Tensor validateWf(torch::Tensor wf) {
+  TORCH_CHECK(
+      wf.dtype() == torch::kFloat32,
+      "waveform must have float32 dtype, got ",
+      wf.dtype());
+  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
+  // planar (fltp).
+  TORCH_CHECK(wf.dim() == 2, "waveform must have 2 dimensions, got ", wf.dim());
+  return wf;
+}
+
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
   if (avCodec.supported_samplerates == nullptr) {
     return;
@@ -79,32 +90,14 @@ AudioEncoder::~AudioEncoder() {}
 AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
-    std::optional<std::string_view> fileName,
-    std::optional<std::string_view> formatName,
+    std::string_view fileName,
     std::optional<int64_t> bitRate)
-    : wf_(wf) {
-  TORCH_CHECK(
-      fileName.has_value() ^ formatName.has_value(),
-      "Pass one of filename OR format, not both.");
-  TORCH_CHECK(
-      wf_.dtype() == torch::kFloat32,
-      "waveform must have float32 dtype, got ",
-      wf_.dtype());
-  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
-  // planar (fltp).
-  TORCH_CHECK(
-      wf_.dim() == 2, "waveform must have 2 dimensions, got ", wf_.dim());
-
+    : wf_(validateWf(wf)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
-  int status = AVSUCCESS;
-  if (fileName.has_value()) {
-    status = avformat_alloc_output_context2(
-        &avFormatContext, nullptr, nullptr, fileName->data());
-  } else {
-    status = avformat_alloc_output_context2(
-        &avFormatContext, nullptr, formatName->data(), nullptr);
-  }
+  int status = avformat_alloc_output_context2(
+      &avFormatContext, nullptr, nullptr, fileName.data());
+
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
@@ -112,18 +105,42 @@ AudioEncoder::AudioEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
-  if (fileName.has_value()) {
-    status =
-        avio_open(&avFormatContext_->pb, fileName->data(), AVIO_FLAG_WRITE);
-    TORCH_CHECK(
-        status >= 0,
-        "avio_open failed: ",
-        getFFMPEGErrorStringFromErrorCode(status));
-  } else {
-    avioContextHolder_ = std::make_unique<AVIOToTensorContext>();
-    avFormatContext->pb = avioContextHolder_->getAVIOContext();
-  }
+  status = avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
+  TORCH_CHECK(
+      status >= 0,
+      "avio_open failed: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
+  initializeEncoder(sampleRate, bitRate);
+}
+
+AudioEncoder::AudioEncoder(
+    const torch::Tensor wf,
+    int sampleRate,
+    std::string_view formatName,
+    std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+    std::optional<int64_t> bitRate)
+    : wf_(validateWf(wf)), avioContextHolder_(std::move(avioContextHolder)) {
+  setFFmpegLogLevel();
+  AVFormatContext* avFormatContext = nullptr;
+  int status = avformat_alloc_output_context2(
+      &avFormatContext, nullptr, formatName.data(), nullptr);
+
+  TORCH_CHECK(
+      avFormatContext != nullptr,
+      "Couldn't allocate AVFormatContext. ",
+      "Check the desired extension? ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  avFormatContext_.reset(avFormatContext);
+
+  avFormatContext_->pb = avioContextHolder_->getAVIOContext();
+
+  initializeEncoder(sampleRate, bitRate);
+}
+
+void AudioEncoder::initializeEncoder(
+    int sampleRate,
+    std::optional<int64_t> bitRate) {
   // We use the AVFormatContext's default codec for that
   // specific format/container.
   const AVCodec* avCodec =
@@ -162,7 +179,7 @@ AudioEncoder::AudioEncoder(
 
   setDefaultChannelLayout(avCodecContext_, numChannels);
 
-  status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
+  int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(
       status == AVSUCCESS,
       "avcodec_open2 failed: ",

@@ -390,8 +390,7 @@ void encode_audio_to_file(
     int64_t sample_rate,
     std::string_view file_name,
     std::optional<int64_t> bit_rate = std::nullopt) {
-  AudioEncoder(
-      wf, validateSampleRate(sample_rate), file_name, std::nullopt, bit_rate)
+  AudioEncoder(wf, validateSampleRate(sample_rate), file_name, bit_rate)
       .encode();
 }
 
@@ -402,11 +401,12 @@ at::Tensor encode_audio_to_tensor(
     int64_t sample_rate,
     std::string_view format,
     std::optional<int64_t> bit_rate = std::nullopt) {
+  auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
   return AudioEncoder(
              wf,
              validateSampleRate(sample_rate),
-             std::nullopt,
              format,
+             std::move(avioContextHolder),
              bit_rate)
       .encodeToTensor();
 }

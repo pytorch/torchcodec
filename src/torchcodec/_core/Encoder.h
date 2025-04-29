@@ -20,13 +20,21 @@ class AudioEncoder {
       // match this, and that's up to the user. If sample rates don't match,
       // encoding will still work but audio will be distorted.
       int sampleRate,
-      std::optional<std::string_view> fileName,
-      std::optional<std::string_view> formatName,
+      std::string_view fileName,
+      std::optional<int64_t> bitRate = std::nullopt);
+  AudioEncoder(
+      const torch::Tensor wf,
+      int sampleRate,
+      std::string_view formatName,
+      std::unique_ptr<AVIOToTensorContext> avioContextHolder,
       std::optional<int64_t> bitRate = std::nullopt);
   void encode();
   torch::Tensor encodeToTensor();
 
  private:
+  void initializeEncoder(
+      int sampleRate,
+      std::optional<int64_t> bitRate = std::nullopt);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& srcAVFrame);
