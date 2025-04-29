@@ -1108,7 +1108,7 @@ class TestAudioDecoder:
     def test_start_equals_stop(self, asset):
         decoder = AudioDecoder(asset.path)
         samples = decoder.get_samples_played_in_range(start_seconds=3, stop_seconds=3)
-        assert samples.data.shape == (0, 0)
+        assert samples.data.shape == (asset.num_channels, 0)
 
     def test_frame_start_is_not_zero(self):
         # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.138125.
