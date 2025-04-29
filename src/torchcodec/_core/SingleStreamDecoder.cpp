@@ -848,12 +848,13 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
             std::to_string(*stopSecondsOptional) + ").");
   }
 
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+
   if (stopSecondsOptional.has_value() && startSeconds == *stopSecondsOptional) {
     // For consistency with video
-    return AudioFramesOutput{torch::empty({0, 0}), 0.0};
+    auto numChannels = getNumChannels(streamInfo.codecContext);
+    return AudioFramesOutput{torch::empty({numChannels, 0}), 0.0};
   }
-
-  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
   auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
   if (startPts < streamInfo.lastDecodedAvFramePts +
