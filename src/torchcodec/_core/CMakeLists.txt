@@ -65,8 +65,9 @@ function(make_torchcodec_libraries
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
     set(decoder_sources
         AVIOContextHolder.cpp
+        AVIOBytesContext.cpp
         FFMPEGCommon.cpp
-	DeviceInterface.cpp
+        DeviceInterface.cpp
         SingleStreamDecoder.cpp
         # TODO: lib name should probably not be "*_decoder*" now that it also
         # contains an encoder

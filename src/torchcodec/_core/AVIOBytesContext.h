@@ -6,12 +6,13 @@
 
 #pragma once
 
+#include <torch/types.h>
 #include "src/torchcodec/_core/AVIOContextHolder.h"
 
 namespace facebook::torchcodec {
 
-// Enables users to pass in the entire video as bytes. Our read and seek
-// functions then traverse the bytes in memory.
+// For Decoding: enables users to pass in the entire video or audio as bytes.
+// Our read and seek functions then traverse the bytes in memory.
 class AVIOBytesContext : public AVIOContextHolder {
  public:
   explicit AVIOBytesContext(const void* data, int64_t dataSize);
@@ -24,6 +25,27 @@ class AVIOBytesContext : public AVIOContextHolder {
   };
 
   static int read(void* opaque, uint8_t* buf, int buf_size);
+  static int64_t seek(void* opaque, int64_t offset, int whence);
+
+  DataContext dataContext_;
+};
+
+// For Encoding: used to encode into an output uint8 (bytes) tensor.
+class AVIOToTensorContext : public AVIOContextHolder {
+ public:
+  explicit AVIOToTensorContext();
+  torch::Tensor getOutputTensor();
+
+ private:
+  struct DataContext {
+    torch::Tensor outputTensor;
+    int64_t current;
+  };
+
+  static constexpr int64_t INITIAL_TENSOR_SIZE = 10'000'000; // 10MB
+  static constexpr int64_t MAX_TENSOR_SIZE = 320'000'000; // 320 MB
+  static int write(void* opaque, const uint8_t* buf, int buf_size);
+  // We need to expose seek() for some formats like mp3.
   static int64_t seek(void* opaque, int64_t offset, int whence);
 
   DataContext dataContext_;

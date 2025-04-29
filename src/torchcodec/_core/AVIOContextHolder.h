@@ -19,9 +19,9 @@ namespace facebook::torchcodec {
 //      freed.
 //   2. It is a base class for AVIOContext specializations. When specializing a
 //      AVIOContext, we need to provide four things:
-//        1. A read callback function.
-//        2. A seek callback function.
-//        3. A write callback function. (Not supported yet; it's for encoding.)
+//        1. A read callback function, for decoding.
+//        2. A seek callback function, for decoding and encoding.
+//        3. A write callback function, for encoding.
 //        4. A pointer to some context object that has the same lifetime as the
 //           AVIOContext itself. This context object holds the custom state that
 //           tracks the custom behavior of reading, seeking and writing. It is
@@ -44,13 +44,10 @@ class AVIOContextHolder {
   // enforced by having a pure virtual methods, but we don't have any.)
   AVIOContextHolder() = default;
 
-  // These signatures are defined by FFmpeg.
-  using AVIOReadFunction = int (*)(void*, uint8_t*, int);
-  using AVIOSeekFunction = int64_t (*)(void*, int64_t, int);
-
   // Deriving classes should call this function in their constructor.
   void createAVIOContext(
       AVIOReadFunction read,
+      AVIOWriteFunction write,
       AVIOSeekFunction seek,
       void* heldData,
       int bufferSize = defaultBufferSize);

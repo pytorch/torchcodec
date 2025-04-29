@@ -261,4 +261,27 @@ void setFFmpegLogLevel() {
   av_log_set_level(logLevel);
 }
 
+AVIOContext* avioAllocContext(
+    uint8_t* buffer,
+    int buffer_size,
+    int write_flag,
+    void* opaque,
+    AVIOReadFunction read_packet,
+    AVIOWriteFunction write_packet,
+    AVIOSeekFunction seek) {
+  return avio_alloc_context(
+      buffer,
+      buffer_size,
+      write_flag,
+      opaque,
+      read_packet,
+// The buf parameter of the write function is not const before FFmpeg 7.
+#if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
+      write_packet,
+#else
+      reinterpret_cast<AVIOWriteFunctionOld>(write_packet),
+#endif
+      seek);
+}
+
 } // namespace facebook::torchcodec
