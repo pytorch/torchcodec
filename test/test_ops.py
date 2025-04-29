@@ -1284,6 +1284,35 @@ class TestAudioEncoderOps:
 
         torch.testing.assert_close(self.decode(encoded_tensor), samples)
 
+    def test_contiguity(self):
+        num_samples = 10_000  # per channel
+        contiguous_samples = torch.rand(2, num_samples).contiguous()
+        assert contiguous_samples.stride() == (num_samples, 1)
+
+        encoded_from_contiguous = encode_audio_to_tensor(
+            wf=contiguous_samples,
+            sample_rate=16_000,
+            format="flac",
+            bit_rate=44_000,
+        )
+        non_contiguous_samples = contiguous_samples.T.contiguous().T
+        assert non_contiguous_samples.stride() == (1, 2)
+
+        torch.testing.assert_close(
+            contiguous_samples, non_contiguous_samples, rtol=0, atol=0
+        )
+
+        encoded_from_non_contiguous = encode_audio_to_tensor(
+            wf=non_contiguous_samples,
+            sample_rate=16_000,
+            format="flac",
+            bit_rate=44_000,
+        )
+
+        torch.testing.assert_close(
+            encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0
+        )
+
 
 if __name__ == "__main__":
     pytest.main()
