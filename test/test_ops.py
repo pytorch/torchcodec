@@ -1132,11 +1132,11 @@ class TestAudioEncoderOps:
 
         with pytest.raises(RuntimeError, match="No such file or directory"):
             encode_audio_to_file(
-                wf=torch.rand(10, 10), sample_rate=10, filename="./bad/path.mp3"
+                wf=torch.rand(2, 10), sample_rate=10, filename="./bad/path.mp3"
             )
         with pytest.raises(RuntimeError, match="Check the desired extension"):
             encode_audio_to_file(
-                wf=torch.rand(10, 10), sample_rate=10, filename="./file.bad_extension"
+                wf=torch.rand(2, 10), sample_rate=10, filename="./file.bad_extension"
             )
 
         with pytest.raises(RuntimeError, match="invalid sample rate=10"):
@@ -1151,6 +1151,11 @@ class TestAudioEncoderOps:
                 sample_rate=NASA_AUDIO_MP3.sample_rate,
                 filename=valid_output_file,
                 bit_rate=-1,  # bad
+            )
+
+        with pytest.raises(RuntimeError, match="Trying to encode 10 channels"):
+            encode_audio_to_file(
+                wf=torch.rand(10, 20), sample_rate=10, filename="doesnt_matter"
             )
 
     @pytest.mark.parametrize(

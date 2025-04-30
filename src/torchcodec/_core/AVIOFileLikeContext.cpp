@@ -23,7 +23,7 @@ AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  createAVIOContext(&read, nullptr, &seek, &fileLike_);
+  createAVIOContext(&read, &write, &seek, &fileLike_);
 }
 
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
@@ -75,6 +75,14 @@ int64_t AVIOFileLikeContext::seek(void* opaque, int64_t offset, int whence) {
   auto fileLike = static_cast<UniquePyObject*>(opaque);
   py::gil_scoped_acquire gil;
   return py::cast<int64_t>((*fileLike)->attr("seek")(offset, whence));
+}
+
+int AVIOFileLikeContext::write(void* opaque, const uint8_t* buf, int buf_size) {
+  auto fileLike = static_cast<UniquePyObject*>(opaque);
+  py::gil_scoped_acquire gil;
+  py::bytes bytes_obj(reinterpret_cast<const char*>(buf), buf_size);
+
+  return py::cast<int64_t>((*fileLike)->attr("write")(bytes_obj));
 }
 
 } // namespace facebook::torchcodec

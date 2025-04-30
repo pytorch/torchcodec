@@ -10,6 +10,7 @@
 #include <string>
 
 #include "src/torchcodec/_core/AVIOFileLikeContext.h"
+#include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 namespace py = pybind11;
@@ -38,8 +39,26 @@ int64_t create_from_file_like(
   return reinterpret_cast<int64_t>(decoder);
 }
 
+void encode_audio_to_file_like(
+    py::object file_like,
+    // const at::Tensor wf,
+    [[maybe_unused]] int wf,
+    int64_t sample_rate,
+    std::string_view format,
+    std::optional<int64_t> bit_rate = std::nullopt) {
+  auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
+  AudioEncoder(
+      torch::empty({2, 1000}, torch::kFloat32),
+      sample_rate, // TODO need validateSampleRate
+      format,
+      std::move(avioContextHolder),
+      bit_rate)
+      .encode();
+}
+
 PYBIND11_MODULE(decoder_core_pybind_ops, m) {
   m.def("create_from_file_like", &create_from_file_like);
+  m.def("encode_audio_to_file_like", &encode_audio_to_file_like);
 }
 
 } // namespace facebook::torchcodec

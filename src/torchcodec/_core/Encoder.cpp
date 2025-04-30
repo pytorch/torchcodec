@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOContextHolder.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -14,6 +15,18 @@ torch::Tensor validateWf(torch::Tensor wf) {
       "waveform must have float32 dtype, got ",
       wf.dtype());
   TORCH_CHECK(wf.dim() == 2, "waveform must have 2 dimensions, got ", wf.dim());
+
+  // We enforce this, but if we get user reports we should investigate whether
+  // that's actually needed.
+  int numChannels = static_cast<int>(wf.sizes()[0]);
+  TORCH_CHECK(
+      numChannels <= AV_NUM_DATA_POINTERS,
+      "Trying to encode ",
+      numChannels,
+      " channels, but FFmpeg only supports ",
+      AV_NUM_DATA_POINTERS,
+      " channels per frame.");
+
   return wf.contiguous();
 }
 
@@ -136,6 +149,31 @@ AudioEncoder::AudioEncoder(
   initializeEncoder(sampleRate, bitRate);
 }
 
+// TODO this sucks, shouldn't need 2 separate constructors for AVIOContextHolder
+AudioEncoder::AudioEncoder(
+    const torch::Tensor wf,
+    int sampleRate,
+    std::string_view formatName,
+    std::unique_ptr<AVIOContextHolder> avioContextHolder,
+    std::optional<int64_t> bitRate)
+    : wf_(validateWf(wf)), avioContextHolderrrr_(std::move(avioContextHolder)) {
+  setFFmpegLogLevel();
+  AVFormatContext* avFormatContext = nullptr;
+  int status = avformat_alloc_output_context2(
+      &avFormatContext, nullptr, formatName.data(), nullptr);
+
+  TORCH_CHECK(
+      avFormatContext != nullptr,
+      "Couldn't allocate AVFormatContext. ",
+      "Check the desired extension? ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  avFormatContext_.reset(avFormatContext);
+
+  avFormatContext_->pb = avioContextHolderrrr_->getAVIOContext();
+
+  initializeEncoder(sampleRate, bitRate);
+}
+
 void AudioEncoder::initializeEncoder(
     int sampleRate,
     std::optional<int64_t> bitRate) {
@@ -164,18 +202,7 @@ void AudioEncoder::initializeEncoder(
   // what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
-  int numChannels = static_cast<int>(wf_.sizes()[0]);
-  TORCH_CHECK(
-      // TODO-ENCODING is this even true / needed? We can probably support more
-      // with non-planar data?
-      numChannels <= AV_NUM_DATA_POINTERS,
-      "Trying to encode ",
-      numChannels,
-      " channels, but FFmpeg only supports ",
-      AV_NUM_DATA_POINTERS,
-      " channels per frame.");
-
-  setDefaultChannelLayout(avCodecContext_, numChannels);
+  setDefaultChannelLayout(avCodecContext_, static_cast<int>(wf_.sizes()[0]));
 
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(
@@ -206,9 +233,12 @@ torch::Tensor AudioEncoder::encodeToTensor() {
 }
 
 void AudioEncoder::encode() {
-  // TODO-ENCODING: Need to check, but consecutive calls to encode() are
-  // probably invalid. We can address this once we (re)design the public and
-  // private encoding APIs.
+  // To be on the safe side we enforce that encode() can only be called once on
+  // an encoder object. Whether this is actually necessary is unknown, so this
+  // may be relaxed if needed.
+  TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
+  encodeWasCalled_ = true;
+
   UniqueAVFrame avFrame(av_frame_alloc());
   TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   //  Default to 256 like in torchaudio
@@ -322,14 +352,17 @@ void AudioEncoder::encodeInnerLoop(
     ReferenceAVPacket packet(autoAVPacket);
     status = avcodec_receive_packet(avCodecContext_.get(), packet.get());
     if (status == AVERROR(EAGAIN) || status == AVERROR_EOF) {
-      // TODO-ENCODING this is from TorchAudio, probably needed, but not sure.
-      //   if (status == AVERROR_EOF) {
-      //     status = av_interleaved_write_frame(avFormatContext_.get(),
-      //     nullptr); TORCH_CHECK(
-      //         status == AVSUCCESS,
-      //         "Failed to flush packet ",
-      //         getFFMPEGErrorStringFromErrorCode(status));
-      //   }
+      if (status == AVERROR_EOF) {
+        // Flush the packets that were potentially buffered by
+        // av_interleaved_write_frame(). See corresponding block in
+        // TorchAudio:
+        // https://github.com/pytorch/audio/blob/d60ce09e2c532d5bf2e05619e700ab520543465e/src/libtorio/ffmpeg/stream_writer/encoder.cpp#L21
+        status = av_interleaved_write_frame(avFormatContext_.get(), nullptr);
+        TORCH_CHECK(
+            status == AVSUCCESS,
+            "Failed to flush packet: ",
+            getFFMPEGErrorStringFromErrorCode(status));
+      }
       return;
     }
     TORCH_CHECK(

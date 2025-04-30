@@ -394,8 +394,6 @@ void encode_audio_to_file(
       .encode();
 }
 
-// TODO-ENCODING is "format" a good parameter name?? It kinda conflicts with
-// "sample_format" which we may eventually want to expose.
 at::Tensor encode_audio_to_tensor(
     const at::Tensor wf,
     int64_t sample_rate,

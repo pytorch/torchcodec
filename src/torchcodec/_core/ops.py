@@ -153,6 +153,17 @@ def create_from_file_like(
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
 
 
+def encode_audio_to_file_like(
+    file_like: Union[io.RawIOBase, io.BufferedReader],
+    wf: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    bit_rate: Optional[int] = None,
+):
+    assert _pybind_ops is not None
+    _pybind_ops.encode_audio_to_file_like(file_like, wf, sample_rate, format, bit_rate)
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
