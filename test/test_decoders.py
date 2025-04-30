@@ -1112,7 +1112,8 @@ class TestAudioDecoder:
 
     def test_frame_start_is_not_zero(self):
         # For NASA_AUDIO_MP3, the first frame is not at 0, it's at 0.138125.
-        # So if we request start = 0.05, we shouldn't be truncating anything.
+        # So if we request (start, stop) = (0.05, None), we shouldn't be
+        # truncating anything.
 
         asset = NASA_AUDIO_MP3
         start_seconds = 0.05  # this is less than the first frame's pts
@@ -1127,6 +1128,35 @@ class TestAudioDecoder:
 
         reference_frames = asset.get_frame_data_by_range(start=0, stop=stop_frame_index)
         torch.testing.assert_close(samples.data, reference_frames)
+
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/567
+        # If we ask for start < stop <= first_frame_pts, we should raise.
+        with pytest.raises(RuntimeError, match="No audio frames were decoded"):
+            decoder.get_samples_played_in_range(start_seconds=0, stop_seconds=0.05)
+
+        first_frame_pts_seconds = asset.get_frame_info(idx=0).pts_seconds
+        with pytest.raises(RuntimeError, match="No audio frames were decoded"):
+            decoder.get_samples_played_in_range(
+                start_seconds=0, stop_seconds=first_frame_pts_seconds
+            )
+
+        # Documenting an edge case: we ask for samples barely beyond the start
+        # of the first frame. The C++ decoder returns the first frame, which
+        # gets (correctly!) truncated by the AudioDecoder, and we end up with
+        # empty data.
+        samples = decoder.get_samples_played_in_range(
+            start_seconds=0, stop_seconds=first_frame_pts_seconds + 1e-5
+        )
+        assert samples.data.shape == (2, 0)
+        assert samples.pts_seconds == first_frame_pts_seconds
+        assert samples.duration_seconds == 0
+
+        # if we ask for a little bit more samples, we get non-empty data
+        samples = decoder.get_samples_played_in_range(
+            start_seconds=0, stop_seconds=first_frame_pts_seconds + 1e-3
+        )
+        assert samples.data.shape == (2, 8)
+        assert samples.pts_seconds == first_frame_pts_seconds
 
     def test_single_channel(self):
         asset = SINE_MONO_S32
