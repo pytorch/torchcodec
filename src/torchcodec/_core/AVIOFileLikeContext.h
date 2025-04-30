@@ -24,6 +24,7 @@ class AVIOFileLikeContext : public AVIOContextHolder {
  private:
   static int read(void* opaque, uint8_t* buf, int buf_size);
   static int64_t seek(void* opaque, int64_t offset, int whence);
+  static int write(void* opaque, const uint8_t* buf, int buf_size);
 
   // Note that we dynamically allocate the Python object because we need to
   // strictly control when its destructor is called. We must hold the GIL

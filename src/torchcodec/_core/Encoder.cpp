@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOContextHolder.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -144,6 +145,31 @@ AudioEncoder::AudioEncoder(
   avFormatContext_.reset(avFormatContext);
 
   avFormatContext_->pb = avioContextHolder_->getAVIOContext();
+
+  initializeEncoder(sampleRate, bitRate);
+}
+
+// TODO this sucks, shouldn't need 2 separate constructors for AVIOContextHolder
+AudioEncoder::AudioEncoder(
+    const torch::Tensor wf,
+    int sampleRate,
+    std::string_view formatName,
+    std::unique_ptr<AVIOContextHolder> avioContextHolder,
+    std::optional<int64_t> bitRate)
+    : wf_(validateWf(wf)), avioContextHolderrrr_(std::move(avioContextHolder)) {
+  setFFmpegLogLevel();
+  AVFormatContext* avFormatContext = nullptr;
+  int status = avformat_alloc_output_context2(
+      &avFormatContext, nullptr, formatName.data(), nullptr);
+
+  TORCH_CHECK(
+      avFormatContext != nullptr,
+      "Couldn't allocate AVFormatContext. ",
+      "Check the desired extension? ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  avFormatContext_.reset(avFormatContext);
+
+  avFormatContext_->pb = avioContextHolderrrr_->getAVIOContext();
 
   initializeEncoder(sampleRate, bitRate);
 }
