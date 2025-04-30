@@ -848,12 +848,13 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
             std::to_string(*stopSecondsOptional) + ").");
   }
 
+  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
+
   if (stopSecondsOptional.has_value() && startSeconds == *stopSecondsOptional) {
     // For consistency with video
-    return AudioFramesOutput{torch::empty({0, 0}), 0.0};
+    int numChannels = getNumChannels(streamInfo.codecContext);
+    return AudioFramesOutput{torch::empty({numChannels, 0}), 0.0};
   }
-
-  StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
 
   auto startPts = secondsToClosestPts(startSeconds, streamInfo.timeBase);
   if (startPts < streamInfo.lastDecodedAvFramePts +
@@ -877,8 +878,9 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
   while (!finished) {
     try {
       UniqueAVFrame avFrame =
-          decodeAVFrame([startPts](const UniqueAVFrame& avFrame) {
-            return startPts < avFrame->pts + getDuration(avFrame);
+          decodeAVFrame([startPts, stopPts](const UniqueAVFrame& avFrame) {
+            return startPts < avFrame->pts + getDuration(avFrame) &&
+                stopPts > avFrame->pts;
           });
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
       if (!firstFramePtsSeconds.has_value()) {
@@ -907,9 +909,12 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
   TORCH_CHECK(
       frames.size() > 0 && firstFramePtsSeconds.has_value(),
       "No audio frames were decoded. ",
-      "This is probably because start_seconds is too high? ",
-      "Current value is ",
-      startSeconds);
+      "This is probably because start_seconds is too high(",
+      startSeconds,
+      "),",
+      "or because stop_seconds(",
+      stopSecondsOptional,
+      ") is too low.");
 
   return AudioFramesOutput{torch::cat(frames, 1), *firstFramePtsSeconds};
 }

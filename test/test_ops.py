@@ -782,7 +782,7 @@ class TestAudioDecoderOps:
         frames, pts_seconds = get_frames_by_pts_in_range_audio(
             decoder, start_seconds=1, stop_seconds=1
         )
-        assert frames.shape == (0, 0)
+        assert frames.shape == (asset.num_channels, 0)
         assert pts_seconds == 0
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
@@ -883,23 +883,6 @@ class TestAudioDecoderOps:
             )
 
             assert pts_seconds == start_seconds
-
-    def test_decode_before_frame_start(self):
-        # Test illustrating bug described in
-        # https://github.com/pytorch/torchcodec/issues/567
-        asset = NASA_AUDIO_MP3
-
-        decoder = create_from_file(str(asset.path), seek_mode="approximate")
-        add_audio_stream(decoder)
-
-        frames, *_ = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=0, stop_seconds=0.05
-        )
-        all_frames, *_ = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=0, stop_seconds=None
-        )
-        # TODO fix this. `frames` should be empty.
-        torch.testing.assert_close(frames, all_frames)
 
     def test_sample_rate_conversion(self):
         def get_all_frames(asset, sample_rate=None, stop_seconds=None):
@@ -1283,6 +1266,39 @@ class TestAudioEncoderOps:
         assert encoded_tensor.numel() > INITIAL_TENSOR_SIZE
 
         torch.testing.assert_close(self.decode(encoded_tensor), samples)
+
+    def test_contiguity(self):
+        # Ensure that 2 waveforms with the same values are encoded in the same
+        # way, regardless of their memory layout. Here we encode 2 equal
+        # waveforms, one is row-aligned while the other is column-aligned.
+
+        num_samples = 10_000  # per channel
+        contiguous_samples = torch.rand(2, num_samples).contiguous()
+        assert contiguous_samples.stride() == (num_samples, 1)
+
+        encoded_from_contiguous = encode_audio_to_tensor(
+            wf=contiguous_samples,
+            sample_rate=16_000,
+            format="flac",
+            bit_rate=44_000,
+        )
+        non_contiguous_samples = contiguous_samples.T.contiguous().T
+        assert non_contiguous_samples.stride() == (1, 2)
+
+        torch.testing.assert_close(
+            contiguous_samples, non_contiguous_samples, rtol=0, atol=0
+        )
+
+        encoded_from_non_contiguous = encode_audio_to_tensor(
+            wf=non_contiguous_samples,
+            sample_rate=16_000,
+            format="flac",
+            bit_rate=44_000,
+        )
+
+        torch.testing.assert_close(
+            encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0
+        )
 
 
 if __name__ == "__main__":
