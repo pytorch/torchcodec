@@ -13,10 +13,8 @@ torch::Tensor validateWf(torch::Tensor wf) {
       wf.dtype() == torch::kFloat32,
       "waveform must have float32 dtype, got ",
       wf.dtype());
-  // TODO-ENCODING check contiguity of the input wf to ensure that it is indeed
-  // planar (fltp).
   TORCH_CHECK(wf.dim() == 2, "waveform must have 2 dimensions, got ", wf.dim());
-  return wf;
+  return wf.contiguous();
 }
 
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
