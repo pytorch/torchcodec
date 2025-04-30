@@ -1268,6 +1268,10 @@ class TestAudioEncoderOps:
         torch.testing.assert_close(self.decode(encoded_tensor), samples)
 
     def test_contiguity(self):
+        # Ensure that 2 waveforms with the same values are encoded in the same
+        # way, regardless of their memory layout. Here we encode 2 equal
+        # waveforms, one is row-aligned while the other is column-aligned.
+
         num_samples = 10_000  # per channel
         contiguous_samples = torch.rand(2, num_samples).contiguous()
         assert contiguous_samples.stride() == (num_samples, 1)
