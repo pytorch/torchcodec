@@ -6,7 +6,6 @@
 
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>
@@ -193,6 +192,7 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {

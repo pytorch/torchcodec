@@ -45,11 +45,6 @@ bool registerDeviceInterface(
 }
 
 torch::Device createTorchDevice(const std::string device) {
-  // TODO: remove once DeviceInterface for CPU is implemented
-  if (device == "cpu") {
-    return torch::kCPU;
-  }
-
   std::scoped_lock lock(g_interface_mutex);
   std::string deviceType = getDeviceType(device);
   auto deviceInterface = std::find_if(
@@ -70,11 +65,6 @@ torch::Device createTorchDevice(const std::string device) {
 std::unique_ptr<DeviceInterface> createDeviceInterface(
     const torch::Device& device) {
   auto deviceType = device.type();
-  // TODO: remove once DeviceInterface for CPU is implemented
-  if (deviceType == torch::kCPU) {
-    return nullptr;
-  }
-
   std::scoped_lock lock(g_interface_mutex);
   TORCH_CHECK(
       g_interface_map->find(deviceType) != g_interface_map->end(),
