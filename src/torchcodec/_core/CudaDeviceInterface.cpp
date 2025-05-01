@@ -15,10 +15,9 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cuda = registerDeviceInterface(
-    torch::kCUDA,
-    [](const torch::Device& device, const AVRational& timeBase) {
-      return new CudaDeviceInterface(device, timeBase);
+bool g_cuda =
+    registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
+      return new CudaDeviceInterface(device);
     });
 
 // We reuse cuda contexts across VideoDeoder instances. This is because
@@ -164,10 +163,8 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 }
 } // namespace
 
-CudaDeviceInterface::CudaDeviceInterface(
-    const torch::Device& device,
-    const AVRational& timeBase)
-    : DeviceInterface(device, timeBase) {
+CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
+    : DeviceInterface(device) {
   if (device_.type() != torch::kCUDA) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }
@@ -195,6 +192,7 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {

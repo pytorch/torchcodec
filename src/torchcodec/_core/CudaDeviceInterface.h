@@ -12,7 +12,7 @@ namespace facebook::torchcodec {
 
 class CudaDeviceInterface : public DeviceInterface {
  public:
-  CudaDeviceInterface(const torch::Device& device, const AVRational& timeBase);
+  CudaDeviceInterface(const torch::Device& device);
 
   virtual ~CudaDeviceInterface();
 
@@ -22,6 +22,7 @@ class CudaDeviceInterface : public DeviceInterface {
 
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
+      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =

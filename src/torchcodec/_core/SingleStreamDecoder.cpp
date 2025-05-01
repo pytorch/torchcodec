@@ -363,7 +363,7 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface_ = createDeviceInterface(device, streamInfo.timeBase);
+  deviceInterface_ = createDeviceInterface(device);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -1151,6 +1151,7 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
   } else if (deviceInterface_) {
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
+        streamInfo.timeBase,
         avFrame,
         frameOutput,
         preAllocatedOutputTensor);

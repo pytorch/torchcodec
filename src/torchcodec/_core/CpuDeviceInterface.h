@@ -13,7 +13,7 @@ namespace facebook::torchcodec {
 
 class CpuDeviceInterface : public DeviceInterface {
  public:
-  CpuDeviceInterface(const torch::Device& device, const AVRational& timeBase);
+  CpuDeviceInterface(const torch::Device& device);
 
   virtual ~CpuDeviceInterface() {}
 
@@ -27,6 +27,7 @@ class CpuDeviceInterface : public DeviceInterface {
 
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
+      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =
@@ -63,7 +64,8 @@ class CpuDeviceInterface : public DeviceInterface {
 
   void createFilterGraph(
       const DecodedFrameContext& frameContext,
-      const VideoStreamOptions& videoStreamOptions);
+      const VideoStreamOptions& videoStreamOptions,
+      const AVRational& timeBase);
 
   // color-conversion fields. Only one of FilterGraphContext and
   // UniqueSwsContext should be non-null.

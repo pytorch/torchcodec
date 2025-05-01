@@ -63,8 +63,7 @@ torch::Device createTorchDevice(const std::string device) {
 }
 
 std::unique_ptr<DeviceInterface> createDeviceInterface(
-    const torch::Device& device,
-    const AVRational& timeBase) {
+    const torch::Device& device) {
   auto deviceType = device.type();
   std::scoped_lock lock(g_interface_mutex);
   TORCH_CHECK(
@@ -73,7 +72,7 @@ std::unique_ptr<DeviceInterface> createDeviceInterface(
       device);
 
   return std::unique_ptr<DeviceInterface>(
-      (*g_interface_map)[deviceType](device, timeBase));
+      (*g_interface_map)[deviceType](device));
 }
 
 } // namespace facebook::torchcodec

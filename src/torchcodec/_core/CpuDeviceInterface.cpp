@@ -16,9 +16,7 @@ namespace {
 
 bool g_cpu = registerDeviceInterface(
     torch::kCPU,
-    [](const torch::Device& device, const AVRational& timeBase) {
-      return new CpuDeviceInterface(device, timeBase);
-    });
+    [](const torch::Device& device) { return new CpuDeviceInterface(device); });
 
 } // namespace
 
@@ -36,10 +34,8 @@ bool CpuDeviceInterface::DecodedFrameContext::operator!=(
   return !(*this == other);
 }
 
-CpuDeviceInterface::CpuDeviceInterface(
-    const torch::Device& device,
-    const AVRational& timeBase)
-    : DeviceInterface(device, timeBase) {
+CpuDeviceInterface::CpuDeviceInterface(const torch::Device& device)
+    : DeviceInterface(device) {
   if (device_.type() != torch::kCPU) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }
@@ -56,6 +52,7 @@ CpuDeviceInterface::CpuDeviceInterface(
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void CpuDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
+    const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -136,7 +133,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     frameOutput.data = outputTensor;
   } else if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
     if (!filterGraphContext_.filterGraph || prevFrameContext_ != frameContext) {
-      createFilterGraph(frameContext, videoStreamOptions);
+      createFilterGraph(frameContext, videoStreamOptions, timeBase);
       prevFrameContext_ = frameContext;
     }
     outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
@@ -215,7 +212,8 @@ torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
 
 void CpuDeviceInterface::createFilterGraph(
     const DecodedFrameContext& frameContext,
-    const VideoStreamOptions& videoStreamOptions) {
+    const VideoStreamOptions& videoStreamOptions,
+    const AVRational& timeBase) {
   filterGraphContext_.filterGraph.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterGraphContext_.filterGraph.get() != nullptr);
 
@@ -231,7 +229,7 @@ void CpuDeviceInterface::createFilterGraph(
   filterArgs << "video_size=" << frameContext.decodedWidth << "x"
              << frameContext.decodedHeight;
   filterArgs << ":pix_fmt=" << frameContext.decodedFormat;
-  filterArgs << ":time_base=" << timeBase_.num << "/" << timeBase_.den;
+  filterArgs << ":time_base=" << timeBase.num << "/" << timeBase.den;
   filterArgs << ":pixel_aspect=" << frameContext.decodedAspectRatio.num << "/"
              << frameContext.decodedAspectRatio.den;
 
