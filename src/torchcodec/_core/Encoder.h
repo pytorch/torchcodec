@@ -49,5 +49,7 @@ class AudioEncoder {
 
   // Stores the AVIOContext for the output tensor buffer.
   std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
+
+  bool encodeWasCalled_ = false;
 };
 } // namespace facebook::torchcodec
