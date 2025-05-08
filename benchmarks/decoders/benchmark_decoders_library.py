@@ -145,6 +145,74 @@ class TorchVision(AbstractDecoder):
         ]
         return frames
 
+class OpenCVDecoder(AbstractDecoder):
+    def __init__(self):
+        import cv2.videoio_registry as vr
+
+        self._print_each_iteration_time = False
+        api_pref = None
+        for backend in vr.getStreamBufferedBackends():
+            if not vr.hasBackend(backend):
+                continue
+            if not vr.isBackendBuiltIn(backend):
+                _, abi, api = vr.getStreamBufferedBackendPluginVersion(backend)
+                if (abi < 1 or (abi == 1 and api < 2)):
+                    continue
+            api_pref = backend
+            break
+        self._backend = api_pref
+
+    def decode_frames(self, video_file, pts_list):
+        import cv2
+
+        cap = cv2.VideoCapture(video_file, self._backend, [])
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        approx_frame_numbers = [int(pts * fps) for pts in pts_list]
+
+        current_frame = 0
+        frames = []
+        while True:
+            ok = cap.grab()
+            if not ok:
+                break
+            if current_frame in approx_frame_numbers:  # only decompress needed
+                ret, frame = cap.retrieve()
+                if ret:
+                    frames.append(frame)
+
+            if len(frames) == len(approx_frame_numbers):
+                break
+            current_frame += 1
+        cap.release()
+        return frames
+
+    def decode_first_n_frames(self, video_file, n):
+        import cv2
+
+        cap = cv2.VideoCapture(video_file, self._backend, [])
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        frames = []
+        for i in range(n):
+            ok = cap.grab()
+            if not ok:
+                break
+            ret, frame = cap.retrieve()
+            if ret:
+                frames.append(frame)
+        cap.release()
+        return frames
+
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
+        import cv2
+        frames = [cv2.resize(frame, (width, height)) for frame in self.decode_frames(video_file, pts_list)]
+        return frames
+
 
 class TorchCodecCore(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
