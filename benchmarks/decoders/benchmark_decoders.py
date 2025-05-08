@@ -28,6 +28,7 @@ from benchmark_decoders_library import (
     TorchCodecPublic,
     TorchCodecPublicNonBatch,
     TorchVision,
+    OpenCVDecoder,
 )
 
 
@@ -61,6 +62,7 @@ decoder_registry = {
         {"backend": "video_reader"},
     ),
     "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
+    "opencv": DecoderKind("OpenCV", OpenCVDecoder),
 }
 
 
