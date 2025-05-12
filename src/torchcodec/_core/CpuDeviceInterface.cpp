@@ -14,7 +14,7 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cpu = registerDeviceInterface(
+static bool g_cpu = registerDeviceInterface(
     torch::kCPU,
     [](const torch::Device& device) { return new CpuDeviceInterface(device); });
 
@@ -36,6 +36,7 @@ bool CpuDeviceInterface::DecodedFrameContext::operator!=(
 
 CpuDeviceInterface::CpuDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
+  TORCH_CHECK(g_cpu, "CpuDeviceInterface was not registered!");
   if (device_.type() != torch::kCPU) {
     throw std::runtime_error("Unsupported device: " + device_.str());
   }
