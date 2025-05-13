@@ -151,6 +151,7 @@ class OpenCVDecoder(AbstractDecoder):
 
         self._print_each_iteration_time = False
         api_pref = None
+        # Check backend abi/api for compatibility
         for backend in vr.getStreamBufferedBackends():
             if not vr.hasBackend(backend):
                 continue
@@ -170,24 +171,24 @@ class OpenCVDecoder(AbstractDecoder):
             raise ValueError("Could not open video stream")
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        approx_frame_numbers = [int(pts * fps) for pts in pts_list]
+        approx_frame_indices = [int(pts * fps) for pts in pts_list]
 
         current_frame = 0
         frames = []
         while True:
             ok = cap.grab()
             if not ok:
-                break
-            if current_frame in approx_frame_numbers:  # only decompress needed
+                raise ValueError("Could not grab video frame")
+            if current_frame in approx_frame_indices:  # only decompress needed
                 ret, frame = cap.retrieve()
                 if ret:
                     frames.append(frame)
 
-            if len(frames) == len(approx_frame_numbers):
+            if len(frames) == len(approx_frame_indices):
                 break
             current_frame += 1
         cap.release()
+        assert len(frames) == len(approx_frame_indices)
         return frames
 
     def decode_first_n_frames(self, video_file, n):
@@ -201,11 +202,12 @@ class OpenCVDecoder(AbstractDecoder):
         for i in range(n):
             ok = cap.grab()
             if not ok:
-                break
+                raise ValueError("Could not grab video frame")
             ret, frame = cap.retrieve()
             if ret:
                 frames.append(frame)
         cap.release()
+        assert len(frames) == n
         return frames
 
     def decode_and_resize(self, video_file, pts_list, height, width, device):
