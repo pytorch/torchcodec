@@ -221,6 +221,8 @@ def add_audio_stream_abstract(
     decoder: torch.Tensor,
     *,
     stream_index: Optional[int] = None,
+    sample_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
 ) -> None:
     return
 

@@ -40,6 +40,8 @@ class AudioDecoder:
             the :term:`best stream` is used.
         sample_rate (int, optional): The desired output sample rate of the decoded samples.
             By default, the samples are returned in their original sample rate.
+        num_channels (int, optional): The desired number of channels of the decoded samples.
+            By default, the original number of channels is used.
 
     Attributes:
         metadata (AudioStreamMetadata): Metadata of the audio stream.
@@ -54,11 +56,15 @@ class AudioDecoder:
         *,
         stream_index: Optional[int] = None,
         sample_rate: Optional[int] = None,
+        num_channels: Optional[int] = None,
     ):
         self._decoder = create_decoder(source=source, seek_mode="approximate")
 
         core.add_audio_stream(
-            self._decoder, stream_index=stream_index, sample_rate=sample_rate
+            self._decoder,
+            stream_index=stream_index,
+            sample_rate=sample_rate,
+            num_channels=num_channels,
         )
 
         container_metadata = core.get_container_metadata(self._decoder)

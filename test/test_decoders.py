@@ -1305,3 +1305,33 @@ class TestAudioDecoder:
         decoder = AudioDecoder(asset.path, sample_rate=sample_rate)
         samples = decoder.get_samples_played_in_range(start_seconds=1, stop_seconds=2)
         assert samples.duration_seconds == 1
+
+    @pytest.mark.parametrize("asset", (SINE_MONO_S32, NASA_AUDIO_MP3))
+    # Note that we parametrize over sample_rate as well, so that we can ensure
+    # that the extra tensor allocation that happens within
+    # maybeFlushSwrBuffers() is correct.
+    @pytest.mark.parametrize("sample_rate", (None, 16_000))
+    # FFmpeg can handle up to AV_NUM_DATA_POINTERS=8 channels
+    @pytest.mark.parametrize("num_channels", (1, 2, None, 8))
+    def test_num_channels(self, asset, sample_rate, num_channels):
+        decoder = AudioDecoder(
+            asset.path, sample_rate=sample_rate, num_channels=num_channels
+        )
+        samples = decoder.get_all_samples()
+
+        if num_channels is None:
+            num_channels = asset.num_channels
+
+        assert samples.data.shape[0] == num_channels
+
+    @pytest.mark.parametrize("asset", (SINE_MONO_S32, NASA_AUDIO_MP3))
+    def test_num_channels_errors(self, asset):
+        with pytest.raises(
+            RuntimeError, match="num_channels must be > 0 and <= AV_NUM_DATA_POINTERS"
+        ):
+            AudioDecoder(asset.path, num_channels=0)
+        with pytest.raises(
+            RuntimeError, match="num_channels must be > 0 and <= AV_NUM_DATA_POINTERS"
+        ):
+            # FFmpeg can handle up to AV_NUM_DATA_POINTERS=8 channels
+            AudioDecoder(asset.path, num_channels=9)

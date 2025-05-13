@@ -293,18 +293,20 @@ void AudioEncoder::encodeInnerLoop(
   if (mustConvert) {
     if (!swrContext_) {
       swrContext_.reset(createSwrContext(
-          avCodecContext_,
           AV_SAMPLE_FMT_FLTP,
           avCodecContext_->sample_fmt,
           srcAVFrame->sample_rate, // No sample rate conversion
-          srcAVFrame->sample_rate));
+          srcAVFrame->sample_rate,
+          srcAVFrame,
+          getNumChannels(srcAVFrame) // No num_channel conversion
+          ));
     }
-    convertedAVFrame = convertAudioAVFrameSampleFormatAndSampleRate(
+    convertedAVFrame = convertAudioAVFrameSamples(
         swrContext_,
         srcAVFrame,
         avCodecContext_->sample_fmt,
         srcAVFrame->sample_rate, // No sample rate conversion
-        srcAVFrame->sample_rate);
+        getNumChannels(srcAVFrame)); // No num_channel conversion
     TORCH_CHECK(
         convertedAVFrame->nb_samples == srcAVFrame->nb_samples,
         "convertedAVFrame->nb_samples=",
