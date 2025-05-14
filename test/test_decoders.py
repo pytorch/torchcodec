@@ -1312,7 +1312,7 @@ class TestAudioDecoder:
     # maybeFlushSwrBuffers() is correct.
     @pytest.mark.parametrize("sample_rate", (None, 16_000))
     # FFmpeg can handle up to AV_NUM_DATA_POINTERS=8 channels
-    @pytest.mark.parametrize("num_channels", (1, 2, None, 8))
+    @pytest.mark.parametrize("num_channels", (1, 2, 8, None))
     def test_num_channels(self, asset, sample_rate, num_channels):
         decoder = AudioDecoder(
             asset.path, sample_rate=sample_rate, num_channels=num_channels

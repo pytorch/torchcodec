@@ -170,7 +170,6 @@ SwrContext* createSwrContext(
   SwrContext* swrContext = nullptr;
   int status = AVSUCCESS;
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  AVChannelLayout sourceLayout = srcAVFrame->ch_layout;
   AVChannelLayout desiredLayout =
       getDesiredChannelLayout(desiredNumChannels, srcAVFrame);
   status = swr_alloc_set_opts2(
@@ -178,7 +177,7 @@ SwrContext* createSwrContext(
       &desiredLayout,
       desiredSampleFormat,
       desiredSampleRate,
-      &sourceLayout,
+      &srcAVFrame->ch_layout,
       sourceSampleFormat,
       sourceSampleRate,
       0,
