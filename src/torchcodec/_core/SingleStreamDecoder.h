@@ -195,22 +195,6 @@ class SingleStreamDecoder {
     bool isKeyFrame = false;
   };
 
-  struct FilterGraphContext {
-    UniqueAVFilterGraph filterGraph;
-    AVFilterContext* sourceContext = nullptr;
-    AVFilterContext* sinkContext = nullptr;
-  };
-
-  struct DecodedFrameContext {
-    int decodedWidth;
-    int decodedHeight;
-    AVPixelFormat decodedFormat;
-    int expectedWidth;
-    int expectedHeight;
-    bool operator==(const DecodedFrameContext&);
-    bool operator!=(const DecodedFrameContext&);
-  };
-
   struct StreamInfo {
     int streamIndex = -1;
     AVStream* stream = nullptr;
@@ -234,14 +218,7 @@ class SingleStreamDecoder {
 
     // color-conversion fields. Only one of FilterGraphContext and
     // UniqueSwsContext should be non-null.
-    FilterGraphContext filterGraphContext;
-    ColorConversionLibrary colorConversionLibrary = FILTERGRAPH;
-    UniqueSwsContext swsContext;
     UniqueSwrContext swrContext;
-
-    // Used to know whether a new FilterGraphContext or UniqueSwsContext should
-    // be created before decoding a new frame.
-    DecodedFrameContext prevFrameContext;
   };
 
   // --------------------------------------------------------------------------
@@ -288,20 +265,6 @@ class SingleStreamDecoder {
       torch::Tensor& outputTensor);
 
   std::optional<torch::Tensor> maybeFlushSwrBuffers();
-
-  // --------------------------------------------------------------------------
-  // COLOR CONVERSION LIBRARIES HANDLERS CREATION
-  // --------------------------------------------------------------------------
-
-  void createFilterGraph(
-      StreamInfo& streamInfo,
-      int expectedOutputHeight,
-      int expectedOutputWidth);
-
-  void createSwsContext(
-      StreamInfo& streamInfo,
-      const DecodedFrameContext& frameContext,
-      const enum AVColorSpace colorspace);
 
   // --------------------------------------------------------------------------
   // PTS <-> INDEX CONVERSIONS
@@ -381,76 +344,6 @@ class SingleStreamDecoder {
   // Tracks that we've already been initialized.
   bool initialized_ = false;
 };
-
-// --------------------------------------------------------------------------
-// FRAME TENSOR ALLOCATION APIs
-// --------------------------------------------------------------------------
-
-// Note [Frame Tensor allocation and height and width]
-//
-// We always allocate [N]HWC tensors. The low-level decoding functions all
-// assume HWC tensors, since this is what FFmpeg natively handles. It's up to
-// the high-level decoding entry-points to permute that back to CHW, by calling
-// maybePermuteHWC2CHW().
-//
-// Also, importantly, the way we figure out the the height and width of the
-// output frame tensor varies, and depends on the decoding entry-point. In
-// *decreasing order of accuracy*, we use the following sources for determining
-// height and width:
-// - getHeightAndWidthFromResizedAVFrame(). This is the height and width of the
-//   AVframe, *post*-resizing. This is only used for single-frame decoding APIs,
-//   on CPU, with filtergraph.
-// - getHeightAndWidthFromOptionsOrAVFrame(). This is the height and width from
-//   the user-specified options if they exist, or the height and width of the
-//   AVFrame *before* it is resized. In theory, i.e. if there are no bugs within
-//   our code or within FFmpeg code, this should be exactly the same as
-//   getHeightAndWidthFromResizedAVFrame(). This is used by single-frame
-//   decoding APIs, on CPU with swscale, and on GPU.
-// - getHeightAndWidthFromOptionsOrMetadata(). This is the height and width from
-//   the user-specified options if they exist, or the height and width form the
-//   stream metadata, which itself got its value from the CodecContext, when the
-//   stream was added. This is used by batch decoding APIs, for both GPU and
-//   CPU.
-//
-// The source of truth for height and width really is the (resized) AVFrame: it
-// comes from the decoded ouptut of FFmpeg. The info from the metadata (i.e.
-// from the CodecContext) may not be as accurate. However, the AVFrame is only
-// available late in the call stack, when the frame is decoded, while the
-// CodecContext is available early when a stream is added. This is why we use
-// the CodecContext for pre-allocating batched output tensors (we could
-// pre-allocate those only once we decode the first frame to get the info frame
-// the AVFrame, but that's a more complex logic).
-//
-// Because the sources for height and width may disagree, we may end up with
-// conflicts: e.g. if we pre-allocate a batch output tensor based on the
-// metadata info, but the decoded AVFrame has a different height and width.
-// it is very important to check the height and width assumptions where the
-// tensors memory is used/filled in order to avoid segfaults.
-
-struct FrameDims {
-  int height;
-  int width;
-
-  FrameDims(int h, int w) : height(h), width(w) {}
-};
-
-// There's nothing preventing you from calling this on a non-resized frame, but
-// please don't.
-FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
-
-FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoStreamOptions& videoStreamOptions,
-    const StreamMetadata& streamMetadata);
-
-FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoStreamOptions& videoStreamOptions,
-    const UniqueAVFrame& avFrame);
-
-torch::Tensor allocateEmptyHWCTensor(
-    int height,
-    int width,
-    torch::Device device,
-    std::optional<int> numFrames = std::nullopt);
 
 // Prints the SingleStreamDecoder::DecodeStats to the ostream.
 std::ostream& operator<<(
