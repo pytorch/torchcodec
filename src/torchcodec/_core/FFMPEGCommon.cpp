@@ -107,6 +107,10 @@ void setChannelLayout(
 
 namespace {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+
+// Returns:
+// - the srcAVFrame's channel layout if srcAVFrame has desiredNumChannels
+// - the default channel layout with desiredNumChannels otherwise.
 AVChannelLayout getDesiredChannelLayout(
     int desiredNumChannels,
     const UniqueAVFrame& srcAVFrame) {
@@ -118,8 +122,10 @@ AVChannelLayout getDesiredChannelLayout(
   }
   return desiredLayout;
 }
+
 #else
 
+// Same as above
 int64_t getDesiredChannelLayout(
     int desiredNumChannels,
     const UniqueAVFrame& srcAVFrame) {
@@ -134,6 +140,7 @@ int64_t getDesiredChannelLayout(
 #endif
 } // namespace
 
+// Sets dstAVFrame' channel layout to getDesiredChannelLayout(): see doc above
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
     const UniqueAVFrame& srcAVFrame,
@@ -147,11 +154,9 @@ void setChannelLayout(
       "Couldn't copy channel layout to avFrame: ",
       getFFMPEGErrorStringFromErrorCode(status));
 #else
-  if (desiredNumChannels == sourceNumChannels) {
-    dstAVFrame->channel_layout =
-        getDesiredChannelLayout(desiredNumChannels, srcAVFrame);
-    dstAVFrame->channels = desiredNumChannels;
-  }
+  dstAVFrame->channel_layout =
+      getDesiredChannelLayout(desiredNumChannels, srcAVFrame);
+  dstAVFrame->channels = desiredNumChannels;
 #endif
 }
 
