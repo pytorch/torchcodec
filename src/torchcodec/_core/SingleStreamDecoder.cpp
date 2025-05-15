@@ -1169,40 +1169,40 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
 void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     UniqueAVFrame& srcAVFrame,
     FrameOutput& frameOutput) {
-  AVSampleFormat sourceSampleFormat =
+  AVSampleFormat srcSampleFormat =
       static_cast<AVSampleFormat>(srcAVFrame->format);
   AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  int sourceSampleRate = srcAVFrame->sample_rate;
+  int srcSampleRate = srcAVFrame->sample_rate;
   int desiredSampleRate =
-      streamInfo.audioStreamOptions.sampleRate.value_or(sourceSampleRate);
+      streamInfo.audioStreamOptions.sampleRate.value_or(srcSampleRate);
 
-  int sourceNumChannels = getNumChannels(streamInfo.codecContext);
+  int srcNumChannels = getNumChannels(streamInfo.codecContext);
   TORCH_CHECK(
-      sourceNumChannels == getNumChannels(srcAVFrame),
+      srcNumChannels == getNumChannels(srcAVFrame),
       "The frame has ",
       getNumChannels(srcAVFrame),
       " channels, expected ",
-      sourceNumChannels,
+      srcNumChannels,
       ". If you are hitting this, it may be because you are using "
       "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
       "valid scenarios. Try to upgrade FFmpeg?");
   int desiredNumChannels =
-      streamInfo.audioStreamOptions.numChannels.value_or(sourceNumChannels);
+      streamInfo.audioStreamOptions.numChannels.value_or(srcNumChannels);
 
   bool mustConvert =
-      (sourceSampleFormat != desiredSampleFormat ||
-       sourceSampleRate != desiredSampleRate ||
-       sourceNumChannels != desiredNumChannels);
+      (srcSampleFormat != desiredSampleFormat ||
+       srcSampleRate != desiredSampleRate ||
+       srcNumChannels != desiredNumChannels);
 
   UniqueAVFrame convertedAVFrame;
   if (mustConvert) {
     if (!streamInfo.swrContext) {
       streamInfo.swrContext.reset(createSwrContext(
-          sourceSampleFormat,
+          srcSampleFormat,
           desiredSampleFormat,
-          sourceSampleRate,
+          srcSampleRate,
           desiredSampleRate,
           srcAVFrame,
           desiredNumChannels));
