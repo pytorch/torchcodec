@@ -142,6 +142,9 @@ class VideoStreamMetadata(StreamMetadata):
             self.end_stream_seconds_from_content is None
             or self.begin_stream_seconds_from_content is None
             or self.num_frames is None
+            # Should never happen, but prevents ZeroDivisionError:
+            or self.end_stream_seconds_from_content
+            == self.begin_stream_seconds_from_content
         ):
             return self.average_fps_from_header
         return self.num_frames / (
