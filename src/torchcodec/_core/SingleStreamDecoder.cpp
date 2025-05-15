@@ -26,10 +26,12 @@ int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
       std::round(seconds * timeBase.den / timeBase.num));
 }
 
-// Some videos aren't properly encoded and do not specify pts values (for
-// packets, and thus for frames). Unset values correspond to INT64_MIN.  When
-// that happens, we fall-back to the dts value which hopefully exists and is
-// correct.
+// Some videos aren't properly encoded and do not specify pts values for
+// packets, and thus for frames. Unset values correspond to INT64_MIN. When that
+// happens, we fallback to the dts value which hopefully exists and is correct.
+// Accessing AVFrames and AVPackets's pts values should **always** go through
+// the helpers below. Then, the "pts" fields in our structs like FrameInfo.pts
+// should be interpreted as "pts if it exists, dts otherwise".
 int64_t getPtsOrDts(ReferenceAVPacket& packet) {
   return packet->pts == INT64_MIN ? packet->dts : packet->pts;
 }
