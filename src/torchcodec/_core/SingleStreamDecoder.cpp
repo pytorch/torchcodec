@@ -630,15 +630,15 @@ FrameBatchOutput SingleStreamDecoder::getFramesInRange(
 FrameOutput SingleStreamDecoder::getFramePlayedAt(double seconds) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-  double frameStartTime =
+  double lastDecodedStartTime =
       ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
-  double frameEndTime = ptsToSeconds(
+  double lastDecodedEndTime = ptsToSeconds(
       streamInfo.lastDecodedAvFramePts + streamInfo.lastDecodedAvFrameDuration,
       streamInfo.timeBase);
-  if (seconds >= frameStartTime && seconds < frameEndTime) {
+  if (seconds >= lastDecodedStartTime && seconds < lastDecodedEndTime) {
     // We are in the same frame as the one we just returned. However, since we
     // don't cache it locally, we have to rewind back.
-    seconds = frameStartTime;
+    seconds = lastDecodedStartTime;
   }
 
   setCursorPtsInSeconds(seconds);
