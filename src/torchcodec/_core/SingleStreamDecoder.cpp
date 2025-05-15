@@ -1178,7 +1178,14 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   int desiredSampleRate =
       streamInfo.audioStreamOptions.sampleRate.value_or(sourceSampleRate);
 
-  int sourceNumChannels = getNumChannels(srcAVFrame);
+  int sourceNumChannels = getNumChannels(streamInfo.codecContext);
+  TORCH_CHECK(
+      sourceNumChannels == getNumChannels(srcAVFrame),
+      "The Frame has ",
+      getNumChannels(srcAVFrame),
+      " channels, expected ",
+      sourceNumChannels,
+      ".");
   int desiredNumChannels =
       streamInfo.audioStreamOptions.numChannels.value_or(sourceNumChannels);
 
