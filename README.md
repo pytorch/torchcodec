@@ -18,12 +18,6 @@ We achieve these capabilities through:
 * Returning data as PyTorch tensors, ready to be fed into PyTorch transforms
   or used directly to train models.
 
-> [!NOTE]
-> ⚠️ TorchCodec is still in development stage and some APIs may be updated
-> in future versions, depending on user feedback.
-> If you have any suggestions or issues, please let us know by
-> [opening an issue](https://github.com/pytorch/torchcodec/issues/new/choose)!
-
 ## Using TorchCodec
 
 Here's a condensed summary of what you can do with TorchCodec. For more detailed
