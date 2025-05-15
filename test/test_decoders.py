@@ -986,6 +986,47 @@ class TestVideoDecoder:
             assert_frames_equal(ref_frame3, frames[1].data)
             assert_frames_equal(ref_frame5, frames[2].data)
 
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_pts_to_dts_fallback(self, seek_mode):
+        # Non-regression test for
+        # https://github.com/pytorch/torchcodec/issues/677 and
+        # https://github.com/pytorch/torchcodec/issues/676.
+        # More accurately, this is a non-regression test for videos which do
+        # *not* specify pts values (all pts values are N/A and set to
+        # INT64_MIN), but specify *dts* value - which we fallback to.
+        #
+        # The test video we have is from
+        # https://huggingface.co/datasets/raushan-testing-hf/videos-test/blob/main/sample_video_2.avi
+        # We can't check it into the repo due to potential licensing issues, so
+        # we have to unconditionally skip this test.#
+        # TODO: encode a video with no pts values to unskip this test. Couldn't
+        # find a way to do that with FFmpeg's CLI, but this should be doable
+        # once we have our own video encoder.
+        pytest.skip(reason="TODO: Need video with no pts values.")
+
+        path = "/home/nicolashug/Downloads/sample_video_2.avi"
+        decoder = VideoDecoder(path, seek_mode=seek_mode)
+        metadata = decoder.metadata
+
+        assert metadata.average_fps == pytest.approx(29.916667)
+        assert metadata.duration_seconds_from_header == 9.02507
+        assert metadata.duration_seconds == 9.02507
+        assert metadata.begin_stream_seconds_from_content == (
+            None if seek_mode == "approximate" else 0
+        )
+        assert metadata.end_stream_seconds_from_content == (
+            None if seek_mode == "approximate" else 9.02507
+        )
+
+        assert decoder[0].shape == (3, 240, 320)
+        decoder[10].shape == (3, 240, 320)
+        decoder.get_frame_at(2).data.shape == (3, 240, 320)
+        decoder.get_frames_at([2, 10]).data.shape == (2, 3, 240, 320)
+        decoder.get_frame_played_at(9).data.shape == (3, 240, 320)
+        decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
+        with pytest.raises(AssertionError, match="not equal"):
+            torch.testing.assert_close(decoder[0], decoder[10])
+
 
 class TestAudioDecoder:
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32))
