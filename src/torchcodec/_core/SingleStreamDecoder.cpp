@@ -148,8 +148,9 @@ void SingleStreamDecoder::initializeDecoder() {
   }
 
   if (formatContext_->duration > 0) {
+    AVRational defaultTimeBase{1, AV_TIME_BASE};
     containerMetadata_.durationSeconds =
-        ptsToSeconds(formatContext_->duration, AV_TIME_BASE_Q);
+        ptsToSeconds(formatContext_->duration, defaultTimeBase);
   }
 
   if (formatContext_->bit_rate > 0) {
