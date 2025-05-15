@@ -17,16 +17,27 @@
 namespace facebook::torchcodec {
 namespace {
 
-double ptsToSeconds(int64_t pts, int den) {
-  return static_cast<double>(pts) / den;
-}
-
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  return ptsToSeconds(pts, timeBase.den);
+  return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
 int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
-  return static_cast<int64_t>(std::round(seconds * timeBase.den));
+  return static_cast<int64_t>(
+      std::round(seconds * timeBase.den / timeBase.num));
+}
+
+// Some videos aren't properly encoded and do not specify pts values for
+// packets, and thus for frames. Unset values correspond to INT64_MIN. When that
+// happens, we fallback to the dts value which hopefully exists and is correct.
+// Accessing AVFrames and AVPackets's pts values should **always** go through
+// the helpers below. Then, the "pts" fields in our structs like FrameInfo.pts
+// should be interpreted as "pts if it exists, dts otherwise".
+int64_t getPtsOrDts(ReferenceAVPacket& packet) {
+  return packet->pts == INT64_MIN ? packet->dts : packet->pts;
+}
+
+int64_t getPtsOrDts(const UniqueAVFrame& avFrame) {
+  return avFrame->pts == INT64_MIN ? avFrame->pkt_dts : avFrame->pts;
 }
 
 } // namespace
@@ -151,8 +162,9 @@ void SingleStreamDecoder::initializeDecoder() {
   }
 
   if (formatContext_->duration > 0) {
+    AVRational defaultTimeBase{1, AV_TIME_BASE};
     containerMetadata_.durationSeconds =
-        ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
+        ptsToSeconds(formatContext_->duration, defaultTimeBase);
   }
 
   if (formatContext_->bit_rate > 0) {
@@ -225,16 +237,16 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     int streamIndex = packet->stream_index;
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
     streamMetadata.minPtsFromScan = std::min(
-        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
+        streamMetadata.minPtsFromScan.value_or(INT64_MAX), getPtsOrDts(packet));
     streamMetadata.maxPtsFromScan = std::max(
         streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
-        packet->pts + packet->duration);
+        getPtsOrDts(packet) + packet->duration);
     streamMetadata.numFramesFromScan =
         streamMetadata.numFramesFromScan.value_or(0) + 1;
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
-    FrameInfo frameInfo = {packet->pts};
+    FrameInfo frameInfo = {getPtsOrDts(packet)};
     if (packet->flags & AV_PKT_FLAG_KEY) {
       frameInfo.isKeyFrame = true;
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
@@ -495,8 +507,9 @@ FrameOutput SingleStreamDecoder::getNextFrame() {
 FrameOutput SingleStreamDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
-  UniqueAVFrame avFrame = decodeAVFrame(
-      [this](const UniqueAVFrame& avFrame) { return avFrame->pts >= cursor_; });
+  UniqueAVFrame avFrame = decodeAVFrame([this](const UniqueAVFrame& avFrame) {
+    return getPtsOrDts(avFrame) >= cursor_;
+  });
   return convertAVFrameToFrameOutput(avFrame, preAllocatedOutputTensor);
 }
 
@@ -632,9 +645,10 @@ FrameOutput SingleStreamDecoder::getFramePlayedAt(double seconds) {
   UniqueAVFrame avFrame =
       decodeAVFrame([seconds, this](const UniqueAVFrame& avFrame) {
         StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+        double frameStartTime =
+            ptsToSeconds(getPtsOrDts(avFrame), streamInfo.timeBase);
         double frameEndTime = ptsToSeconds(
-            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+            getPtsOrDts(avFrame) + getDuration(avFrame), streamInfo.timeBase);
         if (frameStartTime > seconds) {
           // FFMPEG seeked past the frame we are looking for even though we
           // set max_ts to be our needed timestamp in avformat_seek_file()
@@ -861,8 +875,8 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
     try {
       UniqueAVFrame avFrame =
           decodeAVFrame([startPts, stopPts](const UniqueAVFrame& avFrame) {
-            return startPts < avFrame->pts + getDuration(avFrame) &&
-                stopPts > avFrame->pts;
+            return startPts < getPtsOrDts(avFrame) + getDuration(avFrame) &&
+                stopPts > getPtsOrDts(avFrame);
           });
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
       if (!firstFramePtsSeconds.has_value()) {
@@ -1132,7 +1146,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
   // haven't received as frames. Eventually we will either hit AVERROR_EOF from
   // av_receive_frame() or the user will have seeked to a different location in
   // the file and that will flush the decoder.
-  streamInfo.lastDecodedAvFramePts = avFrame->pts;
+  streamInfo.lastDecodedAvFramePts = getPtsOrDts(avFrame);
   streamInfo.lastDecodedAvFrameDuration = getDuration(avFrame);
 
   return avFrame;
@@ -1149,7 +1163,8 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
   FrameOutput frameOutput;
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   frameOutput.ptsSeconds = ptsToSeconds(
-      avFrame->pts, formatContext_->streams[activeStreamIndex_]->time_base);
+      getPtsOrDts(avFrame),
+      formatContext_->streams[activeStreamIndex_]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame),
       formatContext_->streams[activeStreamIndex_]->time_base);
