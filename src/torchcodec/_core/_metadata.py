@@ -46,7 +46,16 @@ class StreamMetadata:
 
 @dataclass
 class VideoStreamMetadata(StreamMetadata):
-    """Metadata of a single video stream."""
+    """Metadata of a single video stream.
+
+    .. note::
+        In general the ``*from_content`` metadata are more accurate than their
+        ``*from_header`` counterparts, since headers may sometime be incorrect.
+        In some rare cases however, e.g. when a video is incorrectly encoded
+        with wrong packet :term:`pts` values, it's possible for the
+        ``*from_content`` metadata to be misleading.
+
+    """
 
     begin_stream_seconds_from_content: Optional[float]
     """Beginning of the stream, in seconds (float or None).
@@ -142,6 +151,9 @@ class VideoStreamMetadata(StreamMetadata):
             self.end_stream_seconds_from_content is None
             or self.begin_stream_seconds_from_content is None
             or self.num_frames is None
+            # Avoid ZeroDivisionError
+            or self.end_stream_seconds_from_content
+            == self.begin_stream_seconds_from_content
         ):
             return self.average_fps_from_header
         return self.num_frames / (

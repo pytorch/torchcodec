@@ -986,6 +986,31 @@ class TestVideoDecoder:
             assert_frames_equal(ref_frame3, frames[1].data)
             assert_frames_equal(ref_frame5, frames[2].data)
 
+    def test_video_with_bad_packet_pts_metadata(self):
+        path = "/home/nicolashug/Downloads/sample_video_2.avi"
+
+        approx_metadata = VideoDecoder(path, seek_mode="approximate").metadata
+        exact_metadata = VideoDecoder(path, seek_mode="exact").metadata
+
+        INT64_MIN_SECONDS = -3.0830212936561926e17
+
+        assert approx_metadata.duration_seconds_from_header == 9.02507
+        assert approx_metadata.duration_seconds == 9.02507
+        assert exact_metadata.duration_seconds_from_header == 9.02507
+        assert exact_metadata.duration_seconds == 0
+
+        assert approx_metadata.begin_stream_seconds_from_header == 0
+        assert approx_metadata.begin_stream_seconds_from_content is None
+        assert approx_metadata.begin_stream_seconds == 0
+        assert exact_metadata.begin_stream_seconds_from_header == 0
+        assert exact_metadata.begin_stream_seconds_from_content == INT64_MIN_SECONDS
+        assert exact_metadata.begin_stream_seconds == INT64_MIN_SECONDS
+
+        assert approx_metadata.end_stream_seconds_from_content is None
+        assert approx_metadata.end_stream_seconds == 9.02507
+        assert exact_metadata.end_stream_seconds_from_content == INT64_MIN_SECONDS
+        assert exact_metadata.end_stream_seconds == INT64_MIN_SECONDS
+
 
 class TestAudioDecoder:
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32))
