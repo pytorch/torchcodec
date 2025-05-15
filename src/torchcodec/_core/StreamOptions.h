@@ -44,6 +44,7 @@ struct AudioStreamOptions {
   AudioStreamOptions() {}
 
   std::optional<int> sampleRate;
+  std::optional<int> numChannels;
 };
 
 } // namespace facebook::torchcodec
