@@ -157,20 +157,28 @@ void setChannelLayout(
 
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
-    const UniqueAVFrame& srcAVFrame);
+    const UniqueAVFrame& srcAVFrame,
+    int desiredNumChannels);
+
 SwrContext* createSwrContext(
-    UniqueAVCodecContext& avCodecContext,
     AVSampleFormat sourceSampleFormat,
     AVSampleFormat desiredSampleFormat,
     int sourceSampleRate,
-    int desiredSampleRate);
+    int desiredSampleRate,
+    const UniqueAVFrame& srcAVFrame,
+    int desiredNumChannels);
 
-UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+// Converts, if needed:
+// - sample format
+// - sample rate
+// - number of channels.
+// createSwrContext must have been previously called with matching parameters.
+UniqueAVFrame convertAudioAVFrameSamples(
     const UniqueSwrContext& swrContext,
     const UniqueAVFrame& srcAVFrame,
     AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate);
+    int desiredSampleRate,
+    int desiredNumChannels);
 
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();

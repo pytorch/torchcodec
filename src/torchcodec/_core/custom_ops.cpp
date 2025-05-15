@@ -40,7 +40,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
   m.def(
-      "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None) -> ()");
+      "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None, int? num_channels=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -280,9 +280,11 @@ void add_video_stream(
 void add_audio_stream(
     at::Tensor& decoder,
     std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<int64_t> sample_rate = std::nullopt) {
+    std::optional<int64_t> sample_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt) {
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.sampleRate = sample_rate;
+  audioStreamOptions.numChannels = num_channels;
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addAudioStream(stream_index.value_or(-1), audioStreamOptions);
