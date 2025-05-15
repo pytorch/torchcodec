@@ -1292,7 +1292,7 @@ class TestAudioDecoder:
         assert decoder.metadata.sample_format == asset.sample_format
 
         cm = (
-            pytest.raises(RuntimeError, match="Invalid argument")
+            pytest.raises(RuntimeError, match="The frame has 0 channels, expected 1.")
             if get_ffmpeg_major_version() == 4
             else contextlib.nullcontext()
         )
