@@ -29,6 +29,13 @@ int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
   return static_cast<int64_t>(std::round(seconds * timeBase.den));
 }
 
+int64_t getPtsOrDts(const UniqueAVFrame& avFrame) {
+    return avFrame->pts == INT64_MIN? avFrame->pkt_dts : avFrame->pts;
+}
+int64_t getPtsOrDts(ReferenceAVPacket& packet){
+    return packet->pts == INT64_MIN? packet->dts : packet->pts;
+}
+
 } // namespace
 
 // --------------------------------------------------------------------------
@@ -225,16 +232,16 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     int streamIndex = packet->stream_index;
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
     streamMetadata.minPtsFromScan = std::min(
-        streamMetadata.minPtsFromScan.value_or(INT64_MAX), packet->pts);
+        streamMetadata.minPtsFromScan.value_or(INT64_MAX), getPtsOrDts(packet));
     streamMetadata.maxPtsFromScan = std::max(
         streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
-        packet->pts + packet->duration);
+        getPtsOrDts(packet) + packet->duration);
     streamMetadata.numFramesFromScan =
         streamMetadata.numFramesFromScan.value_or(0) + 1;
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
-    FrameInfo frameInfo = {packet->pts};
+    FrameInfo frameInfo = {getPtsOrDts(packet)};
     if (packet->flags & AV_PKT_FLAG_KEY) {
       frameInfo.isKeyFrame = true;
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
@@ -496,7 +503,7 @@ FrameOutput SingleStreamDecoder::getNextFrameInternal(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   validateActiveStream();
   UniqueAVFrame avFrame = decodeAVFrame(
-      [this](const UniqueAVFrame& avFrame) { return avFrame->pts >= cursor_; });
+      [this](const UniqueAVFrame& avFrame) { return getPtsOrDts(avFrame) >= cursor_; });
   return convertAVFrameToFrameOutput(avFrame, preAllocatedOutputTensor);
 }
 
@@ -616,6 +623,7 @@ FrameBatchOutput SingleStreamDecoder::getFramesInRange(
 
 FrameOutput SingleStreamDecoder::getFramePlayedAt(double seconds) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
+  printf("seconds=%f\n", seconds);
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   double frameStartTime =
       ptsToSeconds(streamInfo.lastDecodedAvFramePts, streamInfo.timeBase);
@@ -627,14 +635,24 @@ FrameOutput SingleStreamDecoder::getFramePlayedAt(double seconds) {
     // don't cache it locally, we have to rewind back.
     seconds = frameStartTime;
   }
+  printf("seconds=%f\n", seconds);
+  printf("frameStartTime=%f\n", frameStartTime);
+  printf("frameEndTime=%f\n", frameEndTime);
+  printf("TimeBase: %d %d\n", streamInfo.timeBase.num, streamInfo.timeBase.den);
+  printf("In decoding loop\n");
 
   setCursorPtsInSeconds(seconds);
   UniqueAVFrame avFrame =
       decodeAVFrame([seconds, this](const UniqueAVFrame& avFrame) {
         StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-        double frameStartTime = ptsToSeconds(avFrame->pts, streamInfo.timeBase);
+        double frameStartTime = ptsToSeconds(getPtsOrDts(avFrame), streamInfo.timeBase);
         double frameEndTime = ptsToSeconds(
-            avFrame->pts + getDuration(avFrame), streamInfo.timeBase);
+            getPtsOrDts(avFrame) + getDuration(avFrame), streamInfo.timeBase);
+        printf("frame pts=%ld\n", avFrame->pts);
+        printf("frame pkt_dts=%ld\n", avFrame->pkt_dts);
+        printf("frameStartTime=%f\n", frameStartTime);
+        printf("frameEndTime=%f\n", frameEndTime);
+        printf("\n");
         if (frameStartTime > seconds) {
           // FFMPEG seeked past the frame we are looking for even though we
           // set max_ts to be our needed timestamp in avformat_seek_file()
@@ -861,8 +879,8 @@ AudioFramesOutput SingleStreamDecoder::getFramesPlayedInRangeAudio(
     try {
       UniqueAVFrame avFrame =
           decodeAVFrame([startPts, stopPts](const UniqueAVFrame& avFrame) {
-            return startPts < avFrame->pts + getDuration(avFrame) &&
-                stopPts > avFrame->pts;
+            return startPts < getPtsOrDts(avFrame) + getDuration(avFrame) &&
+                stopPts > getPtsOrDts(avFrame);
           });
       auto frameOutput = convertAVFrameToFrameOutput(avFrame);
       if (!firstFramePtsSeconds.has_value()) {
@@ -1132,7 +1150,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
   // haven't received as frames. Eventually we will either hit AVERROR_EOF from
   // av_receive_frame() or the user will have seeked to a different location in
   // the file and that will flush the decoder.
-  streamInfo.lastDecodedAvFramePts = avFrame->pts;
+  streamInfo.lastDecodedAvFramePts = getPtsOrDts(avFrame);
   streamInfo.lastDecodedAvFrameDuration = getDuration(avFrame);
 
   return avFrame;
@@ -1149,7 +1167,7 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
   FrameOutput frameOutput;
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   frameOutput.ptsSeconds = ptsToSeconds(
-      avFrame->pts, formatContext_->streams[activeStreamIndex_]->time_base);
+      getPtsOrDts(avFrame), formatContext_->streams[activeStreamIndex_]->time_base);
   frameOutput.durationSeconds = ptsToSeconds(
       getDuration(avFrame),
       formatContext_->streams[activeStreamIndex_]->time_base);
