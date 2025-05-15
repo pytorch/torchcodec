@@ -17,16 +17,13 @@
 namespace facebook::torchcodec {
 namespace {
 
-double ptsToSeconds(int64_t pts, int den) {
-  return static_cast<double>(pts) / den;
-}
-
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  return ptsToSeconds(pts, timeBase.den);
+  return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
 int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
-  return static_cast<int64_t>(std::round(seconds * timeBase.den));
+  return static_cast<int64_t>(
+      std::round(seconds * timeBase.den / timeBase.num));
 }
 
 } // namespace
@@ -151,8 +148,9 @@ void SingleStreamDecoder::initializeDecoder() {
   }
 
   if (formatContext_->duration > 0) {
+    AVRational defaultTimeBase{1, AV_TIME_BASE};
     containerMetadata_.durationSeconds =
-        ptsToSeconds(formatContext_->duration, AV_TIME_BASE);
+        ptsToSeconds(formatContext_->duration, defaultTimeBase);
   }
 
   if (formatContext_->bit_rate > 0) {
