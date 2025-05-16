@@ -161,9 +161,9 @@ void setChannelLayout(
 }
 
 SwrContext* createSwrContext(
-    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat srcSampleFormat,
     AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
+    int srcSampleRate,
     int desiredSampleRate,
     const UniqueAVFrame& srcAVFrame,
     int desiredNumChannels) {
@@ -178,8 +178,8 @@ SwrContext* createSwrContext(
       desiredSampleFormat,
       desiredSampleRate,
       &srcAVFrame->ch_layout,
-      sourceSampleFormat,
-      sourceSampleRate,
+      srcSampleFormat,
+      srcSampleRate,
       0,
       nullptr);
 
@@ -196,8 +196,8 @@ SwrContext* createSwrContext(
       desiredSampleFormat,
       desiredSampleRate,
       srcAVFrame->channel_layout,
-      sourceSampleFormat,
-      sourceSampleRate,
+      srcSampleFormat,
+      srcSampleRate,
       0,
       nullptr);
 #endif
@@ -228,8 +228,8 @@ UniqueAVFrame convertAudioAVFrameSamples(
   convertedAVFrame->format = static_cast<int>(desiredSampleFormat);
 
   convertedAVFrame->sample_rate = desiredSampleRate;
-  int sourceSampleRate = srcAVFrame->sample_rate;
-  if (sourceSampleRate != desiredSampleRate) {
+  int srcSampleRate = srcAVFrame->sample_rate;
+  if (srcSampleRate != desiredSampleRate) {
     // Note that this is an upper bound on the number of output samples.
     // `swr_convert()` will likely not fill convertedAVFrame with that many
     // samples if sample rate conversion is needed. It will buffer the last few
@@ -239,10 +239,9 @@ UniqueAVFrame convertAudioAVFrameSamples(
     // output samples, but empirically `av_rescale_rnd()` seems to provide a
     // tighter bound.
     convertedAVFrame->nb_samples = av_rescale_rnd(
-        swr_get_delay(swrContext.get(), sourceSampleRate) +
-            srcAVFrame->nb_samples,
+        swr_get_delay(swrContext.get(), srcSampleRate) + srcAVFrame->nb_samples,
         desiredSampleRate,
-        sourceSampleRate,
+        srcSampleRate,
         AV_ROUND_UP);
   } else {
     convertedAVFrame->nb_samples = srcAVFrame->nb_samples;

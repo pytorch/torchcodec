@@ -67,13 +67,6 @@ We achieve these capabilities through:
 
         How to sample regular and random clips from a video
 
-.. note::
-
-   TorchCodec is still in development stage and we are actively seeking
-   feedback. If you have any suggestions or issues, please let us know by
-   `opening an issue <https://github.com/pytorch/torchcodec/issues/new/choose>`_
-   on our `GitHub repository <https://github.com/pytorch/torchcodec/>`_.
-
 .. toctree::
    :maxdepth: 1
    :caption: TorchCodec documentation
