@@ -151,9 +151,11 @@ void setDefaultChannelLayout(
     UniqueAVCodecContext& avCodecContext,
     int numChannels);
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVCodecContext& avCodecContext);
+void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels);
+
+// void setChannelLayout(
+//     UniqueAVFrame& dstAVFrame,
+//     const UniqueAVCodecContext& avCodecContext);
 
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,

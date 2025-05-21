@@ -88,22 +88,34 @@ void setDefaultChannelLayout(
 #endif
 }
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVCodecContext& avCodecContext) {
+void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  auto status = av_channel_layout_copy(
-      &dstAVFrame->ch_layout, &avCodecContext->ch_layout);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't copy channel layout to avFrame: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+  AVChannelLayout channel_layout;
+  av_channel_layout_default(&channel_layout, numChannels);
+  avFrame->ch_layout = channel_layout;
 #else
-  dstAVFrame->channel_layout = avCodecContext->channel_layout;
-  dstAVFrame->channels = avCodecContext->channels;
-
+  uint64_t channel_layout = av_get_default_channel_layout(numChannels);
+  avFrame->channel_layout = channel_layout;
+  avFrame->channels = numChannels;
 #endif
 }
+
+// void setChannelLayout(
+//     UniqueAVFrame& dstAVFrame,
+//     const UniqueAVCodecContext& avCodecContext) {
+// #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+//   auto status = av_channel_layout_copy(
+//       &dstAVFrame->ch_layout, &avCodecContext->ch_layout);
+//   TORCH_CHECK(
+//       status == AVSUCCESS,
+//       "Couldn't copy channel layout to avFrame: ",
+//       getFFMPEGErrorStringFromErrorCode(status));
+// #else
+//   dstAVFrame->channel_layout = avCodecContext->channel_layout;
+//   dstAVFrame->channels = avCodecContext->channels;
+
+// #endif
+// }
 
 namespace {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4

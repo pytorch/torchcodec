@@ -163,14 +163,22 @@ def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.
 
 @register_fake("torchcodec_ns::encode_audio_to_file")
 def encode_audio_to_file_abstract(
-    wf: torch.Tensor, sample_rate: int, filename: str, bit_rate: Optional[int] = None
+    wf: torch.Tensor,
+    sample_rate: int,
+    filename: str,
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
 ) -> None:
     return
 
 
 @register_fake("torchcodec_ns::encode_audio_to_tensor")
 def encode_audio_to_tensor_abstract(
-    wf: torch.Tensor, sample_rate: int, format: str, bit_rate: Optional[int] = None
+    wf: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
 ) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
