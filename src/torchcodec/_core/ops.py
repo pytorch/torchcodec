@@ -161,6 +161,7 @@ def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.
     return torch.empty([], dtype=torch.long)
 
 
+# TODO-ENCODING: rename wf to samples
 @register_fake("torchcodec_ns::encode_audio_to_file")
 def encode_audio_to_file_abstract(
     wf: torch.Tensor,

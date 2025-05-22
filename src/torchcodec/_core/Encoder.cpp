@@ -126,14 +126,18 @@ AudioEncoder::AudioEncoder(
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
-      "Check the desired extension? ",
+      "The destination file is ",
+      fileName,
+      ", check the desired extension? ",
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
   status = avio_open(&avFormatContext_->pb, fileName.data(), AVIO_FLAG_WRITE);
   TORCH_CHECK(
       status >= 0,
-      "avio_open failed: ",
+      "avio_open failed. The destination file is ",
+      fileName,
+      ", make sure it's a valid path? ",
       getFFMPEGErrorStringFromErrorCode(status));
 
   initializeEncoder(sampleRate, bitRate, numChannels);
@@ -155,7 +159,9 @@ AudioEncoder::AudioEncoder(
   TORCH_CHECK(
       avFormatContext != nullptr,
       "Couldn't allocate AVFormatContext. ",
-      "Check the desired extension? ",
+      "Check the desired format? Got format=",
+      formatName,
+      ". ",
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
