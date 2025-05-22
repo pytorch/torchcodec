@@ -32,6 +32,7 @@ class AudioEncoder:
         *,
         bit_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
+        sample_rate: Optional[int] = None,
     ) -> None:
         _core.encode_audio_to_file(
             wf=self._samples,
@@ -39,6 +40,7 @@ class AudioEncoder:
             filename=dest,
             bit_rate=bit_rate,
             num_channels=num_channels,
+            desired_sample_rate=sample_rate,
         )
 
     def to_tensor(
@@ -47,6 +49,7 @@ class AudioEncoder:
         *,
         bit_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
+        sample_rate: Optional[int] = None,
     ) -> Tensor:
         return _core.encode_audio_to_tensor(
             wf=self._samples,
@@ -54,4 +57,5 @@ class AudioEncoder:
             format=format,
             bit_rate=bit_rate,
             num_channels=num_channels,
+            desired_sample_rate=sample_rate,
         )

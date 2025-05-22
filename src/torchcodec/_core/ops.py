@@ -169,6 +169,7 @@ def encode_audio_to_file_abstract(
     filename: str,
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
 ) -> None:
     return
 
@@ -180,6 +181,7 @@ def encode_audio_to_tensor_abstract(
     format: str,
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
 ) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 

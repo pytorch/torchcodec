@@ -25,22 +25,24 @@ class AudioEncoder {
       int sampleRate,
       std::string_view fileName,
       std::optional<int64_t> bitRate = std::nullopt,
-      std::optional<int64_t> numChannels = std::nullopt);
+      std::optional<int64_t> numChannels = std::nullopt,
+      std::optional<int64_t> desiredSampleRate = std::nullopt);
   AudioEncoder(
       const torch::Tensor wf,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> avioContextHolder,
       std::optional<int64_t> bitRate = std::nullopt,
-      std::optional<int64_t> numChannels = std::nullopt);
+      std::optional<int64_t> numChannels = std::nullopt,
+      std::optional<int64_t> desiredSampleRate = std::nullopt);
   void encode();
   torch::Tensor encodeToTensor();
 
  private:
   void initializeEncoder(
-      int sampleRate,
       std::optional<int64_t> bitRate = std::nullopt,
-      std::optional<int64_t> numChannels = std::nullopt);
+      std::optional<int64_t> numChannels = std::nullopt,
+      std::optional<int64_t> desiredSampleRate = std::nullopt);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& srcAVFrame);
@@ -50,11 +52,13 @@ class AudioEncoder {
   UniqueAVCodecContext avCodecContext_;
   int streamIndex_;
   UniqueSwrContext swrContext_;
-  // TODO-ENCODING: desiredNumChannels should just be part of an options struct,
+  // TODO-ENCODING: These should just be part of an options struct,
   // see other TODO above.
-  int desiredNumChannels_ = -1;
+  int numChannelsOutput_ = -1;
+  int sampleRateOutput_ = -1;
 
   const torch::Tensor wf_;
+  int sampleRateInput_ = -1;
 
   // Stores the AVIOContext for the output tensor buffer.
   std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
