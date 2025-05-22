@@ -101,7 +101,7 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 }
 
 void validateNumChannels(const AVCodec& avCodec, int numChannels) {
-#if LIBAVFILTER_VERSION_MAJOR > 8 // FFmpeg > 5
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   if (avCodec.ch_layouts == nullptr) {
     // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
     // eventually raise.

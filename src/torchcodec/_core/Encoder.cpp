@@ -179,7 +179,6 @@ void AudioEncoder::initializeEncoder(
 
   desiredNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
   validateNumChannels(*avCodec, desiredNumChannels_);
-
   setDefaultChannelLayout(avCodecContext_, desiredNumChannels_);
 
   validateSampleRate(*avCodec, sampleRate);
