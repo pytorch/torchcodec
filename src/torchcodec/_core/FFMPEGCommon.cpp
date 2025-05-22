@@ -100,22 +100,56 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 #endif
 }
 
-// void setChannelLayout(
-//     UniqueAVFrame& dstAVFrame,
-//     const UniqueAVCodecContext& avCodecContext) {
-// #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-//   auto status = av_channel_layout_copy(
-//       &dstAVFrame->ch_layout, &avCodecContext->ch_layout);
-//   TORCH_CHECK(
-//       status == AVSUCCESS,
-//       "Couldn't copy channel layout to avFrame: ",
-//       getFFMPEGErrorStringFromErrorCode(status));
-// #else
-//   dstAVFrame->channel_layout = avCodecContext->channel_layout;
-//   dstAVFrame->channels = avCodecContext->channels;
-
-// #endif
-// }
+void validateNumChannels(const AVCodec& avCodec, int numChannels) {
+#if LIBAVFILTER_VERSION_MAJOR > 8 // FFmpeg > 5
+  if (avCodec.ch_layouts == nullptr) {
+    // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
+    // eventually raise.
+    return;
+  }
+  for (auto i = 0; avCodec.ch_layouts[i].order != AV_CHANNEL_ORDER_UNSPEC;
+       ++i) {
+    if (numChannels == avCodec.ch_layouts[i].nb_channels) {
+      return;
+    }
+  }
+  std::stringstream supportedNumChannels;
+  for (auto i = 0; avCodec.ch_layouts[i].order != AV_CHANNEL_ORDER_UNSPEC;
+       ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << avCodec.ch_layouts[i].nb_channels;
+  }
+#else
+  if (avCodec.channel_layouts == nullptr) {
+    // can't validate, same as above.
+    return;
+  }
+  for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
+    if (numChannels ==
+        av_get_channel_layout_nb_channels(avCodec.channel_layouts[i])) {
+      return;
+    }
+  }
+  std::stringstream supportedNumChannels;
+  for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << av_get_channel_layout_nb_channels(
+        avCodec.channel_layouts[i]);
+  }
+#endif
+  TORCH_CHECK(
+      false,
+      "Desired number of channels (",
+      numChannels,
+      ") is not supported by the ",
+      "encoder. Supported number of channels are: ",
+      supportedNumChannels.str(),
+      ".");
+}
 
 namespace {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4

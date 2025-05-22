@@ -55,20 +55,6 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
       supportedRates.str());
 }
 
-void print_supported_channel_layouts(const AVCodec *codec) {
-    if (!codec->ch_layouts) {
-        printf("No specific channel layouts supported by this encoder.\n");
-        return;
-    }
-    const AVChannelLayout *layout = codec->ch_layouts;
-    while (layout->order != AV_CHANNEL_ORDER_UNSPEC) {
-        char layout_name[256];
-        av_channel_layout_describe(layout, layout_name, sizeof(layout_name));
-        printf("Supported channel layout: %s\n", layout_name);
-        layout++;
-    }
-}
-
 static const std::vector<AVSampleFormat> preferredFormatsOrder = {
     AV_SAMPLE_FMT_FLTP,
     AV_SAMPLE_FMT_FLT,
@@ -173,13 +159,12 @@ AudioEncoder::AudioEncoder(
 void AudioEncoder::initializeEncoder(
     int sampleRate,
     std::optional<int64_t> bitRate,
-    [[maybe_unused]] std::optional<int64_t> numChannels) {
+    std::optional<int64_t> numChannels) {
   // We use the AVFormatContext's default codec for that
   // specific format/container.
   const AVCodec* avCodec =
       avcodec_find_encoder(avFormatContext_->oformat->audio_codec);
   TORCH_CHECK(avCodec != nullptr, "Codec not found");
-  print_supported_channel_layouts(avCodec);
 
   AVCodecContext* avCodecContext = avcodec_alloc_context3(avCodec);
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
@@ -193,6 +178,7 @@ void AudioEncoder::initializeEncoder(
   avCodecContext_->bit_rate = bitRate.value_or(0);
 
   desiredNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
+  validateNumChannels(*avCodec, desiredNumChannels_);
 
   setDefaultChannelLayout(avCodecContext_, desiredNumChannels_);
 

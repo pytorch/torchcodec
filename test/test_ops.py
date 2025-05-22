@@ -6,6 +6,7 @@
 
 import io
 import os
+import re
 from functools import partial
 
 os.environ["TORCH_LOGS"] = "output_code"
@@ -1158,10 +1159,19 @@ class TestAudioEncoderOps:
                 wf=torch.rand(10, 20), sample_rate=10, filename="doesnt_matter"
             )
 
-        encode_audio_to_file(
-            wf=torch.rand(2, 10), sample_rate=16_000, filename="ok.mp3", num_channels=8
-        )
-
+        for num_channels in (0, 3):
+            with pytest.raises(
+                RuntimeError,
+                match=re.escape(
+                    f"Desired number of channels ({num_channels}) is not supported"
+                ),
+            ):
+                encode_audio_to_file(
+                    wf=torch.rand(2, 10),
+                    sample_rate=16_000,
+                    filename="ok.mp3",
+                    num_channels=num_channels,
+                )
 
     @pytest.mark.parametrize(
         "encode_method", (encode_audio_to_file, encode_audio_to_tensor)
@@ -1335,7 +1345,7 @@ class TestAudioEncoderOps:
     def test_num_channels(
         self, num_channels_input, num_channels_output, encode_method, tmp_path
     ):
-        # We just check that the num_channels parmameter is respected.
+        # We just check that the num_channels parameter is respected.
         # Correctness is checked in other tests (like test_against_cli())
 
         sample_rate = 16_000
