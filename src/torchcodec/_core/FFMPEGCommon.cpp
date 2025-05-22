@@ -113,6 +113,8 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
       return;
     }
   }
+  // At this point it seems that the encoder doesn't support the requested
+  // number of channels, so we error out.
   std::stringstream supportedNumChannels;
   for (auto i = 0; avCodec.ch_layouts[i].order != AV_CHANNEL_ORDER_UNSPEC;
        ++i) {
@@ -126,6 +128,8 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
     // can't validate, same as above.
     return;
   }
+  // At this point it seems that the encoder doesn't support the requested
+  // number of channels, so we error out.
   for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
     if (numChannels ==
         av_get_channel_layout_nb_channels(avCodec.channel_layouts[i])) {
