@@ -1134,7 +1134,7 @@ class TestAudioEncoderOps:
             encode_audio_to_file(
                 wf=torch.rand(2, 10), sample_rate=10, filename="./bad/path.mp3"
             )
-        with pytest.raises(RuntimeError, match="Check the desired extension"):
+        with pytest.raises(RuntimeError, match="check the desired extension"):
             encode_audio_to_file(
                 wf=torch.rand(2, 10), sample_rate=10, filename="./file.bad_extension"
             )
