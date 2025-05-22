@@ -17,9 +17,9 @@ class AudioEncoder {
   // TODO-ENCODING: bundle the optional params like bitRate, numChannels, etc.
   // into an AudioStreamOptions struct, or similar.
   AudioEncoder(
-      const torch::Tensor wf,
+      const torch::Tensor samples,
       // The *output* sample rate. We can't really decide for the user what it
-      // should be. Particularly, the sample rate of the input waveform should
+      // should be. Particularly, the sample rate of the input samples should
       // match this, and that's up to the user. If sample rates don't match,
       // encoding will still work but audio will be distorted.
       int sampleRate,
@@ -27,7 +27,7 @@ class AudioEncoder {
       std::optional<int64_t> bitRate = std::nullopt,
       std::optional<int64_t> numChannels = std::nullopt);
   AudioEncoder(
-      const torch::Tensor wf,
+      const torch::Tensor samples,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> avioContextHolder,
@@ -54,7 +54,7 @@ class AudioEncoder {
   // see other TODO above.
   int desiredNumChannels_ = -1;
 
-  const torch::Tensor wf_;
+  const torch::Tensor samples_;
 
   // Stores the AVIOContext for the output tensor buffer.
   std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
