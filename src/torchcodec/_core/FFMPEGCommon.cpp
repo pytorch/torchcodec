@@ -88,21 +88,71 @@ void setDefaultChannelLayout(
 #endif
 }
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVCodecContext& avCodecContext) {
+void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 #if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
-  auto status = av_channel_layout_copy(
-      &dstAVFrame->ch_layout, &avCodecContext->ch_layout);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't copy channel layout to avFrame: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+  AVChannelLayout channel_layout;
+  av_channel_layout_default(&channel_layout, numChannels);
+  avFrame->ch_layout = channel_layout;
 #else
-  dstAVFrame->channel_layout = avCodecContext->channel_layout;
-  dstAVFrame->channels = avCodecContext->channels;
-
+  uint64_t channel_layout = av_get_default_channel_layout(numChannels);
+  avFrame->channel_layout = channel_layout;
+  avFrame->channels = numChannels;
 #endif
+}
+
+void validateNumChannels(const AVCodec& avCodec, int numChannels) {
+#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+  if (avCodec.ch_layouts == nullptr) {
+    // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
+    // eventually raise.
+    return;
+  }
+  // FFmpeg doc indicate that the ch_layouts array is terminated by a zeroed
+  // layout, so checking for nb_channels == 0 should indicate its end.
+  for (auto i = 0; avCodec.ch_layouts[i].nb_channels != 0; ++i) {
+    if (numChannels == avCodec.ch_layouts[i].nb_channels) {
+      return;
+    }
+  }
+  // At this point it seems that the encoder doesn't support the requested
+  // number of channels, so we error out.
+  std::stringstream supportedNumChannels;
+  for (auto i = 0; avCodec.ch_layouts[i].nb_channels != 0; ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << avCodec.ch_layouts[i].nb_channels;
+  }
+#else
+  if (avCodec.channel_layouts == nullptr) {
+    // can't validate, same as above.
+    return;
+  }
+  for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
+    if (numChannels ==
+        av_get_channel_layout_nb_channels(avCodec.channel_layouts[i])) {
+      return;
+    }
+  }
+  // At this point it seems that the encoder doesn't support the requested
+  // number of channels, so we error out.
+  std::stringstream supportedNumChannels;
+  for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << av_get_channel_layout_nb_channels(
+        avCodec.channel_layouts[i]);
+  }
+#endif
+  TORCH_CHECK(
+      false,
+      "Desired number of channels (",
+      numChannels,
+      ") is not supported by the ",
+      "encoder. Supported number of channels are: ",
+      supportedNumChannels.str(),
+      ".");
 }
 
 namespace {

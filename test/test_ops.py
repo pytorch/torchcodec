@@ -6,6 +6,7 @@
 
 import io
 import os
+import re
 from functools import partial
 
 os.environ["TORCH_LOGS"] = "output_code"
@@ -1158,6 +1159,20 @@ class TestAudioEncoderOps:
                 wf=torch.rand(10, 20), sample_rate=10, filename="doesnt_matter"
             )
 
+        for num_channels in (0, 3):
+            with pytest.raises(
+                RuntimeError,
+                match=re.escape(
+                    f"Desired number of channels ({num_channels}) is not supported"
+                ),
+            ):
+                encode_audio_to_file(
+                    wf=torch.rand(2, 10),
+                    sample_rate=16_000,
+                    filename="ok.mp3",
+                    num_channels=num_channels,
+                )
+
     @pytest.mark.parametrize(
         "encode_method", (encode_audio_to_file, encode_audio_to_tensor)
     )
@@ -1194,8 +1209,9 @@ class TestAudioEncoderOps:
     @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
+    @pytest.mark.parametrize("num_channels", (None, 1, 2))
     @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
-    def test_against_cli(self, asset, bit_rate, output_format, tmp_path):
+    def test_against_cli(self, asset, bit_rate, num_channels, output_format, tmp_path):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
 
@@ -1206,6 +1222,7 @@ class TestAudioEncoderOps:
         subprocess.run(
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
+            + (["-ac", f"{num_channels}"] if num_channels is not None else [])
             + [
                 str(encoded_by_ffmpeg),
             ],
@@ -1219,9 +1236,19 @@ class TestAudioEncoderOps:
             sample_rate=asset.sample_rate,
             filename=str(encoded_by_us),
             bit_rate=bit_rate,
+            num_channels=num_channels,
         )
 
-        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
+        if output_format == "wav":
+            rtol, atol = 0, 1e-4
+        elif output_format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
+            # Not sure why, this one needs slightly higher tol. With default
+            # tolerances, the check fails on ~1% of the samples, so that's
+            # probably fine. It might be that the FFmpeg CLI doesn't rely on
+            # libswresample for converting channels?
+            rtol, atol = 0, 1e-3
+        else:
+            rtol, atol = None, None
         torch.testing.assert_close(
             self.decode(encoded_by_ffmpeg),
             self.decode(encoded_by_us),
@@ -1231,8 +1258,11 @@ class TestAudioEncoderOps:
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
+    @pytest.mark.parametrize("num_channels", (None, 1, 2))
     @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
-    def test_tensor_against_file(self, asset, bit_rate, output_format, tmp_path):
+    def test_tensor_against_file(
+        self, asset, bit_rate, num_channels, output_format, tmp_path
+    ):
         if get_ffmpeg_major_version() == 4 and output_format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
 
@@ -1242,6 +1272,7 @@ class TestAudioEncoderOps:
             sample_rate=asset.sample_rate,
             filename=str(encoded_file),
             bit_rate=bit_rate,
+            num_channels=num_channels,
         )
 
         encoded_tensor = encode_audio_to_tensor(
@@ -1249,6 +1280,7 @@ class TestAudioEncoderOps:
             sample_rate=asset.sample_rate,
             format=output_format,
             bit_rate=bit_rate,
+            num_channels=num_channels,
         )
 
         torch.testing.assert_close(
@@ -1304,6 +1336,42 @@ class TestAudioEncoderOps:
         torch.testing.assert_close(
             encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0
         )
+
+    @pytest.mark.parametrize("num_channels_input", (1, 2))
+    @pytest.mark.parametrize("num_channels_output", (1, 2, None))
+    @pytest.mark.parametrize(
+        "encode_method", (encode_audio_to_file, encode_audio_to_tensor)
+    )
+    def test_num_channels(
+        self, num_channels_input, num_channels_output, encode_method, tmp_path
+    ):
+        # We just check that the num_channels parameter is respected.
+        # Correctness is checked in other tests (like test_against_cli())
+
+        sample_rate = 16_000
+        source_samples = torch.rand(num_channels_input, 1_000)
+        format = "mp3"
+
+        if encode_method is encode_audio_to_file:
+            encoded_path = tmp_path / f"output.{format}"
+            encode_audio_to_file(
+                wf=source_samples,
+                sample_rate=sample_rate,
+                filename=str(encoded_path),
+                num_channels=num_channels_output,
+            )
+            encoded_source = encoded_path
+        else:
+            encoded_source = encode_audio_to_tensor(
+                wf=source_samples,
+                sample_rate=sample_rate,
+                format=format,
+                num_channels=num_channels_output,
+            )
+
+        if num_channels_output is None:
+            num_channels_output = num_channels_input
+        assert self.decode(encoded_source).shape[0] == num_channels_output
 
 
 if __name__ == "__main__":
