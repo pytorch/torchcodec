@@ -179,6 +179,8 @@ void AudioEncoder::initializeEncoder(
 
   desiredNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
   validateNumChannels(*avCodec, desiredNumChannels_);
+  // The avCodecContext layout defines the layout of the encoded output, it's
+  // not related to the input sampes.
   setDefaultChannelLayout(avCodecContext_, desiredNumChannels_);
 
   validateSampleRate(*avCodec, sampleRate);
@@ -233,6 +235,8 @@ void AudioEncoder::encode() {
   avFrame->format = AV_SAMPLE_FMT_FLTP;
   avFrame->sample_rate = avCodecContext_->sample_rate;
   avFrame->pts = 0;
+  // We set the channel layout of the frame to the default layout corresponding
+  // to the input samples' number of channels
   setDefaultChannelLayout(avFrame, static_cast<int>(wf_.sizes()[0]));
 
   auto status = av_frame_get_buffer(avFrame.get(), 0);
