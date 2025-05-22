@@ -107,8 +107,9 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
     // eventually raise.
     return;
   }
-  for (auto i = 0; avCodec.ch_layouts[i].order != AV_CHANNEL_ORDER_UNSPEC;
-       ++i) {
+  // FFmpeg doc indicate that the ch_layouts array is terminated by a zeroed
+  // layout, so checking for nb_channels == 0 should indicate its end.
+  for (auto i = 0; avCodec.ch_layouts[i].nb_channels != 0; ++i) {
     if (numChannels == avCodec.ch_layouts[i].nb_channels) {
       return;
     }
@@ -116,8 +117,7 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
   // At this point it seems that the encoder doesn't support the requested
   // number of channels, so we error out.
   std::stringstream supportedNumChannels;
-  for (auto i = 0; avCodec.ch_layouts[i].order != AV_CHANNEL_ORDER_UNSPEC;
-       ++i) {
+  for (auto i = 0; avCodec.ch_layouts[i].nb_channels != 0; ++i) {
     if (i > 0) {
       supportedNumChannels << ", ";
     }
@@ -128,14 +128,14 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
     // can't validate, same as above.
     return;
   }
-  // At this point it seems that the encoder doesn't support the requested
-  // number of channels, so we error out.
   for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
     if (numChannels ==
         av_get_channel_layout_nb_channels(avCodec.channel_layouts[i])) {
       return;
     }
   }
+  // At this point it seems that the encoder doesn't support the requested
+  // number of channels, so we error out.
   std::stringstream supportedNumChannels;
   for (auto i = 0; avCodec.channel_layouts[i] != 0; ++i) {
     if (i > 0) {
