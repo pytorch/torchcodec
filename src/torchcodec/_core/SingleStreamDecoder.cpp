@@ -1186,11 +1186,11 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
     FrameOutput& frameOutput) {
   AVSampleFormat srcSampleFormat =
       static_cast<AVSampleFormat>(srcAVFrame->format);
-  AVSampleFormat desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
+  AVSampleFormat outSampleFormat = AV_SAMPLE_FMT_FLTP;
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
   int srcSampleRate = srcAVFrame->sample_rate;
-  int desiredSampleRate =
+  int outSampleRate =
       streamInfo.audioStreamOptions.sampleRate.value_or(srcSampleRate);
 
   int srcNumChannels = getNumChannels(streamInfo.codecContext);
@@ -1203,50 +1203,50 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       ". If you are hitting this, it may be because you are using "
       "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
       "valid scenarios. Try to upgrade FFmpeg?");
-  int desiredNumChannels =
+  int outNumChannels =
       streamInfo.audioStreamOptions.numChannels.value_or(srcNumChannels);
 
   bool mustConvert =
-      (srcSampleFormat != desiredSampleFormat ||
-       srcSampleRate != desiredSampleRate ||
-       srcNumChannels != desiredNumChannels);
+      (srcSampleFormat != outSampleFormat ||
+       srcSampleRate != outSampleRate ||
+       srcNumChannels != outNumChannels);
 
   UniqueAVFrame convertedAVFrame;
   if (mustConvert) {
     if (!streamInfo.swrContext) {
       streamInfo.swrContext.reset(createSwrContext(
           srcSampleFormat,
-          desiredSampleFormat,
+          outSampleFormat,
           srcSampleRate,
-          desiredSampleRate,
+          outSampleRate,
           srcAVFrame,
-          desiredNumChannels));
+          outNumChannels));
     }
 
     convertedAVFrame = convertAudioAVFrameSamples(
         streamInfo.swrContext,
         srcAVFrame,
-        desiredSampleFormat,
-        desiredSampleRate,
-        desiredNumChannels);
+        outSampleFormat,
+        outSampleRate,
+        outNumChannels);
   }
   const UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
 
   AVSampleFormat format = static_cast<AVSampleFormat>(avFrame->format);
   TORCH_CHECK(
-      format == desiredSampleFormat,
+      format == outSampleFormat,
       "Something went wrong, the frame didn't get converted to the desired format. ",
       "Desired format = ",
-      av_get_sample_fmt_name(desiredSampleFormat),
+      av_get_sample_fmt_name(outSampleFormat),
       "source format = ",
       av_get_sample_fmt_name(format));
 
   int numChannels = getNumChannels(avFrame);
   TORCH_CHECK(
-      numChannels == desiredNumChannels,
+      numChannels == outNumChannels,
       "Something went wrong, the frame didn't get converted to the desired ",
       "number of channels = ",
-      desiredNumChannels,
+      outNumChannels,
       ". Got ",
       numChannels,
       " instead.");

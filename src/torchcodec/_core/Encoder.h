@@ -50,9 +50,9 @@ class AudioEncoder {
   UniqueAVCodecContext avCodecContext_;
   int streamIndex_;
   UniqueSwrContext swrContext_;
-  // TODO-ENCODING: desiredNumChannels should just be part of an options struct,
+  // TODO-ENCODING: outNumChannels should just be part of an options struct,
   // see other TODO above.
-  int desiredNumChannels_ = -1;
+  int outNumChannels_ = -1;
 
   const torch::Tensor wf_;
 

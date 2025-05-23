@@ -177,11 +177,11 @@ void AudioEncoder::initializeEncoder(
   // well when "-b:a" isn't specified.
   avCodecContext_->bit_rate = bitRate.value_or(0);
 
-  desiredNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
-  validateNumChannels(*avCodec, desiredNumChannels_);
+  outNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
+  validateNumChannels(*avCodec, outNumChannels_);
   // The avCodecContext layout defines the layout of the encoded output, it's
   // not related to the input sampes.
-  setDefaultChannelLayout(avCodecContext_, desiredNumChannels_);
+  setDefaultChannelLayout(avCodecContext_, outNumChannels_);
 
   validateSampleRate(*avCodec, sampleRate);
   avCodecContext_->sample_rate = sampleRate;
@@ -304,7 +304,7 @@ void AudioEncoder::encodeInnerLoop(
   bool mustConvert =
       (srcAVFrame != nullptr &&
        (avCodecContext_->sample_fmt != AV_SAMPLE_FMT_FLTP ||
-        getNumChannels(srcAVFrame) != desiredNumChannels_));
+        getNumChannels(srcAVFrame) != outNumChannels_));
 
   UniqueAVFrame convertedAVFrame;
   if (mustConvert) {
@@ -315,14 +315,14 @@ void AudioEncoder::encodeInnerLoop(
           srcAVFrame->sample_rate, // No sample rate conversion
           srcAVFrame->sample_rate,
           srcAVFrame,
-          desiredNumChannels_));
+          outNumChannels_));
     }
     convertedAVFrame = convertAudioAVFrameSamples(
         swrContext_,
         srcAVFrame,
         avCodecContext_->sample_fmt,
         srcAVFrame->sample_rate, // No sample rate conversion
-        desiredNumChannels_);
+        outNumChannels_);
     TORCH_CHECK(
         convertedAVFrame->nb_samples == srcAVFrame->nb_samples,
         "convertedAVFrame->nb_samples=",
