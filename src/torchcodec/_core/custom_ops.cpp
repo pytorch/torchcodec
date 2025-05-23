@@ -29,9 +29,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
-      "encode_audio_to_file(Tensor wf, int sample_rate, str filename, int? bit_rate=None) -> ()");
+      "encode_audio_to_file(Tensor wf, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None) -> ()");
   m.def(
-      "encode_audio_to_tensor(Tensor wf, int sample_rate, str format, int? bit_rate=None) -> Tensor");
+      "encode_audio_to_tensor(Tensor wf, int sample_rate, str format, int? bit_rate=None, int? num_channels=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -391,8 +391,10 @@ void encode_audio_to_file(
     const at::Tensor wf,
     int64_t sample_rate,
     std::string_view file_name,
-    std::optional<int64_t> bit_rate = std::nullopt) {
-  AudioEncoder(wf, validateSampleRate(sample_rate), file_name, bit_rate)
+    std::optional<int64_t> bit_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt) {
+  AudioEncoder(
+      wf, validateSampleRate(sample_rate), file_name, bit_rate, num_channels)
       .encode();
 }
 
@@ -400,14 +402,16 @@ at::Tensor encode_audio_to_tensor(
     const at::Tensor wf,
     int64_t sample_rate,
     std::string_view format,
-    std::optional<int64_t> bit_rate = std::nullopt) {
+    std::optional<int64_t> bit_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt) {
   auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
   return AudioEncoder(
              wf,
              validateSampleRate(sample_rate),
              format,
              std::move(avioContextHolder),
-             bit_rate)
+             bit_rate,
+             num_channels)
       .encodeToTensor();
 }
 

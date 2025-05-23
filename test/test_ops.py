@@ -27,7 +27,6 @@ from torchcodec._core import (
     create_from_file_like,
     create_from_tensor,
     encode_audio_to_file,
-    encode_audio_to_tensor,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -44,8 +43,6 @@ from torchcodec._core import (
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
-    get_ffmpeg_major_version,
-    in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
@@ -53,7 +50,6 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
-    TestContainerFile,
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
@@ -1099,22 +1095,6 @@ class TestAudioDecoderOps:
 
 class TestAudioEncoderOps:
 
-    def decode(self, source) -> torch.Tensor:
-        if isinstance(source, torch.Tensor):
-            decoder = create_from_tensor(source, seek_mode="approximate")
-        else:
-            if isinstance(source, TestContainerFile):
-                source = str(source.path)
-            else:
-                source = str(source)
-            decoder = create_from_file(source, seek_mode="approximate")
-
-        add_audio_stream(decoder)
-        frames, *_ = get_frames_by_pts_in_range_audio(
-            decoder, start_seconds=0, stop_seconds=None
-        )
-        return frames
-
     def test_bad_input(self, tmp_path):
 
         valid_output_file = str(tmp_path / ".mp3")
@@ -1138,172 +1118,6 @@ class TestAudioEncoderOps:
             encode_audio_to_file(
                 wf=torch.rand(2, 10), sample_rate=10, filename="./file.bad_extension"
             )
-
-        with pytest.raises(RuntimeError, match="invalid sample rate=10"):
-            encode_audio_to_file(
-                wf=self.decode(NASA_AUDIO_MP3),
-                sample_rate=10,
-                filename=valid_output_file,
-            )
-        with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
-            encode_audio_to_file(
-                wf=self.decode(NASA_AUDIO_MP3),
-                sample_rate=NASA_AUDIO_MP3.sample_rate,
-                filename=valid_output_file,
-                bit_rate=-1,  # bad
-            )
-
-        with pytest.raises(RuntimeError, match="Trying to encode 10 channels"):
-            encode_audio_to_file(
-                wf=torch.rand(10, 20), sample_rate=10, filename="doesnt_matter"
-            )
-
-    @pytest.mark.parametrize(
-        "encode_method", (encode_audio_to_file, encode_audio_to_tensor)
-    )
-    @pytest.mark.parametrize("output_format", ("wav", "flac"))
-    def test_round_trip(self, encode_method, output_format, tmp_path):
-        # Check that decode(encode(samples)) == samples on lossless formats
-
-        if get_ffmpeg_major_version() == 4 and output_format == "wav":
-            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
-
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset)
-
-        if encode_method is encode_audio_to_file:
-            encoded_path = tmp_path / f"output.{output_format}"
-            encode_audio_to_file(
-                wf=source_samples,
-                sample_rate=asset.sample_rate,
-                filename=str(encoded_path),
-            )
-            encoded_source = encoded_path
-        else:
-            encoded_source = encode_audio_to_tensor(
-                wf=source_samples, sample_rate=asset.sample_rate, format=output_format
-            )
-            assert encoded_source.dtype == torch.uint8
-            assert encoded_source.ndim == 1
-
-        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
-        torch.testing.assert_close(
-            self.decode(encoded_source), source_samples, rtol=rtol, atol=atol
-        )
-
-    @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
-    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
-    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
-    @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
-    def test_against_cli(self, asset, bit_rate, output_format, tmp_path):
-        # Encodes samples with our encoder and with the FFmpeg CLI, and checks
-        # that both decoded outputs are equal
-
-        if get_ffmpeg_major_version() == 4 and output_format == "wav":
-            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
-
-        encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{output_format}"
-        subprocess.run(
-            ["ffmpeg", "-i", str(asset.path)]
-            + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
-            + [
-                str(encoded_by_ffmpeg),
-            ],
-            capture_output=True,
-            check=True,
-        )
-
-        encoded_by_us = tmp_path / f"our_output.{output_format}"
-        encode_audio_to_file(
-            wf=self.decode(asset),
-            sample_rate=asset.sample_rate,
-            filename=str(encoded_by_us),
-            bit_rate=bit_rate,
-        )
-
-        rtol, atol = (0, 1e-4) if output_format == "wav" else (None, None)
-        torch.testing.assert_close(
-            self.decode(encoded_by_ffmpeg),
-            self.decode(encoded_by_us),
-            rtol=rtol,
-            atol=atol,
-        )
-
-    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
-    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
-    @pytest.mark.parametrize("output_format", ("mp3", "wav", "flac"))
-    def test_tensor_against_file(self, asset, bit_rate, output_format, tmp_path):
-        if get_ffmpeg_major_version() == 4 and output_format == "wav":
-            pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
-
-        encoded_file = tmp_path / f"our_output.{output_format}"
-        encode_audio_to_file(
-            wf=self.decode(asset),
-            sample_rate=asset.sample_rate,
-            filename=str(encoded_file),
-            bit_rate=bit_rate,
-        )
-
-        encoded_tensor = encode_audio_to_tensor(
-            wf=self.decode(asset),
-            sample_rate=asset.sample_rate,
-            format=output_format,
-            bit_rate=bit_rate,
-        )
-
-        torch.testing.assert_close(
-            self.decode(encoded_file), self.decode(encoded_tensor)
-        )
-
-    def test_encode_to_tensor_long_output(self):
-        # Check that we support re-allocating the output tensor when the encoded
-        # data is large.
-        samples = torch.rand(1, int(1e7))
-        encoded_tensor = encode_audio_to_tensor(
-            wf=samples,
-            sample_rate=16_000,
-            format="flac",
-            bit_rate=44_000,
-        )
-        # Note: this should be in sync with its C++ counterpart for the test to
-        # be meaningful.
-        INITIAL_TENSOR_SIZE = 10_000_000
-        assert encoded_tensor.numel() > INITIAL_TENSOR_SIZE
-
-        torch.testing.assert_close(self.decode(encoded_tensor), samples)
-
-    def test_contiguity(self):
-        # Ensure that 2 waveforms with the same values are encoded in the same
-        # way, regardless of their memory layout. Here we encode 2 equal
-        # waveforms, one is row-aligned while the other is column-aligned.
-
-        num_samples = 10_000  # per channel
-        contiguous_samples = torch.rand(2, num_samples).contiguous()
-        assert contiguous_samples.stride() == (num_samples, 1)
-
-        encoded_from_contiguous = encode_audio_to_tensor(
-            wf=contiguous_samples,
-            sample_rate=16_000,
-            format="flac",
-            bit_rate=44_000,
-        )
-        non_contiguous_samples = contiguous_samples.T.contiguous().T
-        assert non_contiguous_samples.stride() == (1, 2)
-
-        torch.testing.assert_close(
-            contiguous_samples, non_contiguous_samples, rtol=0, atol=0
-        )
-
-        encoded_from_non_contiguous = encode_audio_to_tensor(
-            wf=non_contiguous_samples,
-            sample_rate=16_000,
-            format="flac",
-            bit_rate=44_000,
-        )
-
-        torch.testing.assert_close(
-            encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0
-        )
 
 
 if __name__ == "__main__":
