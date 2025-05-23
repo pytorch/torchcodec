@@ -238,8 +238,7 @@ SwrContext* createSwrContext(
       "Couldn't create SwrContext: ",
       getFFMPEGErrorStringFromErrorCode(status));
 #else
-  int64_t outLayout =
-      getOutputChannelLayout(outNumChannels, srcAVFrame);
+  int64_t outLayout = getOutputChannelLayout(outNumChannels, srcAVFrame);
   swrContext = swr_alloc_set_opts(
       nullptr,
       outLayout,
