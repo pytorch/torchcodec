@@ -1207,8 +1207,7 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
       streamInfo.audioStreamOptions.numChannels.value_or(srcNumChannels);
 
   bool mustConvert =
-      (srcSampleFormat != outSampleFormat ||
-       srcSampleRate != outSampleRate ||
+      (srcSampleFormat != outSampleFormat || srcSampleRate != outSampleRate ||
        srcNumChannels != outNumChannels);
 
   UniqueAVFrame convertedAVFrame;
