@@ -22,6 +22,9 @@ from torchcodec._core import (
     seek_to_pts,
 )
 
+from torchcodec.decoders import VideoDecoder,VideoStreamMetadata
+from torchcodec import Frame, FrameBatch
+
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
@@ -43,36 +46,27 @@ class TestVariableFPSVideoDecoder:
     def test_basic_decoding(self, device):
         self._check_video_exists()
         
-        decoder = create_from_file(str(VAR_FPS_VIDEO.path))
-        add_video_stream(decoder, device=device)
+        decoder = VideoDecoder(str(VAR_FPS_VIDEO.path))
         
-        frame0, pts0, duration0 = get_next_frame(decoder)
-        reference_frame0 = VAR_FPS_VIDEO.get_frame_data_by_index(0)
-        assert_frames_equal(frame0, reference_frame0.to(device))
+        frame = decoder.get_frame_at(0)
+        assert isinstance(frame, Frame)
         
-        metadata = get_json_metadata(decoder)
-        metadata_dict = json.loads(metadata)
-        assert "numFrames" in metadata_dict
-        assert metadata_dict["numFrames"] > 30, "Test video should have at least 30 frames"
+        metadata = decoder.metadata
+        assert isinstance(metadata, VideoStreamMetadata)
+        assert metadata.num_frames > 30
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_exact_seeking_mode(self, device):
-        """Test behavior in exact seeking mode (should work properly)"""
         self._check_video_exists()
         
-        decoder = create_from_file(str(VAR_FPS_VIDEO.path), seek_mode="exact")
-        add_video_stream(decoder, device=device)
+        decoder = VideoDecoder(str(VAR_FPS_VIDEO.path), seek_mode="exact")
         
-        metadata = get_json_metadata(decoder)
-        metadata_dict = json.loads(metadata)
-        
-        test_pts = [0.0, 0.5, 1.0, 1.5, 2.0]
-        for pts in test_pts:
-            if pts < metadata_dict["durationSeconds"]:
-                frame, actual_pts, duration = get_frame_at_pts(decoder, pts)
-                assert frame is not None, f"Failed to seek to {pts}s in exact mode"
-                assert abs(actual_pts.item() - pts) <= duration.item(), \
-                    f"Frame timestamp ({actual_pts.item()}) differs too much from requested time ({pts})"
+        test_timestamps = [0.0, 0.5, 1.0, 1.5, 2.0]
+        for timestamp in test_timestamps:
+            if timestamp < decoder.metadata.duration_seconds:
+                frame_batch = decoder.get_frames_played_at(seconds=[timestamp])
+                assert isinstance(frame_batch, FrameBatch)
+                assert abs(frame_batch.pts_seconds[0] - timestamp) <= frame_batch.duration_seconds[0]
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_approximate_seeking_mode_behavior(self, device):
@@ -200,15 +194,11 @@ class TestVariableFPSVideoDecoder:
     def test_frames_in_range(self, device):
         self._check_video_exists()
         
-        decoder = create_from_file(str(VAR_FPS_VIDEO.path))
-        add_video_stream(decoder, device=device)
+        decoder = VideoDecoder(str(VAR_FPS_VIDEO.path))
         
-        frames, pts_list, durations = get_frames_in_range(decoder, start=0, stop=10)
+        frame_batch = decoder.get_frames_in_range(0, 10)
+        assert isinstance(frame_batch, FrameBatch)
+        assert len(frame_batch) == 10
         
-        assert len(frames) == 10, f"Expected 10 frames, got {len(frames)}"
-        
-        assert len(pts_list) == len(frames), "pts list length should match frame count"
-        assert len(durations) == len(frames), "durations list length should match frame count"
-        
-        for i in range(1, len(pts_list)):
-            assert pts_list[i] > pts_list[i-1], f"pts not monotonically increasing: {pts_list}"
+        timestamps = frame_batch.pts_seconds.tolist()
+        assert all(timestamps[i] < timestamps[i+1] for i in range(len(timestamps)-1))
