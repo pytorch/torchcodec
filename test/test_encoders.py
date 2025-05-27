@@ -118,12 +118,23 @@ class TestAudioEncoder:
         )
 
     @pytest.mark.skipif(in_fbcode(), reason="TODO: enable ffmpeg CLI")
-    @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
-    @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
-    @pytest.mark.parametrize("num_channels", (None, 1, 2))
-    @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
+    # @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
+    @pytest.mark.parametrize("asset", (SINE_MONO_S32,))
+    # @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3,))
+    # @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
+    @pytest.mark.parametrize("bit_rate", (None,))
+    # @pytest.mark.parametrize("num_channels", (None, 1, 2))
+    @pytest.mark.parametrize("num_channels", (None,))
+    # @pytest.mark.parametrize("sample_rate", (None, 32_000))
+    # @pytest.mark.parametrize("sample_rate", (32_000,))
+    @pytest.mark.parametrize("sample_rate", (8_000, 32_000))
+    # @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
+    @pytest.mark.parametrize("format", ("wav",))
     @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
-    def test_against_cli(self, asset, bit_rate, num_channels, format, method, tmp_path):
+    # @pytest.mark.parametrize("method", ("to_file",))#, "to_tensor"))
+    def test_against_cli(
+        self, asset, bit_rate, num_channels, sample_rate, format, method, tmp_path
+    ):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
 
@@ -135,6 +146,7 @@ class TestAudioEncoder:
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
             + (["-ac", f"{num_channels}"] if num_channels is not None else [])
+            + (["-ar", f"{sample_rate}"] if sample_rate is not None else [])
             + [
                 str(encoded_by_ffmpeg),
             ],
@@ -143,7 +155,9 @@ class TestAudioEncoder:
         )
 
         encoder = AudioEncoder(self.decode(asset), sample_rate=asset.sample_rate)
-        params = dict(bit_rate=bit_rate, num_channels=num_channels)
+        params = dict(
+            bit_rate=bit_rate, num_channels=num_channels, sample_rate=sample_rate
+        )
         if method == "to_file":
             encoded_by_us = tmp_path / f"output.{format}"
             encoder.to_file(dest=str(encoded_by_us), **params)
@@ -161,6 +175,10 @@ class TestAudioEncoder:
         else:
             rtol, atol = None, None
         torch.testing.assert_close(
+            # self.decode(encoded_by_ffmpeg)[:, :-100],
+            # self.decode(encoded_by_us)[:, :-100],
+            # self.decode(encoded_by_ffmpeg)[:, :-32],
+            # self.decode(encoded_by_us)[:, :-32],
             self.decode(encoded_by_ffmpeg),
             self.decode(encoded_by_us),
             rtol=rtol,

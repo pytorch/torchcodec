@@ -38,7 +38,9 @@ class AudioEncoder {
   void initializeEncoder(const AudioStreamOptions& audioStreamOptions);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& srcAVFrame);
+      const UniqueAVFrame& srcAVFrame,
+      bool allowConvert = true);
+  void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
 
   UniqueEncodingAVFormatContext avFormatContext_;

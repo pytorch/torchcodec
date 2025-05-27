@@ -93,6 +93,23 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
   return avCodec.sample_fmts[0];
 }
 
+UniqueAVFrame allocateAVFrame(int numSamples, int sampleRate, int numChannels) {
+  auto avFrame = UniqueAVFrame(av_frame_alloc());
+  TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
+
+  avFrame->nb_samples = numSamples;
+  avFrame->format = AV_SAMPLE_FMT_FLTP;
+  avFrame->sample_rate = sampleRate;
+  av_channel_layout_default(&avFrame->ch_layout, numChannels);
+  auto status = av_frame_get_buffer(avFrame.get(), 0);
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't allocate avFrame's buffers: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  return avFrame;
+}
+
 } // namespace
 
 AudioEncoder::~AudioEncoder() {}
@@ -228,24 +245,14 @@ void AudioEncoder::encode() {
   TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
   encodeWasCalled_ = true;
 
-  UniqueAVFrame avFrame(av_frame_alloc());
-  TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   //  Default to 256 like in torchaudio
   int numSamplesAllocatedPerFrame =
       avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
-  avFrame->nb_samples = numSamplesAllocatedPerFrame;
-  avFrame->format = AV_SAMPLE_FMT_FLTP;
-  avFrame->sample_rate = sampleRateInput_;
+  UniqueAVFrame avFrame = allocateAVFrame(
+      numSamplesAllocatedPerFrame,
+      sampleRateInput_,
+      static_cast<int>(wf_.sizes()[0]));
   avFrame->pts = 0;
-  // We set the channel layout of the frame to the default layout corresponding
-  // to the input samples' number of channels
-  setDefaultChannelLayout(avFrame, static_cast<int>(wf_.sizes()[0]));
-
-  auto status = av_frame_get_buffer(avFrame.get(), 0);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't allocate avFrame's buffers: ",
-      getFFMPEGErrorStringFromErrorCode(status));
 
   AutoAVPacket autoAVPacket;
 
@@ -255,7 +262,7 @@ void AudioEncoder::encode() {
   int numBytesPerSample = static_cast<int>(wf_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
-  status = avformat_write_header(avFormatContext_.get(), nullptr);
+  auto status = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
       status == AVSUCCESS,
       "Error in avformat_write_header: ",
@@ -302,10 +309,14 @@ void AudioEncoder::encode() {
 
 void AudioEncoder::encodeInnerLoop(
     AutoAVPacket& autoAVPacket,
-    const UniqueAVFrame& srcAVFrame) {
+    const UniqueAVFrame& srcAVFrame,
+    bool allowConvert) {
+  // TODO: Probably makes more sense to move the conversion away? It shouldn't
+  // be in inner loop in any case. We should also remove allowConvert.
   bool mustConvert =
-      (srcAVFrame != nullptr &&
-       (avCodecContext_->sample_fmt != AV_SAMPLE_FMT_FLTP ||
+      (allowConvert && srcAVFrame != nullptr &&
+       (static_cast<AVSampleFormat>(srcAVFrame->format) !=
+            avCodecContext_->sample_fmt ||
         getNumChannels(srcAVFrame) != outNumChannels_ ||
         srcAVFrame->sample_rate != outSampleRate_));
 
@@ -377,10 +388,31 @@ void AudioEncoder::encodeInnerLoop(
   }
 }
 
+void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
+  // Similar to the decoder's method with the same name, but for encoding this
+  // time. That is, when sample conversion is invovled, libswresample may have
+  // buffered some samples that we now need to flush and send to the encoder.
+  if (swrContext_ == nullptr && sampleRateInput_ == outSampleRate_) {
+    return;
+  }
+  int numRemainingSamples = // this is an upper bound
+      swr_get_out_samples(swrContext_.get(), 0);
+  if (numRemainingSamples == 0) {
+    return;
+  }
+
+  UniqueAVFrame avFrame =
+      allocateAVFrame(numRemainingSamples, outSampleRate_, outNumChannels_);
+  int actualNumRemainingSamples = swr_convert(
+      swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
+  avFrame->nb_samples = actualNumRemainingSamples;
+
+  encodeInnerLoop(autoAVPacket, avFrame, false);
+}
+
 void AudioEncoder::flushBuffers() {
-  // TODO Need to fluh libwresample buffers since we may be doing sample
-  // rate conversion!!!
   AutoAVPacket autoAVPacket;
+  maybeFlushSwrBuffers(autoAVPacket);
   encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec
