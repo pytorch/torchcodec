@@ -394,13 +394,14 @@ void encode_audio_to_file(
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt,
     std::optional<int64_t> desired_sample_rate = std::nullopt) {
+  // TODO Fix implicit int conversion:
+  // https://github.com/pytorch/torchcodec/issues/679
+  AudioStreamOptions audioStreamOptions;
+  audioStreamOptions.bitRate = bit_rate;
+  audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
   AudioEncoder(
-      wf,
-      validateSampleRate(sample_rate),
-      file_name,
-      bit_rate,
-      num_channels,
-      desired_sample_rate)
+      wf, validateSampleRate(sample_rate), file_name, audioStreamOptions)
       .encode();
 }
 
@@ -412,14 +413,18 @@ at::Tensor encode_audio_to_tensor(
     std::optional<int64_t> num_channels = std::nullopt,
     std::optional<int64_t> desired_sample_rate = std::nullopt) {
   auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
+  // TODO Fix implicit int conversion:
+  // https://github.com/pytorch/torchcodec/issues/679
+  AudioStreamOptions audioStreamOptions;
+  audioStreamOptions.bitRate = bit_rate;
+  audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
   return AudioEncoder(
              wf,
              validateSampleRate(sample_rate),
              format,
              std::move(avioContextHolder),
-             bit_rate,
-             num_channels,
-             desired_sample_rate)
+             audioStreamOptions)
       .encodeToTensor();
 }
 
