@@ -184,14 +184,13 @@ void AudioEncoder::initializeEncoder(
   // not related to the input sampes.
   setDefaultChannelLayout(avCodecContext_, outNumChannels_);
 
-  outSampleRate_ = static_cast<int>(
-      audioStreamOptions.sampleRate.value_or(sampleRateInput_));
+  outSampleRate_ = audioStreamOptions.sampleRate.value_or(sampleRateInput_);
   validateSampleRate(*avCodec, outSampleRate_);
   avCodecContext_->sample_rate = outSampleRate_;
 
-  // Input waveform is expected to be FLTP. Not all encoders support FLTP,
-  // so we may need to convert the wf into a supported output sample format,
-  // which is what the `.sample_fmt` defines.
+  // Input waveform is expected to be FLTP. Not all encoders support FLTP, so we
+  // may need to convert the wf into a supported output sample format, which is
+  // what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
@@ -223,9 +222,9 @@ torch::Tensor AudioEncoder::encodeToTensor() {
 }
 
 void AudioEncoder::encode() {
-  // To be on the safe side we enforce that encode() can only be called once
-  // on an encoder object. Whether this is actually necessary is unknown, so
-  // this may be relaxed if needed.
+  // To be on the safe side we enforce that encode() can only be called once on
+  // an encoder object. Whether this is actually necessary is unknown, so this
+  // may be relaxed if needed.
   TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
   encodeWasCalled_ = true;
 
@@ -279,11 +278,11 @@ void AudioEncoder::encode() {
     }
     pwf += numBytesToEncode;
 
-    // Above, we set the AVFrame's .nb_samples to AVCodecContext.frame_size
-    // so that the frame buffers are allocated to a big enough size. Here,
-    // we reset it to the exact number of samples that need to be encoded,
-    // otherwise the encoded frame would contain more samples than necessary
-    // and our results wouldn't match the ffmpeg CLI.
+    // Above, we set the AVFrame's .nb_samples to AVCodecContext.frame_size so
+    // that the frame buffers are allocated to a big enough size. Here, we reset
+    // it to the exact number of samples that need to be encoded, otherwise the
+    // encoded frame would contain more samples than necessary and our results
+    // wouldn't match the ffmpeg CLI.
     avFrame->nb_samples = numSamplesToEncode;
     encodeInnerLoop(autoAVPacket, avFrame);
 
