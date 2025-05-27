@@ -13,7 +13,10 @@ torch::Tensor validateSamples(torch::Tensor samples) {
       samples.dtype() == torch::kFloat32,
       "samples must have float32 dtype, got ",
       samples.dtype());
-  TORCH_CHECK(samples.dim() == 2, "samples must have 2 dimensions, got ", samples.dim());
+  TORCH_CHECK(
+      samples.dim() == 2,
+      "samples must have 2 dimensions, got ",
+      samples.dim());
 
   // We enforce this, but if we get user reports we should investigate whether
   // that's actually needed.
@@ -102,7 +105,7 @@ AudioEncoder::AudioEncoder(
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
-: samples_(validateSamples(samples)) {
+    : samples_(validateSamples(samples)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -134,7 +137,8 @@ AudioEncoder::AudioEncoder(
     std::string_view formatName,
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
-    : samples_(validateSamples(samples)), avioContextHolder_(std::move(avioContextHolder)) {
+    : samples_(validateSamples(samples)),
+      avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -175,8 +179,9 @@ void AudioEncoder::initializeEncoder(
   // bit_rate=None defaults to 0, which is what the FFmpeg CLI seems to use as
   // well when "-b:a" isn't specified.
   avCodecContext_->bit_rate = desiredBitRate.value_or(0);
-  outNumChannels_ =
-      static_cast<int>(audioStreamOptions.numChannels.value_or(samples_.sizes()[0]));
+
+  outNumChannels_ = static_cast<int>(
+      audioStreamOptions.numChannels.value_or(samples_.sizes()[0]));
   validateNumChannels(*avCodec, outNumChannels_);
   // The avCodecContext layout defines the layout of the encoded output, it's
   // not related to the input sampes.
@@ -186,11 +191,12 @@ void AudioEncoder::initializeEncoder(
   avCodecContext_->sample_rate = sampleRate;
 
   // Input samples are expected to be FLTP. Not all encoders support FLTP, so we
-  // may need to convert the samples into a supported output sample format, which is
-  // what the `.sample_fmt` defines.
+  // may need to convert the samples into a supported output sample format,
+  // which is what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
-  setDefaultChannelLayout(avCodecContext_, static_cast<int>(samples_.sizes()[0]));
+  setDefaultChannelLayout(
+      avCodecContext_, static_cast<int>(samples_.sizes()[0]));
 
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(
@@ -273,7 +279,9 @@ void AudioEncoder::encode() {
 
     for (int ch = 0; ch < samples_.sizes()[0]; ch++) {
       std::memcpy(
-          avFrame->data[ch], psamples + ch * numBytesPerChannel, numBytesToEncode);
+          avFrame->data[ch],
+          psamples + ch * numBytesPerChannel,
+          numBytesToEncode);
     }
     psamples += numBytesToEncode;
 
