@@ -43,8 +43,11 @@ struct VideoStreamOptions {
 struct AudioStreamOptions {
   AudioStreamOptions() {}
 
-  std::optional<int> sampleRate;
+  // Encoding only
+  std::optional<int> bitRate;
+  // Decoding and encoding:
   std::optional<int> numChannels;
+  std::optional<int> sampleRate;
 };
 
 } // namespace facebook::torchcodec

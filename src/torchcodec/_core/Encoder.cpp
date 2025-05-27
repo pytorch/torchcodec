@@ -101,8 +101,7 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor wf,
     int sampleRate,
     std::string_view fileName,
-    std::optional<int64_t> bitRate,
-    std::optional<int64_t> numChannels)
+    const AudioStreamOptions& audioStreamOptions)
     : wf_(validateWf(wf)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
@@ -126,7 +125,7 @@ AudioEncoder::AudioEncoder(
       ", make sure it's a valid path? ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  initializeEncoder(sampleRate, bitRate, numChannels);
+  initializeEncoder(sampleRate, audioStreamOptions);
 }
 
 AudioEncoder::AudioEncoder(
@@ -134,8 +133,7 @@ AudioEncoder::AudioEncoder(
     int sampleRate,
     std::string_view formatName,
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
-    std::optional<int64_t> bitRate,
-    std::optional<int64_t> numChannels)
+    const AudioStreamOptions& audioStreamOptions)
     : wf_(validateWf(wf)), avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
@@ -153,13 +151,12 @@ AudioEncoder::AudioEncoder(
 
   avFormatContext_->pb = avioContextHolder_->getAVIOContext();
 
-  initializeEncoder(sampleRate, bitRate, numChannels);
+  initializeEncoder(sampleRate, audioStreamOptions);
 }
 
 void AudioEncoder::initializeEncoder(
     int sampleRate,
-    std::optional<int64_t> bitRate,
-    std::optional<int64_t> numChannels) {
+    const AudioStreamOptions& audioStreamOptions) {
   // We use the AVFormatContext's default codec for that
   // specific format/container.
   const AVCodec* avCodec =
@@ -170,14 +167,17 @@ void AudioEncoder::initializeEncoder(
   TORCH_CHECK(avCodecContext != nullptr, "Couldn't allocate codec context.");
   avCodecContext_.reset(avCodecContext);
 
-  if (bitRate.has_value()) {
-    TORCH_CHECK(*bitRate >= 0, "bit_rate=", *bitRate, " must be >= 0.");
+  auto desiredBitRate = audioStreamOptions.bitRate;
+  if (desiredBitRate.has_value()) {
+    TORCH_CHECK(
+        *desiredBitRate >= 0, "bit_rate=", *desiredBitRate, " must be >= 0.");
   }
   // bit_rate=None defaults to 0, which is what the FFmpeg CLI seems to use as
   // well when "-b:a" isn't specified.
-  avCodecContext_->bit_rate = bitRate.value_or(0);
+  avCodecContext_->bit_rate = desiredBitRate.value_or(0);
 
-  outNumChannels_ = static_cast<int>(numChannels.value_or(wf_.sizes()[0]));
+  outNumChannels_ =
+      static_cast<int>(audioStreamOptions.numChannels.value_or(wf_.sizes()[0]));
   validateNumChannels(*avCodec, outNumChannels_);
   // The avCodecContext layout defines the layout of the encoded output, it's
   // not related to the input sampes.
