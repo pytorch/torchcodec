@@ -38,6 +38,7 @@ class AudioEncoder {
   void initializeEncoder(
       int sampleRate,
       const AudioStreamOptions& audioStreamOptions);
+  UniqueAVFrame maybeConvertAVFrame(const UniqueAVFrame& avFrame);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& srcAVFrame);
