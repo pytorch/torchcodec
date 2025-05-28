@@ -195,9 +195,6 @@ void AudioEncoder::initializeEncoder(
   // which is what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
-  setDefaultChannelLayout(
-      avCodecContext_, static_cast<int>(samples_.sizes()[0]));
-
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
   TORCH_CHECK(
       status == AVSUCCESS,
