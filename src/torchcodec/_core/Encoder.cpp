@@ -215,6 +215,9 @@ void AudioEncoder::initializeEncoder(
       status == AVSUCCESS,
       "avcodec_open2 failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
+  
+  bool supportsVariableFrameSize = avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE;
+  printf("supportsVariableFrameSize = %d\n", supportsVariableFrameSize);
 
   // We're allocating the stream here. Streams are meant to be freed by
   // avformat_free_context(avFormatContext), which we call in the
@@ -228,6 +231,12 @@ void AudioEncoder::initializeEncoder(
       "avcodec_parameters_from_context failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
+
+  // frame_size * 2 is a decent default size. FFmpeg automatically re-allocates
+  // the fifo if more space is needed.
+  auto avAudioFifo = av_audio_fifo_alloc(avCodecContext_->sample_fmt, outNumChannels_, avCodecContext_->frame_size * 2);
+  TORCH_CHECK(avAudioFifo!= nullptr, "Couldn't create AVAudioFifo.");
+  avAudioFifo_.reset(avAudioFifo);
 }
 
 torch::Tensor AudioEncoder::encodeToTensor() {
@@ -309,7 +318,7 @@ void AudioEncoder::encode() {
 
 void AudioEncoder::encodeInnerLoop(
     AutoAVPacket& autoAVPacket,
-    const UniqueAVFrame& srcAVFrame,
+    UniqueAVFrame& srcAVFrame,
     bool allowConvert) {
   // TODO: Probably makes more sense to move the conversion away? It shouldn't
   // be in inner loop in any case. We should also remove allowConvert.
@@ -348,8 +357,26 @@ void AudioEncoder::encodeInnerLoop(
           "This is unexpected, please report on the TorchCodec bug tracker.");
     }
   }
-  const UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
+  UniqueAVFrame& avFrame = mustConvert ? convertedAVFrame : srcAVFrame;
 
+  if (avFrame != nullptr) {
+    // TODO static cast
+    int numSamplesWritten = av_audio_fifo_write(avAudioFifo_.get(), (void**)avFrame->data, avFrame->nb_samples);
+    TORCH_CHECK(numSamplesWritten == avFrame->nb_samples, "Tried to write  TODO");
+    printf("Writing %d samples to fifo (size = %d)\n", avFrame->nb_samples, av_audio_fifo_size(avAudioFifo_.get()));
+
+    avFrame = allocateAVFrame(avCodecContext_->frame_size, outSampleRate_, outNumChannels_);
+    // TODO cast
+    int numSamplesRead = av_audio_fifo_read(avAudioFifo_.get(), (void**)avFrame->data, avFrame->nb_samples);
+    printf("Read %d from fifo\n", numSamplesRead);
+    TORCH_CHECK(numSamplesRead > 0, "Tried to read TODO");
+  }
+
+  if (avFrame != nullptr) {
+    printf("Sending frame with %d samples\n", avFrame->nb_samples);
+  } else{
+    printf("AVFrame is empty\n");
+  }
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       status == AVSUCCESS,
@@ -413,6 +440,7 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
 void AudioEncoder::flushBuffers() {
   AutoAVPacket autoAVPacket;
   maybeFlushSwrBuffers(autoAVPacket);
-  encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
+  auto zob = UniqueAVFrame(nullptr);
+  encodeInnerLoop(autoAVPacket, zob);
 }
 } // namespace facebook::torchcodec

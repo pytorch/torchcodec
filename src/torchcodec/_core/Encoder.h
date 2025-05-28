@@ -38,7 +38,7 @@ class AudioEncoder {
   void initializeEncoder(const AudioStreamOptions& audioStreamOptions);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& srcAVFrame,
+      UniqueAVFrame& srcAVFrame,
       bool allowConvert = true);
   void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
@@ -54,6 +54,9 @@ class AudioEncoder {
 
   const torch::Tensor wf_;
   int sampleRateInput_ = -1;
+
+
+  UniqueAVAudioFifo avAudioFifo_;
 
   // Stores the AVIOContext for the output tensor buffer.
   std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
