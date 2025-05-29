@@ -8,16 +8,19 @@ namespace facebook::torchcodec {
 
 namespace {
 
-torch::Tensor validateWf(torch::Tensor wf) {
+torch::Tensor validateSamples(torch::Tensor samples) {
   TORCH_CHECK(
-      wf.dtype() == torch::kFloat32,
-      "waveform must have float32 dtype, got ",
-      wf.dtype());
-  TORCH_CHECK(wf.dim() == 2, "waveform must have 2 dimensions, got ", wf.dim());
+      samples.dtype() == torch::kFloat32,
+      "samples must have float32 dtype, got ",
+      samples.dtype());
+  TORCH_CHECK(
+      samples.dim() == 2,
+      "samples must have 2 dimensions, got ",
+      samples.dim());
 
   // We enforce this, but if we get user reports we should investigate whether
   // that's actually needed.
-  int numChannels = static_cast<int>(wf.sizes()[0]);
+  int numChannels = static_cast<int>(samples.sizes()[0]);
   TORCH_CHECK(
       numChannels <= AV_NUM_DATA_POINTERS,
       "Trying to encode ",
@@ -26,7 +29,7 @@ torch::Tensor validateWf(torch::Tensor wf) {
       AV_NUM_DATA_POINTERS,
       " channels per frame.");
 
-  return wf.contiguous();
+  return samples.contiguous();
 }
 
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
@@ -71,7 +74,7 @@ static const std::vector<AVSampleFormat> preferredFormatsOrder = {
 
 AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
   // Find a sample format that the encoder supports. We prefer using FLT[P],
-  // since this is the format of the input waveform. If FLTP isn't supported
+  // since this is the format of the input samples. If FLTP isn't supported
   // then we'll need to convert the AVFrame's format. Our heuristic is to encode
   // into the format with the highest resolution.
   if (avCodec.sample_fmts == nullptr) {
@@ -115,11 +118,11 @@ UniqueAVFrame allocateAVFrame(int numSamples, int sampleRate, int numChannels) {
 AudioEncoder::~AudioEncoder() {}
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor wf,
+    const torch::Tensor samples,
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
-    : wf_(validateWf(wf)), sampleRateInput_(sampleRate) {
+    : samples_(validateSamples(samples)), sampleRateInput_(sampleRate) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -146,12 +149,12 @@ AudioEncoder::AudioEncoder(
 }
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor wf,
+    const torch::Tensor samples,
     int sampleRate,
     std::string_view formatName,
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
-    : wf_(validateWf(wf)),
+    : samples_(validateSamples(samples)),
       sampleRateInput_(sampleRate),
       avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
@@ -194,8 +197,8 @@ void AudioEncoder::initializeEncoder(
   // well when "-b:a" isn't specified.
   avCodecContext_->bit_rate = desiredBitRate.value_or(0);
 
-  outNumChannels_ =
-      static_cast<int>(audioStreamOptions.numChannels.value_or(wf_.sizes()[0]));
+  outNumChannels_ = static_cast<int>(
+      audioStreamOptions.numChannels.value_or(samples_.sizes()[0]));
   validateNumChannels(*avCodec, outNumChannels_);
   // The avCodecContext layout defines the layout of the encoded output, it's
   // not related to the input sampes.
@@ -205,9 +208,9 @@ void AudioEncoder::initializeEncoder(
   validateSampleRate(*avCodec, outSampleRate_);
   avCodecContext_->sample_rate = outSampleRate_;
 
-  // Input waveform is expected to be FLTP. Not all encoders support FLTP, so we
-  // may need to convert the wf into a supported output sample format, which is
-  // what the `.sample_fmt` defines.
+  // Input samples are expected to be FLTP. Not all encoders support FLTP, so we
+  // may need to convert the samples into a supported output sample format,
+  // which is what the `.sample_fmt` defines.
   avCodecContext_->sample_fmt = findBestOutputSampleFormat(*avCodec);
 
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
@@ -265,15 +268,15 @@ void AudioEncoder::encode() {
   UniqueAVFrame avFrame = allocateAVFrame(
       numSamplesAllocatedPerFrame,
       sampleRateInput_,
-      static_cast<int>(wf_.sizes()[0]));
+      static_cast<int>(samples_.sizes()[0]));
   avFrame->pts = 0;
 
   AutoAVPacket autoAVPacket;
 
-  uint8_t* pwf = static_cast<uint8_t*>(wf_.data_ptr());
-  int numSamples = static_cast<int>(wf_.sizes()[1]); // per channel
+  uint8_t* psamples = static_cast<uint8_t*>(samples_.data_ptr());
+  int numSamples = static_cast<int>(samples_.sizes()[1]); // per channel
   int numEncodedSamples = 0; // per channel
-  int numBytesPerSample = static_cast<int>(wf_.element_size());
+  int numBytesPerSample = static_cast<int>(samples_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
   auto status = avformat_write_header(avFormatContext_.get(), nullptr);
@@ -293,11 +296,13 @@ void AudioEncoder::encode() {
         std::min(numSamplesAllocatedPerFrame, numSamples - numEncodedSamples);
     int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
 
-    for (int ch = 0; ch < wf_.sizes()[0]; ch++) {
+    for (int ch = 0; ch < samples_.sizes()[0]; ch++) {
       std::memcpy(
-          avFrame->data[ch], pwf + ch * numBytesPerChannel, numBytesToEncode);
+          avFrame->data[ch],
+          psamples + ch * numBytesPerChannel,
+          numBytesToEncode);
     }
-    pwf += numBytesToEncode;
+    psamples += numBytesToEncode;
 
     // Above, we set the AVFrame's .nb_samples to AVCodecContext.frame_size so
     // that the frame buffers are allocated to a big enough size. Here, we reset

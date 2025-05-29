@@ -1101,22 +1101,24 @@ class TestAudioEncoderOps:
 
         with pytest.raises(RuntimeError, match="must have float32 dtype, got int"):
             encode_audio_to_file(
-                wf=torch.arange(10, dtype=torch.int),
+                samples=torch.arange(10, dtype=torch.int),
                 sample_rate=10,
                 filename=valid_output_file,
             )
         with pytest.raises(RuntimeError, match="must have 2 dimensions, got 1"):
             encode_audio_to_file(
-                wf=torch.rand(3), sample_rate=10, filename=valid_output_file
+                samples=torch.rand(3), sample_rate=10, filename=valid_output_file
             )
 
         with pytest.raises(RuntimeError, match="No such file or directory"):
             encode_audio_to_file(
-                wf=torch.rand(2, 10), sample_rate=10, filename="./bad/path.mp3"
+                samples=torch.rand(2, 10), sample_rate=10, filename="./bad/path.mp3"
             )
         with pytest.raises(RuntimeError, match="check the desired extension"):
             encode_audio_to_file(
-                wf=torch.rand(2, 10), sample_rate=10, filename="./file.bad_extension"
+                samples=torch.rand(2, 10),
+                sample_rate=10,
+                filename="./file.bad_extension",
             )
 
 
