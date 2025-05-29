@@ -36,10 +36,10 @@ class AudioEncoder {
 
  private:
   void initializeEncoder(const AudioStreamOptions& audioStreamOptions);
+  UniqueAVFrame maybeConvertAVFrame(const UniqueAVFrame& avFrame);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      UniqueAVFrame& srcAVFrame,
-      bool allowConvert = true);
+      const UniqueAVFrame& srcAVFrame);
   void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
 
@@ -54,7 +54,6 @@ class AudioEncoder {
 
   const torch::Tensor wf_;
   int sampleRateInput_ = -1;
-
 
   UniqueAVAudioFifo avAudioFifo_;
 
