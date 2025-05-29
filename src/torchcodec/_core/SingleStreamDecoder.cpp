@@ -125,11 +125,11 @@ void SingleStreamDecoder::initializeDecoder() {
 
     int64_t frameCount = avStream->nb_frames;
     if (frameCount > 0) {
-      streamMetadata.numFrames = frameCount;
+      streamMetadata.numFramesFromHeader = frameCount;
     }
 
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
-      streamMetadata.durationSeconds =
+      streamMetadata.durationSecondsFromHeader =
           av_q2d(avStream->time_base) * avStream->duration;
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
@@ -163,7 +163,7 @@ void SingleStreamDecoder::initializeDecoder() {
 
   if (formatContext_->duration > 0) {
     AVRational defaultTimeBase{1, AV_TIME_BASE};
-    containerMetadata_.durationSeconds =
+    containerMetadata_.durationSecondsFromHeader =
         ptsToSeconds(formatContext_->duration, defaultTimeBase);
   }
 
@@ -1463,9 +1463,9 @@ int64_t SingleStreamDecoder::getNumFrames(
       return streamMetadata.numFramesFromScan.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
-          streamMetadata.numFrames.has_value(),
+          streamMetadata.numFramesFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the number of frames from the metadata.");
-      return streamMetadata.numFrames.value();
+      return streamMetadata.numFramesFromHeader.value();
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1491,9 +1491,9 @@ double SingleStreamDecoder::getMaxSeconds(
       return streamMetadata.maxPtsSecondsFromScan.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
-          streamMetadata.durationSeconds.has_value(),
+          streamMetadata.durationSecondsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the duration from the metadata.");
-      return streamMetadata.durationSeconds.value();
+      return streamMetadata.durationSecondsFromHeader.value();
     }
     default:
       throw std::runtime_error("Unknown SeekMode");

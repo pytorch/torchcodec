@@ -25,9 +25,9 @@ struct StreamMetadata {
   AVMediaType mediaType;
   std::optional<AVCodecID> codecId;
   std::optional<std::string> codecName;
-  std::optional<double> durationSeconds;
+  std::optional<double> durationSecondsFromHeader;
   std::optional<double> beginStreamFromHeader;
-  std::optional<int64_t> numFrames;
+  std::optional<int64_t> numFramesFromHeader;
   std::optional<int64_t> numKeyFrames;
   std::optional<double> averageFps;
   std::optional<double> bitRate;
@@ -58,7 +58,7 @@ struct ContainerMetadata {
   int numVideoStreams = 0;
   // Note that this is the container-level duration, which is usually the max
   // of all stream durations available in the container.
-  std::optional<double> durationSeconds;
+  std::optional<double> durationSecondsFromHeader;
   // Total BitRate level information at the container level in bit/s
   std::optional<double> bitRate;
   // If set, this is the index to the default audio stream.

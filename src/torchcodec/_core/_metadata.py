@@ -225,9 +225,9 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
     for stream_index in range(container_dict["numStreams"]):
         stream_dict = json.loads(_get_stream_json_metadata(decoder, stream_index))
         common_meta = dict(
-            duration_seconds_from_header=stream_dict.get("durationSeconds"),
+            duration_seconds_from_header=stream_dict.get("durationSecondsFromHeader"),
             bit_rate=stream_dict.get("bitRate"),
-            begin_stream_seconds_from_header=stream_dict.get("beginStreamFromHeader"),
+            begin_stream_seconds_from_header=stream_dict.get("beginStreamSecondsFromHeader"),
             codec=stream_dict.get("codec"),
             stream_index=stream_index,
         )
@@ -242,9 +242,9 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                     ),
                     width=stream_dict.get("width"),
                     height=stream_dict.get("height"),
-                    num_frames_from_header=stream_dict.get("numFrames"),
+                    num_frames_from_header=stream_dict.get("numFramesFromHeader"),
                     num_frames_from_content=stream_dict.get("numFramesFromScan"),
-                    average_fps_from_header=stream_dict.get("averageFps"),
+                    average_fps_from_header=stream_dict.get("averageFpsFromHeader"),
                     **common_meta,
                 )
             )
@@ -264,7 +264,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
             streams_metadata.append(StreamMetadata(**common_meta))
 
     return ContainerMetadata(
-        duration_seconds_from_header=container_dict.get("durationSeconds"),
+        duration_seconds_from_header=container_dict.get("durationSecondsFromHeader"),
         bit_rate_from_header=container_dict.get("bitRate"),
         best_video_stream_index=container_dict.get("bestVideoStreamIndex"),
         best_audio_stream_index=container_dict.get("bestAudioStreamIndex"),
