@@ -460,14 +460,20 @@ std::string get_json_metadata(at::Tensor& decoder) {
   if (maybeBestVideoStreamIndex.has_value() &&
       videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
           .durationSecondsFromHeader.has_value()) {
+<<<<<<< HEAD
             durationSecondsFromHeader =
+=======
+    durationSecondsFromHeader =
+>>>>>>> e932590 (Update C++ metadata names to match python)
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
             .durationSecondsFromHeader.value_or(0);
   } else {
     // Fallback to container-level duration if stream duration is not found.
-    durationSecondsFromHeader = videoMetadata.durationSecondsFromHeader.value_or(0);
+    durationSecondsFromHeader =
+        videoMetadata.durationSecondsFromHeader.value_or(0);
   }
-  metadataMap["durationSecondsFromHeader"] = std::to_string(durationSecondsFromHeader);
+  metadataMap["durationSecondsFromHeader"] =
+      std::to_string(durationSecondsFromHeader);
 
   if (videoMetadata.bitRate.has_value()) {
     metadataMap["bitRate"] = std::to_string(videoMetadata.bitRate.value());
@@ -479,8 +485,9 @@ std::string get_json_metadata(at::Tensor& decoder) {
     if (streamMetadata.numFramesFromScan.has_value()) {
       metadataMap["numFrames"] =
           std::to_string(*streamMetadata.numFramesFromScan);
-    } else if (streamMetadata.numFrames.has_value()) {
-      metadataMap["numFrames"] = std::to_string(*streamMetadata.numFrames);
+    } else if (streamMetadata.numFramesFromHeader.has_value()) {
+      metadataMap["numFrames"] =
+          std::to_string(*streamMetadata.numFramesFromHeader);
     }
     if (streamMetadata.minPtsSecondsFromScan.has_value()) {
       metadataMap["minPtsSecondsFromScan"] =
@@ -499,8 +506,9 @@ std::string get_json_metadata(at::Tensor& decoder) {
     if (streamMetadata.height.has_value()) {
       metadataMap["height"] = std::to_string(*streamMetadata.height);
     }
-    if (streamMetadata.averageFps.has_value()) {
-      metadataMap["averageFps"] = std::to_string(*streamMetadata.averageFps);
+    if (streamMetadata.averageFpsFromHeader.has_value()) {
+      metadataMap["averageFpsFromHeader"] =
+          std::to_string(*streamMetadata.averageFpsFromHeader);
     }
   }
   if (videoMetadata.bestVideoStreamIndex.has_value()) {
@@ -524,7 +532,8 @@ std::string get_container_json_metadata(at::Tensor& decoder) {
   std::map<std::string, std::string> map;
 
   if (containerMetadata.durationSecondsFromHeader.has_value()) {
-    map["durationSecondsFromHeader"] = std::to_string(*containerMetadata.durationSecondsFromHeader);
+    map["durationSecondsFromHeader"] =
+        std::to_string(*containerMetadata.durationSecondsFromHeader);
   }
 
   if (containerMetadata.bitRate.has_value()) {
@@ -563,7 +572,8 @@ std::string get_stream_json_metadata(
   std::map<std::string, std::string> map;
 
   if (streamMetadata.durationSecondsFromHeader.has_value()) {
-    map["durationSecondsFromHeader"] = std::to_string(*streamMetadata.durationSecondsFromHeader);
+    map["durationSecondsFromHeader"] =
+        std::to_string(*streamMetadata.durationSecondsFromHeader);
   }
   if (streamMetadata.bitRate.has_value()) {
     map["bitRate"] = std::to_string(*streamMetadata.bitRate);
@@ -573,11 +583,12 @@ std::string get_stream_json_metadata(
         std::to_string(*streamMetadata.numFramesFromScan);
   }
   if (streamMetadata.numFramesFromHeader.has_value()) {
-    map["numFramesFromHeader"] = std::to_string(*streamMetadata.numFramesFromHeader);
+    map["numFramesFromHeader"] =
+        std::to_string(*streamMetadata.numFramesFromHeader);
   }
-  if (streamMetadata.beginStreamFromHeader.has_value()) {
+  if (streamMetadata.beginStreamSecondsFromHeader.has_value()) {
     map["beginStreamSecondsFromHeader"] =
-        std::to_string(*streamMetadata.beginStreamFromHeader);
+        std::to_string(*streamMetadata.beginStreamSecondsFromHeader);
   }
   if (streamMetadata.minPtsSecondsFromScan.has_value()) {
     map["minPtsSecondsFromScan"] =
@@ -596,8 +607,9 @@ std::string get_stream_json_metadata(
   if (streamMetadata.height.has_value()) {
     map["height"] = std::to_string(*streamMetadata.height);
   }
-  if (streamMetadata.averageFps.has_value()) {
-    map["averageFpsFromHeader"] = std::to_string(*streamMetadata.averageFps);
+  if (streamMetadata.averageFpsFromHeader.has_value()) {
+    map["averageFpsFromHeader"] =
+        std::to_string(*streamMetadata.averageFpsFromHeader);
   }
   if (streamMetadata.sampleRate.has_value()) {
     map["sampleRate"] = std::to_string(*streamMetadata.sampleRate);

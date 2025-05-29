@@ -133,14 +133,14 @@ void SingleStreamDecoder::initializeDecoder() {
           av_q2d(avStream->time_base) * avStream->duration;
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
-      streamMetadata.beginStreamFromHeader =
+      streamMetadata.beginStreamSecondsFromHeader =
           av_q2d(avStream->time_base) * avStream->start_time;
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
       double fps = av_q2d(avStream->r_frame_rate);
       if (fps > 0) {
-        streamMetadata.averageFps = fps;
+        streamMetadata.averageFpsFromHeader = fps;
       }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -445,7 +445,7 @@ void SingleStreamDecoder::addVideoStream(
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
 
   if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
+      !streamMetadata.averageFpsFromHeader.has_value()) {
     throw std::runtime_error(
         "Seek mode is approximate, but stream " +
         std::to_string(activeStreamIndex_) +
@@ -1397,9 +1397,9 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
-      return std::floor(seconds * streamMetadata.averageFps.value());
+      return std::floor(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1424,9 +1424,9 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
-      return std::ceil(seconds * streamMetadata.averageFps.value());
+      return std::ceil(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1442,10 +1442,11 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return secondsToClosestPts(
-          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+          frameIndex / streamMetadata.averageFpsFromHeader.value(),
+          streamInfo.timeBase);
     }
     default:
       throw std::runtime_error("Unknown SeekMode");

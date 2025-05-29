@@ -26,10 +26,10 @@ struct StreamMetadata {
   std::optional<AVCodecID> codecId;
   std::optional<std::string> codecName;
   std::optional<double> durationSecondsFromHeader;
-  std::optional<double> beginStreamFromHeader;
+  std::optional<double> beginStreamSecondsFromHeader;
   std::optional<int64_t> numFramesFromHeader;
   std::optional<int64_t> numKeyFrames;
-  std::optional<double> averageFps;
+  std::optional<double> averageFpsFromHeader;
   std::optional<double> bitRate;
 
   // More accurate duration, obtained by scanning the file.
