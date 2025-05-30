@@ -460,11 +460,7 @@ std::string get_json_metadata(at::Tensor& decoder) {
   if (maybeBestVideoStreamIndex.has_value() &&
       videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
           .durationSecondsFromHeader.has_value()) {
-<<<<<<< HEAD
-            durationSecondsFromHeader =
-=======
     durationSecondsFromHeader =
->>>>>>> e932590 (Update C++ metadata names to match python)
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
             .durationSecondsFromHeader.value_or(0);
   } else {
