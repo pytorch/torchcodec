@@ -240,7 +240,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                         "beginStreamSecondsFromContent"
                     ),
                     end_stream_seconds_from_content=stream_dict.get(
-                        "endStreamFromContentSeconds"
+                        "endStreamSecondsFromContent"
                     ),
                     width=stream_dict.get("width"),
                     height=stream_dict.get("height"),

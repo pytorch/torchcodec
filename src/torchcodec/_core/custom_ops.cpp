@@ -489,9 +489,9 @@ std::string get_json_metadata(at::Tensor& decoder) {
       metadataMap["beginStreamSecondsFromContent"] =
           std::to_string(*streamMetadata.beginStreamSecondsFromContent);
     }
-    if (streamMetadata.endStreamFromContentSeconds.has_value()) {
-      metadataMap["endStreamFromContentSeconds"] =
-          std::to_string(*streamMetadata.endStreamFromContentSeconds);
+    if (streamMetadata.endStreamSecondsFromContent.has_value()) {
+      metadataMap["endStreamSecondsFromContent"] =
+          std::to_string(*streamMetadata.endStreamSecondsFromContent);
     }
     if (streamMetadata.codecName.has_value()) {
       metadataMap["codec"] = quoteValue(streamMetadata.codecName.value());
@@ -590,9 +590,9 @@ std::string get_stream_json_metadata(
     map["beginStreamSecondsFromContent"] =
         std::to_string(*streamMetadata.beginStreamSecondsFromContent);
   }
-  if (streamMetadata.endStreamFromContentSeconds.has_value()) {
-    map["endStreamFromContentSeconds"] =
-        std::to_string(*streamMetadata.endStreamFromContentSeconds);
+  if (streamMetadata.endStreamSecondsFromContent.has_value()) {
+    map["endStreamSecondsFromContent"] =
+        std::to_string(*streamMetadata.endStreamSecondsFromContent);
   }
   if (streamMetadata.codecName.has_value()) {
     map["codec"] = quoteValue(streamMetadata.codecName.value());

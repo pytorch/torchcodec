@@ -276,13 +276,13 @@ class VideoClipSampler(nn.Module):
             if metadata_json["beginStreamSecondsFromContent"]
             else 0
         )
-        endStreamFromContentSeconds = (
-            metadata_json["endStreamFromContentSeconds"]
-            if metadata_json["endStreamFromContentSeconds"] > 0
+        endStreamSecondsFromContent = (
+            metadata_json["endStreamSecondsFromContent"]
+            if metadata_json["endStreamSecondsFromContent"] > 0
             else video_duration_in_seconds
         )
         last_possible_clip_start_in_seconds = (
-            endStreamFromContentSeconds - clip_duration_in_seconds
+            endStreamSecondsFromContent - clip_duration_in_seconds
         )
         if last_possible_clip_start_in_seconds < 0:
             raise VideoTooShortException(

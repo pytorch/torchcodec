@@ -415,7 +415,7 @@ class TestVideoDecoderOps:
         assert metadata_dict["width"] == 480
         assert metadata_dict["height"] == 270
         assert metadata_dict["beginStreamSecondsFromContent"] == 0
-        assert metadata_dict["endStreamFromContentSeconds"] == 13.013
+        assert metadata_dict["endStreamSecondsFromContent"] == 13.013
 
     def test_get_ffmpeg_version(self):
         ffmpeg_dict = get_ffmpeg_library_versions()

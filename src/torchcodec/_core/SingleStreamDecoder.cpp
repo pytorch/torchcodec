@@ -270,7 +270,7 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
           *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
     }
     if (streamMetadata.maxPtsFromScan.has_value()) {
-      streamMetadata.endStreamFromContentSeconds =
+      streamMetadata.endStreamSecondsFromContent =
           *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
     }
   }
@@ -1489,7 +1489,7 @@ double SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.endStreamFromContentSeconds.value();
+      return streamMetadata.endStreamSecondsFromContent.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
           streamMetadata.durationSecondsFromHeader.has_value(),

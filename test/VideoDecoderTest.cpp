@@ -85,13 +85,13 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
   EXPECT_EQ(videoStream.numFrames, 390);
   EXPECT_FALSE(videoStream.beginStreamSecondsFromContent.has_value());
-  EXPECT_FALSE(videoStream.endStreamFromContentSeconds.has_value());
+  EXPECT_FALSE(videoStream.endStreamSecondsFromContent.has_value());
   EXPECT_FALSE(videoStream.numFramesFromContent.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
   const auto& videoStream1 = metadata.allStreamMetadata[3];
   EXPECT_EQ(*videoStream1.beginStreamSecondsFromContent, 0);
-  EXPECT_EQ(*videoStream1.endStreamFromContentSeconds, 13.013);
+  EXPECT_EQ(*videoStream1.endStreamSecondsFromContent, 13.013);
   EXPECT_EQ(*videoStream1.numFramesFromContent, 390);
 }
 
