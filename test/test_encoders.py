@@ -56,9 +56,11 @@ class TestAudioEncoder:
             encoder.to_tensor(format=bad_format)
 
     @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
-    def test_bad_input_parametrized(self, method):
+    def test_bad_input_parametrized(self, method, tmp_path):
         valid_params = (
-            dict(dest="output.mp3") if method == "to_file" else dict(format="mp3")
+            dict(dest=str(tmp_path / "output.mp3"))
+            if method == "to_file"
+            else dict(format="mp3")
         )
 
         decoder = AudioEncoder(self.decode(NASA_AUDIO_MP3), sample_rate=10)
