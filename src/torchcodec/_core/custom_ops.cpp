@@ -29,9 +29,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
-      "encode_audio_to_file(Tensor wf, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None) -> ()");
+      "encode_audio_to_file(Tensor samples, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None) -> ()");
   m.def(
-      "encode_audio_to_tensor(Tensor wf, int sample_rate, str format, int? bit_rate=None, int? num_channels=None) -> Tensor");
+      "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -388,7 +388,7 @@ OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
 }
 
 void encode_audio_to_file(
-    const at::Tensor wf,
+    const at::Tensor samples,
     int64_t sample_rate,
     std::string_view file_name,
     std::optional<int64_t> bit_rate = std::nullopt,
@@ -399,12 +399,12 @@ void encode_audio_to_file(
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
   AudioEncoder(
-      wf, validateSampleRate(sample_rate), file_name, audioStreamOptions)
+      samples, validateSampleRate(sample_rate), file_name, audioStreamOptions)
       .encode();
 }
 
 at::Tensor encode_audio_to_tensor(
-    const at::Tensor wf,
+    const at::Tensor samples,
     int64_t sample_rate,
     std::string_view format,
     std::optional<int64_t> bit_rate = std::nullopt,
@@ -416,7 +416,7 @@ at::Tensor encode_audio_to_tensor(
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
   return AudioEncoder(
-             wf,
+             samples,
              validateSampleRate(sample_rate),
              format,
              std::move(avioContextHolder),
