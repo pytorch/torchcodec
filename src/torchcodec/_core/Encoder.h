@@ -39,7 +39,7 @@ class AudioEncoder {
   UniqueAVFrame maybeConvertAVFrame(const UniqueAVFrame& avFrame);
   void encodeInnerLoop(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& srcAVFrame);
+      const UniqueAVFrame& avFrame);
   void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
 
