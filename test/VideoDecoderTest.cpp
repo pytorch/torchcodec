@@ -80,10 +80,10 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   const auto& videoStream = metadata.allStreamMetadata[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
   EXPECT_EQ(videoStream.codecName, "h264");
-  EXPECT_NEAR(*videoStream.averageFps, 29.97f, 1e-1);
+  EXPECT_NEAR(*videoStream.averageFpsFromHeader, 29.97f, 1e-1);
   EXPECT_NEAR(*videoStream.bitRate, 128783, 1e-1);
-  EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
-  EXPECT_EQ(videoStream.numFrames, 390);
+  EXPECT_NEAR(*videoStream.durationSecondsFromHeader, 13.013, 1e-1);
+  EXPECT_EQ(videoStream.numFramesFromHeader, 390);
   EXPECT_FALSE(videoStream.beginStreamSecondsFromContent.has_value());
   EXPECT_FALSE(videoStream.endStreamSecondsFromContent.has_value());
   EXPECT_FALSE(videoStream.numFramesFromContent.has_value());
@@ -434,7 +434,7 @@ TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
 
   const auto& audioStream = metadata.allStreamMetadata[0];
   EXPECT_EQ(audioStream.mediaType, AVMEDIA_TYPE_AUDIO);
-  EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
+  EXPECT_NEAR(*audioStream.durationSecondsFromHeader, 13.25, 1e-1);
 }
 
 INSTANTIATE_TEST_SUITE_P(
