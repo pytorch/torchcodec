@@ -315,7 +315,7 @@ void AudioEncoder::encode() {
     avFrame->nb_samples = numSamplesToEncode;
 
     UniqueAVFrame convertedAVFrame = maybeConvertAVFrame(avFrame);
-    sendFrameThroughFifo(autoAVPacket, convertedAVFrame);
+    encodeFrameThroughFifo(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
     // TODO-ENCODING set frame pts correctly, and test against it.
@@ -370,7 +370,7 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
   return convertedAVFrame;
 }
 
-void AudioEncoder::sendFrameThroughFifo(
+void AudioEncoder::encodeFrameThroughFifo(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame,
     bool andFlushFifo) {
@@ -463,7 +463,7 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
       swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
   avFrame->nb_samples = actualNumRemainingSamples;
 
-  sendFrameThroughFifo(autoAVPacket, avFrame, /*andFlushFifo=*/true);
+  encodeFrameThroughFifo(autoAVPacket, avFrame, /*andFlushFifo=*/true);
 }
 
 void AudioEncoder::flushBuffers() {
