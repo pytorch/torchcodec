@@ -479,10 +479,10 @@ std::string get_json_metadata(at::Tensor& decoder) {
     auto streamMetadata =
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex];
     if (streamMetadata.numFramesFromScan.has_value()) {
-      metadataMap["numFrames"] =
+      metadataMap["numFramesFromHeader"] =
           std::to_string(*streamMetadata.numFramesFromScan);
     } else if (streamMetadata.numFramesFromHeader.has_value()) {
-      metadataMap["numFrames"] =
+      metadataMap["numFramesFromHeader"] =
           std::to_string(*streamMetadata.numFramesFromHeader);
     }
     if (streamMetadata.minPtsSecondsFromScan.has_value()) {

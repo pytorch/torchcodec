@@ -213,7 +213,7 @@ class VideoClipSampler(nn.Module):
         sample_end_index = (
             min(
                 index_based_sampler_args.sample_end_index + 1,
-                metadata_json["numFrames"],
+                metadata_json["numFramesFromHeader"],
             )
             - index_based_sampler_args.video_frame_dilation
             * index_based_sampler_args.frames_per_clip
@@ -263,13 +263,13 @@ class VideoClipSampler(nn.Module):
         Returns:
             (`List[float]`): List of the sampled clip start position in seconds
         """
-        video_duration_in_seconds = metadata_json["durationSeconds"]
+        video_duration_in_seconds = metadata_json["durationSecondsFromHeader"]
 
         clip_duration_in_seconds = (
             time_based_sampler_args.frames_per_clip
             * time_based_sampler_args.video_frame_dilation
             + 1
-        ) / metadata_json["averageFps"]
+        ) / metadata_json["averageFpsFromHeader"]
 
         minPtsSecondsFromScan = (
             metadata_json["minPtsSecondsFromScan"]

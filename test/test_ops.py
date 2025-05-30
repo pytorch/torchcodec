@@ -215,7 +215,7 @@ class TestVideoDecoderOps:
 
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
-        num_frames = metadata_dict["numFrames"]
+        num_frames = metadata_dict["numFramesFromHeader"]
         assert num_frames == 390
 
         _, all_pts_seconds_ref, _ = zip(
@@ -395,9 +395,11 @@ class TestVideoDecoderOps:
         metadata_dict = json.loads(metadata)
 
         # We should be able to see all of this metadata without adding a video stream
-        assert metadata_dict["durationSeconds"] == pytest.approx(13.013, abs=0.001)
-        assert metadata_dict["numFrames"] == 390
-        assert metadata_dict["averageFps"] == pytest.approx(29.97, abs=0.001)
+        assert metadata_dict["durationSecondsFromHeader"] == pytest.approx(
+            13.013, abs=0.001
+        )
+        assert metadata_dict["numFramesFromHeader"] == 390
+        assert metadata_dict["averageFpsFromHeader"] == pytest.approx(29.97, abs=0.001)
         assert metadata_dict["codec"] == "h264"
         ffmpeg_dict = get_ffmpeg_library_versions()
         if ffmpeg_dict["libavformat"][0] >= 60:
