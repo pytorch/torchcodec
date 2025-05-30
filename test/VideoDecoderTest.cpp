@@ -84,15 +84,15 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   EXPECT_NEAR(*videoStream.bitRate, 128783, 1e-1);
   EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
   EXPECT_EQ(videoStream.numFrames, 390);
-  EXPECT_FALSE(videoStream.minPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.maxPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
+  EXPECT_FALSE(videoStream.beginStreamSecondsFromContent.has_value());
+  EXPECT_FALSE(videoStream.endStreamFromContentSeconds.has_value());
+  EXPECT_FALSE(videoStream.numFramesFromContent.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
   const auto& videoStream1 = metadata.allStreamMetadata[3];
-  EXPECT_EQ(*videoStream1.minPtsSecondsFromScan, 0);
-  EXPECT_EQ(*videoStream1.maxPtsSecondsFromScan, 13.013);
-  EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
+  EXPECT_EQ(*videoStream1.beginStreamSecondsFromContent, 0);
+  EXPECT_EQ(*videoStream1.endStreamFromContentSeconds, 13.013);
+  EXPECT_EQ(*videoStream1.numFramesFromContent, 390);
 }
 
 TEST(SingleStreamDecoderTest, MissingVideoFileThrowsException) {

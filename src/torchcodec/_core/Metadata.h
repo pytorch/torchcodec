@@ -37,10 +37,10 @@ struct StreamMetadata {
   std::optional<int64_t> minPtsFromScan;
   std::optional<int64_t> maxPtsFromScan;
   // These presentation timestamps are in seconds.
-  std::optional<double> minPtsSecondsFromScan;
-  std::optional<double> maxPtsSecondsFromScan;
+  std::optional<double> beginStreamSecondsFromContent;
+  std::optional<double> endStreamFromContentSeconds;
   // This can be useful for index-based seeking.
-  std::optional<int64_t> numFramesFromScan;
+  std::optional<int64_t> numFramesFromContent;
 
   // Video-only fields derived from the AVCodecContext.
   std::optional<int64_t> width;

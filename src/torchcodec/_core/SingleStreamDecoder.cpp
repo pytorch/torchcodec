@@ -241,8 +241,8 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     streamMetadata.maxPtsFromScan = std::max(
         streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
         getPtsOrDts(packet) + packet->duration);
-    streamMetadata.numFramesFromScan =
-        streamMetadata.numFramesFromScan.value_or(0) + 1;
+    streamMetadata.numFramesFromContent =
+        streamMetadata.numFramesFromContent.value_or(0) + 1;
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
@@ -262,15 +262,15 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
     auto avStream = formatContext_->streams[streamIndex];
 
-    streamMetadata.numFramesFromScan =
+    streamMetadata.numFramesFromContent =
         streamInfos_[streamIndex].allFrames.size();
 
     if (streamMetadata.minPtsFromScan.has_value()) {
-      streamMetadata.minPtsSecondsFromScan =
+      streamMetadata.beginStreamSecondsFromContent =
           *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
     }
     if (streamMetadata.maxPtsFromScan.has_value()) {
-      streamMetadata.maxPtsSecondsFromScan =
+      streamMetadata.endStreamFromContentSeconds =
           *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
     }
   }
@@ -1461,7 +1461,7 @@ int64_t SingleStreamDecoder::getNumFrames(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.numFramesFromScan.value();
+      return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
           streamMetadata.numFramesFromHeader.has_value(),
@@ -1477,7 +1477,7 @@ double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.minPtsSecondsFromScan.value();
+      return streamMetadata.beginStreamSecondsFromContent.value();
     case SeekMode::approximate:
       return 0;
     default:
@@ -1489,7 +1489,7 @@ double SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.maxPtsSecondsFromScan.value();
+      return streamMetadata.endStreamFromContentSeconds.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
           streamMetadata.durationSecondsFromHeader.has_value(),

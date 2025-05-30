@@ -478,20 +478,20 @@ std::string get_json_metadata(at::Tensor& decoder) {
   if (maybeBestVideoStreamIndex.has_value()) {
     auto streamMetadata =
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex];
-    if (streamMetadata.numFramesFromScan.has_value()) {
+    if (streamMetadata.numFramesFromContent.has_value()) {
       metadataMap["numFramesFromHeader"] =
-          std::to_string(*streamMetadata.numFramesFromScan);
+          std::to_string(*streamMetadata.numFramesFromContent);
     } else if (streamMetadata.numFramesFromHeader.has_value()) {
       metadataMap["numFramesFromHeader"] =
           std::to_string(*streamMetadata.numFramesFromHeader);
     }
-    if (streamMetadata.minPtsSecondsFromScan.has_value()) {
-      metadataMap["minPtsSecondsFromScan"] =
-          std::to_string(*streamMetadata.minPtsSecondsFromScan);
+    if (streamMetadata.beginStreamSecondsFromContent.has_value()) {
+      metadataMap["beginStreamSecondsFromContent"] =
+          std::to_string(*streamMetadata.beginStreamSecondsFromContent);
     }
-    if (streamMetadata.maxPtsSecondsFromScan.has_value()) {
-      metadataMap["maxPtsSecondsFromScan"] =
-          std::to_string(*streamMetadata.maxPtsSecondsFromScan);
+    if (streamMetadata.endStreamFromContentSeconds.has_value()) {
+      metadataMap["endStreamFromContentSeconds"] =
+          std::to_string(*streamMetadata.endStreamFromContentSeconds);
     }
     if (streamMetadata.codecName.has_value()) {
       metadataMap["codec"] = quoteValue(streamMetadata.codecName.value());
@@ -574,9 +574,9 @@ std::string get_stream_json_metadata(
   if (streamMetadata.bitRate.has_value()) {
     map["bitRate"] = std::to_string(*streamMetadata.bitRate);
   }
-  if (streamMetadata.numFramesFromScan.has_value()) {
-    map["numFramesFromScan"] =
-        std::to_string(*streamMetadata.numFramesFromScan);
+  if (streamMetadata.numFramesFromContent.has_value()) {
+    map["numFramesFromContent"] =
+        std::to_string(*streamMetadata.numFramesFromContent);
   }
   if (streamMetadata.numFramesFromHeader.has_value()) {
     map["numFramesFromHeader"] =
@@ -586,13 +586,13 @@ std::string get_stream_json_metadata(
     map["beginStreamSecondsFromHeader"] =
         std::to_string(*streamMetadata.beginStreamSecondsFromHeader);
   }
-  if (streamMetadata.minPtsSecondsFromScan.has_value()) {
-    map["minPtsSecondsFromScan"] =
-        std::to_string(*streamMetadata.minPtsSecondsFromScan);
+  if (streamMetadata.beginStreamSecondsFromContent.has_value()) {
+    map["beginStreamSecondsFromContent"] =
+        std::to_string(*streamMetadata.beginStreamSecondsFromContent);
   }
-  if (streamMetadata.maxPtsSecondsFromScan.has_value()) {
-    map["maxPtsSecondsFromScan"] =
-        std::to_string(*streamMetadata.maxPtsSecondsFromScan);
+  if (streamMetadata.endStreamFromContentSeconds.has_value()) {
+    map["endStreamFromContentSeconds"] =
+        std::to_string(*streamMetadata.endStreamFromContentSeconds);
   }
   if (streamMetadata.codecName.has_value()) {
     map["codec"] = quoteValue(streamMetadata.codecName.value());
