@@ -109,11 +109,17 @@ UniqueAVFrame allocateAVFrame(
   av_channel_layout_default(&avFrame->ch_layout, numChannels);
   avFrame->format = sampleFormat;
   auto status = av_frame_get_buffer(avFrame.get(), 0);
+
   TORCH_CHECK(
       status == AVSUCCESS,
       "Couldn't allocate avFrame's buffers: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
+  status = av_frame_make_writable(avFrame.get());
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't make AVFrame writable: ",
+      getFFMPEGErrorStringFromErrorCode(status));
   return avFrame;
 }
 
@@ -236,19 +242,17 @@ void AudioEncoder::initializeEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
 
-  //   bool supportsVariableFrameSize =
-  //       avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE;
-  //   printf("supportsVariableFrameSize = %d\n", supportsVariableFrameSize);
-
-  //   // frame_size * 2 is a decent default size. FFmpeg automatically
-  //   re-allocates
-  //   // the fifo if more space is needed.
-  auto avAudioFifo = av_audio_fifo_alloc(
-      avCodecContext_->sample_fmt,
-      outNumChannels_,
-      avCodecContext_->frame_size * 2);
-  TORCH_CHECK(avAudioFifo != nullptr, "Couldn't create AVAudioFifo.");
-  avAudioFifo_.reset(avAudioFifo);
+  if (((avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) == 0) &&
+      (sampleRateInput_ != outSampleRate_)) {
+    // frame_size * 2 is a decent default size. FFmpeg automatically
+    // re-allocates the fifo if more space is needed.
+    auto avAudioFifo = av_audio_fifo_alloc(
+        avCodecContext_->sample_fmt,
+        outNumChannels_,
+        avCodecContext_->frame_size * 2);
+    TORCH_CHECK(avAudioFifo != nullptr, "Couldn't create AVAudioFifo.");
+    avAudioFifo_.reset(avAudioFifo);
+  }
 }
 
 torch::Tensor AudioEncoder::encodeToTensor() {
@@ -291,12 +295,6 @@ void AudioEncoder::encode() {
       getFFMPEGErrorStringFromErrorCode(status));
 
   while (numEncodedSamples < numSamples) {
-    status = av_frame_make_writable(avFrame.get());
-    TORCH_CHECK(
-        status == AVSUCCESS,
-        "Couldn't make AVFrame writable: ",
-        getFFMPEGErrorStringFromErrorCode(status));
-
     int numSamplesToEncode =
         std::min(numSamplesAllocatedPerFrame, numSamples - numEncodedSamples);
     int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
@@ -317,34 +315,7 @@ void AudioEncoder::encode() {
     avFrame->nb_samples = numSamplesToEncode;
 
     UniqueAVFrame convertedAVFrame = maybeConvertAVFrame(avFrame);
-    // TODO static cast
-    int numSamplesWritten = av_audio_fifo_write(
-        avAudioFifo_.get(),
-        (void**)convertedAVFrame->data,
-        convertedAVFrame->nb_samples);
-    TORCH_CHECK(
-        numSamplesWritten == convertedAVFrame->nb_samples,
-        "Tried to write TODO");
-
-      UniqueAVFrame newavFrame = allocateAVFrame(
-          avCodecContext_->frame_size,
-          outSampleRate_,
-          outNumChannels_,
-          avCodecContext_->sample_fmt);
-    while (av_audio_fifo_size(avAudioFifo_.get()) >=
-           avCodecContext_->frame_size) {
-
-      // TODO cast
-      int numSamplesRead = av_audio_fifo_read(
-          avAudioFifo_.get(), (void**)newavFrame->data, newavFrame->nb_samples);
-      TORCH_CHECK(numSamplesRead > 0, "Tried to read TODO");
-
-      //   UniqueAVFrame clonedFrame(av_frame_clone(newavFrame.get()));
-      //   UniqueAVFrame refFrame(av_frame_alloc());
-      //   av_frame_ref(refFrame.get(), newavFrame.get());
-
-      encodeInnerLoop(autoAVPacket, newavFrame);
-    }
+    sendFrameThroughFifo(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
     // TODO-ENCODING set frame pts correctly, and test against it.
@@ -367,7 +338,6 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
       getNumChannels(avFrame) == outNumChannels_ &&
       avFrame->sample_rate == outSampleRate_) {
     // Note: the clone references the same underlying data, it's a cheap copy.
-    TORCH_CHECK(false, "unexpected");
     return UniqueAVFrame(av_frame_clone(avFrame.get()));
   }
 
@@ -400,7 +370,37 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
   return convertedAVFrame;
 }
 
-void AudioEncoder::encodeInnerLoop(
+void AudioEncoder::sendFrameThroughFifo(
+    AutoAVPacket& autoAVPacket,
+    const UniqueAVFrame& avFrame,
+    bool andFlushFifo) {
+  if (avAudioFifo_ == nullptr) {
+    encodeFrame(autoAVPacket, avFrame);
+    return;
+  }
+  // TODO static cast
+  int numSamplesWritten = av_audio_fifo_write(
+      avAudioFifo_.get(), (void**)avFrame->data, avFrame->nb_samples);
+  TORCH_CHECK(numSamplesWritten == avFrame->nb_samples, "Tried to write TODO");
+
+  UniqueAVFrame newavFrame = allocateAVFrame(
+      avCodecContext_->frame_size,
+      outSampleRate_,
+      outNumChannels_,
+      avCodecContext_->sample_fmt);
+
+  while (av_audio_fifo_size(avAudioFifo_.get()) >=
+         (andFlushFifo ? 1 : avCodecContext_->frame_size)) {
+    // TODO cast
+    int numSamplesRead = av_audio_fifo_read(
+        avAudioFifo_.get(), (void**)newavFrame->data, newavFrame->nb_samples);
+    TORCH_CHECK(numSamplesRead > 0, "Tried to read TODO");
+
+    encodeFrame(autoAVPacket, newavFrame);
+  }
+}
+
+void AudioEncoder::encodeFrame(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
@@ -463,14 +463,12 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
       swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
   avFrame->nb_samples = actualNumRemainingSamples;
 
-  encodeInnerLoop(autoAVPacket, avFrame);
+  sendFrameThroughFifo(autoAVPacket, avFrame, /*andFlushFifo=*/true);
 }
 
 void AudioEncoder::flushBuffers() {
-  printf("Flushing, there are %d samples in fifo\n", av_audio_fifo_size(avAudioFifo_.get()));
   AutoAVPacket autoAVPacket;
   maybeFlushSwrBuffers(autoAVPacket);
-  encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
-  printf("Done flushing, there are %d samples in fifo\n", av_audio_fifo_size(avAudioFifo_.get()));
+  encodeFrame(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec

@@ -37,9 +37,11 @@ class AudioEncoder {
  private:
   void initializeEncoder(const AudioStreamOptions& audioStreamOptions);
   UniqueAVFrame maybeConvertAVFrame(const UniqueAVFrame& avFrame);
-  void encodeInnerLoop(
+  void sendFrameThroughFifo(
       AutoAVPacket& autoAVPacket,
-      const UniqueAVFrame& avFrame);
+      const UniqueAVFrame& avFrame,
+      bool andFlushFifo = false);
+  void encodeFrame(AutoAVPacket& autoAVPacket, const UniqueAVFrame& avFrame);
   void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
 
