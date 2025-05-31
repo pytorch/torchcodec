@@ -597,10 +597,10 @@ class TestVideoDecoder:
     def test_get_frames_played_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        with pytest.raises(RuntimeError, match="must be in range"):
+        with pytest.raises(RuntimeError, match="must be greater than or equal to"):
             decoder.get_frames_played_at([-1])
 
-        with pytest.raises(RuntimeError, match="must be in range"):
+        with pytest.raises(RuntimeError, match="must be less than"):
             decoder.get_frames_played_at([14])
 
         with pytest.raises(RuntimeError, match="Expected a value of type"):
