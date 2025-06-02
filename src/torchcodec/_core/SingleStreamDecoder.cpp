@@ -1487,7 +1487,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     case SeekMode::exact:
       return streamMetadata.numFramesFromScan.value();
     case SeekMode::approximate: {
-      return streamMetadata.numFrames.value();
+      return streamMetadata.numFrames;
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
