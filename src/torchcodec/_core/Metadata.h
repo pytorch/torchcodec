@@ -34,8 +34,8 @@ struct StreamMetadata {
 
   // More accurate duration, obtained by scanning the file.
   // These presentation timestamps are in time base.
-  std::optional<int64_t> minPtsFromScan;
-  std::optional<int64_t> maxPtsFromScan;
+  std::optional<int64_t> beginStreamPtsFromContent;
+  std::optional<int64_t> endStreamPtsFromContent;
   // These presentation timestamps are in seconds.
   std::optional<double> beginStreamSecondsFromContent;
   std::optional<double> endStreamSecondsFromContent;

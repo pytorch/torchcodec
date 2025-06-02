@@ -236,10 +236,11 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     // record its relevant metadata.
     int streamIndex = packet->stream_index;
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
-    streamMetadata.minPtsFromScan = std::min(
-        streamMetadata.minPtsFromScan.value_or(INT64_MAX), getPtsOrDts(packet));
-    streamMetadata.maxPtsFromScan = std::max(
-        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
+    streamMetadata.beginStreamPtsFromContent = std::min(
+        streamMetadata.beginStreamPtsFromContent.value_or(INT64_MAX),
+        getPtsOrDts(packet));
+    streamMetadata.endStreamPtsFromContent = std::max(
+        streamMetadata.endStreamPtsFromContent.value_or(INT64_MIN),
         getPtsOrDts(packet) + packet->duration);
     streamMetadata.numFramesFromContent =
         streamMetadata.numFramesFromContent.value_or(0) + 1;
@@ -265,13 +266,14 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     streamMetadata.numFramesFromContent =
         streamInfos_[streamIndex].allFrames.size();
 
-    if (streamMetadata.minPtsFromScan.has_value()) {
+    if (streamMetadata.beginStreamPtsFromContent.has_value()) {
       streamMetadata.beginStreamSecondsFromContent =
-          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
+          *streamMetadata.beginStreamPtsFromContent *
+          av_q2d(avStream->time_base);
     }
-    if (streamMetadata.maxPtsFromScan.has_value()) {
+    if (streamMetadata.endStreamPtsFromContent.has_value()) {
       streamMetadata.endStreamSecondsFromContent =
-          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
+          *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
     }
   }
 
