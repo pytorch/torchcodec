@@ -121,7 +121,7 @@ class SingleStreamDecoder {
   //
   // Valid values for startSeconds and stopSeconds are:
   //
-  //   [beginStreamSecondsFromContent, endStreamSecondsFromContent)
+  //   [beginStreamPtsSecondsFromContent, endStreamPtsSecondsFromContent)
   FrameBatchOutput getFramesPlayedInRange(
       double startSeconds,
       double stopSeconds);

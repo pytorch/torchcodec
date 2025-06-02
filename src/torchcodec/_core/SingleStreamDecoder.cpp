@@ -267,12 +267,12 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
         streamInfos_[streamIndex].allFrames.size();
 
     if (streamMetadata.beginStreamPtsFromContent.has_value()) {
-      streamMetadata.beginStreamSecondsFromContent =
+      streamMetadata.beginStreamPtsSecondsFromContent =
           *streamMetadata.beginStreamPtsFromContent *
           av_q2d(avStream->time_base);
     }
     if (streamMetadata.endStreamPtsFromContent.has_value()) {
-      streamMetadata.endStreamSecondsFromContent =
+      streamMetadata.endStreamPtsSecondsFromContent =
           *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
     }
   }
@@ -1479,7 +1479,7 @@ double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.beginStreamSecondsFromContent.value();
+      return streamMetadata.beginStreamPtsSecondsFromContent.value();
     case SeekMode::approximate:
       return 0;
     default:
@@ -1491,7 +1491,7 @@ double SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.endStreamSecondsFromContent.value();
+      return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
       TORCH_CHECK(
           streamMetadata.durationSecondsFromHeader.has_value(),

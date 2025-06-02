@@ -37,8 +37,8 @@ struct StreamMetadata {
   std::optional<int64_t> beginStreamPtsFromContent;
   std::optional<int64_t> endStreamPtsFromContent;
   // These presentation timestamps are in seconds.
-  std::optional<double> beginStreamSecondsFromContent;
-  std::optional<double> endStreamSecondsFromContent;
+  std::optional<double> beginStreamPtsSecondsFromContent;
+  std::optional<double> endStreamPtsSecondsFromContent;
   // This can be useful for index-based seeking.
   std::optional<int64_t> numFramesFromContent;
 
