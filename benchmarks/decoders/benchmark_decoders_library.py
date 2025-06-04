@@ -145,28 +145,20 @@ class TorchVision(AbstractDecoder):
         ]
         return frames
 
+
 class OpenCVDecoder(AbstractDecoder):
-    def __init__(self):
-        import cv2.videoio_registry as vr
+    def __init__(self, backend):
+        import cv2
+
+        self._available_backends = {"FFMPEG": cv2.CAP_FFMPEG}
+        self._backend = self._available_backends.get(backend)
 
         self._print_each_iteration_time = False
-        api_pref = None
-        # Check backend abi/api for compatibility
-        for backend in vr.getStreamBufferedBackends():
-            if not vr.hasBackend(backend):
-                continue
-            if not vr.isBackendBuiltIn(backend):
-                _, abi, api = vr.getStreamBufferedBackendPluginVersion(backend)
-                if (abi < 1 or (abi == 1 and api < 2)):
-                    continue
-            api_pref = backend
-            break
-        self._backend = api_pref
 
     def decode_frames(self, video_file, pts_list):
         import cv2
 
-        cap = cv2.VideoCapture(video_file, self._backend, [])
+        cap = cv2.VideoCapture(video_file, self._backend)
         if not cap.isOpened():
             raise ValueError("Could not open video stream")
 
@@ -194,7 +186,7 @@ class OpenCVDecoder(AbstractDecoder):
     def decode_first_n_frames(self, video_file, n):
         import cv2
 
-        cap = cv2.VideoCapture(video_file, self._backend, [])
+        cap = cv2.VideoCapture(video_file, self._backend)
         if not cap.isOpened():
             raise ValueError("Could not open video stream")
 
@@ -212,7 +204,11 @@ class OpenCVDecoder(AbstractDecoder):
 
     def decode_and_resize(self, video_file, pts_list, height, width, device):
         import cv2
-        frames = [cv2.resize(frame, (width, height)) for frame in self.decode_frames(video_file, pts_list)]
+
+        frames = [
+            cv2.resize(frame, (width, height))
+            for frame in self.decode_frames(video_file, pts_list)
+        ]
         return frames
 
 
