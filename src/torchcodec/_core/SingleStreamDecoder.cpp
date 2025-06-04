@@ -1490,10 +1490,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     case SeekMode::exact:
       return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
-      TORCH_CHECK(
-          streamMetadata.numFramesFromHeader.has_value(),
-          "Cannot use approximate mode since we couldn't find the number of frames from the metadata.");
-      return streamMetadata.numFramesFromHeader.value();
+      return streamMetadata.numFramesFromHeader;
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1518,10 +1515,7 @@ std::optional<double> SingleStreamDecoder::getMaxSeconds(
     case SeekMode::exact:
       return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
-      TORCH_CHECK(
-          streamMetadata.durationSecondsFromHeader.has_value(),
-          "Cannot use approximate mode since we couldn't find the duration from the metadata.");
-      return streamMetadata.durationSecondsFromHeader.value();
+      return streamMetadata.durationSecondsFromHeader;
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
