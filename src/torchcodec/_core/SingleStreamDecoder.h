@@ -304,9 +304,9 @@ class SingleStreamDecoder {
   // index. Note that this index may be truncated for some files.
   int getBestStreamIndex(AVMediaType mediaType);
 
-  int64_t getNumFrames(const StreamMetadata& streamMetadata);
+  std::optional<int64_t> getNumFrames(const StreamMetadata& streamMetadata);
   double getMinSeconds(const StreamMetadata& streamMetadata);
-  double getMaxSeconds(const StreamMetadata& streamMetadata);
+  std::optional<double> getMaxSeconds(const StreamMetadata& streamMetadata);
 
   // --------------------------------------------------------------------------
   // VALIDATION UTILS
