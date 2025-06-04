@@ -18,6 +18,7 @@ from benchmark_decoders_library import (
     AbstractDecoder,
     DecordAccurate,
     DecordAccurateBatch,
+    OpenCVDecoder,
     plot_data,
     run_benchmarks,
     TorchAudioDecoder,
@@ -28,7 +29,6 @@ from benchmark_decoders_library import (
     TorchCodecPublic,
     TorchCodecPublicNonBatch,
     TorchVision,
-    OpenCVDecoder,
 )
 
 
@@ -62,7 +62,9 @@ decoder_registry = {
         {"backend": "video_reader"},
     ),
     "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
-    "opencv": DecoderKind("OpenCV", OpenCVDecoder),
+    "opencv": DecoderKind(
+        "OpenCV[backend=FFMPEG]", OpenCVDecoder, {"backend": "FFMPEG"}
+    ),
 }
 
 
