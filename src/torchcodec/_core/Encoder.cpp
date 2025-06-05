@@ -8,7 +8,7 @@ namespace facebook::torchcodec {
 
 namespace {
 
-torch::Tensor validateSamples(torch::Tensor samples) {
+torch::Tensor validateSamples(const torch::Tensor& samples) {
   TORCH_CHECK(
       samples.dtype() == torch::kFloat32,
       "samples must have float32 dtype, got ",
@@ -101,7 +101,7 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
 AudioEncoder::~AudioEncoder() {}
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor samples,
+    const torch::Tensor& samples,
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
@@ -132,7 +132,7 @@ AudioEncoder::AudioEncoder(
 }
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor samples,
+    const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,

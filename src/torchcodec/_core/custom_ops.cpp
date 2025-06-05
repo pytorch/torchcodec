@@ -388,7 +388,7 @@ OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
 }
 
 void encode_audio_to_file(
-    const at::Tensor samples,
+    const at::Tensor& samples,
     int64_t sample_rate,
     std::string_view file_name,
     std::optional<int64_t> bit_rate = std::nullopt,
@@ -404,7 +404,7 @@ void encode_audio_to_file(
 }
 
 at::Tensor encode_audio_to_tensor(
-    const at::Tensor samples,
+    const at::Tensor& samples,
     int64_t sample_rate,
     std::string_view format,
     std::optional<int64_t> bit_rate = std::nullopt,

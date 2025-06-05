@@ -15,7 +15,7 @@ class AudioEncoder {
   // Passing 44_100 could result in output being 44000 if only 44000 is
   // supported.
   AudioEncoder(
-      const torch::Tensor samples,
+      const torch::Tensor& samples,
       // TODO-ENCODING: update this comment when we support an output sample
       // rate. This will become the input sample rate.
       // The *output* sample rate. We can't really decide for the user what it
@@ -26,7 +26,7 @@ class AudioEncoder {
       std::string_view fileName,
       const AudioStreamOptions& audioStreamOptions);
   AudioEncoder(
-      const torch::Tensor samples,
+      const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> avioContextHolder,
