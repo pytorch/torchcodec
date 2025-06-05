@@ -29,9 +29,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
-      "encode_audio_to_file(Tensor samples, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None) -> ()");
+      "encode_audio_to_file(Tensor samples, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> ()");
   m.def(
-      "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None) -> Tensor");
+      "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -392,12 +392,14 @@ void encode_audio_to_file(
     int64_t sample_rate,
     std::string_view file_name,
     std::optional<int64_t> bit_rate = std::nullopt,
-    std::optional<int64_t> num_channels = std::nullopt) {
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
   // TODO Fix implicit int conversion:
   // https://github.com/pytorch/torchcodec/issues/679
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
   AudioEncoder(
       samples, validateSampleRate(sample_rate), file_name, audioStreamOptions)
       .encode();
@@ -408,13 +410,15 @@ at::Tensor encode_audio_to_tensor(
     int64_t sample_rate,
     std::string_view format,
     std::optional<int64_t> bit_rate = std::nullopt,
-    std::optional<int64_t> num_channels = std::nullopt) {
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
   auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
   // TODO Fix implicit int conversion:
   // https://github.com/pytorch/torchcodec/issues/679
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
   return AudioEncoder(
              samples,
              validateSampleRate(sample_rate),
