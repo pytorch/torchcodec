@@ -145,6 +145,76 @@ class TorchVision(AbstractDecoder):
         ]
         return frames
 
+class OpenCVDecoder(AbstractDecoder):
+    def __init__(self):
+        import cv2.videoio_registry as vr
+
+        self._print_each_iteration_time = False
+        api_pref = None
+        # Check backend abi/api for compatibility
+        for backend in vr.getStreamBufferedBackends():
+            if not vr.hasBackend(backend):
+                continue
+            if not vr.isBackendBuiltIn(backend):
+                _, abi, api = vr.getStreamBufferedBackendPluginVersion(backend)
+                if (abi < 1 or (abi == 1 and api < 2)):
+                    continue
+            api_pref = backend
+            break
+        self._backend = api_pref
+
+    def decode_frames(self, video_file, pts_list):
+        import cv2
+
+        cap = cv2.VideoCapture(video_file, self._backend, [])
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        approx_frame_indices = [int(pts * fps) for pts in pts_list]
+
+        current_frame = 0
+        frames = []
+        while True:
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            if current_frame in approx_frame_indices:  # only decompress needed
+                ret, frame = cap.retrieve()
+                if ret:
+                    frames.append(frame)
+
+            if len(frames) == len(approx_frame_indices):
+                break
+            current_frame += 1
+        cap.release()
+        assert len(frames) == len(approx_frame_indices)
+        return frames
+
+    def decode_first_n_frames(self, video_file, n):
+        import cv2
+
+        cap = cv2.VideoCapture(video_file, self._backend, [])
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        frames = []
+        for i in range(n):
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            ret, frame = cap.retrieve()
+            if ret:
+                frames.append(frame)
+        cap.release()
+        assert len(frames) == n
+        return frames
+
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
+        import cv2
+        frames = [cv2.resize(frame, (width, height)) for frame in self.decode_frames(video_file, pts_list)]
+        return frames
+
 
 class TorchCodecCore(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
