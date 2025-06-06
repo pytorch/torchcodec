@@ -146,6 +146,80 @@ class TorchVision(AbstractDecoder):
         return frames
 
 
+class OpenCVDecoder(AbstractDecoder):
+    def __init__(self, backend):
+        import cv2
+
+        self.cv2 = cv2
+
+        self._available_backends = {"FFMPEG": cv2.CAP_FFMPEG}
+        self._backend = self._available_backends.get(backend)
+
+        self._print_each_iteration_time = False
+
+    def decode_frames(self, video_file, pts_list):
+        cap = self.cv2.VideoCapture(video_file, self._backend)
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        fps = cap.get(self.cv2.CAP_PROP_FPS)
+        approx_frame_indices = [int(pts * fps) for pts in pts_list]
+
+        current_frame = 0
+        frames = []
+        while True:
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            if current_frame in approx_frame_indices:  # only decompress needed
+                ret, frame = cap.retrieve()
+                if ret:
+                    # OpenCV uses BGR, change to RGB
+                    frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+                    # Update to C, H, W
+                    frame = np.transpose(frame, (2, 0, 1))
+                    frame = torch.from_numpy(frame)
+                    frames.append(frame)
+
+            if len(frames) == len(approx_frame_indices):
+                break
+            current_frame += 1
+        cap.release()
+        assert len(frames) == len(approx_frame_indices)
+        return frames
+
+    def decode_first_n_frames(self, video_file, n):
+        cap = self.cv2.VideoCapture(video_file, self._backend)
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        frames = []
+        for i in range(n):
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            ret, frame = cap.retrieve()
+            if ret:
+                # OpenCV uses BGR, change to RGB
+                frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+                # Update to C, H, W
+                frame = np.transpose(frame, (2, 0, 1))
+                frame = torch.from_numpy(frame)
+                frames.append(frame)
+        cap.release()
+        assert len(frames) == n
+        return frames
+
+    def decode_and_resize(self, video_file, pts_list, height, width, device):
+
+        # OpenCV doesn't apply antialias, while other `decode_and_resize()` implementations apply antialias by default.
+        frames = [
+            self.cv2.resize(frame, (width, height))
+            for frame in self.decode_frames(video_file, pts_list)
+        ]
+        return frames
+
+
 class TorchCodecCore(AbstractDecoder):
     def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
         self._num_threads = int(num_threads) if num_threads else None
