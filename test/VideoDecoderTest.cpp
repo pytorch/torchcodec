@@ -80,19 +80,19 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   const auto& videoStream = metadata.allStreamMetadata[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
   EXPECT_EQ(videoStream.codecName, "h264");
-  EXPECT_NEAR(*videoStream.averageFps, 29.97f, 1e-1);
+  EXPECT_NEAR(*videoStream.averageFpsFromHeader, 29.97f, 1e-1);
   EXPECT_NEAR(*videoStream.bitRate, 128783, 1e-1);
-  EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
-  EXPECT_EQ(videoStream.numFrames, 390);
-  EXPECT_FALSE(videoStream.minPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.maxPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
+  EXPECT_NEAR(*videoStream.durationSecondsFromHeader, 13.013, 1e-1);
+  EXPECT_EQ(videoStream.numFramesFromHeader, 390);
+  EXPECT_FALSE(videoStream.beginStreamPtsSecondsFromContent.has_value());
+  EXPECT_FALSE(videoStream.endStreamPtsSecondsFromContent.has_value());
+  EXPECT_FALSE(videoStream.numFramesFromContent.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
   const auto& videoStream1 = metadata.allStreamMetadata[3];
-  EXPECT_EQ(*videoStream1.minPtsSecondsFromScan, 0);
-  EXPECT_EQ(*videoStream1.maxPtsSecondsFromScan, 13.013);
-  EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
+  EXPECT_EQ(*videoStream1.beginStreamPtsSecondsFromContent, 0);
+  EXPECT_EQ(*videoStream1.endStreamPtsSecondsFromContent, 13.013);
+  EXPECT_EQ(*videoStream1.numFramesFromContent, 390);
 }
 
 TEST(SingleStreamDecoderTest, MissingVideoFileThrowsException) {
@@ -434,7 +434,7 @@ TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
 
   const auto& audioStream = metadata.allStreamMetadata[0];
   EXPECT_EQ(audioStream.mediaType, AVMEDIA_TYPE_AUDIO);
-  EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
+  EXPECT_NEAR(*audioStream.durationSecondsFromHeader, 13.25, 1e-1);
 }
 
 INSTANTIATE_TEST_SUITE_P(

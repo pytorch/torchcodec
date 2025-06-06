@@ -25,22 +25,22 @@ struct StreamMetadata {
   AVMediaType mediaType;
   std::optional<AVCodecID> codecId;
   std::optional<std::string> codecName;
-  std::optional<double> durationSeconds;
-  std::optional<double> beginStreamFromHeader;
-  std::optional<int64_t> numFrames;
+  std::optional<double> durationSecondsFromHeader;
+  std::optional<double> beginStreamSecondsFromHeader;
+  std::optional<int64_t> numFramesFromHeader;
   std::optional<int64_t> numKeyFrames;
-  std::optional<double> averageFps;
+  std::optional<double> averageFpsFromHeader;
   std::optional<double> bitRate;
 
   // More accurate duration, obtained by scanning the file.
   // These presentation timestamps are in time base.
-  std::optional<int64_t> minPtsFromScan;
-  std::optional<int64_t> maxPtsFromScan;
+  std::optional<int64_t> beginStreamPtsFromContent;
+  std::optional<int64_t> endStreamPtsFromContent;
   // These presentation timestamps are in seconds.
-  std::optional<double> minPtsSecondsFromScan;
-  std::optional<double> maxPtsSecondsFromScan;
+  std::optional<double> beginStreamPtsSecondsFromContent;
+  std::optional<double> endStreamPtsSecondsFromContent;
   // This can be useful for index-based seeking.
-  std::optional<int64_t> numFramesFromScan;
+  std::optional<int64_t> numFramesFromContent;
 
   // Video-only fields derived from the AVCodecContext.
   std::optional<int64_t> width;
@@ -58,7 +58,7 @@ struct ContainerMetadata {
   int numVideoStreams = 0;
   // Note that this is the container-level duration, which is usually the max
   // of all stream durations available in the container.
-  std::optional<double> durationSeconds;
+  std::optional<double> durationSecondsFromHeader;
   // Total BitRate level information at the container level in bit/s
   std::optional<double> bitRate;
   // If set, this is the index to the default audio stream.

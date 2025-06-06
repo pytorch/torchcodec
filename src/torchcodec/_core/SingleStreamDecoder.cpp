@@ -125,22 +125,22 @@ void SingleStreamDecoder::initializeDecoder() {
 
     int64_t frameCount = avStream->nb_frames;
     if (frameCount > 0) {
-      streamMetadata.numFrames = frameCount;
+      streamMetadata.numFramesFromHeader = frameCount;
     }
 
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
-      streamMetadata.durationSeconds =
+      streamMetadata.durationSecondsFromHeader =
           av_q2d(avStream->time_base) * avStream->duration;
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
-      streamMetadata.beginStreamFromHeader =
+      streamMetadata.beginStreamSecondsFromHeader =
           av_q2d(avStream->time_base) * avStream->start_time;
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
       double fps = av_q2d(avStream->r_frame_rate);
       if (fps > 0) {
-        streamMetadata.averageFps = fps;
+        streamMetadata.averageFpsFromHeader = fps;
       }
       containerMetadata_.numVideoStreams++;
     } else if (avStream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -163,7 +163,7 @@ void SingleStreamDecoder::initializeDecoder() {
 
   if (formatContext_->duration > 0) {
     AVRational defaultTimeBase{1, AV_TIME_BASE};
-    containerMetadata_.durationSeconds =
+    containerMetadata_.durationSecondsFromHeader =
         ptsToSeconds(formatContext_->duration, defaultTimeBase);
   }
 
@@ -236,13 +236,14 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     // record its relevant metadata.
     int streamIndex = packet->stream_index;
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
-    streamMetadata.minPtsFromScan = std::min(
-        streamMetadata.minPtsFromScan.value_or(INT64_MAX), getPtsOrDts(packet));
-    streamMetadata.maxPtsFromScan = std::max(
-        streamMetadata.maxPtsFromScan.value_or(INT64_MIN),
+    streamMetadata.beginStreamPtsFromContent = std::min(
+        streamMetadata.beginStreamPtsFromContent.value_or(INT64_MAX),
+        getPtsOrDts(packet));
+    streamMetadata.endStreamPtsFromContent = std::max(
+        streamMetadata.endStreamPtsFromContent.value_or(INT64_MIN),
         getPtsOrDts(packet) + packet->duration);
-    streamMetadata.numFramesFromScan =
-        streamMetadata.numFramesFromScan.value_or(0) + 1;
+    streamMetadata.numFramesFromContent =
+        streamMetadata.numFramesFromContent.value_or(0) + 1;
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
@@ -262,16 +263,17 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
     auto avStream = formatContext_->streams[streamIndex];
 
-    streamMetadata.numFramesFromScan =
+    streamMetadata.numFramesFromContent =
         streamInfos_[streamIndex].allFrames.size();
 
-    if (streamMetadata.minPtsFromScan.has_value()) {
-      streamMetadata.minPtsSecondsFromScan =
-          *streamMetadata.minPtsFromScan * av_q2d(avStream->time_base);
+    if (streamMetadata.beginStreamPtsFromContent.has_value()) {
+      streamMetadata.beginStreamPtsSecondsFromContent =
+          *streamMetadata.beginStreamPtsFromContent *
+          av_q2d(avStream->time_base);
     }
-    if (streamMetadata.maxPtsFromScan.has_value()) {
-      streamMetadata.maxPtsSecondsFromScan =
-          *streamMetadata.maxPtsFromScan * av_q2d(avStream->time_base);
+    if (streamMetadata.endStreamPtsFromContent.has_value()) {
+      streamMetadata.endStreamPtsSecondsFromContent =
+          *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
     }
   }
 
@@ -445,7 +447,7 @@ void SingleStreamDecoder::addVideoStream(
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
 
   if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFps.has_value()) {
+      !streamMetadata.averageFpsFromHeader.has_value()) {
     throw std::runtime_error(
         "Seek mode is approximate, but stream " +
         std::to_string(activeStreamIndex_) +
@@ -1422,9 +1424,9 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
-      return std::floor(seconds * streamMetadata.averageFps.value());
+      return std::floor(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1449,9 +1451,9 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
-      return std::ceil(seconds * streamMetadata.averageFps.value());
+      return std::ceil(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1467,10 +1469,11 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
       TORCH_CHECK(
-          streamMetadata.averageFps.has_value(),
+          streamMetadata.averageFpsFromHeader.has_value(),
           "Cannot use approximate mode since we couldn't find the average fps from the metadata.");
       return secondsToClosestPts(
-          frameIndex / streamMetadata.averageFps.value(), streamInfo.timeBase);
+          frameIndex / streamMetadata.averageFpsFromHeader.value(),
+          streamInfo.timeBase);
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1485,9 +1488,9 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.numFramesFromScan.value();
+      return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
-      return streamMetadata.numFrames;
+      return streamMetadata.numFramesFromHeader;
     }
     default:
       throw std::runtime_error("Unknown SeekMode");
@@ -1498,7 +1501,7 @@ double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.minPtsSecondsFromScan.value();
+      return streamMetadata.beginStreamPtsSecondsFromContent.value();
     case SeekMode::approximate:
       return 0;
     default:
@@ -1510,9 +1513,9 @@ std::optional<double> SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
     case SeekMode::exact:
-      return streamMetadata.maxPtsSecondsFromScan.value();
+      return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
-      return streamMetadata.durationSeconds;
+      return streamMetadata.durationSecondsFromHeader;
     }
     default:
       throw std::runtime_error("Unknown SeekMode");

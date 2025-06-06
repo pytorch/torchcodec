@@ -213,7 +213,7 @@ class VideoClipSampler(nn.Module):
         sample_end_index = (
             min(
                 index_based_sampler_args.sample_end_index + 1,
-                metadata_json["numFrames"],
+                metadata_json["numFramesFromHeader"],
             )
             - index_based_sampler_args.video_frame_dilation
             * index_based_sampler_args.frames_per_clip
@@ -263,26 +263,26 @@ class VideoClipSampler(nn.Module):
         Returns:
             (`List[float]`): List of the sampled clip start position in seconds
         """
-        video_duration_in_seconds = metadata_json["durationSeconds"]
+        video_duration_in_seconds = metadata_json["durationSecondsFromHeader"]
 
         clip_duration_in_seconds = (
             time_based_sampler_args.frames_per_clip
             * time_based_sampler_args.video_frame_dilation
             + 1
-        ) / metadata_json["averageFps"]
+        ) / metadata_json["averageFpsFromHeader"]
 
-        minPtsSecondsFromScan = (
-            metadata_json["minPtsSecondsFromScan"]
-            if metadata_json["minPtsSecondsFromScan"]
+        beginStreamSecondsFromContent = (
+            metadata_json["beginStreamSecondsFromContent"]
+            if metadata_json["beginStreamSecondsFromContent"]
             else 0
         )
-        maxPtsSecondsFromScan = (
-            metadata_json["maxPtsSecondsFromScan"]
-            if metadata_json["maxPtsSecondsFromScan"] > 0
+        endStreamSecondsFromContent = (
+            metadata_json["endStreamSecondsFromContent"]
+            if metadata_json["endStreamSecondsFromContent"] > 0
             else video_duration_in_seconds
         )
         last_possible_clip_start_in_seconds = (
-            maxPtsSecondsFromScan - clip_duration_in_seconds
+            endStreamSecondsFromContent - clip_duration_in_seconds
         )
         if last_possible_clip_start_in_seconds < 0:
             raise VideoTooShortException(
@@ -292,7 +292,7 @@ class VideoClipSampler(nn.Module):
         clip_starts_in_seconds: List[float] = []
         sample_start_second = max(
             time_based_sampler_args.sample_start_second,
-            minPtsSecondsFromScan,
+            beginStreamSecondsFromContent,
         )
         sample_end_second = min(
             last_possible_clip_start_in_seconds,
