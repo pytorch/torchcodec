@@ -263,3 +263,13 @@ class TestAudioEncoder:
         if num_channels_output is None:
             num_channels_output = num_channels_input
         assert self.decode(encoded_source).shape[0] == num_channels_output
+
+    def test_1d_samples(self):
+        # smoke test making sure 1D samples are supported
+        samples_1d, sample_rate = torch.rand(1000), 16_000
+        samples_2d = samples_1d[None, :]
+
+        torch.testing.assert_close(
+            AudioEncoder(samples_1d, sample_rate=sample_rate).to_tensor("wav"),
+            AudioEncoder(samples_2d, sample_rate=sample_rate).to_tensor("wav"),
+        )
