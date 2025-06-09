@@ -8,6 +8,14 @@ from torchcodec import _core
 
 
 class AudioEncoder:
+    """An audio encoder.
+
+    Args:
+        samples (``torch.Tensor``): The samples to encode. This must be a 2D
+            tensor of shape ``(num_channels, num_samples)``
+        sample_rate (int): The sample rate of the **input** ``samples``.    
+    """
+
     def __init__(self, samples: Tensor, *, sample_rate: int):
         # Some of these checks are also done in C++: it's OK, they're cheap, and
         # doing them here allows to surface them when the AudioEncoder is
@@ -33,6 +41,20 @@ class AudioEncoder:
         bit_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
     ) -> None:
+        """Encode samples into a file.
+
+        Args:
+            dest (str or ``pathlib.Path``): The path to the output file, e.g.
+                ``audio.mp3``. The extension of the file determines the audio
+                format and container.
+            bit_rate (int, optional): The output bit rate. Encoders typically
+                support a finite set of bit rate values, so ``bit_rate`` will be
+                matched to one of those supported values. The default is chosen
+                by FFmpeg.
+            num_channels (int, optional): The number of channels of the encoded
+                output samples. By default, the number of channels of the input
+                ``samples`` is used.
+        """
         _core.encode_audio_to_file(
             samples=self._samples,
             sample_rate=self._sample_rate,
@@ -48,6 +70,22 @@ class AudioEncoder:
         bit_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
     ) -> Tensor:
+        """Encode samples into raw bytes, as a 1D uint8 Tensor.
+
+        Args:
+            format (str): The format of the encoded samples, e.g. "mp3", "wav"
+                or "flac".
+            bit_rate (int, optional): The output bit rate. Encoders typically
+                support a finite set of bit rate values, so ``bit_rate`` will be
+                matched to one of those supported values. The default is chosen
+                by FFmpeg.
+            num_channels (int, optional): The number of channels of the encoded
+                output samples. By default, the number of channels of the input
+                ``samples`` is used.
+
+        Returns:
+            Tensor: The raw encoded bytes as 1D uint8 Tensor.
+        """
         return _core.encode_audio_to_tensor(
             samples=self._samples,
             sample_rate=self._sample_rate,

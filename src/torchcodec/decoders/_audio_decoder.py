@@ -26,7 +26,8 @@ class AudioDecoder:
     Returned samples are float samples normalized in [-1, 1]
 
     Args:
-        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like object): The source of the video:
+        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like
+            object): The source of the video or audio:
 
             - If ``str``: a local path or a URL to a video or audio file.
             - If ``Pathlib.path``: a path to a local video or audio file.
