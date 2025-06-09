@@ -61,7 +61,7 @@ def plot(frames: torch.Tensor, title : Optional[str] = None):
 # Sampling clips from a video always starts by creating a
 # :class:`~torchcodec.decoders.VideoDecoder` object. If you're not already
 # familiar with :class:`~torchcodec.decoders.VideoDecoder`, take a quick look
-# at: :ref:`sphx_glr_generated_examples_basic_example.py`.
+# at: :ref:`sphx_glr_generated_examples_decoding_basic_example.py`.
 from torchcodec.decoders import VideoDecoder
 
 # You can also pass a path to a local file!

@@ -68,18 +68,24 @@ class CustomGalleryExampleSortKey:
     def __init__(self, src_dir):
         self.src_dir = src_dir
 
-    order = [
-        "basic_example.py",
-        "audio_decoding.py",
-        "basic_cuda_example.py",
-        "file_like.py",
-        "approximate_mode.py",
-        "sampling.py",
-    ]
-
     def __call__(self, filename):
+        if "examples/decoding" in self.src_dir:
+            order = [
+                "basic_example.py",
+                "audio_decoding.py",
+                "basic_cuda_example.py",
+                "file_like.py",
+                "approximate_mode.py",
+                "sampling.py",
+            ]
+        else:
+            assert "examples/encoding" in self.src_dir
+            order = [
+                "audio_encoding.py",
+            ]
+
         try:
-            return self.order.index(filename)
+            return order.index(filename)
         except ValueError as e:
             raise ValueError(
                 "Looks like you added an example in the examples/ folder?"

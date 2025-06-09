@@ -7,8 +7,8 @@ torchcodec.decoders
 .. currentmodule:: torchcodec.decoders
 
 
-For a video decoder tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
-For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_audio_decoding.py`.
+For a video decoder tutorial, see: :ref:`sphx_glr_generated_examples_decoding_basic_example.py`.
+For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_decoding_audio_decoding.py`.
 
 
 .. autosummary::

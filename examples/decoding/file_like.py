@@ -96,7 +96,7 @@ print(decoder.metadata)
 # the :class:`~torchcodec.decoders.VideoDecoder` class to ``"approximate"``. We do
 # this to avoid scanning the entire video during initialization, which would
 # require downloading the entire video even if we only want to decode the first
-# frame. See :ref:`sphx_glr_generated_examples_approximate_mode.py` for more.
+# frame. See :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py` for more.
 
 
 def decode_from_existing_download():

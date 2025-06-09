@@ -60,7 +60,7 @@ class FrameBatch(Iterable):
 
     The ``data`` tensor is typically 4D for sequences of frames (NHWC or NCHW),
     or 5D for sequences of clips, as returned by the :ref:`samplers
-    <sphx_glr_generated_examples_sampling.py>`. When ``data`` is 4D (resp.  5D)
+    <sphx_glr_generated_examples_decoding_sampling.py>`. When ``data`` is 4D (resp.  5D)
     the ``pts_seconds`` and ``duration_seconds`` tensors are 1D (resp. 2D).
 
     .. note::
