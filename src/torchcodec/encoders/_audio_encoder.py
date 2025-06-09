@@ -12,8 +12,10 @@ class AudioEncoder:
 
     Args:
         samples (``torch.Tensor``): The samples to encode. This must be a 2D
-            tensor of shape ``(num_channels, num_samples)``
-        sample_rate (int): The sample rate of the **input** ``samples``.    
+            tensor of shape ``(num_channels, num_samples)``, or a 1D tensor in
+            which case ``num_channels = 1`` is assumed. Values must be float
+            values in ``[-1, 1]``.
+        sample_rate (int): The sample rate of the **input** ``samples``.
     """
 
     def __init__(self, samples: Tensor, *, sample_rate: int):
@@ -24,8 +26,11 @@ class AudioEncoder:
             raise ValueError(
                 f"Expected samples to be a Tensor, got {type(samples) = }."
             )
+        if samples.ndim == 1:
+            # make it 2D and assume 1 channel
+            samples = samples[None, :]
         if samples.ndim != 2:
-            raise ValueError(f"Expected 2D samples, got {samples.shape = }.")
+            raise ValueError(f"Expected 1D or 2D samples, got {samples.shape = }.")
         if samples.dtype != torch.float32:
             raise ValueError(f"Expected float32 samples, got {samples.dtype = }.")
         if sample_rate <= 0:

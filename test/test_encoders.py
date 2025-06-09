@@ -26,8 +26,8 @@ class TestAudioEncoder:
     def test_bad_input(self):
         with pytest.raises(ValueError, match="Expected samples to be a Tensor"):
             AudioEncoder(samples=123, sample_rate=32_000)
-        with pytest.raises(ValueError, match="Expected 2D samples"):
-            AudioEncoder(samples=torch.rand(10), sample_rate=32_000)
+        with pytest.raises(ValueError, match="Expected 1D or 2D samples"):
+            AudioEncoder(samples=torch.rand(3, 4, 5), sample_rate=32_000)
         with pytest.raises(ValueError, match="Expected float32 samples"):
             AudioEncoder(
                 samples=torch.rand(10, 10, dtype=torch.float64), sample_rate=32_000
