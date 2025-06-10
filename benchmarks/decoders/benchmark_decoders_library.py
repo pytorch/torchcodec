@@ -372,7 +372,7 @@ class TorchCodecPublic(AbstractDecoder):
         num_ffmpeg_threads=None,
         device="cpu",
         seek_mode="exact",
-        stream_index: int | None = None,
+        stream_index=None,
     ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
@@ -536,7 +536,7 @@ class TorchCodecCoreCompiled(AbstractDecoder):
 
 
 class TorchAudioDecoder(AbstractDecoder):
-    def __init__(self):
+    def __init__(self, stream_index=None):
         import torchaudio  # noqa: F401
 
         self.torchaudio = torchaudio
@@ -544,11 +544,14 @@ class TorchAudioDecoder(AbstractDecoder):
         from torchvision.transforms import v2 as transforms_v2
 
         self.transforms_v2 = transforms_v2
+        self._stream_index = int(stream_index) if stream_index else None
 
     def decode_frames(self, video_file, pts_list):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "0"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "0"},
+            stream_index=self._stream_index,
         )
         frames = []
         for pts in pts_list:
@@ -561,7 +564,9 @@ class TorchAudioDecoder(AbstractDecoder):
     def decode_first_n_frames(self, video_file, n):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "0"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "0"},
+            stream_index=self._stream_index,
         )
         frames = []
         frame_cnt = 0
@@ -576,7 +581,9 @@ class TorchAudioDecoder(AbstractDecoder):
     def decode_and_resize(self, video_file, pts_list, height, width, device):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "1"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "1"},
+            stream_index=self._stream_index,
         )
         frames = []
         for pts in pts_list:
