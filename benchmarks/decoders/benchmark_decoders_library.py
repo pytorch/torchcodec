@@ -425,6 +425,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         frames = decoder.get_frames_played_at(pts_list)
         frames = self.transforms_v2.functional.resize(frames.data, (height, width))
@@ -828,7 +829,7 @@ def run_benchmarks(
         # are using different random pts values across videos.
         random_pts_list = (torch.rand(num_samples) * duration).tolist()
 
-        for decoder_name, decoder in decoder_dict.items():
+        for decoder_name, decoder in sorted(decoder_dict.items(), key=lambda x: x[0]):
             print(f"video={video_file_path}, decoder={decoder_name}")
 
             if dataloader_parameters:
