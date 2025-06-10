@@ -93,6 +93,7 @@ class TestDecoder:
         decoder = Decoder(source)
         assert isinstance(decoder.metadata, _core._metadata.StreamMetadata)
 
+
     @pytest.mark.parametrize("Decoder", (VideoDecoder, AudioDecoder))
     def test_create_fails(self, Decoder):
         with pytest.raises(TypeError, match="Unknown source type"):
@@ -125,6 +126,22 @@ class TestVideoDecoder:
         assert decoder.metadata.num_frames == 390
         assert decoder.metadata.height == 270
         assert decoder.metadata.width == 480
+
+    def test_create_bytes_ownership(self):
+        # Note that the bytes object we use to instantiate the decoder does not
+        # live past the VideoDecoder destructor. That is what we're testing:
+        # that the VideoDecoder takes ownership of the bytes. If it does not,
+        # then we will hit errors when we try to actually decode from the bytes
+        # later on. By the time we actually decode, the reference on the Python
+        # side has gone away, and if we don't have ownership on the C++ side, we
+        # will hit runtime errors or segfaults.
+        with open(NASA_VIDEO.path, "rb") as f:
+            decoder = VideoDecoder(f.read())
+
+        assert decoder[0] is not None
+        assert decoder[len(decoder)//2] is not None
+        assert decoder[-1] is not None
+
 
     def test_create_fails(self):
         with pytest.raises(ValueError, match="Invalid seek mode"):
