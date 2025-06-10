@@ -367,10 +367,17 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 
 class TorchCodecPublic(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="exact"):
+    def __init__(
+        self,
+        num_ffmpeg_threads=None,
+        device="cpu",
+        seek_mode="exact",
+        stream_index: int | None = None,
+    ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
         self._seek_mode = seek_mode
+        self._stream_index = int(stream_index) if stream_index else None
 
         from torchvision.transforms import v2 as transforms_v2
 
@@ -385,6 +392,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         return decoder.get_frames_played_at(pts_list)
 
@@ -397,6 +405,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         frames = []
         count = 0
