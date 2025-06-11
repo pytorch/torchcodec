@@ -13,7 +13,6 @@ namespace {
 
 constexpr int64_t INITIAL_TENSOR_SIZE = 10'000'000; // 10 MB
 constexpr int64_t MAX_TENSOR_SIZE = 320'000'000; // 320 MB
-                                                 //
 
 // The signature of this function is defined by FFMPEG.
 int read(void* opaque, uint8_t* buf, int buf_size) {
