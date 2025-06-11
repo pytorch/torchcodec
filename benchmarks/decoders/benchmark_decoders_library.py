@@ -202,15 +202,6 @@ class OpenCVDecoder(AbstractDecoder):
         assert len(frames) == n
         return frames
 
-    def decode_and_resize(self, video_file, pts_list, height, width, device):
-
-        # OpenCV doesn't apply antialias, while other `decode_and_resize()` implementations apply antialias by default.
-        frames = [
-            self.cv2.resize(frame, (width, height))
-            for frame in self.decode_frames(video_file, pts_list)
-        ]
-        return frames
-
     def convert_frame_to_rgb_tensor(self, frame):
         # OpenCV uses BGR, change to RGB
         frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
