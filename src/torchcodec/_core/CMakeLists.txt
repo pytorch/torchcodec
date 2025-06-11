@@ -65,7 +65,7 @@ function(make_torchcodec_libraries
     set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
     set(decoder_sources
         AVIOContextHolder.cpp
-        AVIOBytesContext.cpp
+        AVIOTensorContext.cpp
         FFMPEGCommon.cpp
         Frame.cpp
         DeviceInterface.cpp
@@ -102,7 +102,7 @@ function(make_torchcodec_libraries
     # 2. Create libtorchcodec_custom_opsN.{ext}.
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
     set(custom_ops_sources
-        AVIOBytesContext.cpp
+        AVIOTensorContext.cpp
         custom_ops.cpp
     )
     set(custom_ops_dependencies

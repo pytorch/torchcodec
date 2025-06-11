@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import contextlib
+import gc
 
 import numpy
 import pytest
@@ -125,6 +126,32 @@ class TestVideoDecoder:
         assert decoder.metadata.num_frames == 390
         assert decoder.metadata.height == 270
         assert decoder.metadata.width == 480
+
+    def test_create_bytes_ownership(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/720
+        #
+        # Note that the bytes object we use to instantiate the decoder does not
+        # live past the VideoDecoder destructor. That is what we're testing:
+        # that the VideoDecoder takes ownership of the bytes. If it does not,
+        # then we will hit errors when we try to actually decode from the bytes
+        # later on. By the time we actually decode, the reference on the Python
+        # side has gone away, and if we don't have ownership on the C++ side, we
+        # will hit runtime errors or segfaults.
+        #
+        # Also note that if this test fails, OTHER tests will likely
+        # mysteriously fail. That's because a failure in this tests likely
+        # indicates memory corruption, and the memory we corrupt could easily
+        # cause problems in other tests. So if this test fails, fix this test
+        # first.
+        with open(NASA_VIDEO.path, "rb") as f:
+            decoder = VideoDecoder(f.read())
+
+        # Let's ensure that the bytes really go away!
+        gc.collect()
+
+        assert decoder[0] is not None
+        assert decoder[len(decoder) // 2] is not None
+        assert decoder[-1] is not None
 
     def test_create_fails(self):
         with pytest.raises(ValueError, match="Invalid seek mode"):

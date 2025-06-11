@@ -10,7 +10,7 @@
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
@@ -196,15 +196,13 @@ at::Tensor create_from_tensor(
   TORCH_CHECK(
       video_tensor.scalar_type() == torch::kUInt8,
       "video_tensor must be kUInt8");
-  void* data = video_tensor.mutable_data_ptr();
-  size_t length = video_tensor.numel();
 
   SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
+  auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
