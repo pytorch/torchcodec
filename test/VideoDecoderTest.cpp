@@ -52,7 +52,8 @@ class SingleStreamDecoderTest : public testing::TestWithParam<bool> {
 
       void* buffer = content_.data();
       size_t length = content_.length();
-      auto contextHolder = std::make_unique<AVIOFromTensorContext>(buffer, length);
+      auto contextHolder =
+          std::make_unique<AVIOFromTensorContext>(buffer, length);
       return std::make_unique<SingleStreamDecoder>(
           std::move(contextHolder), SingleStreamDecoder::SeekMode::approximate);
     } else {
