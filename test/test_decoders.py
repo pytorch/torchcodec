@@ -134,6 +134,12 @@ class TestVideoDecoder:
         # later on. By the time we actually decode, the reference on the Python
         # side has gone away, and if we don't have ownership on the C++ side, we
         # will hit runtime errors or segfaults.
+        #
+        # Also note that if this test fails, OTHER tests will likely
+        # mysteriously fail. That's because a failure in this tests likely
+        # indicates memory corruption, and the memory we corrupt could easily
+        # cause problems in other tests. So if this test fails, fix this test
+        # first.
         with open(NASA_VIDEO.path, "rb") as f:
             decoder = VideoDecoder(f.read())
 
