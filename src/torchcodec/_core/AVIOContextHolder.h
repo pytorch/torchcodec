@@ -27,8 +27,9 @@ namespace facebook::torchcodec {
 //           tracks the custom behavior of reading, seeking and writing. It is
 //           provided upon AVIOContext creation and to the read, seek and
 //           write callback functions.
-//      While it's not required, it is natural for the derived classes to make
-//      all of the above members. Base classes need to call
+//      The callback functions do not need to be members of the derived class,
+//      but the derived class must have access to them. The context object must
+//      be a member of the derived class. Derived classes need to call
 //      createAVIOContext(), ideally in their constructor.
 //  3. A generic handle for those that just need to manage having access to an
 //     AVIOContext, but aren't necessarily concerned with how it was customized:

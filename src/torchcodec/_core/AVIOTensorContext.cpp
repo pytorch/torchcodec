@@ -16,7 +16,7 @@ constexpr int64_t MAX_TENSOR_SIZE = 320'000'000; // 320 MB
 
 // The signature of this function is defined by FFMPEG.
 int read(void* opaque, uint8_t* buf, int buf_size) {
-  auto tensorContext = static_cast<TensorContext*>(opaque);
+  auto tensorContext = static_cast<detail::TensorContext*>(opaque);
   TORCH_CHECK(
       tensorContext->current <= tensorContext->data.numel(),
       "Tried to read outside of the buffer: current=",
@@ -51,7 +51,7 @@ int read(void* opaque, uint8_t* buf, int buf_size) {
 
 // The signature of this function is defined by FFMPEG.
 int write(void* opaque, const uint8_t* buf, int buf_size) {
-  auto tensorContext = static_cast<TensorContext*>(opaque);
+  auto tensorContext = static_cast<detail::TensorContext*>(opaque);
 
   int64_t bufSize = static_cast<int64_t>(buf_size);
   if (tensorContext->current + bufSize > tensorContext->data.numel()) {
@@ -80,7 +80,7 @@ int write(void* opaque, const uint8_t* buf, int buf_size) {
 
 // The signature of this function is defined by FFMPEG.
 int64_t seek(void* opaque, int64_t offset, int whence) {
-  auto tensorContext = static_cast<TensorContext*>(opaque);
+  auto tensorContext = static_cast<detail::TensorContext*>(opaque);
   int64_t ret = -1;
 
   switch (whence) {

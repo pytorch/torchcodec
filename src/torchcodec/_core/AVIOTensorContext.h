@@ -11,10 +11,14 @@
 
 namespace facebook::torchcodec {
 
+namespace detail {
+
 struct TensorContext {
   torch::Tensor data;
   int64_t current;
 };
+
+} // namespace detail
 
 // For Decoding: enables users to pass in the entire video or audio as bytes.
 // Our read and seek functions then traverse the bytes in memory.
@@ -23,7 +27,7 @@ class AVIOFromTensorContext : public AVIOContextHolder {
   explicit AVIOFromTensorContext(torch::Tensor data);
 
  private:
-  TensorContext tensorContext_;
+  detail::TensorContext tensorContext_;
 };
 
 // For Encoding: used to encode into an output uint8 (bytes) tensor.
@@ -33,7 +37,7 @@ class AVIOToTensorContext : public AVIOContextHolder {
   torch::Tensor getOutputTensor();
 
  private:
-  TensorContext tensorContext_;
+  detail::TensorContext tensorContext_;
 };
 
 } // namespace facebook::torchcodec
