@@ -196,15 +196,13 @@ at::Tensor create_from_tensor(
   TORCH_CHECK(
       video_tensor.scalar_type() == torch::kUInt8,
       "video_tensor must be kUInt8");
-  void* data = video_tensor.mutable_data_ptr();
-  size_t length = video_tensor.numel();
 
   SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
+  auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);

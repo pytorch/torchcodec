@@ -9,117 +9,87 @@
 
 namespace facebook::torchcodec {
 
-AVIOBytesContext::AVIOBytesContext(const void* data, int64_t dataSize)
-    : dataContext_{static_cast<const uint8_t*>(data), dataSize, 0} {
-  TORCH_CHECK(data != nullptr, "Video data buffer cannot be nullptr!");
-  TORCH_CHECK(dataSize > 0, "Video data size must be positive");
-  createAVIOContext(&read, nullptr, &seek, &dataContext_);
-}
+namespace {
+
+constexpr int64_t INITIAL_TENSOR_SIZE = 10'000'000; // 10 MB
+constexpr int64_t MAX_TENSOR_SIZE = 320'000'000; // 320 MB
+                                                 //
 
 // The signature of this function is defined by FFMPEG.
-int AVIOBytesContext::read(void* opaque, uint8_t* buf, int buf_size) {
-  auto dataContext = static_cast<DataContext*>(opaque);
+int read(void* opaque, uint8_t* buf, int buf_size) {
+  auto tensorContext = static_cast<TensorContext*>(opaque);
   TORCH_CHECK(
-      dataContext->current <= dataContext->size,
+      tensorContext->current <= tensorContext->data.numel(),
       "Tried to read outside of the buffer: current=",
-      dataContext->current,
+      tensorContext->current,
       ", size=",
-      dataContext->size);
+      tensorContext->data.numel());
 
   int64_t numBytesRead = std::min(
-      static_cast<int64_t>(buf_size), dataContext->size - dataContext->current);
+      static_cast<int64_t>(buf_size),
+      tensorContext->data.numel() - tensorContext->current);
 
   TORCH_CHECK(
       numBytesRead >= 0,
       "Tried to read negative bytes: numBytesRead=",
       numBytesRead,
       ", size=",
-      dataContext->size,
+      tensorContext->data.numel(),
       ", current=",
-      dataContext->current);
+      tensorContext->current);
 
   if (numBytesRead == 0) {
     return AVERROR_EOF;
   }
 
-  std::memcpy(buf, dataContext->data + dataContext->current, numBytesRead);
-  dataContext->current += numBytesRead;
+  std::memcpy(
+      buf,
+      tensorContext->data.data_ptr<uint8_t>() + tensorContext->current,
+      numBytesRead);
+  tensorContext->current += numBytesRead;
   return numBytesRead;
 }
 
 // The signature of this function is defined by FFMPEG.
-int64_t AVIOBytesContext::seek(void* opaque, int64_t offset, int whence) {
-  auto dataContext = static_cast<DataContext*>(opaque);
-  int64_t ret = -1;
-
-  switch (whence) {
-    case AVSEEK_SIZE:
-      ret = dataContext->size;
-      break;
-    case SEEK_SET:
-      dataContext->current = offset;
-      ret = offset;
-      break;
-    default:
-      break;
-  }
-
-  return ret;
-}
-
-AVIOToTensorContext::AVIOToTensorContext()
-    : dataContext_{
-          torch::empty(
-              {AVIOToTensorContext::INITIAL_TENSOR_SIZE},
-              {torch::kUInt8}),
-          0} {
-  createAVIOContext(nullptr, &write, &seek, &dataContext_);
-}
-
-// The signature of this function is defined by FFMPEG.
-int AVIOToTensorContext::write(void* opaque, const uint8_t* buf, int buf_size) {
-  auto dataContext = static_cast<DataContext*>(opaque);
+int write(void* opaque, const uint8_t* buf, int buf_size) {
+  auto tensorContext = static_cast<TensorContext*>(opaque);
 
   int64_t bufSize = static_cast<int64_t>(buf_size);
-  if (dataContext->current + bufSize > dataContext->outputTensor.numel()) {
+  if (tensorContext->current + bufSize > tensorContext->data.numel()) {
     TORCH_CHECK(
-        dataContext->outputTensor.numel() * 2 <=
-            AVIOToTensorContext::MAX_TENSOR_SIZE,
+        tensorContext->data.numel() * 2 <= MAX_TENSOR_SIZE,
         "We tried to allocate an output encoded tensor larger than ",
-        AVIOToTensorContext::MAX_TENSOR_SIZE,
+        MAX_TENSOR_SIZE,
         " bytes. If you think this should be supported, please report.");
 
     // We double the size of the outpout tensor. Calling cat() may not be the
     // most efficient, but it's simple.
-    dataContext->outputTensor =
-        torch::cat({dataContext->outputTensor, dataContext->outputTensor});
+    tensorContext->data =
+        torch::cat({tensorContext->data, tensorContext->data});
   }
 
   TORCH_CHECK(
-      dataContext->current + bufSize <= dataContext->outputTensor.numel(),
+      tensorContext->current + bufSize <= tensorContext->data.numel(),
       "Re-allocation of the output tensor didn't work. ",
       "This should not happen, please report on TorchCodec bug tracker");
 
-  uint8_t* outputTensorData = dataContext->outputTensor.data_ptr<uint8_t>();
-  std::memcpy(outputTensorData + dataContext->current, buf, bufSize);
-  dataContext->current += bufSize;
+  uint8_t* outputTensorData = tensorContext->data.data_ptr<uint8_t>();
+  std::memcpy(outputTensorData + tensorContext->current, buf, bufSize);
+  tensorContext->current += bufSize;
   return buf_size;
 }
 
 // The signature of this function is defined by FFMPEG.
-// Note: This `seek()` implementation is very similar to that of
-// AVIOBytesContext. We could consider merging both classes, or do some kind of
-// refac, but this doesn't seem worth it ATM.
-int64_t AVIOToTensorContext::seek(void* opaque, int64_t offset, int whence) {
-  auto dataContext = static_cast<DataContext*>(opaque);
+int64_t seek(void* opaque, int64_t offset, int whence) {
+  auto tensorContext = static_cast<TensorContext*>(opaque);
   int64_t ret = -1;
 
   switch (whence) {
     case AVSEEK_SIZE:
-      ret = dataContext->outputTensor.numel();
+      ret = tensorContext->data.numel();
       break;
     case SEEK_SET:
-      dataContext->current = offset;
+      tensorContext->current = offset;
       ret = offset;
       break;
     default:
@@ -129,9 +99,24 @@ int64_t AVIOToTensorContext::seek(void* opaque, int64_t offset, int whence) {
   return ret;
 }
 
+} // namespace
+
+AVIOFromTensorContext::AVIOFromTensorContext(torch::Tensor data)
+    : tensorContext_{data, 0} {
+  TORCH_CHECK(data.numel() > 0, "data must not be empty");
+  TORCH_CHECK(data.is_contiguous(), "data must be contiguous");
+  TORCH_CHECK(data.scalar_type() == torch::kUInt8, "data must be kUInt8");
+  createAVIOContext(&read, nullptr, &seek, &tensorContext_);
+}
+
+AVIOToTensorContext::AVIOToTensorContext()
+    : tensorContext_{torch::empty({INITIAL_TENSOR_SIZE}, {torch::kUInt8}), 0} {
+  createAVIOContext(nullptr, &write, &seek, &tensorContext_);
+}
+
 torch::Tensor AVIOToTensorContext::getOutputTensor() {
-  return dataContext_.outputTensor.narrow(
-      /*dim=*/0, /*start=*/0, /*length=*/dataContext_.current);
+  return tensorContext_.data.narrow(
+      /*dim=*/0, /*start=*/0, /*length=*/tensorContext_.current);
 }
 
 } // namespace facebook::torchcodec
