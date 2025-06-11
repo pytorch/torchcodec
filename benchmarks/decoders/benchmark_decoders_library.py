@@ -853,6 +853,7 @@ def run_benchmarks(
         # are using different random pts values across videos.
         random_pts_list = (torch.rand(num_samples) * duration).tolist()
 
+        # The decoder items are sorted to perform and display the benchmarks in a consistent order.
         for decoder_name, decoder in sorted(decoder_dict.items(), key=lambda x: x[0]):
             print(f"video={video_file_path}, decoder={decoder_name}")
 
