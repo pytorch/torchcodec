@@ -174,11 +174,7 @@ class OpenCVDecoder(AbstractDecoder):
             if current_frame in approx_frame_indices:  # only decompress needed
                 ret, frame = cap.retrieve()
                 if ret:
-                    # OpenCV uses BGR, change to RGB
-                    frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-                    # Update to C, H, W
-                    frame = np.transpose(frame, (2, 0, 1))
-                    frame = torch.from_numpy(frame)
+                    frame = self.convert_frame_to_rgb_tensor(frame)
                     frames.append(frame)
 
             if len(frames) == len(approx_frame_indices):
@@ -200,11 +196,7 @@ class OpenCVDecoder(AbstractDecoder):
                 raise ValueError("Could not grab video frame")
             ret, frame = cap.retrieve()
             if ret:
-                # OpenCV uses BGR, change to RGB
-                frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-                # Update to C, H, W
-                frame = np.transpose(frame, (2, 0, 1))
-                frame = torch.from_numpy(frame)
+                frame = self.convert_frame_to_rgb_tensor(frame)
                 frames.append(frame)
         cap.release()
         assert len(frames) == n
@@ -219,9 +211,23 @@ class OpenCVDecoder(AbstractDecoder):
         ]
         return frames
 
+    def convert_frame_to_rgb_tensor(self, frame):
+        # OpenCV uses BGR, change to RGB
+        frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+        # Update to C, H, W
+        frame = np.transpose(frame, (2, 0, 1))
+        # Convert to tensor
+        frame = torch.from_numpy(frame)
+        return frame
+
 
 class TorchCodecCore(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
         self._device = device
@@ -259,7 +265,12 @@ class TorchCodecCore(AbstractDecoder):
 
 
 class TorchCodecCoreNonBatch(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._num_threads = num_threads
         self._color_conversion_library = color_conversion_library
         self._device = device
@@ -328,7 +339,12 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
 
 class TorchCodecCoreBatch(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
@@ -369,10 +385,10 @@ class TorchCodecCoreBatch(AbstractDecoder):
 class TorchCodecPublic(AbstractDecoder):
     def __init__(
         self,
-        num_ffmpeg_threads=None,
+        num_ffmpeg_threads: str | None = None,
         device="cpu",
         seek_mode="exact",
-        stream_index=None,
+        stream_index: str | None = None,
     ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
@@ -433,7 +449,12 @@ class TorchCodecPublic(AbstractDecoder):
 
 
 class TorchCodecPublicNonBatch(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="approximate"):
+    def __init__(
+        self,
+        num_ffmpeg_threads: str | None = None,
+        device="cpu",
+        seek_mode="approximate",
+    ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
         self._seek_mode = seek_mode
@@ -536,7 +557,7 @@ class TorchCodecCoreCompiled(AbstractDecoder):
 
 
 class TorchAudioDecoder(AbstractDecoder):
-    def __init__(self, stream_index=None):
+    def __init__(self, stream_index: str | None = None):
         import torchaudio  # noqa: F401
 
         self.torchaudio = torchaudio
