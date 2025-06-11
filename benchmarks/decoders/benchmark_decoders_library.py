@@ -202,6 +202,11 @@ class OpenCVDecoder(AbstractDecoder):
         assert len(frames) == n
         return frames
 
+    def decode_and_resize(self, *args, **kwargs):
+        raise ValueError(
+            "OpenCV doesn't apply antialias while pytorch does by default, this is potentially an unfair comparison"
+        )
+
     def convert_frame_to_rgb_tensor(self, frame):
         # OpenCV uses BGR, change to RGB
         frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
