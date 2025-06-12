@@ -14,7 +14,6 @@ import pandas as pd
 
 import torch
 import torch.utils.benchmark as benchmark
-
 from torchcodec._core import (
     _add_video_stream,
     create_from_file,
@@ -24,6 +23,8 @@ from torchcodec._core import (
     get_next_frame,
     seek_to_pts,
 )
+
+from torchcodec._frame import FrameBatch
 from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
 torch._dynamo.config.cache_size_limit = 100
@@ -1028,59 +1029,87 @@ def run_benchmarks(
 
 def verify_outputs(decoders_to_run, video_paths, num_samples):
     from tensorcat import tensorcat
-    from torchcodec._frame import FrameBatch
 
-    # Get frames using a decoder
+    # Add torchcodec_public to the list of decoders to run to use as a baseline
+    if matches := list(
+        filter(
+            lambda decoder_name: "TorchCodecPublic" in decoder_name,
+            decoders_to_run.keys(),
+        )
+    ):
+        torchcodec_display_name = matches[0]
+        torchcodec_public_decoder = decoders_to_run[matches[0]]
+        # del decoders_to_run["TorchCodecPublic"]
+        print(f"Using {torchcodec_public_decoder}")
+    else:
+        torchcodec_display_name = decoder_registry["torchcodec_public"].display_name
+        options = decoder_registry["torchcodec_public"].default_options
+        kind = decoder_registry["torchcodec_public"].kind
+        torchcodec_public_decoder = kind(**options)
+        print("Adding TorchCodecPublic")
+
+    # Get frames using each decoder
     for video_file_path in video_paths:
         metadata = get_metadata(video_file_path)
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
         print(f"{metadata_label=}")
 
+        # Uncomment to use non-sequential frames
         duration = metadata.duration_seconds
         uniform_pts_list = [i * duration / num_samples for i in range(num_samples)]
+
+        # Use TorchCodecPublic as the baseline
+        torchcodec_public_results = decode_and_adjust_frames(
+            torchcodec_public_decoder,
+            video_file_path,
+            num_samples=num_samples,
+            pts_list=uniform_pts_list,
+        )
 
         decoders_and_frames = []
         for decoder_name, decoder in decoders_to_run.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
 
-            # Decode random or uniform frames
-            new_frames = decoder.decode_frames(video_file_path, uniform_pts_list)
-            if isinstance(new_frames, FrameBatch):
-                new_frames = new_frames.data
-            decoders_and_frames.append((decoder_name, new_frames))
+            frames = decode_and_adjust_frames(
+                decoder,
+                video_file_path,
+                num_samples=num_samples,
+                pts_list=uniform_pts_list,
+            )
+            decoders_and_frames.append((decoder_name, frames))
 
-            # Decode the first n frames
-            # new_frames = decoder.decode_first_n_frames(video_file_path, num_samples)
-            # if isinstance(new_frames, FrameBatch):
-            #     new_frames = new_frames.data
-            # decoders_and_frames.append((decoder_name, new_frames))
+        # Compare the frames from all decoders to the frames from TorchCodecPublic
+        for i in range(0, len(decoders_and_frames)):
+            curr_decoder_name, curr_decoder_frames = decoders_and_frames[i]
+            print(f"Compare: {f"{torchcodec_display_name}"} and {curr_decoder_name}")
+            assert len(torchcodec_public_results) == len(curr_decoder_frames)
+            all_match = True
+            for f1, f2 in zip(torchcodec_public_results, curr_decoder_frames):
+                # Validate that the frames are the same with a tolerance
+                try:
+                    torch.testing.assert_close(f1, f2)  # , atol=1, rtol=0.01)
+                except Exception as e:
+                    tensorcat(f1)
+                    tensorcat(f2)
+                    all_match = False
+                    print(
+                        f"Error while comparing {torchcodec_display_name} and {curr_decoder_name}: {e}"
+                    )
+                    break
+            if all_match:
+                print(
+                    f"Results of {torchcodec_display_name} and {curr_decoder_name} match!"
+                )
 
-        if len(decoders_and_frames) == 1:
-            # Display the frames if only 1 decoder passed in
-            baseline = decoders_and_frames[0]
-            for frame in baseline[1]:
-                tensorcat(frame)
-        else:
-            # Transitively compare the frames from all decoders
-            num_decoders = len(decoders_and_frames)
-            prev_decoder = decoders_and_frames[-1]
-            for i in range(0, num_decoders):
-                all_match = True
-                curr_decoder = decoders_and_frames[i]
-                print(f"Compare: {prev_decoder[0]} and {curr_decoder[0]}")
-                assert len(prev_decoder[1]) == len(curr_decoder[1])
-                for f1, f2 in zip(curr_decoder[1], prev_decoder[1]):
-                    # Validate that the frames are the same with a tolerance
-                    try:
-                        torch.testing.assert_close(f1, f2)
-                    except Exception as e:
-                        tensorcat(f1)
-                        tensorcat(f2)
-                        all_match = False
-                        print(
-                            f"Error while comparing {curr_decoder[0]} and {prev_decoder[0]}: {e}"
-                        )
-                        break
-                    prev_decoder = curr_decoder
-                if all_match:
-                    print(f"Results of {curr_decoder[0]} and {prev_decoder[0]} match")
+
+def decode_and_adjust_frames(
+    decoder, video_file_path, *, num_samples: int, pts_list: list[float] | None
+):
+    frames = None
+    if pts_list:
+        frames = decoder.decode_frames(video_file_path, pts_list)
+    else:
+        frames = decoder.decode_first_n_frames(video_file_path, num_samples)
+    if isinstance(frames, FrameBatch):
+        frames = frames.data
+    return frames
