@@ -1,9 +1,10 @@
 import abc
 import json
 import subprocess
+import typing
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
 
@@ -824,6 +825,42 @@ def convert_result_to_df_item(
     return df_item
 
 
+@dataclass
+class DecoderKind:
+    display_name: str
+    kind: typing.Type[AbstractDecoder]
+    default_options: dict[str, str] = field(default_factory=dict)
+
+
+decoder_registry = {
+    "decord": DecoderKind("DecordAccurate", DecordAccurate),
+    "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
+    "torchcodec_core": DecoderKind("TorchCodecCore", TorchCodecCore),
+    "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
+    "torchcodec_core_nonbatch": DecoderKind(
+        "TorchCodecCoreNonBatch", TorchCodecCoreNonBatch
+    ),
+    "torchcodec_core_compiled": DecoderKind(
+        "TorchCodecCoreCompiled", TorchCodecCoreCompiled
+    ),
+    "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
+    "torchcodec_public_nonbatch": DecoderKind(
+        "TorchCodecPublicNonBatch", TorchCodecPublicNonBatch
+    ),
+    "torchvision": DecoderKind(
+        # We don't compare against TorchVision's "pyav" backend because it doesn't support
+        # accurate seeks.
+        "TorchVision[backend=video_reader]",
+        TorchVision,
+        {"backend": "video_reader"},
+    ),
+    "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
+    "opencv": DecoderKind(
+        "OpenCV[backend=FFMPEG]", OpenCVDecoder, {"backend": "FFMPEG"}
+    ),
+}
+
+
 def run_benchmarks(
     decoder_dict: dict[str, AbstractDecoder],
     video_files_paths: list[Path],
@@ -856,6 +893,7 @@ def run_benchmarks(
         # The decoder items are sorted to perform and display the benchmarks in a consistent order.
         for decoder_name, decoder in sorted(decoder_dict.items(), key=lambda x: x[0]):
             print(f"video={video_file_path}, decoder={decoder_name}")
+            print(f"metadata={metadata_label}")
 
             if dataloader_parameters:
                 bp = dataloader_parameters.batch_parameters
@@ -986,3 +1024,63 @@ def run_benchmarks(
     compare = benchmark.Compare(results)
     compare.print()
     return df_data
+
+
+def verify_outputs(decoders_to_run, video_paths, num_samples):
+    from tensorcat import tensorcat
+    from torchcodec._frame import FrameBatch
+
+    # Get frames using a decoder
+    for video_file_path in video_paths:
+        metadata = get_metadata(video_file_path)
+        metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
+        print(f"{metadata_label=}")
+
+        duration = metadata.duration_seconds
+        uniform_pts_list = [i * duration / num_samples for i in range(num_samples)]
+
+        decoders_and_frames = []
+        for decoder_name, decoder in decoders_to_run.items():
+            print(f"video={video_file_path}, decoder={decoder_name}")
+
+            # Decode random or uniform frames
+            new_frames = decoder.decode_frames(video_file_path, uniform_pts_list)
+            if isinstance(new_frames, FrameBatch):
+                new_frames = new_frames.data
+            decoders_and_frames.append((decoder_name, new_frames))
+
+            # Decode the first n frames
+            # new_frames = decoder.decode_first_n_frames(video_file_path, num_samples)
+            # if isinstance(new_frames, FrameBatch):
+            #     new_frames = new_frames.data
+            # decoders_and_frames.append((decoder_name, new_frames))
+
+        if len(decoders_and_frames) == 1:
+            # Display the frames if only 1 decoder passed in
+            baseline = decoders_and_frames[0]
+            for frame in baseline[1]:
+                tensorcat(frame)
+        else:
+            # Transitively compare the frames from all decoders
+            num_decoders = len(decoders_and_frames)
+            prev_decoder = decoders_and_frames[-1]
+            for i in range(0, num_decoders):
+                all_match = True
+                curr_decoder = decoders_and_frames[i]
+                print(f"Compare: {prev_decoder[0]} and {curr_decoder[0]}")
+                assert len(prev_decoder[1]) == len(curr_decoder[1])
+                for f1, f2 in zip(curr_decoder[1], prev_decoder[1]):
+                    # Validate that the frames are the same with a tolerance
+                    try:
+                        torch.testing.assert_close(f1, f2)
+                    except Exception as e:
+                        tensorcat(f1)
+                        tensorcat(f2)
+                        all_match = False
+                        print(
+                            f"Error while comparing {curr_decoder[0]} and {prev_decoder[0]}: {e}"
+                        )
+                        break
+                    prev_decoder = curr_decoder
+                if all_match:
+                    print(f"Results of {curr_decoder[0]} and {prev_decoder[0]} match")
