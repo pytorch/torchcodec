@@ -270,7 +270,7 @@ TEST_P(SingleStreamDecoderTest, SeeksCloseToEof) {
   EXPECT_EQ(output.ptsSeconds, 388'388. / 30'000);
   output = ourDecoder->getNextFrame();
   EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
-  EXPECT_THROW(ourDecoder->getNextFrame(), std::exception);
+  EXPECT_THROW(ourDecoder->getNextFrame(), c10::Error);
 }
 
 TEST_P(SingleStreamDecoderTest, GetsFramePlayedAtTimestamp) {

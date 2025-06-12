@@ -243,8 +243,10 @@ void _add_video_stream(
       videoStreamOptions.colorConversionLibrary =
           ColorConversionLibrary::SWSCALE;
     } else {
-      throw std::runtime_error(
-          "Invalid color_conversion_library=" + stdColorConversionLibrary +
+      TORCH_CHECK(
+          false,
+          "Invalid color_conversion_library=",
+          stdColorConversionLibrary,
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
@@ -556,11 +558,12 @@ std::string get_stream_json_metadata(
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   auto allStreamMetadata =
       videoDecoder->getContainerMetadata().allStreamMetadata;
-  if (stream_index < 0 ||
-      stream_index >= static_cast<int64_t>(allStreamMetadata.size())) {
-    throw std::out_of_range(
-        "stream_index out of bounds: " + std::to_string(stream_index));
-  }
+  TORCH_CHECK(
+      stream_index >= 0 &&
+          stream_index < static_cast<int64_t>(allStreamMetadata.size()),
+      "stream_index out of bounds: ",
+      std::to_string(stream_index));
+
   auto streamMetadata = allStreamMetadata[stream_index];
 
   std::map<std::string, std::string> map;
