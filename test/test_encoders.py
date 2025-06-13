@@ -1,5 +1,7 @@
+import json
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 import torch
@@ -14,6 +16,49 @@ from .utils import (
     SINE_MONO_S32,
     TestContainerFile,
 )
+
+
+def validate_frames_properties(*, actual: Path, expected: Path):
+
+    frames_actual, frames_expected = (
+        json.loads(
+            subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-hide_banner",
+                    "-select_streams",
+                    "a:0",
+                    "-show_frames",
+                    "-of",
+                    "json",
+                    f"{f}",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+        )["frames"]
+        for f in (actual, expected)
+    )
+
+    # frames_actual and frames_expected are both a list of dicts, each dict
+    # corresponds to a frame and each key-value pair corresponds to a frame
+    # property like pts, nb_samples, etc., similar to the AVFrame fields.
+    assert isinstance(frames_actual, list)
+    assert all(isinstance(d, dict) for d in frames_actual)
+
+    assert len(frames_actual) == len(frames_expected)
+    for frame_index, (d_actual, d_expected) in enumerate(
+        zip(frames_actual, frames_expected)
+    ):
+        for prop in d_actual:
+            if prop == "pkt_pos":
+                continue  # TODO this probably matters
+            assert (
+                d_actual[prop] == d_expected[prop]
+            ), f"{prop} value is different for frame {frame_index}:"
 
 
 class TestAudioEncoder:
@@ -162,12 +207,18 @@ class TestAudioEncoder:
             rtol, atol = 0, 1e-3
         else:
             rtol, atol = None, None
+        # TODO should validate `.pts_seconds` and `duration_seconds` as well
         torch.testing.assert_close(
-            self.decode(encoded_by_ffmpeg),
             self.decode(encoded_by_us),
+            self.decode(encoded_by_ffmpeg),
             rtol=rtol,
             atol=atol,
         )
+
+        if method == "to_file":
+            validate_frames_properties(actual=encoded_by_us, expected=encoded_by_ffmpeg)
+        else:
+            assert method == "to_tensor", "wrong test parametrization!"
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
