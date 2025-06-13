@@ -136,7 +136,6 @@ def main() -> None:
 
     if args.verify_outputs:
         verify_outputs(decoders_to_run, video_paths, num_uniform_samples)
-        return
 
     results = run_benchmarks(
         decoders_to_run,
