@@ -58,7 +58,7 @@ def validate_frames_properties(*, actual: Path, expected: Path):
                 continue  # TODO this probably matters
             assert (
                 d_actual[prop] == d_expected[prop]
-            ), f"{prop} value is different for frame {frame_index}:"
+            ), f"\nComparing: {actual}\nagainst reference: {expected},\nthe {prop} property is different at frame {frame_index}:"
 
 
 class TestAudioEncoder:
