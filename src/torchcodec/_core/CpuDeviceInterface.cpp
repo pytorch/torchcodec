@@ -37,9 +37,8 @@ bool CpuDeviceInterface::DecodedFrameContext::operator!=(
 CpuDeviceInterface::CpuDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
   TORCH_CHECK(g_cpu, "CpuDeviceInterface was not registered!");
-  if (device_.type() != torch::kCPU) {
-    throw std::runtime_error("Unsupported device: " + device_.str());
-  }
+  TORCH_CHECK(
+      device_.type() == torch::kCPU, "Unsupported device: ", device_.str());
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
@@ -161,9 +160,10 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
       frameOutput.data = outputTensor;
     }
   } else {
-    throw std::runtime_error(
-        "Invalid color conversion library: " +
-        std::to_string(static_cast<int>(colorConversionLibrary)));
+    TORCH_CHECK(
+        false,
+        "Invalid color conversion library: ",
+        static_cast<int>(colorConversionLibrary));
   }
 }
 
@@ -189,9 +189,8 @@ torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
     const UniqueAVFrame& avFrame) {
   int status = av_buffersrc_write_frame(
       filterGraphContext_.sourceContext, avFrame.get());
-  if (status < AVSUCCESS) {
-    throw std::runtime_error("Failed to add frame to buffer source context");
-  }
+  TORCH_CHECK(
+      status >= AVSUCCESS, "Failed to add frame to buffer source context");
 
   UniqueAVFrame filteredAVFrame(av_frame_alloc());
   status = av_buffersink_get_frame(
@@ -241,11 +240,12 @@ void CpuDeviceInterface::createFilterGraph(
       filterArgs.str().c_str(),
       nullptr,
       filterGraphContext_.filterGraph.get());
-  if (status < 0) {
-    throw std::runtime_error(
-        std::string("Failed to create filter graph: ") + filterArgs.str() +
-        ": " + getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to create filter graph: ",
+      filterArgs.str(),
+      ": ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   status = avfilter_graph_create_filter(
       &filterGraphContext_.sinkContext,
@@ -254,11 +254,10 @@ void CpuDeviceInterface::createFilterGraph(
       nullptr,
       nullptr,
       filterGraphContext_.filterGraph.get());
-  if (status < 0) {
-    throw std::runtime_error(
-        "Failed to create filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to create filter graph: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
 
@@ -268,11 +267,10 @@ void CpuDeviceInterface::createFilterGraph(
       pix_fmts,
       AV_PIX_FMT_NONE,
       AV_OPT_SEARCH_CHILDREN);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Failed to set output pixel formats: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to set output pixel formats: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   UniqueAVFilterInOut outputs(avfilter_inout_alloc());
   UniqueAVFilterInOut inputs(avfilter_inout_alloc());
@@ -301,19 +299,17 @@ void CpuDeviceInterface::createFilterGraph(
       nullptr);
   outputs.reset(outputsTmp);
   inputs.reset(inputsTmp);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Failed to parse filter description: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to parse filter description: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   status =
       avfilter_graph_config(filterGraphContext_.filterGraph.get(), nullptr);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Failed to configure filter graph: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to configure filter graph: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 }
 
 void CpuDeviceInterface::createSwsContext(

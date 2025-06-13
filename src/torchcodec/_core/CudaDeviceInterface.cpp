@@ -166,9 +166,8 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
   TORCH_CHECK(g_cuda, "CudaDeviceInterface was not registered!");
-  if (device_.type() != torch::kCUDA) {
-    throw std::runtime_error("Unsupported device: " + device_.str());
-  }
+  TORCH_CHECK(
+      device_.type() == torch::kCUDA, "Unsupported device: ", device_.str());
 }
 
 CudaDeviceInterface::~CudaDeviceInterface() {
