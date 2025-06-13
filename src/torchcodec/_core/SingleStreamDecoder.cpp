@@ -441,12 +441,13 @@ void SingleStreamDecoder::addVideoStream(
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
 
-  TORCH_CHECK(
-      !(seekMode_ == SeekMode::approximate &&
-        !streamMetadata.averageFps.has_value()),
-      "Seek mode is approximate, but stream ",
-      std::to_string(activeStreamIndex_),
-      " does not have an average fps in its metadata.");
+  if (seekMode_ == SeekMode::approximate) {
+    TORCH_CHECK(
+        streamMetadata.averageFpsFromHeader.has_value(),
+        "Seek mode is approximate, but stream ",
+        std::to_string(activeStreamIndex_),
+        " does not have an average fps in its metadata.");
+  }
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.videoStreamOptions = videoStreamOptions;
@@ -1151,10 +1152,11 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
   }
 
   if (status < AVSUCCESS) {
-    TORCH_CHECK(
-        !(reachedEOF || status == AVERROR_EOF),
-        "Requested next frame while there are no more frames left to decode.");
-
+    if (reachedEOF || status == AVERROR_EOF) {
+      throw SingleStreamDecoder::EndOfFileException(
+          "Requested next frame while there are no more frames left to "
+          "decode.");
+    }
     TORCH_CHECK(
         false,
         "Could not receive frame from decoder: ",
