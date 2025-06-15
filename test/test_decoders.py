@@ -100,11 +100,11 @@ class TestDecoder:
             Decoder(123)
 
         # stream index that does not exist
-        with pytest.raises(ValueError, match="No valid stream found"):
+        with pytest.raises(RuntimeError, match="No valid stream found"):
             Decoder(NASA_VIDEO.path, stream_index=40)
 
         # stream index that does exist, but it's not audio or video
-        with pytest.raises(ValueError, match="No valid stream found"):
+        with pytest.raises(RuntimeError, match="No valid stream found"):
             Decoder(NASA_VIDEO.path, stream_index=2)
 
         # user mistakenly forgets to specify binary reading when creating a file
