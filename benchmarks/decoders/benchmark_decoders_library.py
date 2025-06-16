@@ -1030,18 +1030,20 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
     # Import library to show frames that don't match
     from tensorcat import tensorcat
 
-    # Reuse TorchCodecPublic decoder with options, if provided, as the baseline
-    if torchcodec_display_name := next(
-        (name for name in decoders_to_run if "TorchCodecPublic" in name),
+    # Reuse TorchCodecPublic decoder stream_index option, if provided.
+    options = decoder_registry["torchcodec_public"].default_options
+    if torchcodec_decoder := next(
+        (
+            decoder
+            for name, decoder in decoders_to_run.items()
+            if "TorchCodecPublic" in name
+        ),
         None,
     ):
-        torchcodec_public_decoder = decoders_to_run[torchcodec_display_name]
+        options["stream_index"] = str(torchcodec_decoder._stream_index)
     # Create default TorchCodecPublic decoder to use as a baseline
-    else:
-        torchcodec_display_name = decoder_registry["torchcodec_public"].display_name
-        options = decoder_registry["torchcodec_public"].default_options
-        kind = decoder_registry["torchcodec_public"].kind
-        torchcodec_public_decoder = kind(**options)
+    torchcodec_public_decoder = TorchCodecPublic(**options)
+
     # Get frames using each decoder
     for video_file_path in video_paths:
         metadata = get_metadata(video_file_path)
@@ -1086,12 +1088,12 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
                     tensorcat(f2)
                     all_match = False
                     print(
-                        f"Error while comparing {torchcodec_display_name} and {curr_decoder_name}: {e}"
+                        f"Error while comparing baseline TorchCodecPublic and {curr_decoder_name}: {e}"
                     )
                     break
             if all_match:
                 print(
-                    f"Results of {torchcodec_display_name} and {curr_decoder_name} match!"
+                    f"Results of baseline TorchCodecPublic and {curr_decoder_name} match!"
                 )
 
 
