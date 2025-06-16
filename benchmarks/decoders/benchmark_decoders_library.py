@@ -1027,9 +1027,6 @@ def run_benchmarks(
 
 
 def verify_outputs(decoders_to_run, video_paths, num_samples):
-    # Import library to show frames that don't match
-    from tensorcat import tensorcat
-
     # Reuse TorchCodecPublic decoder stream_index option, if provided.
     options = decoder_registry["torchcodec_public"].default_options
     if torchcodec_decoder := next(
@@ -1040,7 +1037,11 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
         ),
         None,
     ):
-        options["stream_index"] = str(torchcodec_decoder._stream_index)
+        options["stream_index"] = (
+            str(torchcodec_decoder._stream_index)
+            if torchcodec_decoder._stream_index is not None
+            else ""
+        )
     # Create default TorchCodecPublic decoder to use as a baseline
     torchcodec_public_decoder = TorchCodecPublic(**options)
 
@@ -1050,7 +1051,7 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
         metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
         print(f"{metadata_label=}")
 
-        # Generate uniformly random PTS
+        # Generate uniformly spaced PTS
         duration = metadata.duration_seconds
         pts_list = [i * duration / num_samples for i in range(num_samples)]
 
@@ -1062,8 +1063,6 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
             pts_list=pts_list,
         )
 
-        # Get the frames from each decoder
-        decoders_and_frames = []
         for decoder_name, decoder in decoders_to_run.items():
             print(f"video={video_file_path}, decoder={decoder_name}")
 
@@ -1073,28 +1072,8 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
                 num_samples=num_samples,
                 pts_list=pts_list,
             )
-            decoders_and_frames.append((decoder_name, frames))
-
-        # Compare the frames from all decoders to the frames from TorchCodecPublic
-        for curr_decoder_name, curr_decoder_frames in decoders_and_frames:
-            assert len(torchcodec_public_results) == len(curr_decoder_frames)
-            all_match = True
-            for f1, f2 in zip(torchcodec_public_results, curr_decoder_frames):
-                # Validate that the frames are the same with a tolerance
-                try:
-                    torch.testing.assert_close(f1, f2)
-                except Exception as e:
-                    tensorcat(f1)
-                    tensorcat(f2)
-                    all_match = False
-                    print(
-                        f"Error while comparing baseline TorchCodecPublic and {curr_decoder_name}: {e}"
-                    )
-                    break
-            if all_match:
-                print(
-                    f"Results of baseline TorchCodecPublic and {curr_decoder_name} match!"
-                )
+            for f1, f2 in zip(torchcodec_public_results, frames):
+                torch.testing.assert_close(f1, f2)
 
 
 def decode_and_adjust_frames(
@@ -1103,20 +1082,18 @@ def decode_and_adjust_frames(
     frames = []
     # Decode non-sequential frames using decode_frames function
     random_frames = decoder.decode_frames(video_file_path, pts_list)
-    # Extract the frames from the FrameBatch if necessary
+    # TorchCodec's batch APIs return a FrameBatch, so we need to extract the frames
     if isinstance(random_frames, FrameBatch):
         random_frames = random_frames.data
     frames.extend(random_frames)
 
     # Decode sequential frames using decode_first_n_frames function
     seq_frames = decoder.decode_first_n_frames(video_file_path, num_samples)
-    # Extract the frames from the FrameBatch if necessary
     if isinstance(seq_frames, FrameBatch):
         seq_frames = seq_frames.data
     frames.extend(seq_frames)
 
-    # Check if frames are returned in H,W,C where 3 is the last dimension.
-    # If so, convert to C,H,W for consistency with other decoders.
+    # Check and convert frames to C,H,W for consistency with other decoders.
     if frames[0].shape[-1] == 3:
         frames = [frame.permute(-1, *range(frame.dim() - 1)) for frame in frames]
     return frames
