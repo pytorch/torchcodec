@@ -1074,6 +1074,7 @@ def verify_outputs(decoders_to_run, video_paths, num_samples):
             )
             for f1, f2 in zip(torchcodec_public_results, frames):
                 torch.testing.assert_close(f1, f2)
+            print(f"Results of baseline TorchCodecPublic and {decoder_name} match!")
 
 
 def decode_and_adjust_frames(
