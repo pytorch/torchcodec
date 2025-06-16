@@ -19,6 +19,7 @@ from benchmark_decoders_library import (
     verify_outputs,
 )
 
+
 def in_fbcode() -> bool:
     return "FB_PAR_RUNTIME_FILES" in os.environ
 
