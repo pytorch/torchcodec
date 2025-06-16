@@ -136,31 +136,31 @@ def main() -> None:
                 video_paths.append(entry.path)
 
     if args.verify_outputs:
-        verify_outputs(decoders_to_run, video_paths, num_uniform_samples)
-
-    results = run_benchmarks(
-        decoders_to_run,
-        video_paths,
-        num_uniform_samples,
-        num_sequential_frames_from_start=[1, 10, 100],
-        min_runtime_seconds=args.min_run_seconds,
-        benchmark_video_creation=args.bm_video_creation,
-    )
-    data = {
-        "experiments": results,
-        "system_metadata": {
-            "cpu_count": os.cpu_count(),
-            "system": platform.system(),
-            "machine": platform.machine(),
-            "python_version": str(platform.python_version()),
-            "cuda": (
-                torch.cuda.get_device_properties(0).name
-                if torch.cuda.is_available()
-                else "not available"
-            ),
-        },
-    }
-    plot_data(data, args.plot_path)
+        verify_outputs(decoders_to_run, video_paths, 1)
+    else:
+        results = run_benchmarks(
+            decoders_to_run,
+            video_paths,
+            num_uniform_samples,
+            num_sequential_frames_from_start=[1, 10, 100],
+            min_runtime_seconds=args.min_run_seconds,
+            benchmark_video_creation=args.bm_video_creation,
+        )
+        data = {
+            "experiments": results,
+            "system_metadata": {
+                "cpu_count": os.cpu_count(),
+                "system": platform.system(),
+                "machine": platform.machine(),
+                "python_version": str(platform.python_version()),
+                "cuda": (
+                    torch.cuda.get_device_properties(0).name
+                    if torch.cuda.is_available()
+                    else "not available"
+                ),
+            },
+        }
+        plot_data(data, args.plot_path)
 
 
 if __name__ == "__main__":
