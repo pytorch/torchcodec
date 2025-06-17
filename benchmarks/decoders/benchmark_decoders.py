@@ -136,7 +136,7 @@ def main() -> None:
                 video_paths.append(entry.path)
 
     if args.verify_outputs:
-        verify_outputs(decoders_to_run, video_paths, 1)
+        verify_outputs(decoders_to_run, video_paths, num_uniform_samples)
     else:
         results = run_benchmarks(
             decoders_to_run,

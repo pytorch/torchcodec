@@ -1082,11 +1082,11 @@ def decode_and_adjust_frames(
 ):
     frames = []
     # Decode non-sequential frames using decode_frames function
-    random_frames = decoder.decode_frames(video_file_path, pts_list)
+    non_seq_frames = decoder.decode_frames(video_file_path, pts_list)
     # TorchCodec's batch APIs return a FrameBatch, so we need to extract the frames
-    if isinstance(random_frames, FrameBatch):
-        random_frames = random_frames.data
-    frames.extend(random_frames)
+    if isinstance(non_seq_frames, FrameBatch):
+        non_seq_frames = non_seq_frames.data
+    frames.extend(non_seq_frames)
 
     # Decode sequential frames using decode_first_n_frames function
     seq_frames = decoder.decode_first_n_frames(video_file_path, num_samples)
