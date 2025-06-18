@@ -119,7 +119,7 @@ def test_get_metadata_audio_file(metadata_getter):
 
 @pytest.mark.parametrize(
     "num_frames_from_header, num_frames_from_content, expected_num_frames",
-    [(None, 10, 10), (10, None, 10), (None, None, None)],
+    [(10, 20, 20), (None, 10, 10), (10, None, 10)],
 )
 def test_num_frames_fallback(
     num_frames_from_header, num_frames_from_content, expected_num_frames
@@ -137,6 +137,34 @@ def test_num_frames_fallback(
         width=123,
         height=321,
         average_fps_from_header=30,
+        stream_index=0,
+    )
+
+    assert metadata.num_frames == expected_num_frames
+
+
+@pytest.mark.parametrize(
+    "average_fps_from_header, duration_seconds_from_header, expected_num_frames",
+    [(60, 10, 600), (60, None, None), (None, 10, None), (None, None, None)],
+)
+def test_calculate_num_frames_using_fps_and_duration(
+    average_fps_from_header, duration_seconds_from_header, expected_num_frames
+):
+    """Check that if num_frames_from_content and num_frames_from_header are missing,
+    `.num_frames` is calculated using average_fps_from_header and duration_seconds_from_header
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=duration_seconds_from_header,
+        bit_rate=123,
+        num_frames_from_header=None,  # None to test calculating num_frames
+        num_frames_from_content=None,  # None to test calculating num_frames
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=0,
+        end_stream_seconds_from_content=4,
+        codec="whatever",
+        width=123,
+        height=321,
+        average_fps_from_header=average_fps_from_header,
         stream_index=0,
     )
 
