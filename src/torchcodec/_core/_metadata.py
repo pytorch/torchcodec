@@ -129,8 +129,15 @@ class VideoStreamMetadata(StreamMetadata):
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
-        else:
+        elif self.num_frames_from_header is not None:
             return self.num_frames_from_header
+        elif (
+            self.average_fps_from_header is not None
+            and self.duration_seconds_from_header is not None
+        ):
+            return int(self.average_fps_from_header * self.duration_seconds_from_header)
+        else:
+            return None
 
     @property
     def average_fps(self) -> Optional[float]:
