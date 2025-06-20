@@ -361,9 +361,9 @@ void SingleStreamDecoder::addStream(
       formatContext_.get(), mediaType, streamIndex, -1, &avCodec, 0);
 
   if (activeStreamIndex_ < 0) {
-      throw std::invalid_argument(
-          "No valid stream found in input file. Is " +
-          std::to_string(streamIndex) + " of the desired media type?");
+    throw std::invalid_argument(
+        "No valid stream found in input file. Is " +
+        std::to_string(streamIndex) + " of the desired media type?");
   }
 
   TORCH_CHECK(avCodec != nullptr);
