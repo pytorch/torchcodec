@@ -80,6 +80,12 @@ class VideoStreamMetadata(StreamMetadata):
     average_fps_from_header: Optional[float]
     """Averate fps of the stream, obtained from the header (float or None).
     We recommend using the ``average_fps`` attribute instead."""
+    sample_aspect_ratio: Optional[tuple[int, int]]
+    """Sample Aspect Ratio (SAR), also known as Pixel Aspect Ratio
+    (PAR), is the ratio between the width of a pixel and the height of
+    each pixel.  This is a tuple of two ints: the first element is the
+    numerator, and the second element is the denominator.  Not to be
+    confused with Storage Aspect Ratio (also SAR)."""
 
     @property
     def duration_seconds(self) -> Optional[float]:
@@ -211,6 +217,16 @@ class ContainerMetadata:
         return metadata
 
 
+def _get_optional_sar_tuple(stream_dict):
+    try:
+        return (
+            stream_dict["sampleAspectRatioNum"],
+            stream_dict["sampleAspectRatioDen"],
+        )
+    except KeyError:
+        return None
+
+
 # TODO-AUDIO: This is user-facing. Should this just be `get_metadata`, without
 # the "container" name in it? Same below.
 def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
@@ -247,6 +263,9 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                     num_frames_from_header=stream_dict.get("numFramesFromHeader"),
                     num_frames_from_content=stream_dict.get("numFramesFromContent"),
                     average_fps_from_header=stream_dict.get("averageFpsFromHeader"),
+                    # sample_aspect_ratio is a tuple.  Return None,
+                    # and not (None, None), if missing.
+                    sample_aspect_ratio=_get_optional_sar_tuple(stream_dict),
                     **common_meta,
                 )
             )
