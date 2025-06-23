@@ -93,10 +93,9 @@ play_audio(samples)
 # ------------------
 #
 # We can also decode the samples into a desired sample rate using the
-# ``sample_rate`` parameter of :class:`~torchcodec.decoders.AudioDecoder`.
-# The number of samples has reduced from `4297722` to `1559264`, in the 
-# ratio `44100` to `16000`. The downsampled output loses high frequency 
-# content, which may or may not sound the same depending on the playback device.
+# ``sample_rate`` parameter of :class:`~torchcodec.decoders.AudioDecoder`. The
+# ouput will sound similar, but note that the number of samples greatly
+# decreased:```
 
 decoder = AudioDecoder(raw_audio_bytes, sample_rate=16_000)
 samples = decoder.get_all_samples()
