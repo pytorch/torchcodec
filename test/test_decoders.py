@@ -782,34 +782,13 @@ class TestVideoDecoder:
         )
         assert len(decoder) == 390
 
-        # Test get_frames_in_range
+        # Test get_frames_in_range Python logic which uses the num_frames metadata mocked earlier.
+        # The frame is read at the C++ level.
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
             start=9, stop=10, stream_index=3
         ).to(device)
         frames9 = decoder.get_frames_in_range(start=9, stop=10)
         assert_frames_equal(ref_frames9, frames9.data)
-
-        # Test get_frame_at
-        ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9, stream_index=3).to(device)
-        frame9 = decoder.get_frame_at(9)
-        assert_frames_equal(ref_frame9, frame9.data)
-
-        # Test get_frames_at
-        indices = [0, 1, 25, 35]
-        ref_frames = [
-            NASA_VIDEO.get_frame_data_by_index(i, stream_index=3).to(device)
-            for i in indices
-        ]
-        frames = decoder.get_frames_at(indices)
-        for ref, frame in zip(ref_frames, frames.data):
-            assert_frames_equal(ref, frame)
-
-        # Test get_frames_played_in_range to get all frames
-        assert decoder.metadata.end_stream_seconds is not None
-        all_frames = decoder.get_frames_played_in_range(
-            decoder.metadata.begin_stream_seconds, decoder.metadata.end_stream_seconds
-        )
-        assert_frames_equal(all_frames.data, decoder[:])
 
     @pytest.mark.parametrize("dimension_order", ["NCHW", "NHWC"])
     @pytest.mark.parametrize(
