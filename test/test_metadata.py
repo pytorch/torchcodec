@@ -171,6 +171,65 @@ def test_calculate_num_frames_using_fps_and_duration(
     assert metadata.num_frames == expected_num_frames
 
 
+@pytest.mark.parametrize(
+    "duration_seconds_from_header, begin_stream_seconds_from_content, end_stream_seconds_from_content, expected_duration_seconds",
+    [(60, 5, 20, 15), (60, 1, None, 60), (None, 0, 10, 10)],
+)
+def test_duration_seconds_fallback(
+    duration_seconds_from_header,
+    begin_stream_seconds_from_content,
+    end_stream_seconds_from_content,
+    expected_duration_seconds,
+):
+    """Check that using begin_stream_seconds_from_content and end_stream_seconds_from_content to calculate `.duration_seconds`
+    has priority. If either value is missing, duration_seconds_from_header is used.
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=duration_seconds_from_header,
+        bit_rate=123,
+        num_frames_from_header=5,
+        num_frames_from_content=10,
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=begin_stream_seconds_from_content,
+        end_stream_seconds_from_content=end_stream_seconds_from_content,
+        codec="whatever",
+        width=123,
+        height=321,
+        average_fps_from_header=5,
+        stream_index=0,
+    )
+
+    assert metadata.duration_seconds == expected_duration_seconds
+
+
+@pytest.mark.parametrize(
+    "num_frames_from_header, average_fps_from_header, expected_duration_seconds",
+    [(100, 10, 10), (100, None, None), (None, None, None)],
+)
+def test_calculate_duration_seconds_using_fps_and_num_frames(
+    num_frames_from_header, average_fps_from_header, expected_duration_seconds
+):
+    """Check that duration_seconds is calculated using average_fps_from_header and num_frames_from_header
+    if duration_seconds_from_header is missing.
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=None,  # None to test calculating duration_seconds
+        bit_rate=123,
+        num_frames_from_header=num_frames_from_header,
+        num_frames_from_content=10,
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=None,  # None to test calculating duration_seconds
+        end_stream_seconds_from_content=None,  # None to test calculating duration_seconds
+        codec="whatever",
+        width=123,
+        height=321,
+        average_fps_from_header=average_fps_from_header,
+        stream_index=0,
+    )
+    assert metadata.duration_seconds_from_header is None
+    assert metadata.duration_seconds == expected_duration_seconds
+
+
 def test_repr():
     # Test for calls to print(), str(), etc. Useful to make sure we don't forget
     # to add additional @properties to __repr__
