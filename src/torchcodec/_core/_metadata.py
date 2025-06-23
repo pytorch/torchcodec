@@ -88,14 +88,22 @@ class VideoStreamMetadata(StreamMetadata):
         fall back to ``duration_seconds_from_header``.
         """
         if (
-            self.end_stream_seconds_from_content is None
-            or self.begin_stream_seconds_from_content is None
+            self.end_stream_seconds_from_content is not None
+            and self.begin_stream_seconds_from_content is not None
         ):
+            return (
+                self.end_stream_seconds_from_content
+                - self.begin_stream_seconds_from_content
+            )
+        elif self.duration_seconds_from_header is not None:
             return self.duration_seconds_from_header
-        return (
-            self.end_stream_seconds_from_content
-            - self.begin_stream_seconds_from_content
-        )
+        elif (
+            self.num_frames_from_header is not None
+            and self.average_fps_from_header is not None
+        ):
+            return self.num_frames_from_header / self.average_fps_from_header
+        else:
+            return None
 
     @property
     def begin_stream_seconds(self) -> float:
