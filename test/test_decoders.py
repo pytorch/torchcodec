@@ -780,6 +780,7 @@ class TestVideoDecoder:
         assert decoder.metadata.num_frames == int(
             decoder.metadata.duration_seconds * decoder.metadata.average_fps
         )
+        assert len(decoder) == 390
 
         # Test get_frames_in_range
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
@@ -791,7 +792,7 @@ class TestVideoDecoder:
         # Test get_frame_at
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9, stream_index=3).to(device)
         frame9 = decoder.get_frame_at(9)
-        torch.testing.assert_close(ref_frame9, frame9.data)
+        assert_frames_equal(ref_frame9, frame9.data)
 
         # Test get_frames_at
         indices = [0, 1, 25, 35]
@@ -801,7 +802,7 @@ class TestVideoDecoder:
         ]
         frames = decoder.get_frames_at(indices)
         for ref, frame in zip(ref_frames, frames.data):
-            torch.testing.assert_close(ref, frame)
+            assert_frames_equal(ref, frame)
 
         # Test get_frames_played_in_range to get all frames
         assert decoder.metadata.end_stream_seconds is not None
