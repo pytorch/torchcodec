@@ -123,9 +123,10 @@ class VideoStreamMetadata(StreamMetadata):
 
     @property
     def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to
-        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
-        corresponds to ``num_frames_from_header``.
+        """Number of frames in the stream (int or None).
+        This corresponds to ``num_frames_from_content`` if a :term:`scan` was made,
+        otherwise it corresponds to ``num_frames_from_header``. If it is None,
+        the number of frames is calculated from the duration and the average fps.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
