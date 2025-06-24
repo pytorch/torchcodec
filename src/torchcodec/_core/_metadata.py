@@ -83,7 +83,7 @@ class VideoStreamMetadata(StreamMetadata):
     We recommend using the ``average_fps`` attribute instead."""
     pixel_aspect_ratio: Optional[Fraction]
     """Pixel Aspect Ratio (PAR), also known as Sample Aspect Ratio
-    (SAR --- not to be confused with Sample Aspect Ratio, also SAR),
+    (SAR --- not to be confused with Storage Aspect Ratio, also SAR),
     is the ratio between the width and height of each pixel
     (``fractions.Fraction`` or None)."""
 
