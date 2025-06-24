@@ -8,12 +8,12 @@
 
 #include <optional>
 #include <string>
-#include <utility>
 #include <vector>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
+#include <libavutil/rational.h>
 }
 
 namespace facebook::torchcodec {
@@ -46,7 +46,7 @@ struct StreamMetadata {
   // Video-only fields derived from the AVCodecContext.
   std::optional<int64_t> width;
   std::optional<int64_t> height;
-  std::optional<std::pair<int, int>> sampleAspectRatio;
+  std::optional<AVRational> sampleAspectRatio;
 
   // Audio-only fields
   std::optional<int64_t> sampleRate;
