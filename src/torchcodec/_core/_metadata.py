@@ -81,9 +81,10 @@ class VideoStreamMetadata(StreamMetadata):
     average_fps_from_header: Optional[float]
     """Averate fps of the stream, obtained from the header (float or None).
     We recommend using the ``average_fps`` attribute instead."""
-    sample_aspect_ratio: Optional[Fraction]
-    """Sample Aspect Ratio (SAR), also known as Pixel Aspect Ratio
-    (PAR), is the ratio between the width and height of each pixel
+    pixel_aspect_ratio: Optional[Fraction]
+    """Pixel Aspect Ratio (PAR), also known as Sample Aspect Ratio
+    (SAR --- not to be confused with Sample Aspect Ratio, also SAR),
+    is the ratio between the width and height of each pixel
     (``fractions.Fraction`` or None)."""
 
     @property
@@ -262,7 +263,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                     num_frames_from_header=stream_dict.get("numFramesFromHeader"),
                     num_frames_from_content=stream_dict.get("numFramesFromContent"),
                     average_fps_from_header=stream_dict.get("averageFpsFromHeader"),
-                    sample_aspect_ratio=_get_optional_sar_fraction(stream_dict),
+                    pixel_aspect_ratio=_get_optional_par_fraction(stream_dict),
                     **common_meta,
                 )
             )
