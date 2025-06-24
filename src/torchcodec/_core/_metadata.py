@@ -8,6 +8,7 @@ import dataclasses
 import json
 import pathlib
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import List, Optional, Union
 
 import torch
@@ -80,12 +81,10 @@ class VideoStreamMetadata(StreamMetadata):
     average_fps_from_header: Optional[float]
     """Averate fps of the stream, obtained from the header (float or None).
     We recommend using the ``average_fps`` attribute instead."""
-    sample_aspect_ratio: Optional[tuple[int, int]]
+    sample_aspect_ratio: Optional[Fraction]
     """Sample Aspect Ratio (SAR), also known as Pixel Aspect Ratio
-    (PAR), is the ratio between the width of a pixel and the height of
-    each pixel.  This is a tuple of two ints: the first element is the
-    numerator, and the second element is the denominator.  Not to be
-    confused with Storage Aspect Ratio (also SAR)."""
+    (PAR), is the ratio between the width and height of each pixel
+    (``fractions.Fraction`` or None)."""
 
     @property
     def duration_seconds(self) -> Optional[float]:
@@ -217,9 +216,9 @@ class ContainerMetadata:
         return metadata
 
 
-def _get_optional_sar_tuple(stream_dict):
+def _get_optional_par_fraction(stream_dict):
     try:
-        return (
+        return Fraction(
             stream_dict["sampleAspectRatioNum"],
             stream_dict["sampleAspectRatioDen"],
         )
@@ -263,9 +262,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                     num_frames_from_header=stream_dict.get("numFramesFromHeader"),
                     num_frames_from_content=stream_dict.get("numFramesFromContent"),
                     average_fps_from_header=stream_dict.get("averageFpsFromHeader"),
-                    # sample_aspect_ratio is a tuple.  Return None,
-                    # and not (None, None), if missing.
-                    sample_aspect_ratio=_get_optional_sar_tuple(stream_dict),
+                    sample_aspect_ratio=_get_optional_sar_fraction(stream_dict),
                     **common_meta,
                 )
             )

@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import functools
+from fractions import Fraction
 
 import pytest
 
@@ -138,7 +139,7 @@ def test_num_frames_fallback(
         width=123,
         height=321,
         average_fps_from_header=30,
-        sample_aspect_ratio=(1, 1),
+        sample_aspect_ratio=Fraction(1, 1),
         stream_index=0,
     )
 
@@ -163,7 +164,7 @@ def test_repr():
   num_frames_from_header: 390
   num_frames_from_content: 390
   average_fps_from_header: 29.97003
-  sample_aspect_ratio: (1, 1)
+  sample_aspect_ratio: 1
   duration_seconds: 13.013
   begin_stream_seconds: 0.0
   end_stream_seconds: 13.013
