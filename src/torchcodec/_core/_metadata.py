@@ -85,7 +85,7 @@ class VideoStreamMetadata(StreamMetadata):
     def duration_seconds(self) -> Optional[float]:
         """Duration of the stream in seconds. We try to calculate the duration
         from the actual frames if a :term:`scan` was performed. Otherwise we
-        fall back to ``duration_seconds_from_header``. If that value is None,
+        fall back to ``duration_seconds_from_header``. If that value is also None,
         we  instead calculate the duration from ``num_frames_from_header`` and
         ``average_fps_from_header``.
         """
@@ -135,8 +135,8 @@ class VideoStreamMetadata(StreamMetadata):
     def num_frames(self) -> Optional[int]:
         """Number of frames in the stream (int or None).
         This corresponds to ``num_frames_from_content`` if a :term:`scan` was made,
-        otherwise it corresponds to ``num_frames_from_header``. If it is None,
-        the number of frames is calculated from the duration and the average fps.
+        otherwise it corresponds to ``num_frames_from_header``. If that value is also
+        None, the number of frames is calculated from the duration and the average fps.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
