@@ -173,7 +173,7 @@ def test_calculate_num_frames_using_fps_and_duration(
 
 @pytest.mark.parametrize(
     "duration_seconds_from_header, begin_stream_seconds_from_content, end_stream_seconds_from_content, expected_duration_seconds",
-    [(60, 5, 20, 15), (60, 1, None, 60), (None, 0, 10, 10)],
+    [(60, 5, 20, 15), (60, 1, None, 60), (60, None, 1, 60), (None, 0, 10, 10)],
 )
 def test_duration_seconds_fallback(
     duration_seconds_from_header,
@@ -204,7 +204,7 @@ def test_duration_seconds_fallback(
 
 @pytest.mark.parametrize(
     "num_frames_from_header, average_fps_from_header, expected_duration_seconds",
-    [(100, 10, 10), (100, None, None), (None, None, None)],
+    [(100, 10, 10), (100, None, None), (None, 10, None), (None, None, None)],
 )
 def test_calculate_duration_seconds_using_fps_and_num_frames(
     num_frames_from_header, average_fps_from_header, expected_duration_seconds
