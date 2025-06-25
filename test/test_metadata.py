@@ -167,6 +167,7 @@ def test_calculate_num_frames_using_fps_and_duration(
         codec="whatever",
         width=123,
         height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
         average_fps_from_header=average_fps_from_header,
         stream_index=0,
     )
@@ -198,6 +199,7 @@ def test_duration_seconds_fallback(
         codec="whatever",
         width=123,
         height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
         average_fps_from_header=5,
         stream_index=0,
     )
@@ -226,6 +228,7 @@ def test_calculate_duration_seconds_using_fps_and_num_frames(
         codec="whatever",
         width=123,
         height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
         average_fps_from_header=average_fps_from_header,
         stream_index=0,
     )
