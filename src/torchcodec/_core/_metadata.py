@@ -85,17 +85,27 @@ class VideoStreamMetadata(StreamMetadata):
     def duration_seconds(self) -> Optional[float]:
         """Duration of the stream in seconds. We try to calculate the duration
         from the actual frames if a :term:`scan` was performed. Otherwise we
-        fall back to ``duration_seconds_from_header``.
+        fall back to ``duration_seconds_from_header``. If that value is also None,
+        we  instead calculate the duration from ``num_frames_from_header`` and
+        ``average_fps_from_header``.
         """
         if (
-            self.end_stream_seconds_from_content is None
-            or self.begin_stream_seconds_from_content is None
+            self.end_stream_seconds_from_content is not None
+            and self.begin_stream_seconds_from_content is not None
         ):
+            return (
+                self.end_stream_seconds_from_content
+                - self.begin_stream_seconds_from_content
+            )
+        elif self.duration_seconds_from_header is not None:
             return self.duration_seconds_from_header
-        return (
-            self.end_stream_seconds_from_content
-            - self.begin_stream_seconds_from_content
-        )
+        elif (
+            self.num_frames_from_header is not None
+            and self.average_fps_from_header is not None
+        ):
+            return self.num_frames_from_header / self.average_fps_from_header
+        else:
+            return None
 
     @property
     def begin_stream_seconds(self) -> float:
@@ -123,14 +133,22 @@ class VideoStreamMetadata(StreamMetadata):
 
     @property
     def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to
-        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
-        corresponds to ``num_frames_from_header``.
+        """Number of frames in the stream (int or None).
+        This corresponds to ``num_frames_from_content`` if a :term:`scan` was made,
+        otherwise it corresponds to ``num_frames_from_header``. If that value is also
+        None, the number of frames is calculated from the duration and the average fps.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
-        else:
+        elif self.num_frames_from_header is not None:
             return self.num_frames_from_header
+        elif (
+            self.average_fps_from_header is not None
+            and self.duration_seconds_from_header is not None
+        ):
+            return int(self.average_fps_from_header * self.duration_seconds_from_header)
+        else:
+            return None
 
     @property
     def average_fps(self) -> Optional[float]:

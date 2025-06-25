@@ -6,6 +6,8 @@
 
 import contextlib
 import gc
+import json
+from unittest.mock import patch
 
 import numpy
 import pytest
@@ -737,6 +739,56 @@ class TestVideoDecoder:
         torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    @patch("torchcodec._core._metadata._get_stream_json_metadata")
+    def test_get_frames_with_missing_num_frames_metadata(
+        self, mock_get_stream_json_metadata, device, seek_mode
+    ):
+        # Create a mock stream_dict to test that initializing VideoDecoder without
+        # num_frames_from_header and num_frames_from_content calculates num_frames
+        # using the average_fps and duration_seconds metadata.
+        mock_stream_dict = {
+            "averageFpsFromHeader": 29.97003,
+            "beginStreamSecondsFromContent": 0.0,
+            "beginStreamSecondsFromHeader": 0.0,
+            "bitRate": 128783.0,
+            "codec": "h264",
+            "durationSecondsFromHeader": 13.013,
+            "endStreamSecondsFromContent": 13.013,
+            "width": 480,
+            "height": 270,
+            "mediaType": "video",
+            "numFramesFromHeader": None,
+            "numFramesFromContent": None,
+        }
+        # Set the return value of the mock to be the mock_stream_dict
+        mock_get_stream_json_metadata.return_value = json.dumps(mock_stream_dict)
+
+        decoder = VideoDecoder(
+            NASA_VIDEO.path,
+            stream_index=3,
+            device=device,
+            seek_mode=seek_mode,
+        )
+
+        assert decoder.metadata.num_frames_from_header is None
+        assert decoder.metadata.num_frames_from_content is None
+        assert decoder.metadata.duration_seconds is not None
+        assert decoder.metadata.average_fps is not None
+        assert decoder.metadata.num_frames == int(
+            decoder.metadata.duration_seconds * decoder.metadata.average_fps
+        )
+        assert len(decoder) == 390
+
+        # Test get_frames_in_range Python logic which uses the num_frames metadata mocked earlier.
+        # The frame is read at the C++ level.
+        ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
+            start=9, stop=10, stream_index=3
+        ).to(device)
+        frames9 = decoder.get_frames_in_range(start=9, stop=10)
+        assert_frames_equal(ref_frames9, frames9.data)
 
     @pytest.mark.parametrize("dimension_order", ["NCHW", "NHWC"])
     @pytest.mark.parametrize(
