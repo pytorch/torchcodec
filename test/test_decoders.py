@@ -488,6 +488,9 @@ class TestVideoDecoder:
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(IndexError, match="out of bounds"):
+            frame = decoder.get_frame_at(-10000)  # noqa
+
+        with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(10000)  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
@@ -545,6 +548,12 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_get_frames_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
+
+        expected_converted_index = -10000 + len(decoder)
+        with pytest.raises(
+            RuntimeError, match=f"Invalid frame index={expected_converted_index}"
+        ):
+            decoder.get_frames_at([-10000])
 
         with pytest.raises(RuntimeError, match="Invalid frame index=390"):
             decoder.get_frames_at([390])
