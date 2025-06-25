@@ -454,6 +454,8 @@ void SingleStreamDecoder::addVideoStream(
 
   streamMetadata.width = streamInfo.codecContext->width;
   streamMetadata.height = streamInfo.codecContext->height;
+  streamMetadata.sampleAspectRatio =
+      streamInfo.codecContext->sample_aspect_ratio;
 }
 
 void SingleStreamDecoder::addAudioStream(

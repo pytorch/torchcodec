@@ -604,6 +604,12 @@ std::string get_stream_json_metadata(
   if (streamMetadata.height.has_value()) {
     map["height"] = std::to_string(*streamMetadata.height);
   }
+  if (streamMetadata.sampleAspectRatio.has_value()) {
+    map["sampleAspectRatioNum"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).num);
+    map["sampleAspectRatioDen"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).den);
+  }
   if (streamMetadata.averageFpsFromHeader.has_value()) {
     map["averageFpsFromHeader"] =
         std::to_string(*streamMetadata.averageFpsFromHeader);

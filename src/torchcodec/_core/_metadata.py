@@ -8,6 +8,7 @@ import dataclasses
 import json
 import pathlib
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import List, Optional, Union
 
 import torch
@@ -80,22 +81,37 @@ class VideoStreamMetadata(StreamMetadata):
     average_fps_from_header: Optional[float]
     """Averate fps of the stream, obtained from the header (float or None).
     We recommend using the ``average_fps`` attribute instead."""
+    pixel_aspect_ratio: Optional[Fraction]
+    """Pixel Aspect Ratio (PAR), also known as Sample Aspect Ratio
+    (SAR --- not to be confused with Storage Aspect Ratio, also SAR),
+    is the ratio between the width and height of each pixel
+    (``fractions.Fraction`` or None)."""
 
     @property
     def duration_seconds(self) -> Optional[float]:
         """Duration of the stream in seconds. We try to calculate the duration
         from the actual frames if a :term:`scan` was performed. Otherwise we
-        fall back to ``duration_seconds_from_header``.
+        fall back to ``duration_seconds_from_header``. If that value is also None,
+        we  instead calculate the duration from ``num_frames_from_header`` and
+        ``average_fps_from_header``.
         """
         if (
-            self.end_stream_seconds_from_content is None
-            or self.begin_stream_seconds_from_content is None
+            self.end_stream_seconds_from_content is not None
+            and self.begin_stream_seconds_from_content is not None
         ):
+            return (
+                self.end_stream_seconds_from_content
+                - self.begin_stream_seconds_from_content
+            )
+        elif self.duration_seconds_from_header is not None:
             return self.duration_seconds_from_header
-        return (
-            self.end_stream_seconds_from_content
-            - self.begin_stream_seconds_from_content
-        )
+        elif (
+            self.num_frames_from_header is not None
+            and self.average_fps_from_header is not None
+        ):
+            return self.num_frames_from_header / self.average_fps_from_header
+        else:
+            return None
 
     @property
     def begin_stream_seconds(self) -> float:
@@ -123,14 +139,22 @@ class VideoStreamMetadata(StreamMetadata):
 
     @property
     def num_frames(self) -> Optional[int]:
-        """Number of frames in the stream. This corresponds to
-        ``num_frames_from_content`` if a :term:`scan` was made, otherwise it
-        corresponds to ``num_frames_from_header``.
+        """Number of frames in the stream (int or None).
+        This corresponds to ``num_frames_from_content`` if a :term:`scan` was made,
+        otherwise it corresponds to ``num_frames_from_header``. If that value is also
+        None, the number of frames is calculated from the duration and the average fps.
         """
         if self.num_frames_from_content is not None:
             return self.num_frames_from_content
-        else:
+        elif self.num_frames_from_header is not None:
             return self.num_frames_from_header
+        elif (
+            self.average_fps_from_header is not None
+            and self.duration_seconds_from_header is not None
+        ):
+            return int(self.average_fps_from_header * self.duration_seconds_from_header)
+        else:
+            return None
 
     @property
     def average_fps(self) -> Optional[float]:
@@ -211,6 +235,16 @@ class ContainerMetadata:
         return metadata
 
 
+def _get_optional_par_fraction(stream_dict):
+    try:
+        return Fraction(
+            stream_dict["sampleAspectRatioNum"],
+            stream_dict["sampleAspectRatioDen"],
+        )
+    except KeyError:
+        return None
+
+
 # TODO-AUDIO: This is user-facing. Should this just be `get_metadata`, without
 # the "container" name in it? Same below.
 def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
@@ -247,6 +281,7 @@ def get_container_metadata(decoder: torch.Tensor) -> ContainerMetadata:
                     num_frames_from_header=stream_dict.get("numFramesFromHeader"),
                     num_frames_from_content=stream_dict.get("numFramesFromContent"),
                     average_fps_from_header=stream_dict.get("averageFpsFromHeader"),
+                    pixel_aspect_ratio=_get_optional_par_fraction(stream_dict),
                     **common_meta,
                 )
             )
