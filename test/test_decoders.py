@@ -328,6 +328,19 @@ class TestVideoDecoder:
         )
         assert_frames_equal(ref386_389, slice386_389)
 
+        # slices with upper bound greater than len(decoder) are supported
+        slice387_389 = decoder[-3:10000].to(device)
+        assert slice387_389.shape == torch.Size(
+            [
+                3,
+                NASA_VIDEO.num_color_channels,
+                NASA_VIDEO.height,
+                NASA_VIDEO.width,
+            ]
+        )
+        ref387_389 = NASA_VIDEO.get_frame_data_by_range(387, 390).to(device)
+        assert_frames_equal(ref387_389, slice387_389)
+
         # an empty range is valid!
         empty_frame = decoder[5:5]
         assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
@@ -437,6 +450,11 @@ class TestVideoDecoder:
             expected_frame_info.duration_seconds, rel=1e-3
         )
 
+        # test negative frame index
+        frame_minus1 = decoder.get_frame_at(-1)
+        ref_frame_minus1 = NASA_VIDEO.get_frame_data_by_index(389).to(device)
+        assert_frames_equal(ref_frame_minus1, frame_minus1.data)
+
         # test numpy.int64
         frame9 = decoder.get_frame_at(numpy.int64(9))
         assert_frames_equal(ref_frame9, frame9.data)
@@ -470,9 +488,6 @@ class TestVideoDecoder:
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
         with pytest.raises(IndexError, match="out of bounds"):
-            frame = decoder.get_frame_at(-1)  # noqa
-
-        with pytest.raises(IndexError, match="out of bounds"):
             frame = decoder.get_frame_at(10000)  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
@@ -480,7 +495,8 @@ class TestVideoDecoder:
     def test_get_frames_at(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        frames = decoder.get_frames_at([35, 25])
+        # test positive and negative frame index
+        frames = decoder.get_frames_at([35, 25, -1, -2])
 
         assert isinstance(frames, FrameBatch)
 
@@ -490,12 +506,20 @@ class TestVideoDecoder:
         assert_frames_equal(
             frames[1].data, NASA_VIDEO.get_frame_data_by_index(25).to(device)
         )
+        assert_frames_equal(
+            frames[2].data, NASA_VIDEO.get_frame_data_by_index(389).to(device)
+        )
+        assert_frames_equal(
+            frames[3].data, NASA_VIDEO.get_frame_data_by_index(388).to(device)
+        )
 
         assert frames.pts_seconds.device.type == "cpu"
         expected_pts_seconds = torch.tensor(
             [
                 NASA_VIDEO.get_frame_info(35).pts_seconds,
                 NASA_VIDEO.get_frame_info(25).pts_seconds,
+                NASA_VIDEO.get_frame_info(389).pts_seconds,
+                NASA_VIDEO.get_frame_info(388).pts_seconds,
             ],
             dtype=torch.float64,
         )
@@ -508,6 +532,8 @@ class TestVideoDecoder:
             [
                 NASA_VIDEO.get_frame_info(35).duration_seconds,
                 NASA_VIDEO.get_frame_info(25).duration_seconds,
+                NASA_VIDEO.get_frame_info(389).duration_seconds,
+                NASA_VIDEO.get_frame_info(388).duration_seconds,
             ],
             dtype=torch.float64,
         )
@@ -519,9 +545,6 @@ class TestVideoDecoder:
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_get_frames_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
-
-        with pytest.raises(RuntimeError, match="Invalid frame index=-1"):
-            decoder.get_frames_at([-1])
 
         with pytest.raises(RuntimeError, match="Invalid frame index=390"):
             decoder.get_frames_at([390])
