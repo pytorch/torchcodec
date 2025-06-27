@@ -195,6 +195,8 @@ class VideoDecoder:
         Returns:
             Frame: The frame at the given index.
         """
+        if index < 0:
+            index += self._num_frames
 
         if not 0 <= index < self._num_frames:
             raise IndexError(
@@ -218,6 +220,9 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames at the given indices.
         """
+        indices = [
+            index if index >= 0 else index + self._num_frames for index in indices
+        ]
 
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
             self._decoder, frame_indices=indices
