@@ -552,13 +552,10 @@ class TestVideoDecoder:
     def test_get_frames_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        expected_converted_index = -10000 + len(decoder)
-        with pytest.raises(
-            RuntimeError, match=f"Invalid frame index={expected_converted_index}"
-        ):
+        with pytest.raises(IndexError, match="Index -\\d+ is out of bounds"):
             decoder.get_frames_at([-10000])
 
-        with pytest.raises(RuntimeError, match="Invalid frame index=390"):
+        with pytest.raises(IndexError, match="Index 390 is out of bounds"):
             decoder.get_frames_at([390])
 
         with pytest.raises(RuntimeError, match="Expected a value of type"):
@@ -774,6 +771,66 @@ class TestVideoDecoder:
         torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("stream_index", [3, None])
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range_tensor_index_semantics(
+        self, stream_index, device, seek_mode
+    ):
+        decoder = VideoDecoder(
+            NASA_VIDEO.path,
+            stream_index=stream_index,
+            device=device,
+            seek_mode=seek_mode,
+        )
+        # slices with upper bound greater than len(decoder) are supported
+        ref_frames387_389 = NASA_VIDEO.get_frame_data_by_range(
+            start=387, stop=390, stream_index=stream_index
+        ).to(device)
+        frames387_389 = decoder.get_frames_in_range(start=387, stop=1000)
+        print(f"{frames387_389.data.shape=}")
+        assert frames387_389.data.shape == torch.Size(
+            [
+                3,
+                NASA_VIDEO.get_num_color_channels(stream_index=stream_index),
+                NASA_VIDEO.get_height(stream_index=stream_index),
+                NASA_VIDEO.get_width(stream_index=stream_index),
+            ]
+        )
+        assert_frames_equal(ref_frames387_389, frames387_389.data)
+
+        # test that negative values in the range are supported
+        ref_frames386_389 = NASA_VIDEO.get_frame_data_by_range(
+            start=386, stop=390, stream_index=stream_index
+        ).to(device)
+        frames386_389 = decoder.get_frames_in_range(start=-4, stop=1000)
+        assert frames386_389.data.shape == torch.Size(
+            [
+                4,
+                NASA_VIDEO.get_num_color_channels(stream_index=stream_index),
+                NASA_VIDEO.get_height(stream_index=stream_index),
+                NASA_VIDEO.get_width(stream_index=stream_index),
+            ]
+        )
+        assert_frames_equal(ref_frames386_389, frames386_389.data)
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range_fails(self, device, seek_mode):
+        decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
+
+        with pytest.raises(IndexError, match="Start index 1000 is out of bounds"):
+            decoder.get_frames_in_range(start=1000, stop=10)
+
+        with pytest.raises(IndexError, match="Start index -\\d+ is out of bounds"):
+            decoder.get_frames_in_range(start=-1000, stop=10)
+
+        with pytest.raises(
+            IndexError,
+            match="Stop index \\(-\\d+\\) must not be less than the start index",
+        ):
+            decoder.get_frames_in_range(start=0, stop=-1000)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
