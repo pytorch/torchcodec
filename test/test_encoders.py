@@ -69,7 +69,13 @@ def validate_frames_properties(*, actual: Path, expected: Path):
         assert all(required_prop in d_actual for required_prop in required_props)
         for prop in d_expected:
             if prop == "pkt_pos":
-                continue  # TODO this probably matters
+                # pkt_pos is the position of the packet *in bytes* in its
+                # stream. We don't always match FFmpeg exactly on this,
+                # typically on compressed formats like mp3. It's probably
+                # because we are not writing the exact same headers, or
+                # something like this. In any case, this doesn't seem to be
+                # critical.
+                continue
             assert (
                 d_actual[prop] == d_expected[prop]
             ), f"\nComparing: {actual}\nagainst reference: {expected},\nthe {prop} property is different at frame {frame_index}:"
