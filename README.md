@@ -11,7 +11,7 @@ videos and audio, TorchCodec is how you turn these into data.
 We achieve these capabilities through:
 
 * Pythonic APIs that mirror Python and PyTorch conventions.
-* Relying on [FFmpeg](https://www.ffmpeg.org/) to do the decoding / encoding.
+* Relying on [FFmpeg](https://www.ffmpeg.org/) to do the decoding and encoding.
   TorchCodec uses the version of FFmpeg you already have installed. FFmpeg is a
   mature library with broad coverage available on most systems. It is, however,
   not easy to use. TorchCodec abstracts FFmpeg's complexity to ensure it is used

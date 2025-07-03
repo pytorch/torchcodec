@@ -35,7 +35,7 @@ play_audio(samples, rate=sample_rate)
 
 # %%
 # We first instantiate an :class:`~torchcodec.encoders.AudioEncoder`. We pass it
-# the samples to be encoded. The samples must a 2D tensors of shape
+# the samples to be encoded. The samples must be a 2D tensors of shape
 # ``(num_channels, num_samples)``, or in this case, a 1D tensor where
 # ``num_channels`` is assumed to be 1. The values must be float values
 # normalized in ``[-1, 1]``: this is also what the

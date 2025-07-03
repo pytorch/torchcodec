@@ -28,7 +28,7 @@ class AudioEncoder:
             )
         if samples.ndim == 1:
             # make it 2D and assume 1 channel
-            samples = samples[None, :]
+            samples = torch.unsqueeze(samples, 0)
         if samples.ndim != 2:
             raise ValueError(f"Expected 1D or 2D samples, got {samples.shape = }.")
         if samples.dtype != torch.float32:
