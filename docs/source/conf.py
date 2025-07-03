@@ -69,6 +69,9 @@ class CustomGalleryExampleSortKey:
         self.src_dir = src_dir
 
     def __call__(self, filename):
+        # We have two top-level galleries, one for decoding examples and one for
+        # encoding examples. We define the example order within each gallery
+        # individually.
         if "examples/decoding" in self.src_dir:
             order = [
                 "basic_example.py",
