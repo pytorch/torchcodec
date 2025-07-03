@@ -29,6 +29,9 @@ def with_ffmpeg_debug_logs():
 
 
 def validate_frames_properties(*, actual: Path, expected: Path):
+    # actual and expected are files containing encoded audio data.  We call
+    # `ffprobe` on both, and assert that the frame properties match (pts,
+    # duration, etc.)
 
     frames_actual, frames_expected = (
         json.loads(
@@ -76,7 +79,7 @@ def validate_frames_properties(*, actual: Path, expected: Path):
     for frame_index, (d_actual, d_expected) in enumerate(
         zip(frames_actual, frames_expected)
     ):
-        assert all(required_prop in d_actual for required_prop in required_props)
+        assert all(required_prop in d_expected for required_prop in required_props)
         for prop in d_expected:
             if prop == "pkt_pos":
                 # pkt_pos is the position of the packet *in bytes* in its
