@@ -125,7 +125,7 @@ class AudioSamples(Iterable):
     pts_seconds: float
     """The :term:`pts` of the first sample, in seconds."""
     duration_seconds: float
-    """The duration of the sampleas, in seconds."""
+    """The duration of the samples, in seconds."""
     sample_rate: int
     """The sample rate of the samples, in Hz."""
 

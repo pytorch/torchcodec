@@ -293,8 +293,7 @@ void AudioEncoder::encode() {
     encodeInnerLoop(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
-    // TODO-ENCODING set frame pts correctly, and test against it.
-    // avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
+    avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 

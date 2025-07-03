@@ -139,7 +139,7 @@ def test_framebatch_indexing():
     assert isinstance(fb_fancy, FrameBatch)
     assert fb_fancy.data.shape == (3, N, C, H, W)
 
-    fb_fancy = fb[[[0], [1]]]  # select T=0 and N=1.
+    fb_fancy = fb[([0], [1])]  # select T=0 and N=1.
     assert isinstance(fb_fancy, FrameBatch)
     assert fb_fancy.data.shape == (1, C, H, W)
 
