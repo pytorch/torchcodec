@@ -79,7 +79,10 @@ def validate_frames_properties(*, actual: Path, expected: Path):
     for frame_index, (d_actual, d_expected) in enumerate(
         zip(frames_actual, frames_expected)
     ):
-        assert all(required_prop in d_expected for required_prop in required_props)
+        # assert all(required_prop in d_expected for required_prop in required_props)
+        for prop in required_props:
+            assert prop in d_expected, f"{prop} not in {d_expected.keys()}"
+
         for prop in d_expected:
             if prop == "pkt_pos":
                 # pkt_pos is the position of the packet *in bytes* in its
