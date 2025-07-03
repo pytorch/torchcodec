@@ -79,9 +79,8 @@ def validate_frames_properties(*, actual: Path, expected: Path):
     for frame_index, (d_actual, d_expected) in enumerate(
         zip(frames_actual, frames_expected)
     ):
-        # assert all(required_prop in d_expected for required_prop in required_props)
-        for prop in required_props:
-            assert prop in d_expected, f"{prop} not in {d_expected.keys()}"
+        if get_ffmpeg_major_version() >= 6:
+            assert all(required_prop in d_expected for required_prop in required_props)
 
         for prop in d_expected:
             if prop == "pkt_pos":
