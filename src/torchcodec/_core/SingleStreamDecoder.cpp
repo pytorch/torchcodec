@@ -103,11 +103,10 @@ void SingleStreamDecoder::initializeDecoder() {
   // which decodes a few frames to get missing info. For more, see:
   //   https://ffmpeg.org/doxygen/7.0/group__lavf__decoding.html
   int status = avformat_find_stream_info(formatContext_.get(), nullptr);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Failed to find stream info: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to find stream info: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   for (unsigned int i = 0; i < formatContext_->nb_streams; i++) {
     AVStream* avStream = formatContext_->streams[i];
@@ -222,11 +221,10 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
       break;
     }
 
-    if (status != AVSUCCESS) {
-      throw std::runtime_error(
-          "Failed to read frame from input file: " +
-          getFFMPEGErrorStringFromErrorCode(status));
-    }
+    TORCH_CHECK(
+        status == AVSUCCESS,
+        "Failed to read frame from input file: ",
+        getFFMPEGErrorStringFromErrorCode(status));
 
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
       continue;
@@ -279,11 +277,10 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 
   // Reset the seek-cursor back to the beginning.
   int status = avformat_seek_file(formatContext_.get(), 0, INT64_MIN, 0, 0, 0);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Could not seek file to pts=0: " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Could not seek file to pts=0: ",
+      getFFMPEGErrorStringFromErrorCode(status));
 
   // Sort all frames by their pts.
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
@@ -415,9 +412,7 @@ void SingleStreamDecoder::addStream(
   }
 
   retVal = avcodec_open2(streamInfo.codecContext.get(), avCodec, nullptr);
-  if (retVal < AVSUCCESS) {
-    throw std::invalid_argument(getFFMPEGErrorStringFromErrorCode(retVal));
-  }
+  TORCH_CHECK(retVal >= AVSUCCESS, getFFMPEGErrorStringFromErrorCode(retVal));
 
   codecContext->time_base = streamInfo.stream->time_base;
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
@@ -446,11 +441,11 @@ void SingleStreamDecoder::addVideoStream(
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
 
-  if (seekMode_ == SeekMode::approximate &&
-      !streamMetadata.averageFpsFromHeader.has_value()) {
-    throw std::runtime_error(
-        "Seek mode is approximate, but stream " +
-        std::to_string(activeStreamIndex_) +
+  if (seekMode_ == SeekMode::approximate) {
+    TORCH_CHECK(
+        streamMetadata.averageFpsFromHeader.has_value(),
+        "Seek mode is approximate, but stream ",
+        std::to_string(activeStreamIndex_),
         " does not have an average fps in its metadata.");
   }
 
@@ -459,6 +454,8 @@ void SingleStreamDecoder::addVideoStream(
 
   streamMetadata.width = streamInfo.codecContext->width;
   streamMetadata.height = streamInfo.codecContext->height;
+  streamMetadata.sampleAspectRatio =
+      streamInfo.codecContext->sample_aspect_ratio;
 }
 
 void SingleStreamDecoder::addAudioStream(
@@ -1048,11 +1045,13 @@ void SingleStreamDecoder::maybeSeekToBeforeDesiredPts() {
       desiredPts,
       desiredPts,
       0);
-  if (status < 0) {
-    throw std::runtime_error(
-        "Could not seek file to pts=" + std::to_string(desiredPts) + ": " +
-        getFFMPEGErrorStringFromErrorCode(status));
-  }
+  TORCH_CHECK(
+      status >= 0,
+      "Could not seek file to pts=",
+      std::to_string(desiredPts),
+      ": ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
 }
@@ -1121,21 +1120,20 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
         status = avcodec_send_packet(
             streamInfo.codecContext.get(),
             /*avpkt=*/nullptr);
-        if (status < AVSUCCESS) {
-          throw std::runtime_error(
-              "Could not flush decoder: " +
-              getFFMPEGErrorStringFromErrorCode(status));
-        }
+        TORCH_CHECK(
+            status >= AVSUCCESS,
+            "Could not flush decoder: ",
+            getFFMPEGErrorStringFromErrorCode(status));
 
         reachedEOF = true;
         break;
       }
 
-      if (status < AVSUCCESS) {
-        throw std::runtime_error(
-            "Could not read frame from input file: " +
-            getFFMPEGErrorStringFromErrorCode(status));
-      }
+      TORCH_CHECK(
+          status >= AVSUCCESS,
+          "Could not read frame from input file: ",
+          getFFMPEGErrorStringFromErrorCode(status));
+
     } while (packet->stream_index != activeStreamIndex_);
 
     if (reachedEOF) {
@@ -1147,11 +1145,10 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
     status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    if (status < AVSUCCESS) {
-      throw std::runtime_error(
-          "Could not push packet to decoder: " +
-          getFFMPEGErrorStringFromErrorCode(status));
-    }
+    TORCH_CHECK(
+        status >= AVSUCCESS,
+        "Could not push packet to decoder: ",
+        getFFMPEGErrorStringFromErrorCode(status));
 
     decodeStats_.numPacketsSentToDecoder++;
   }
@@ -1162,8 +1159,9 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
           "Requested next frame while there are no more frames left to "
           "decode.");
     }
-    throw std::runtime_error(
-        "Could not receive frame from decoder: " +
+    TORCH_CHECK(
+        false,
+        "Could not receive frame from decoder: ",
         getFFMPEGErrorStringFromErrorCode(status));
   }
 
@@ -1429,7 +1427,7 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
       return std::floor(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1456,7 +1454,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
       return std::ceil(seconds * streamMetadata.averageFpsFromHeader.value());
     }
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1476,7 +1474,7 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
           streamInfo.timeBase);
     }
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1493,7 +1491,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
       return streamMetadata.numFramesFromHeader;
     }
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1505,7 +1503,7 @@ double SingleStreamDecoder::getMinSeconds(
     case SeekMode::approximate:
       return 0;
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1518,7 +1516,7 @@ std::optional<double> SingleStreamDecoder::getMaxSeconds(
       return streamMetadata.durationSecondsFromHeader;
     }
     default:
-      throw std::runtime_error("Unknown SeekMode");
+      TORCH_CHECK(false, "Unknown SeekMode");
   }
 }
 
@@ -1552,10 +1550,10 @@ void SingleStreamDecoder::validateActiveStream(
 }
 
 void SingleStreamDecoder::validateScannedAllStreams(const std::string& msg) {
-  if (!scannedAllStreams_) {
-    throw std::runtime_error(
-        "Must scan all streams to update metadata before calling " + msg);
-  }
+  TORCH_CHECK(
+      scannedAllStreams_,
+      "Must scan all streams to update metadata before calling ",
+      msg);
 }
 
 void SingleStreamDecoder::validateFrameIndex(

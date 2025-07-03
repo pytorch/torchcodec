@@ -592,6 +592,9 @@ def test_time_based_sampler_errors(sampler):
     with restore_metadata():
         decoder.metadata.end_stream_seconds_from_content = None
         decoder.metadata.duration_seconds_from_header = None
+        decoder.metadata.num_frames_from_header = (
+            None  # Set to none to prevent fallback calculation
+        )
         with pytest.raises(
             ValueError, match="Could not infer stream end from video metadata"
         ):
