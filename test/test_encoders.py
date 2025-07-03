@@ -49,10 +49,24 @@ def validate_frames_properties(*, actual: Path, expected: Path):
     assert isinstance(frames_actual, list)
     assert all(isinstance(d, dict) for d in frames_actual)
 
+    assert len(frames_actual) > 3  # arbitrary sanity check
     assert len(frames_actual) == len(frames_expected)
+
+    # non-exhaustive list of the props we want to test for:
+    required_props = (
+        "pts",
+        "pts_time",
+        "sample_fmt",
+        "nb_samples",
+        "channels",
+        "duration",
+        "duration_time",
+    )
+
     for frame_index, (d_actual, d_expected) in enumerate(
         zip(frames_actual, frames_expected)
     ):
+        assert all(required_prop in d_actual for required_prop in required_props)
         for prop in d_expected:
             if prop == "pkt_pos":
                 continue  # TODO this probably matters
