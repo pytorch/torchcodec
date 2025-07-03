@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -16,6 +17,15 @@ from .utils import (
     SINE_MONO_S32,
     TestContainerFile,
 )
+
+
+@pytest.fixture
+def with_ffmpeg_debug_logs():
+    # Fixture that sets the ffmpeg logs to DEBUG mode
+    previous_log_level = os.environ.get("TORCHCODEC_FFMPEG_LOG_LEVEL", "QUIET")
+    os.environ["TORCHCODEC_FFMPEG_LOG_LEVEL"] = "DEBUG"
+    yield
+    os.environ["TORCHCODEC_FFMPEG_LOG_LEVEL"] = previous_log_level
 
 
 def validate_frames_properties(*, actual: Path, expected: Path):
@@ -190,7 +200,17 @@ class TestAudioEncoder:
     @pytest.mark.parametrize("num_channels", (None, 1, 2))
     @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
     @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
-    def test_against_cli(self, asset, bit_rate, num_channels, format, method, tmp_path):
+    def test_against_cli(
+        self,
+        asset,
+        bit_rate,
+        num_channels,
+        format,
+        method,
+        tmp_path,
+        capfd,
+        with_ffmpeg_debug_logs,
+    ):
         # Encodes samples with our encoder and with the FFmpeg CLI, and checks
         # that both decoded outputs are equal
 
@@ -210,12 +230,23 @@ class TestAudioEncoder:
         )
 
         encoder = AudioEncoder(self.decode(asset).data, sample_rate=asset.sample_rate)
+
         params = dict(bit_rate=bit_rate, num_channels=num_channels)
         if method == "to_file":
             encoded_by_us = tmp_path / f"output.{format}"
             encoder.to_file(dest=str(encoded_by_us), **params)
         else:
             encoded_by_us = encoder.to_tensor(format=format, **params)
+
+        captured = capfd.readouterr()
+        if format == "wav":
+            assert "Timestamps are unset in a packet" not in captured.err
+        if format == "mp3":
+            assert "Queue input is backward in time" not in captured.err
+        if format in ("flac", "wav"):
+            assert "Encoder did not produce proper pts" not in captured.err
+        if format in ("flac", "mp3"):
+            assert "Application provided invalid" not in captured.err
 
         if format == "wav":
             rtol, atol = 0, 1e-4
