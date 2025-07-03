@@ -29,7 +29,7 @@
 import os
 import sys
 
-import pytorch_sphinx_theme
+import pytorch_sphinx_theme2
 import torchcodec
 
 sys.path.append(os.path.abspath("."))
@@ -55,6 +55,10 @@ extensions = [
     "sphinx_tabs.tabs",
     "sphinx_design",
     "sphinx_copybutton",
+    "sphinx_sitemap",
+    "sphinxcontrib.mermaid",
+    "pytorch_sphinx_theme2",
+    "sphinxext.opengraph",
 ]
 
 
@@ -121,15 +125,13 @@ napoleon_numpy_docstring = False
 napoleon_google_docstring = True
 
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
-
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 source_suffix = [".rst"]
 
 html_title = f"TorchCodec {torchcodec.__version__} Documentation"
+html_baseurl = "https://github.com/pytorch/torchcodec"
 
 # The master toctree document.
 master_doc = "index"
@@ -162,21 +164,69 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "pytorch_sphinx_theme"
-html_theme_path = [pytorch_sphinx_theme.get_html_theme_path()]
+html_theme = "pytorch_sphinx_theme2"
+html_theme_path = [pytorch_sphinx_theme2.get_html_theme_path()]
+
+ogp_site_url = "http://pytorch.org/<your-sub-site>"
+ogp_image = "https://pytorch.org/assets/images/social-share.jpg"
+
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
 html_theme_options = {
-    "collapse_navigation": False,
-    "display_version": True,
-    "logo_only": True,
-    "pytorch_project": "docs",
-    "navigation_with_keys": True,
+    "navigation_with_keys": False,
     "analytics_id": "GTM-T8XT4PS",
+    "logo": {
+        "text": "",
+    },
+    "icon_links": [
+        {
+            "name": "X",
+            "url": "https://x.com/PyTorch",
+            "icon": "fa-brands fa-x-twitter",
+        },
+        {
+            "name": "GitHub",
+            "url": "https://github.com/pytorch/torchcodec",
+            "icon": "fa-brands fa-github",
+        },
+        {
+            "name": "Discourse",
+            "url": "https://dev-discuss.pytorch.org/",
+            "icon": "fa-brands fa-discourse",
+        },
+        {
+            "name": "PyPi",
+            "url": "https://pypi.org/project/torchcodec",
+            "icon": "fa-brands fa-python",
+        },
+    ],
+    "use_edit_page_button": True,
+    "navbar_center": "navbar-nav",
 }
+theme_variables = pytorch_sphinx_theme2.get_theme_variables()
+
+templates_path = [
+    "_templates",
+    os.path.join(os.path.dirname(pytorch_sphinx_theme2.__file__), "templates"),
+]
+
+html_context = {
+    "theme_variables": theme_variables,
+    "display_github": True,
+    "github_url": "https://github.com",
+    "github_user": "pytorch",
+    "github_repo": "<your-repo>",
+    "feedback_url": "https://github.com/pytorch/<path-to-your-repo>",
+    "github_version": "main",
+    "doc_path": "docs/source",
+    "library_links": theme_variables.get("library_links", []),
+    "community_links": theme_variables.get("community_links", []),
+    "language_bindings_links": html_theme_options.get("language_bindings_links", []),
+}
+
 
 html_logo = "_static/img/pytorch-logo-dark.svg"
 
