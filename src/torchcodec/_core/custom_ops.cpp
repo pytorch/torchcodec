@@ -10,7 +10,7 @@
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
@@ -196,15 +196,13 @@ at::Tensor create_from_tensor(
   TORCH_CHECK(
       video_tensor.scalar_type() == torch::kUInt8,
       "video_tensor must be kUInt8");
-  void* data = video_tensor.mutable_data_ptr();
-  size_t length = video_tensor.numel();
 
   SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
+  auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
@@ -245,8 +243,10 @@ void _add_video_stream(
       videoStreamOptions.colorConversionLibrary =
           ColorConversionLibrary::SWSCALE;
     } else {
-      throw std::runtime_error(
-          "Invalid color_conversion_library=" + stdColorConversionLibrary +
+      TORCH_CHECK(
+          false,
+          "Invalid color_conversion_library=",
+          stdColorConversionLibrary,
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
@@ -563,6 +563,7 @@ std::string get_stream_json_metadata(
     throw std::out_of_range(
         "stream_index out of bounds: " + std::to_string(stream_index));
   }
+
   auto streamMetadata = allStreamMetadata[stream_index];
 
   std::map<std::string, std::string> map;
@@ -602,6 +603,12 @@ std::string get_stream_json_metadata(
   }
   if (streamMetadata.height.has_value()) {
     map["height"] = std::to_string(*streamMetadata.height);
+  }
+  if (streamMetadata.sampleAspectRatio.has_value()) {
+    map["sampleAspectRatioNum"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).num);
+    map["sampleAspectRatioDen"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).den);
   }
   if (streamMetadata.averageFpsFromHeader.has_value()) {
     map["averageFpsFromHeader"] =

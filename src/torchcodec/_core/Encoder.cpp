@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
