@@ -106,8 +106,8 @@ class TestAudioEncoder:
     def test_bad_input(self):
         with pytest.raises(ValueError, match="Expected samples to be a Tensor"):
             AudioEncoder(samples=123, sample_rate=32_000)
-        with pytest.raises(ValueError, match="Expected 2D samples"):
-            AudioEncoder(samples=torch.rand(10), sample_rate=32_000)
+        with pytest.raises(ValueError, match="Expected 1D or 2D samples"):
+            AudioEncoder(samples=torch.rand(3, 4, 5), sample_rate=32_000)
         with pytest.raises(ValueError, match="Expected float32 samples"):
             AudioEncoder(
                 samples=torch.rand(10, 10, dtype=torch.float64), sample_rate=32_000
@@ -374,3 +374,13 @@ class TestAudioEncoder:
         if num_channels_output is None:
             num_channels_output = num_channels_input
         assert self.decode(encoded_source).data.shape[0] == num_channels_output
+
+    def test_1d_samples(self):
+        # smoke test making sure 1D samples are supported
+        samples_1d, sample_rate = torch.rand(1000), 16_000
+        samples_2d = samples_1d[None, :]
+
+        torch.testing.assert_close(
+            AudioEncoder(samples_1d, sample_rate=sample_rate).to_tensor("wav"),
+            AudioEncoder(samples_2d, sample_rate=sample_rate).to_tensor("wav"),
+        )
