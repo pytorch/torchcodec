@@ -1,6 +1,6 @@
 #pragma once
 #include <torch/types.h>
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/StreamOptions.h"
 
@@ -9,13 +9,8 @@ class AudioEncoder {
  public:
   ~AudioEncoder();
 
-  // TODO-ENCODING: document in public docs that bit_rate value is only
-  // best-effort, matching to the closest supported bit_rate. I.e. passing 1 is
-  // like passing 0, which results in choosing the minimum supported bit rate.
-  // Passing 44_100 could result in output being 44000 if only 44000 is
-  // supported.
   AudioEncoder(
-      const torch::Tensor samples,
+      const torch::Tensor& samples,
       // TODO-ENCODING: update this comment when we support an output sample
       // rate. This will become the input sample rate.
       // The *output* sample rate. We can't really decide for the user what it
@@ -26,7 +21,7 @@ class AudioEncoder {
       std::string_view fileName,
       const AudioStreamOptions& audioStreamOptions);
   AudioEncoder(
-      const torch::Tensor samples,
+      const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> avioContextHolder,

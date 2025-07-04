@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import functools
+from fractions import Fraction
 
 import pytest
 
@@ -81,6 +82,7 @@ def test_get_metadata(metadata_getter):
     assert best_video_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_video_stream_metadata.bit_rate == 128783
     assert best_video_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
+    assert best_video_stream_metadata.pixel_aspect_ratio is None
     assert best_video_stream_metadata.codec == "h264"
     assert best_video_stream_metadata.num_frames_from_content == (
         390 if with_scan else None
@@ -119,7 +121,7 @@ def test_get_metadata_audio_file(metadata_getter):
 
 @pytest.mark.parametrize(
     "num_frames_from_header, num_frames_from_content, expected_num_frames",
-    [(None, 10, 10), (10, None, 10), (None, None, None)],
+    [(10, 20, 20), (None, 10, 10), (10, None, 10)],
 )
 def test_num_frames_fallback(
     num_frames_from_header, num_frames_from_content, expected_num_frames
@@ -137,10 +139,101 @@ def test_num_frames_fallback(
         width=123,
         height=321,
         average_fps_from_header=30,
+        pixel_aspect_ratio=Fraction(1, 1),
         stream_index=0,
     )
 
     assert metadata.num_frames == expected_num_frames
+
+
+@pytest.mark.parametrize(
+    "average_fps_from_header, duration_seconds_from_header, expected_num_frames",
+    [(60, 10, 600), (60, None, None), (None, 10, None), (None, None, None)],
+)
+def test_calculate_num_frames_using_fps_and_duration(
+    average_fps_from_header, duration_seconds_from_header, expected_num_frames
+):
+    """Check that if num_frames_from_content and num_frames_from_header are missing,
+    `.num_frames` is calculated using average_fps_from_header and duration_seconds_from_header
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=duration_seconds_from_header,
+        bit_rate=123,
+        num_frames_from_header=None,  # None to test calculating num_frames
+        num_frames_from_content=None,  # None to test calculating num_frames
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=0,
+        end_stream_seconds_from_content=4,
+        codec="whatever",
+        width=123,
+        height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
+        average_fps_from_header=average_fps_from_header,
+        stream_index=0,
+    )
+
+    assert metadata.num_frames == expected_num_frames
+
+
+@pytest.mark.parametrize(
+    "duration_seconds_from_header, begin_stream_seconds_from_content, end_stream_seconds_from_content, expected_duration_seconds",
+    [(60, 5, 20, 15), (60, 1, None, 60), (60, None, 1, 60), (None, 0, 10, 10)],
+)
+def test_duration_seconds_fallback(
+    duration_seconds_from_header,
+    begin_stream_seconds_from_content,
+    end_stream_seconds_from_content,
+    expected_duration_seconds,
+):
+    """Check that using begin_stream_seconds_from_content and end_stream_seconds_from_content to calculate `.duration_seconds`
+    has priority. If either value is missing, duration_seconds_from_header is used.
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=duration_seconds_from_header,
+        bit_rate=123,
+        num_frames_from_header=5,
+        num_frames_from_content=10,
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=begin_stream_seconds_from_content,
+        end_stream_seconds_from_content=end_stream_seconds_from_content,
+        codec="whatever",
+        width=123,
+        height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
+        average_fps_from_header=5,
+        stream_index=0,
+    )
+
+    assert metadata.duration_seconds == expected_duration_seconds
+
+
+@pytest.mark.parametrize(
+    "num_frames_from_header, average_fps_from_header, expected_duration_seconds",
+    [(100, 10, 10), (100, None, None), (None, 10, None), (None, None, None)],
+)
+def test_calculate_duration_seconds_using_fps_and_num_frames(
+    num_frames_from_header, average_fps_from_header, expected_duration_seconds
+):
+    """Check that duration_seconds is calculated using average_fps_from_header and num_frames_from_header
+    if duration_seconds_from_header is missing.
+    """
+    metadata = VideoStreamMetadata(
+        duration_seconds_from_header=None,  # None to test calculating duration_seconds
+        bit_rate=123,
+        num_frames_from_header=num_frames_from_header,
+        num_frames_from_content=10,
+        begin_stream_seconds_from_header=0,
+        begin_stream_seconds_from_content=None,  # None to test calculating duration_seconds
+        end_stream_seconds_from_content=None,  # None to test calculating duration_seconds
+        codec="whatever",
+        width=123,
+        height=321,
+        pixel_aspect_ratio=Fraction(10, 11),
+        average_fps_from_header=average_fps_from_header,
+        stream_index=0,
+    )
+    assert metadata.duration_seconds_from_header is None
+    assert metadata.duration_seconds == expected_duration_seconds
 
 
 def test_repr():
@@ -161,6 +254,7 @@ def test_repr():
   num_frames_from_header: 390
   num_frames_from_content: 390
   average_fps_from_header: 29.97003
+  pixel_aspect_ratio: 1
   duration_seconds: 13.013
   begin_stream_seconds: 0.0
   end_stream_seconds: 13.013

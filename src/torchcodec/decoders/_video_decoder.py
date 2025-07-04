@@ -30,7 +30,7 @@ class VideoDecoder:
             - If file-like object: we read video data from the object on demand. The object must
               expose the methods `read(self, size: int) -> bytes` and
               `seek(self, offset: int, whence: int) -> bytes`. Read more in:
-              :ref:`sphx_glr_generated_examples_file_like.py`.
+              :ref:`sphx_glr_generated_examples_decoding_file_like.py`.
         stream_index (int, optional): Specifies which stream in the video to decode frames from.
             Note that this index is absolute across all media types. If left unspecified, then
             the :term:`best stream` is used.
@@ -59,7 +59,7 @@ class VideoDecoder:
             accurate as it uses the file's metadata to calculate where i
             probably is. Default: "exact".
             Read more about this parameter in:
-            :ref:`sphx_glr_generated_examples_approximate_mode.py`
+            :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
 
 
     Attributes:
@@ -195,6 +195,8 @@ class VideoDecoder:
         Returns:
             Frame: The frame at the given index.
         """
+        if index < 0:
+            index += self._num_frames
 
         if not 0 <= index < self._num_frames:
             raise IndexError(
@@ -218,6 +220,9 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames at the given indices.
         """
+        indices = [
+            index if index >= 0 else index + self._num_frames for index in indices
+        ]
 
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
             self._decoder, frame_indices=indices

@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "torch/types.h"
 
@@ -8,7 +8,7 @@ namespace facebook::torchcodec {
 
 namespace {
 
-torch::Tensor validateSamples(torch::Tensor samples) {
+torch::Tensor validateSamples(const torch::Tensor& samples) {
   TORCH_CHECK(
       samples.dtype() == torch::kFloat32,
       "samples must have float32 dtype, got ",
@@ -128,7 +128,7 @@ UniqueAVFrame allocateAVFrame(
 AudioEncoder::~AudioEncoder() {}
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor samples,
+    const torch::Tensor& samples,
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
@@ -159,7 +159,7 @@ AudioEncoder::AudioEncoder(
 }
 
 AudioEncoder::AudioEncoder(
-    const torch::Tensor samples,
+    const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
@@ -318,8 +318,7 @@ void AudioEncoder::encode() {
     encodeFrameThroughFifo(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
-    // TODO-ENCODING set frame pts correctly, and test against it.
-    // avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
+    avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 

@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import contextlib
 import io
 import os
 from functools import partial
@@ -215,7 +216,7 @@ class TestVideoDecoderOps:
 
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
-        num_frames = metadata_dict["numFrames"]
+        num_frames = metadata_dict["numFramesFromHeader"]
         assert num_frames == 390
 
         _, all_pts_seconds_ref, _ = zip(
@@ -395,9 +396,11 @@ class TestVideoDecoderOps:
         metadata_dict = json.loads(metadata)
 
         # We should be able to see all of this metadata without adding a video stream
-        assert metadata_dict["durationSeconds"] == pytest.approx(13.013, abs=0.001)
-        assert metadata_dict["numFrames"] == 390
-        assert metadata_dict["averageFps"] == pytest.approx(29.97, abs=0.001)
+        assert metadata_dict["durationSecondsFromHeader"] == pytest.approx(
+            13.013, abs=0.001
+        )
+        assert metadata_dict["numFramesFromHeader"] == 390
+        assert metadata_dict["averageFpsFromHeader"] == pytest.approx(29.97, abs=0.001)
         assert metadata_dict["codec"] == "h264"
         ffmpeg_dict = get_ffmpeg_library_versions()
         if ffmpeg_dict["libavformat"][0] >= 60:
@@ -412,8 +415,8 @@ class TestVideoDecoderOps:
         metadata_dict = json.loads(metadata)
         assert metadata_dict["width"] == 480
         assert metadata_dict["height"] == 270
-        assert metadata_dict["minPtsSecondsFromScan"] == 0
-        assert metadata_dict["maxPtsSecondsFromScan"] == 13.013
+        assert metadata_dict["beginStreamSecondsFromContent"] == 0
+        assert metadata_dict["endStreamSecondsFromContent"] == 13.013
 
     def test_get_ffmpeg_version(self):
         ffmpeg_dict = get_ffmpeg_library_versions()
@@ -553,11 +556,7 @@ class TestVideoDecoderOps:
     def test_color_conversion_library_with_generated_videos(
         self, tmp_path, width, height, width_scaling_factor, height_scaling_factor
     ):
-        ffmpeg_cli = "ffmpeg"
-        if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
-            import importlib.resources
 
-            ffmpeg_cli = importlib.resources.path(__package__, "ffmpeg")
         # We consider filtergraph to be the reference color conversion library.
         # However the video decoder sometimes uses swscale as that is faster.
         # The exact color conversion library used is an implementation detail
@@ -571,22 +570,32 @@ class TestVideoDecoderOps:
         # We don't specify a particular encoder because the ffmpeg binary could
         # be configured with different encoders. For the purposes of this test,
         # the actual encoder is irrelevant.
-        command = [
-            ffmpeg_cli,
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=blue",
-            "-pix_fmt",
-            "yuv420p",
-            "-s",
-            f"{width}x{height}",
-            "-frames:v",
-            "1",
-            video_path,
-        ]
-        subprocess.check_call(command)
+        with contextlib.ExitStack() as stack:
+            ffmpeg_cli = "ffmpeg"
+
+            if os.environ.get("IN_FBCODE_TORCHCODEC") == "1":
+                import importlib.resources
+
+                ffmpeg_cli = stack.enter_context(
+                    importlib.resources.path(__package__, "ffmpeg")
+                )
+
+            command = [
+                ffmpeg_cli,
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=blue",
+                "-pix_fmt",
+                "yuv420p",
+                "-s",
+                f"{width}x{height}",
+                "-frames:v",
+                "1",
+                video_path,
+            ]
+            subprocess.check_call(command)
 
         decoder = create_from_file(str(video_path))
         add_video_stream(decoder)
