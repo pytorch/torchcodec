@@ -15,6 +15,77 @@ set(
 )
 
 
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    set(
+        platform_url
+        ${base_url}/linux_x86_64
+    )
+
+    set(
+        f4_sha256
+        1a083f1922443bedb5243d04896383b8c606778a7ddb9d886c8303e55339fe0c
+    )
+    set(
+        f5_sha256
+        65d6ad54082d94dcb3f801d73df2265e0e1bb303c7afbce7723e3b77ccd0e207
+    )
+    set(
+        f6_sha256
+        8bd5939c2f4a4b072e837e7870c13fe7d13824e5ff087ab534e4db4e90b7be9c
+    )
+    set(
+        f7_sha256
+        1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
+    )
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(
+        platform_url
+        ${base_url}/macos_arm64
+    )
+    set(
+        f4_sha256
+        f0335434529d9e19359eae0fe912dd9e747667534a1c92e662f5219a55dfad8c
+    )
+    set(
+        f5_sha256
+        cfc3449c9af6863731a431ce89e32c08c5f8ece94b306fb6b695828502a76166
+    )
+    set(
+        f6_sha256
+        ec47b4783c342038e720e33b2fdfa55a9a490afb1cf37a26467733983688647e
+    )
+    set(
+        f7_sha256
+        48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
+    )
+
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(
+        platform_url
+        ${base_url}/windows_x86_64
+    )
+    set(
+        f4_sha256
+        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
+    )
+    set(
+        f5_sha256
+        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
+    )
+    set(
+        f6_sha256
+        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
+    )
+    set(
+        f7_sha256
+        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
+    )
+else()
+    message(
+        FATAL_ERROR
+        "Unsupported operating system: ${CMAKE_SYSTEM_NAME}"
+    )
+endif()
 
 FetchContent_Declare(
     f4
@@ -51,28 +122,6 @@ add_library(ffmpeg7 INTERFACE)
 # Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    set(
-        platform_url
-        ${base_url}/linux_x86_64
-    )
-
-    set(
-        f4_sha256
-        1a083f1922443bedb5243d04896383b8c606778a7ddb9d886c8303e55339fe0c
-    )
-    set(
-        f5_sha256
-        65d6ad54082d94dcb3f801d73df2265e0e1bb303c7afbce7723e3b77ccd0e207
-    )
-    set(
-        f6_sha256
-        8bd5939c2f4a4b072e837e7870c13fe7d13824e5ff087ab534e4db4e90b7be9c
-    )
-    set(
-        f7_sha256
-        1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
-    )
-
     set(
        f4_library_paths
        ${f4_SOURCE_DIR}/lib/libavutil.so.56
@@ -115,26 +164,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(
-        platform_url
-        ${base_url}/macos_arm64
-    )
-    set(
-        f4_sha256
-        f0335434529d9e19359eae0fe912dd9e747667534a1c92e662f5219a55dfad8c
-    )
-    set(
-        f5_sha256
-        cfc3449c9af6863731a431ce89e32c08c5f8ece94b306fb6b695828502a76166
-    )
-    set(
-        f6_sha256
-        ec47b4783c342038e720e33b2fdfa55a9a490afb1cf37a26467733983688647e
-    )
-    set(
-        f7_sha256
-        48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
-    )
-    set(
        f4_library_paths
        ${f4_SOURCE_DIR}/lib/libavutil.56.dylib
        ${f4_SOURCE_DIR}/lib/libavcodec.58.dylib
@@ -176,26 +205,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(
-        platform_url
-        ${base_url}/windows_x86_64
-    )
-    set(
-        f4_sha256
-        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
-    )
-    set(
-        f5_sha256
-        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
-    )
-    set(
-        f6_sha256
-        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
-    )
-    set(
-        f7_sha256
-        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
-    )
-    set(
        f4_library_paths
        ${f4_SOURCE_DIR}/bin/avutil.lib
        ${f4_SOURCE_DIR}/bin/avcodec.lib
@@ -234,11 +243,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
        ${f7_SOURCE_DIR}/bin/avfilter.lib
        ${f7_SOURCE_DIR}/bin/swscale.lib
        ${f7_SOURCE_DIR}/bin/swresample.lib
-    )
-else()
-    message(
-        FATAL_ERROR
-        "Unsupported operating system: ${CMAKE_SYSTEM_NAME}"
     )
 endif()
 target_include_directories(ffmpeg4 INTERFACE ${f4_SOURCE_DIR}/include)
