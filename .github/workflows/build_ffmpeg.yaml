@@ -70,3 +70,40 @@ jobs:
         artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/macos_$(uname -m)"
         mkdir -p "${artifact_dir}"
         mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+
+  LGPL-Windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+
+      - name: Build FFmpeg
+        run: |
+          export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
+          export FFMPEG_ROOT="${PWD}/ffmpeg"
+
+          .github/scripts/ffmpeg/build.bat
+
+          tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
+
+          artifact_dir="${{ runner.temp }}/$(date +%Y-%m-%d)/windows_x86_64"
+          mkdir -p "${artifact_dir}"
+          mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ffmpeg-lgpl-windows-${{ matrix.ffmpeg-version }}
+          path: ${{ runner.temp }}/$(date +%Y-%m-%d)/windows_x86_64
