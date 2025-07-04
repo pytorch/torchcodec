@@ -55,8 +55,9 @@ jobs:
       smoke-test-script: packaging/fake_smoke_test.py
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
-      build-platform: "python-build-package"
-      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
+      # TODO Probably needs to enable this
+      # build-platform: "python-build-package"
+      # build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
     runs-on: ubuntu-latest
