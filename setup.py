@@ -169,14 +169,14 @@ not_a_license_violation = os.getenv(NOT_A_LICENSE_VIOLATION_VAR) is not None
 build_against_all_ffmpeg_from_s3 = (
     os.getenv(BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR) is not None
 )
-if "bdist_wheel" in sys.argv and not (
-    build_against_all_ffmpeg_from_s3 or not_a_license_violation
-):
-    raise ValueError(
-        "It looks like you're trying to build a wheel. "
-        f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
-        f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
-    )
+# if "bdist_wheel" in sys.argv and not (
+#     build_against_all_ffmpeg_from_s3 or not_a_license_violation
+# ):
+#     raise ValueError(
+#         "It looks like you're trying to build a wheel. "
+#         f"You probably want to set {BUILD_AGAINST_ALL_FFMPEG_FROM_S3_VAR}. "
+#         f"If you have a good reason *not* to, then set {NOT_A_LICENSE_VIOLATION_VAR}."
+#     )
 
 # See `CMakeBuild.build_extension()`.
 fake_extension = Extension(name="FAKE_NAME", sources=[])

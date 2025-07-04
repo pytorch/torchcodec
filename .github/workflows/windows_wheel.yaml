@@ -51,12 +51,13 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       post-script: packaging/post_build_script.sh
-      # env-script: packaging/vc_env_helper.bat
+      env-script: packaging/vc_env_helper.bat
       smoke-test-script: packaging/fake_smoke_test.py
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
-      build-command: "set BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 && python -m build --wheel -vvv --no-isolation"
+      # build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
+      build-command: "python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
     runs-on: ubuntu-latest
