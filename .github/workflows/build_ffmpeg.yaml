@@ -87,7 +87,7 @@ jobs:
 
         packaging/build_ffmpeg.bat
 
-        tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
+        tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/bin
 
         artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/windows_$(uname -m)"
         mkdir -p "${artifact_dir}"
