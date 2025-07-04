@@ -14,6 +14,42 @@ set(
     https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2025-03-14
 )
 
+
+
+FetchContent_Declare(
+    f4
+    URL ${platform_url}/4.4.4.tar.gz
+    URL_HASH
+    SHA256=${f4_sha256}
+)
+FetchContent_Declare(
+    f5
+    URL ${platform_url}/5.1.4.tar.gz
+    URL_HASH
+    SHA256=${f5_sha256}
+)
+FetchContent_Declare(
+    f6
+    URL ${platform_url}/6.1.1.tar.gz
+    URL_HASH
+    SHA256=${f6_sha256}
+)
+FetchContent_Declare(
+    f7
+    URL ${platform_url}/7.0.1.tar.gz
+    URL_HASH
+    SHA256=${f7_sha256}
+)
+
+FetchContent_MakeAvailable(f4 f5 f6 f7)
+
+add_library(ffmpeg4 INTERFACE)
+add_library(ffmpeg5 INTERFACE)
+add_library(ffmpeg6 INTERFACE)
+add_library(ffmpeg7 INTERFACE)
+
+# Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
+
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(
         platform_url
@@ -205,40 +241,6 @@ else()
         "Unsupported operating system: ${CMAKE_SYSTEM_NAME}"
     )
 endif()
-
-FetchContent_Declare(
-    f4
-    URL ${platform_url}/4.4.4.tar.gz
-    URL_HASH
-    SHA256=${f4_sha256}
-)
-FetchContent_Declare(
-    f5
-    URL ${platform_url}/5.1.4.tar.gz
-    URL_HASH
-    SHA256=${f5_sha256}
-)
-FetchContent_Declare(
-    f6
-    URL ${platform_url}/6.1.1.tar.gz
-    URL_HASH
-    SHA256=${f6_sha256}
-)
-FetchContent_Declare(
-    f7
-    URL ${platform_url}/7.0.1.tar.gz
-    URL_HASH
-    SHA256=${f7_sha256}
-)
-
-FetchContent_MakeAvailable(f4 f5 f6 f7)
-
-add_library(ffmpeg4 INTERFACE)
-add_library(ffmpeg5 INTERFACE)
-add_library(ffmpeg6 INTERFACE)
-add_library(ffmpeg7 INTERFACE)
-
-# Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
 target_include_directories(ffmpeg4 INTERFACE ${f4_SOURCE_DIR}/include)
 target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
 target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
