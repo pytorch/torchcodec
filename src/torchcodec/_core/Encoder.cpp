@@ -390,11 +390,14 @@ void AudioEncoder::encodeFrameThroughFifo(
 
   while (av_audio_fifo_size(avAudioFifo_.get()) >=
          (andFlushFifo ? 1 : avCodecContext_->frame_size)) {
+    int samplesToRead = std::min(
+        av_audio_fifo_size(avAudioFifo_.get()), newavFrame->nb_samples);
     // TODO cast
     int numSamplesRead = av_audio_fifo_read(
-        avAudioFifo_.get(), (void**)newavFrame->data, newavFrame->nb_samples);
+        avAudioFifo_.get(), (void**)newavFrame->data, samplesToRead);
     TORCH_CHECK(numSamplesRead > 0, "Tried to read TODO");
 
+    newavFrame->nb_samples = numSamplesRead;
     encodeFrame(autoAVPacket, newavFrame);
   }
 }
@@ -447,6 +450,11 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
   if (swrContext_ == nullptr && sampleRateInput_ == outSampleRate_) {
     return;
   }
+  TORCH_CHECK(
+      swrContext_ != nullptr,
+      "swrContext is null, but sample rate conversion is needed. ",
+      "This is unexpected, please report on the TorchCodec bug tracker.");
+
   int numRemainingSamples = // this is an upper bound
       swr_get_out_samples(swrContext_.get(), 0);
   if (numRemainingSamples == 0) {
