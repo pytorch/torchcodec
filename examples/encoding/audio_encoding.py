@@ -78,13 +78,15 @@ play_audio(samples_back.data, rate=samples_back.sample_rate)
 # %%
 # The encoder supports some encoding options that allow you to change how to
 # data is encoded. For example, we can decide to encode our mono data (1
-# channel) into stereo data (2 channels):
-encoded_samples = encoder.to_tensor(format="wav", num_channels=2)
+# channel) into stereo data (2 channels), and to specify an output sample rate:
+
+desired_sample_rate = 32000
+encoded_samples = encoder.to_tensor(format="wav", num_channels=2, sample_rate=desired_sample_rate)
 
 stereo_samples_back = AudioDecoder(encoded_samples).get_all_samples()
 
 print(stereo_samples_back)
-play_audio(stereo_samples_back.data, rate=stereo_samples_back.sample_rate)
+play_audio(stereo_samples_back.data, rate=desired_sample_rate)
 
 # %%
 # Check the docstring of the encoding methods to learn about the different
