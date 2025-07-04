@@ -163,6 +163,12 @@ void setChannelLayout(
     const UniqueAVFrame& srcAVFrame,
     int desiredNumChannels);
 
+UniqueAVFrame allocateAVFrame(
+    int numSamples,
+    int sampleRate,
+    int numChannels,
+    AVSampleFormat sampleFormat);
+
 SwrContext* createSwrContext(
     AVSampleFormat srcSampleFormat,
     AVSampleFormat desiredSampleFormat,
