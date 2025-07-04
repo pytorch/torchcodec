@@ -58,5 +58,6 @@ class AudioEncoder {
   std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
 
   bool encodeWasCalled_ = false;
+  int64_t lastEncodedAVFramePts_ = 0;
 };
 } // namespace facebook::torchcodec

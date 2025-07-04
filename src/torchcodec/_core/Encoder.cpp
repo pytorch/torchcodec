@@ -318,7 +318,6 @@ void AudioEncoder::encode() {
     encodeFrameThroughFifo(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
-    avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 
@@ -405,6 +404,11 @@ void AudioEncoder::encodeFrameThroughFifo(
 void AudioEncoder::encodeFrame(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
+  if (avFrame != nullptr) {
+    avFrame->pts = lastEncodedAVFramePts_;
+    lastEncodedAVFramePts_ += avFrame->nb_samples;
+  }
+
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       status == AVSUCCESS,

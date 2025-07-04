@@ -229,7 +229,7 @@ class TestAudioEncoder:
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
             + (["-ac", f"{num_channels}"] if num_channels is not None else [])
-            + (["-ar", f"{sample_rate}"] if sample_rate is not None else [])
+            + ["-ar", f"{sample_rate}"]
             + [
                 str(encoded_by_ffmpeg),
             ],
@@ -247,17 +247,19 @@ class TestAudioEncoder:
         else:
             encoded_by_us = encoder.to_tensor(format=format, **params)
 
-        # captured = capfd.readouterr()
-        # if format == "wav":
-        #     assert "Timestamps are unset in a packet" not in captured.err
-        # if format == "mp3":
-        #     assert "Queue input is backward in time" not in captured.err
-        # if format in ("flac", "wav"):
-        #     assert "Encoder did not produce proper pts" not in captured.err
-        # if format in ("flac", "mp3"):
-        #     assert "Application provided invalid" not in captured.err
-
+        captured = capfd.readouterr()
         if format == "wav":
+            assert "Timestamps are unset in a packet" not in captured.err
+        if format == "mp3":
+            assert "Queue input is backward in time" not in captured.err
+        if format in ("flac", "wav"):
+            assert "Encoder did not produce proper pts" not in captured.err
+        if format in ("flac", "mp3"):
+            assert "Application provided invalid" not in captured.err
+
+        if sample_rate != asset.sample_rate:
+            rtol, atol = 0, 1e-3
+        elif format == "wav":
             rtol, atol = 0, 1e-4
         elif format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
             # Not sure why, this one needs slightly higher tol. With default
@@ -268,7 +270,6 @@ class TestAudioEncoder:
         else:
             rtol, atol = None, None
 
-        rtol, atol = 0, 1e-3
         samples_by_us = self.decode(encoded_by_us)
         samples_by_ffmpeg = self.decode(encoded_by_ffmpeg)
         torch.testing.assert_close(
