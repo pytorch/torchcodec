@@ -89,6 +89,6 @@ jobs:
 
         tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/lib
 
-        artifact_dir="${{ runner.temp }}/$(date +%Y-%m-%d)/windows_x86_64"
+        artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/windows_$(uname -m)"
         mkdir -p "${artifact_dir}"
         mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
