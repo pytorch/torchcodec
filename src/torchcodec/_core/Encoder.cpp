@@ -215,6 +215,9 @@ void AudioEncoder::initializeEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
 
+  // If sample rate conversion is needed and the encoder doesn't support
+  // variable frame size, we need to create an intermediate FIFO. See
+  // [Encoding loop, sample rate conversion and FIFO].
   if (((avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) == 0) &&
       (inSampleRate_ != outSampleRate_)) {
     // frame_size * 2 is a decent default size. FFmpeg automatically
