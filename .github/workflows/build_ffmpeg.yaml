@@ -81,6 +81,7 @@ jobs:
       job-name: Build
       upload-artifact: ffmpeg-lgpl-windows_x86_64-${{ matrix.ffmpeg-version }}
       repository: pytorch/torchcodec
+      runner: windows.4xlarge
       script: |
         export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
         export FFMPEG_ROOT="${PWD}/ffmpeg"
