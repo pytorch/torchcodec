@@ -38,44 +38,44 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     )
 
     set(
-       f4_library_file_names
-       libavutil.so.56
-       libavcodec.so.58
-       libavformat.so.58
-       libavdevice.so.58
-       libavfilter.so.7
-       libswscale.so.5
-       libswresample.so.3
+       f4_library_paths
+       ${f4_SOURCE_DIR}/lib/libavutil.so.56
+       ${f4_SOURCE_DIR}/lib/libavcodec.so.58
+       ${f4_SOURCE_DIR}/lib/libavformat.so.58
+       ${f4_SOURCE_DIR}/lib/libavdevice.so.58
+       ${f4_SOURCE_DIR}/lib/libavfilter.so.7
+       ${f4_SOURCE_DIR}/lib/libswscale.so.5
+       ${f4_SOURCE_DIR}/lib/libswresample.so.3
     )
     set(
-       f5_library_file_names
-       libavutil.so.57
-       libavcodec.so.59
-       libavformat.so.59
-       libavdevice.so.59
-       libavfilter.so.8
-       libswscale.so.6
-       libswresample.so.4
+       f5_library_paths
+       ${f5_SOURCE_DIR}/lib/libavutil.so.57
+       ${f5_SOURCE_DIR}/lib/libavcodec.so.59
+       ${f5_SOURCE_DIR}/lib/libavformat.so.59
+       ${f5_SOURCE_DIR}/lib/libavdevice.so.59
+       ${f5_SOURCE_DIR}/lib/libavfilter.so.8
+       ${f5_SOURCE_DIR}/lib/libswscale.so.6
+       ${f5_SOURCE_DIR}/lib/libswresample.so.4
     )
     set(
-       f6_library_file_names
-       libavutil.so.58
-       libavcodec.so.60
-       libavformat.so.60
-       libavdevice.so.60
-       libavfilter.so.9
-       libswscale.so.7
-       libswresample.so.4
+       f6_library_paths
+       ${f6_SOURCE_DIR}/lib/libavutil.so.58
+       ${f6_SOURCE_DIR}/lib/libavcodec.so.60
+       ${f6_SOURCE_DIR}/lib/libavformat.so.60
+       ${f6_SOURCE_DIR}/lib/libavdevice.so.60
+       ${f6_SOURCE_DIR}/lib/libavfilter.so.9
+       ${f6_SOURCE_DIR}/lib/libswscale.so.7
+       ${f6_SOURCE_DIR}/lib/libswresample.so.4
     )
     set(
-       f7_library_file_names
-       libavutil.so.59
-       libavcodec.so.61
-       libavformat.so.61
-       libavdevice.so.61
-       libavfilter.so.10
-       libswscale.so.8
-       libswresample.so.5
+       f7_library_paths
+       ${f7_SOURCE_DIR}/lib/libavutil.so.59
+       ${f7_SOURCE_DIR}/lib/libavcodec.so.61
+       ${f7_SOURCE_DIR}/lib/libavformat.so.61
+       ${f7_SOURCE_DIR}/lib/libavdevice.so.61
+       ${f7_SOURCE_DIR}/lib/libavfilter.so.10
+       ${f7_SOURCE_DIR}/lib/libswscale.so.8
+       ${f7_SOURCE_DIR}/lib/libswresample.so.5
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(
@@ -99,44 +99,105 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
     )
     set(
-       f4_library_file_names
-       libavutil.56.dylib
-       libavcodec.58.dylib
-       libavformat.58.dylib
-       libavdevice.58.dylib
-       libavfilter.7.dylib
-       libswscale.5.dylib
-       libswresample.3.dylib
+       f4_library_paths
+       ${f4_SOURCE_DIR}/lib/libavutil.56.dylib
+       ${f4_SOURCE_DIR}/lib/libavcodec.58.dylib
+       ${f4_SOURCE_DIR}/lib/libavformat.58.dylib
+       ${f4_SOURCE_DIR}/lib/libavdevice.58.dylib
+       ${f4_SOURCE_DIR}/lib/libavfilter.7.dylib
+       ${f4_SOURCE_DIR}/lib/libswscale.5.dylib
+       ${f4_SOURCE_DIR}/lib/libswresample.3.dylib
     )
     set(
-       f5_library_file_names
-       libavutil.57.dylib
-       libavcodec.59.dylib
-       libavformat.59.dylib
-       libavdevice.59.dylib
-       libavfilter.8.dylib
-       libswscale.6.dylib
-       libswresample.4.dylib
+       f5_library_paths
+       ${f6_SOURCE_DIR}/lib/libavutil.57.dylib
+       ${f6_SOURCE_DIR}/lib/libavcodec.59.dylib
+       ${f6_SOURCE_DIR}/lib/libavformat.59.dylib
+       ${f6_SOURCE_DIR}/lib/libavdevice.59.dylib
+       ${f6_SOURCE_DIR}/lib/libavfilter.8.dylib
+       ${f6_SOURCE_DIR}/lib/libswscale.6.dylib
+       ${f6_SOURCE_DIR}/lib/libswresample.4.dylib
     )
     set(
-       f6_library_file_names
-       libavutil.58.dylib
-       libavcodec.60.dylib
-       libavformat.60.dylib
-       libavdevice.60.dylib
-       libavfilter.9.dylib
-       libswscale.7.dylib
-       libswresample.4.dylib
+       f6_library_paths
+       ${f6_SOURCE_DIR}/lib/libavutil.58.dylib
+       ${f6_SOURCE_DIR}/lib/libavcodec.60.dylib
+       ${f6_SOURCE_DIR}/lib/libavformat.60.dylib
+       ${f6_SOURCE_DIR}/lib/libavdevice.60.dylib
+       ${f6_SOURCE_DIR}/lib/libavfilter.9.dylib
+       ${f6_SOURCE_DIR}/lib/libswscale.7.dylib
+       ${f6_SOURCE_DIR}/lib/libswresample.4.dylib
     )
     set(
-       f7_library_file_names
-       libavutil.59.dylib
-       libavcodec.61.dylib
-       libavformat.61.dylib
-       libavdevice.61.dylib
-       libavfilter.10.dylib
-       libswscale.8.dylib
-       libswresample.5.dylib
+       f7_library_paths
+       ${f7_SOURCE_DIR}/lib/libavutil.59.dylib
+       ${f7_SOURCE_DIR}/lib/libavcodec.61.dylib
+       ${f7_SOURCE_DIR}/lib/libavformat.61.dylib
+       ${f7_SOURCE_DIR}/lib/libavdevice.61.dylib
+       ${f7_SOURCE_DIR}/lib/libavfilter.10.dylib
+       ${f7_SOURCE_DIR}/lib/libswscale.8.dylib
+       ${f7_SOURCE_DIR}/lib/libswresample.5.dylib
+    )
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(
+        platform_url
+        ${base_url}/windows_x86_64
+    )
+    set(
+        f4_sha256
+        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
+    )
+    set(
+        f5_sha256
+        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
+    )
+    set(
+        f6_sha256
+        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
+    )
+    set(
+        f7_sha256
+        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
+    )
+    set(
+       f4_library_paths
+       ${f4_SOURCE_DIR}/bin/avutil.lib
+       ${f4_SOURCE_DIR}/bin/avcodec.lib
+       ${f4_SOURCE_DIR}/bin/avformat.lib
+       ${f4_SOURCE_DIR}/bin/avdevice.lib
+       ${f4_SOURCE_DIR}/bin/avfilter.lib
+       ${f4_SOURCE_DIR}/bin/swscale.lib
+       ${f4_SOURCE_DIR}/bin/swresample.lib
+    )
+    set(
+       f5_library_paths
+       ${f5_SOURCE_DIR}/bin/avutil.lib
+       ${f5_SOURCE_DIR}/bin/avcodec.lib
+       ${f5_SOURCE_DIR}/bin/avformat.lib
+       ${f5_SOURCE_DIR}/bin/avdevice.lib
+       ${f5_SOURCE_DIR}/bin/avfilter.lib
+       ${f5_SOURCE_DIR}/bin/swscale.lib
+       ${f5_SOURCE_DIR}/bin/swresample.lib
+    )
+    set(
+       f6_library_paths
+       ${f6_SOURCE_DIR}/bin/avutil.lib
+       ${f6_SOURCE_DIR}/bin/avcodec.lib
+       ${f6_SOURCE_DIR}/bin/avformat.lib
+       ${f6_SOURCE_DIR}/bin/avdevice.lib
+       ${f6_SOURCE_DIR}/bin/avfilter.lib
+       ${f6_SOURCE_DIR}/bin/swscale.lib
+       ${f6_SOURCE_DIR}/bin/swresample.lib
+    )
+    set(
+       f7_library_paths
+       ${f7_SOURCE_DIR}/bin/avutil.lib
+       ${f7_SOURCE_DIR}/bin/avcodec.lib
+       ${f7_SOURCE_DIR}/bin/avformat.lib
+       ${f7_SOURCE_DIR}/bin/avdevice.lib
+       ${f7_SOURCE_DIR}/bin/avfilter.lib
+       ${f7_SOURCE_DIR}/bin/swscale.lib
+       ${f7_SOURCE_DIR}/bin/swresample.lib
     )
 else()
     message(
@@ -183,26 +244,6 @@ target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
 target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
 target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
 
-list(
-    TRANSFORM f4_library_file_names
-    PREPEND ${f4_SOURCE_DIR}/lib/
-    OUTPUT_VARIABLE f4_library_paths
-)
-list(
-    TRANSFORM f5_library_file_names
-    PREPEND ${f5_SOURCE_DIR}/lib/
-    OUTPUT_VARIABLE f5_library_paths
-)
-list(
-    TRANSFORM f6_library_file_names
-    PREPEND ${f6_SOURCE_DIR}/lib/
-    OUTPUT_VARIABLE f6_library_paths
-)
-list(
-    TRANSFORM f7_library_file_names
-    PREPEND ${f7_SOURCE_DIR}/lib/
-    OUTPUT_VARIABLE f7_library_paths
-)
 
 target_link_libraries(
     ffmpeg4
