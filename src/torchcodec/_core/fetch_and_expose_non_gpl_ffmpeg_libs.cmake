@@ -110,13 +110,13 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     )
     set(
        f5_library_paths
-       ${f6_SOURCE_DIR}/lib/libavutil.57.dylib
-       ${f6_SOURCE_DIR}/lib/libavcodec.59.dylib
-       ${f6_SOURCE_DIR}/lib/libavformat.59.dylib
-       ${f6_SOURCE_DIR}/lib/libavdevice.59.dylib
-       ${f6_SOURCE_DIR}/lib/libavfilter.8.dylib
-       ${f6_SOURCE_DIR}/lib/libswscale.6.dylib
-       ${f6_SOURCE_DIR}/lib/libswresample.4.dylib
+       ${f5_SOURCE_DIR}/lib/libavutil.57.dylib
+       ${f5_SOURCE_DIR}/lib/libavcodec.59.dylib
+       ${f5_SOURCE_DIR}/lib/libavformat.59.dylib
+       ${f5_SOURCE_DIR}/lib/libavdevice.59.dylib
+       ${f5_SOURCE_DIR}/lib/libavfilter.8.dylib
+       ${f5_SOURCE_DIR}/lib/libswscale.6.dylib
+       ${f5_SOURCE_DIR}/lib/libswresample.4.dylib
     )
     set(
        f6_library_paths
