@@ -132,7 +132,7 @@ AudioEncoder::AudioEncoder(
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
-    : samples_(validateSamples(samples)), sampleRateInput_(sampleRate) {
+    : samples_(validateSamples(samples)), inSampleRate_(sampleRate) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -165,7 +165,7 @@ AudioEncoder::AudioEncoder(
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
-      sampleRateInput_(sampleRate),
+      inSampleRate_(sampleRate),
       avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
@@ -214,7 +214,7 @@ void AudioEncoder::initializeEncoder(
   // not related to the input sampes.
   setDefaultChannelLayout(avCodecContext_, outNumChannels_);
 
-  outSampleRate_ = audioStreamOptions.sampleRate.value_or(sampleRateInput_);
+  outSampleRate_ = audioStreamOptions.sampleRate.value_or(inSampleRate_);
   validateSampleRate(*avCodec, outSampleRate_);
   avCodecContext_->sample_rate = outSampleRate_;
 
@@ -243,7 +243,7 @@ void AudioEncoder::initializeEncoder(
   streamIndex_ = avStream->index;
 
   if (((avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) == 0) &&
-      (sampleRateInput_ != outSampleRate_)) {
+      (inSampleRate_ != outSampleRate_)) {
     // frame_size * 2 is a decent default size. FFmpeg automatically
     // re-allocates the fifo if more space is needed.
     auto avAudioFifo = av_audio_fifo_alloc(
@@ -275,7 +275,7 @@ void AudioEncoder::encode() {
       avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
   UniqueAVFrame avFrame = allocateAVFrame(
       numSamplesAllocatedPerFrame,
-      sampleRateInput_,
+      inSampleRate_,
       static_cast<int>(samples_.sizes()[0]),
       AV_SAMPLE_FMT_FLTP);
   avFrame->pts = 0;
@@ -376,10 +376,16 @@ void AudioEncoder::encodeFrameThroughFifo(
     encodeFrame(autoAVPacket, avFrame);
     return;
   }
-  // TODO static cast
   int numSamplesWritten = av_audio_fifo_write(
-      avAudioFifo_.get(), (void**)avFrame->data, avFrame->nb_samples);
-  TORCH_CHECK(numSamplesWritten == avFrame->nb_samples, "Tried to write TODO");
+      avAudioFifo_.get(),
+      reinterpret_cast<void**>(avFrame->data),
+      avFrame->nb_samples);
+  TORCH_CHECK(
+      numSamplesWritten == avFrame->nb_samples,
+      "Tried to write ",
+      avFrame->nb_samples,
+      " samples, but only wrote ",
+      numSamplesWritten);
 
   UniqueAVFrame newavFrame = allocateAVFrame(
       avCodecContext_->frame_size,
@@ -391,10 +397,16 @@ void AudioEncoder::encodeFrameThroughFifo(
          (andFlushFifo ? 1 : avCodecContext_->frame_size)) {
     int samplesToRead = std::min(
         av_audio_fifo_size(avAudioFifo_.get()), newavFrame->nb_samples);
-    // TODO cast
     int numSamplesRead = av_audio_fifo_read(
-        avAudioFifo_.get(), (void**)newavFrame->data, samplesToRead);
-    TORCH_CHECK(numSamplesRead > 0, "Tried to read TODO");
+        avAudioFifo_.get(),
+        reinterpret_cast<void**>(newavFrame->data),
+        samplesToRead);
+    TORCH_CHECK(
+        numSamplesRead == samplesToRead,
+        "Tried to read ",
+        samplesToRead,
+        " samples, but only read ",
+        numSamplesRead);
 
     newavFrame->nb_samples = numSamplesRead;
     encodeFrame(autoAVPacket, newavFrame);
@@ -449,9 +461,9 @@ void AudioEncoder::encodeFrame(
 
 void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
   // Similar to the decoder's method with the same name, but for encoding this
-  // time. That is, when sample conversion is invovled, libswresample may have
+  // time. That is, when sample conversion is involved, libswresample may have
   // buffered some samples that we now need to flush and send to the encoder.
-  if (swrContext_ == nullptr && sampleRateInput_ == outSampleRate_) {
+  if (swrContext_ == nullptr && inSampleRate_ == outSampleRate_) {
     return;
   }
   TORCH_CHECK(

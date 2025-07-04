@@ -150,6 +150,10 @@ class TestAudioEncoder:
         decoder = AudioEncoder(
             self.decode(NASA_AUDIO_MP3).data, sample_rate=NASA_AUDIO_MP3.sample_rate
         )
+        with pytest.raises(RuntimeError, match="invalid sample rate=10"):
+            getattr(decoder, method)(sample_rate=10, **valid_params)
+        with pytest.raises(RuntimeError, match="invalid sample rate=99999999"):
+            getattr(decoder, method)(sample_rate=99999999, **valid_params)
         with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
             getattr(decoder, method)(**valid_params, bit_rate=-1)
 
@@ -269,7 +273,6 @@ class TestAudioEncoder:
             rtol, atol = 0, 1e-3
         else:
             rtol, atol = None, None
-
         samples_by_us = self.decode(encoded_by_us)
         samples_by_ffmpeg = self.decode(encoded_by_ffmpeg)
         torch.testing.assert_close(

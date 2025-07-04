@@ -46,11 +46,11 @@ class AudioEncoder {
   UniqueSwrContext swrContext_;
   AudioStreamOptions audioStreamOptions;
 
+  const torch::Tensor samples_;
+
   int outNumChannels_ = -1;
   int outSampleRate_ = -1;
-
-  const torch::Tensor samples_;
-  int sampleRateInput_ = -1;
+  int inSampleRate_ = -1;
 
   UniqueAVAudioFifo avAudioFifo_;
 
