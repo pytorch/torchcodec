@@ -1,4 +1,4 @@
-:: This is stolen from torchaudio
+:: Taken from torchaudio
 @echo off
 
 set PROJ_FOLDER=%cd%
