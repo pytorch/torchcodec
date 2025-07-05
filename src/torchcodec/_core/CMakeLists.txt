@@ -14,7 +14,8 @@ else()
     set(TORCHCODEC_WERROR_OPTION "-Werror")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 
 function(make_torchcodec_sublibrary
     library_name
