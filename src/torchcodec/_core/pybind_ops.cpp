@@ -11,8 +11,8 @@
 #include <string>
 
 #include "src/torchcodec/_core/AVIOFileLikeContext.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
 #include "src/torchcodec/_core/Encoder.h"
+#include "src/torchcodec/_core/SingleStreamDecoder.h"
 #include "src/torchcodec/_core/StreamOptions.h"
 
 namespace py = pybind11;
@@ -50,41 +50,49 @@ int64_t encode_audio_to_file_like(
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
-  
   // Convert Python data back to tensor
   auto shape_vec = samples_shape.cast<std::vector<int64_t>>();
   std::string samples_str = samples_data;
-  
+
   // Create tensor from raw data
   auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
-  auto samples = torch::from_blob(
-      const_cast<void*>(static_cast<const void*>(samples_str.data())),
-      shape_vec,
-      tensor_options).clone(); // Clone to ensure memory ownership
-  
+  auto samples =
+      torch::from_blob(
+          const_cast<void*>(static_cast<const void*>(samples_str.data())),
+          shape_vec,
+          tensor_options)
+          .clone(); // Clone to ensure memory ownership
+
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
-  
+
   auto avioContextHolder = AVIOFileLikeContext::createForWriting(file_like);
-  
+
   AudioEncoder encoder(
-      samples, 
-      static_cast<int>(sample_rate), 
+      samples,
+      static_cast<int>(sample_rate),
       format,
-      std::move(avioContextHolder), 
+      std::move(avioContextHolder),
       audioStreamOptions);
   encoder.encode();
-  
+
   // Return 0 to indicate success
   return 0;
 }
 
 PYBIND11_MODULE(decoder_core_pybind_ops, m) {
   m.def("create_from_file_like", &create_from_file_like);
-  m.def("encode_audio_to_file_like", &encode_audio_to_file_like,
-        "samples_data"_a, "samples_shape"_a, "sample_rate"_a, "format"_a, 
-        "file_like"_a, "bit_rate"_a = py::none(), "num_channels"_a = py::none());
+  m.def(
+      "encode_audio_to_file_like",
+      &encode_audio_to_file_like,
+      "samples_data"_a,
+      "samples_shape"_a,
+      "sample_rate"_a,
+      "format"_a,
+      "file_like"_a,
+      "bit_rate"_a = py::none(),
+      "num_channels"_a = py::none());
 }
 
 } // namespace facebook::torchcodec

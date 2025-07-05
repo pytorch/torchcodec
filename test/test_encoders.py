@@ -1,5 +1,5 @@
-import json
 import io
+import json
 import os
 import re
 import subprocess
@@ -430,7 +430,9 @@ class TestAudioEncoder:
             # Verify we can decode the result (for lossless formats)
             buffer.seek(0)
             decoded_samples = self.decode(buffer.getvalue())
-            assert decoded_samples.data.shape[0] == source_samples.shape[0]  # Same number of channels
+            assert (
+                decoded_samples.data.shape[0] == source_samples.shape[0]
+            )  # Same number of channels
 
     def test_encode_to_file_like_with_parameters(self, tmp_path):
         """Test encode_to_file_like with different encoding parameters."""
@@ -532,19 +534,22 @@ class TestAudioEncoder:
 
         # Verify we can decode the result
         decoded_samples = self.decode(custom_file.data)
-        
+
         # Allow for small differences in sample count due to encoding/padding
         # Check that the shapes are approximately the same (within a few samples)
-        assert decoded_samples.data.shape[0] == source_samples.shape[0]  # Same number of channels
+        assert (
+            decoded_samples.data.shape[0] == source_samples.shape[0]
+        )  # Same number of channels
         sample_diff = abs(decoded_samples.data.shape[1] - source_samples.shape[1])
         assert sample_diff <= 10, f"Sample count difference too large: {sample_diff}"
-        
+
         # Compare the overlapping portion
         min_samples = min(decoded_samples.data.shape[1], source_samples.shape[1])
         torch.testing.assert_close(
-            decoded_samples.data[:, :min_samples], 
-            source_samples[:, :min_samples], 
-            rtol=0, atol=1e-4
+            decoded_samples.data[:, :min_samples],
+            source_samples[:, :min_samples],
+            rtol=0,
+            atol=1e-4,
         )
 
     def test_encode_to_file_like_real_file(self, tmp_path):
@@ -580,7 +585,9 @@ class TestAudioEncoder:
             def seek(self, offset, whence=0):
                 return 0
 
-        with pytest.raises(RuntimeError, match="File like object must implement a write method"):
+        with pytest.raises(
+            RuntimeError, match="File like object must implement a write method"
+        ):
             encoder.encode_to_file_like(NoWriteMethod(), format="wav")
 
         # Test with object missing seek method
@@ -588,7 +595,9 @@ class TestAudioEncoder:
             def write(self, data):
                 return len(data)
 
-        with pytest.raises(RuntimeError, match="File like object must implement a seek method"):
+        with pytest.raises(
+            RuntimeError, match="File like object must implement a seek method"
+        ):
             encoder.encode_to_file_like(NoSeekMethod(), format="wav")
 
         # Test with invalid format
@@ -626,12 +635,8 @@ class TestAudioEncoder:
         decoded2 = self.decode(buffer2.getvalue())
 
         # Both should be close to the original (within format limitations)
-        torch.testing.assert_close(
-            decoded1.data, source_samples, rtol=0, atol=1e-4
-        )
-        torch.testing.assert_close(
-            decoded2.data, source_samples, rtol=0, atol=1e-4
-        )
+        torch.testing.assert_close(decoded1.data, source_samples, rtol=0, atol=1e-4)
+        torch.testing.assert_close(decoded2.data, source_samples, rtol=0, atol=1e-4)
 
     def test_encode_to_file_like_empty_samples(self):
         """Test encode_to_file_like with very short audio samples."""

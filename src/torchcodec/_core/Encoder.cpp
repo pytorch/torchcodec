@@ -168,7 +168,7 @@ AudioEncoder::AudioEncoder(
       avioFileLikeContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
-  
+
   int status = avformat_alloc_output_context2(
       &avFormatContext, nullptr, formatName.data(), nullptr);
 

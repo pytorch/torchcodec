@@ -12,8 +12,10 @@ namespace facebook::torchcodec {
 AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
     : AVIOFileLikeContext(fileLike, false) {}
 
-std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext::createForWriting(py::object fileLike) {
-  return std::unique_ptr<AVIOFileLikeContext>(new AVIOFileLikeContext(fileLike, true));
+std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext::createForWriting(
+    py::object fileLike) {
+  return std::unique_ptr<AVIOFileLikeContext>(
+      new AVIOFileLikeContext(fileLike, true));
 }
 
 AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike, bool isWriteMode)
@@ -36,7 +38,7 @@ AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike, bool isWriteMode)
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  
+
   if (isWriteMode) {
     createAVIOContext(nullptr, &write, &seek, &fileLike_);
   } else {
@@ -93,10 +95,10 @@ int AVIOFileLikeContext::write(void* opaque, const uint8_t* buf, int buf_size) {
 
   // Create a bytes object from the buffer
   py::bytes data_bytes(reinterpret_cast<const char*>(buf), buf_size);
-  
+
   // Call the Python write method
   auto bytes_written = (*fileLike)->attr("write")(data_bytes);
-  
+
   // Python write() should return the number of bytes written
   return py::cast<int>(bytes_written);
 }

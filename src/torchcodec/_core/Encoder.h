@@ -1,7 +1,7 @@
 #pragma once
 #include <torch/types.h>
-#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/AVIOFileLikeContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/StreamOptions.h"
 
