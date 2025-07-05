@@ -158,19 +158,23 @@ function(make_torchcodec_libraries
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-      "-fvisibility=hidden"
-    )
-    # If we don't make sure this flag is set, we run into segfauls at import
-    # time on Mac. See:
-    #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
-    target_link_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-        "LINKER:-undefined,dynamic_lookup"
-    )
+    if(NOT WIN32)  # TODO unify WIN detection
+        target_compile_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "-fvisibility=hidden"
+        )
+    endif()
+    if(APPLE)  # TODO unify APPLE detection
+        # If we don't make sure this flag is set, we run into segfauls at import
+        # time on Mac. See:
+        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+        target_link_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "LINKER:-undefined,dynamic_lookup"
+        )
+    endif()
 
     # Install all libraries.
     set(
