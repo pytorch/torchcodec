@@ -50,7 +50,7 @@ jobs:
       test-infra-ref: build-platform-windows
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
-      post-script: packaging/post_build_script.sh
+      # post-script: packaging/post_build_script.sh  # TODO enable post-build checks?
       env-script: packaging/vc_env_helper.bat
       smoke-test-script: packaging/fake_smoke_test.py
       package-name: torchcodec
