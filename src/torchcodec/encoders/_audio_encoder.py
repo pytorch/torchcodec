@@ -99,7 +99,7 @@ class AudioEncoder:
             num_channels=num_channels,
         )
 
-    def encode_to_file_like(
+    def to_file_like(
         self,
         file_like,
         format: str,
