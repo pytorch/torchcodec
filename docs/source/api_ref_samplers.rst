@@ -6,7 +6,7 @@ torchcodec.samplers
 
 .. currentmodule:: torchcodec.samplers
 
-For a tutorial, see: :ref:`sphx_glr_generated_examples_sampling.py`.
+For a tutorial, see: :ref:`sphx_glr_generated_examples_decoding_sampling.py`.
 
 .. autosummary::
     :toctree: generated/

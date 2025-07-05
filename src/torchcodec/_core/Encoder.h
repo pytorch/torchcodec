@@ -9,11 +9,6 @@ class AudioEncoder {
  public:
   ~AudioEncoder();
 
-  // TODO-ENCODING: document in public docs that bit_rate value is only
-  // best-effort, matching to the closest supported bit_rate. I.e. passing 1 is
-  // like passing 0, which results in choosing the minimum supported bit rate.
-  // Passing 44_100 could result in output being 44000 if only 44000 is
-  // supported.
   AudioEncoder(
       const torch::Tensor& samples,
       // TODO-ENCODING: update this comment when we support an output sample
