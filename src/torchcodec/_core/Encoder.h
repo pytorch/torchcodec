@@ -1,6 +1,7 @@
 #pragma once
 #include <torch/types.h>
 #include "src/torchcodec/_core/AVIOTensorContext.h"
+#include "src/torchcodec/_core/AVIOFileLikeContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/StreamOptions.h"
 
@@ -26,6 +27,12 @@ class AudioEncoder {
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> avioContextHolder,
       const AudioStreamOptions& audioStreamOptions);
+  AudioEncoder(
+      const torch::Tensor& samples,
+      int sampleRate,
+      std::string_view formatName,
+      std::unique_ptr<AVIOFileLikeContext> avioContextHolder,
+      const AudioStreamOptions& audioStreamOptions);
   void encode();
   torch::Tensor encodeToTensor();
 
@@ -50,7 +57,10 @@ class AudioEncoder {
   const torch::Tensor samples_;
 
   // Stores the AVIOContext for the output tensor buffer.
-  std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
+  std::unique_ptr<AVIOToTensorContext> avioTensorContextHolder_;
+
+  // Stores the AVIOContext for file-like object output.
+  std::unique_ptr<AVIOFileLikeContext> avioFileLikeContextHolder_;
 
   bool encodeWasCalled_ = false;
 };

@@ -138,7 +138,7 @@ AudioEncoder::AudioEncoder(
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
-      avioContextHolder_(std::move(avioContextHolder)) {
+      avioTensorContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -153,7 +153,35 @@ AudioEncoder::AudioEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
-  avFormatContext_->pb = avioContextHolder_->getAVIOContext();
+  avFormatContext_->pb = avioTensorContextHolder_->getAVIOContext();
+
+  initializeEncoder(sampleRate, audioStreamOptions);
+}
+
+AudioEncoder::AudioEncoder(
+    const torch::Tensor& samples,
+    int sampleRate,
+    std::string_view formatName,
+    std::unique_ptr<AVIOFileLikeContext> avioContextHolder,
+    const AudioStreamOptions& audioStreamOptions)
+    : samples_(validateSamples(samples)),
+      avioFileLikeContextHolder_(std::move(avioContextHolder)) {
+  setFFmpegLogLevel();
+  AVFormatContext* avFormatContext = nullptr;
+  
+  int status = avformat_alloc_output_context2(
+      &avFormatContext, nullptr, formatName.data(), nullptr);
+
+  TORCH_CHECK(
+      avFormatContext != nullptr,
+      "Couldn't allocate AVFormatContext for file-like object. ",
+      "Check the desired format? Got format=",
+      formatName,
+      ". ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  avFormatContext_.reset(avFormatContext);
+
+  avFormatContext_->pb = avioFileLikeContextHolder_->getAVIOContext();
 
   initializeEncoder(sampleRate, audioStreamOptions);
 }
@@ -217,10 +245,10 @@ void AudioEncoder::initializeEncoder(
 
 torch::Tensor AudioEncoder::encodeToTensor() {
   TORCH_CHECK(
-      avioContextHolder_ != nullptr,
-      "Cannot encode to tensor, avio context doesn't exist.");
+      avioTensorContextHolder_ != nullptr,
+      "Cannot encode to tensor, avio tensor context doesn't exist.");
   encode();
-  return avioContextHolder_->getOutputTensor();
+  return avioTensorContextHolder_->getOutputTensor();
 }
 
 void AudioEncoder::encode() {

@@ -15,14 +15,22 @@ namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
-// Enables uers to pass in a Python file-like object. We then forward all read
-// and seek calls back up to the methods on the Python object.
-class AVIOFileLikeContext : public AVIOContextHolder {
+// Enables users to pass in a Python file-like object. We then forward all read,
+// write and seek calls back up to the methods on the Python object.
+class __attribute__((visibility("default"))) AVIOFileLikeContext : public AVIOContextHolder {
  public:
+  // Constructor for reading from a file-like object
   explicit AVIOFileLikeContext(py::object fileLike);
+  
+  // Constructor for writing to a file-like object
+  static std::unique_ptr<AVIOFileLikeContext> createForWriting(py::object fileLike);
 
  private:
+  // Private constructor for write mode
+  AVIOFileLikeContext(py::object fileLike, bool isWriteMode);
+  
   static int read(void* opaque, uint8_t* buf, int buf_size);
+  static int write(void* opaque, const uint8_t* buf, int buf_size);
   static int64_t seek(void* opaque, int64_t offset, int whence);
 
   // Note that we dynamically allocate the Python object because we need to

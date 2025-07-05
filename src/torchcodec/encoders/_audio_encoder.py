@@ -98,3 +98,35 @@ class AudioEncoder:
             bit_rate=bit_rate,
             num_channels=num_channels,
         )
+
+    def encode_to_file_like(
+        self,
+        file_like,
+        format: str,
+        *,
+        bit_rate: Optional[int] = None,
+        num_channels: Optional[int] = None,
+    ) -> None:
+        """Encode samples into a file-like object.
+
+        Args:
+            file_like: A file-like object that supports write() and seek() methods,
+                such as io.BytesIO(), an open file in binary write mode, etc.
+            format (str): The format of the encoded samples, e.g. "mp3", "wav"
+                or "flac".
+            bit_rate (int, optional): The output bit rate. Encoders typically
+                support a finite set of bit rate values, so ``bit_rate`` will be
+                matched to one of those supported values. The default is chosen
+                by FFmpeg.
+            num_channels (int, optional): The number of channels of the encoded
+                output samples. By default, the number of channels of the input
+                ``samples`` is used.
+        """
+        _core.encode_audio_to_file_like(
+            samples=self._samples,
+            sample_rate=self._sample_rate,
+            format=format,
+            file_like=file_like,
+            bit_rate=bit_rate,
+            num_channels=num_channels,
+        )

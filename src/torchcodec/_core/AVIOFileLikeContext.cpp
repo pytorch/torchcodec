@@ -10,20 +10,38 @@
 namespace facebook::torchcodec {
 
 AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
+    : AVIOFileLikeContext(fileLike, false) {}
+
+std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext::createForWriting(py::object fileLike) {
+  return std::unique_ptr<AVIOFileLikeContext>(new AVIOFileLikeContext(fileLike, true));
+}
+
+AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike, bool isWriteMode)
     : fileLike_{UniquePyObject(new py::object(fileLike))} {
   {
     // TODO: Is it necessary to acquire the GIL here? Is it maybe even
     // harmful? At the moment, this is only called from within a pybind
     // function, and pybind guarantees we have the GIL.
     py::gil_scoped_acquire gil;
-    TORCH_CHECK(
-        py::hasattr(fileLike, "read"),
-        "File like object must implement a read method.");
+    if (isWriteMode) {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "write"),
+          "File like object must implement a write method.");
+    } else {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "read"),
+          "File like object must implement a read method.");
+    }
     TORCH_CHECK(
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  createAVIOContext(&read, nullptr, &seek, &fileLike_);
+  
+  if (isWriteMode) {
+    createAVIOContext(nullptr, &write, &seek, &fileLike_);
+  } else {
+    createAVIOContext(&read, nullptr, &seek, &fileLike_);
+  }
 }
 
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
@@ -64,6 +82,23 @@ int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
   }
 
   return totalNumRead == 0 ? AVERROR_EOF : totalNumRead;
+}
+
+int AVIOFileLikeContext::write(void* opaque, const uint8_t* buf, int buf_size) {
+  auto fileLike = static_cast<UniquePyObject*>(opaque);
+
+  // Note that we acquire the GIL outside of the loop. This is likely more
+  // efficient than releasing and acquiring it each loop iteration.
+  py::gil_scoped_acquire gil;
+
+  // Create a bytes object from the buffer
+  py::bytes data_bytes(reinterpret_cast<const char*>(buf), buf_size);
+  
+  // Call the Python write method
+  auto bytes_written = (*fileLike)->attr("write")(data_bytes);
+  
+  // Python write() should return the number of bytes written
+  return py::cast<int>(bytes_written);
 }
 
 int64_t AVIOFileLikeContext::seek(void* opaque, int64_t offset, int whence) {

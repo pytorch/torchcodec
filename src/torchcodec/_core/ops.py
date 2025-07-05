@@ -153,6 +153,28 @@ def create_from_file_like(
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
 
 
+def encode_audio_to_file_like(
+    samples: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    file_like: Union[io.RawIOBase, io.BufferedIOBase],
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
+) -> None:
+    """Encode audio samples to a file-like object.
+    
+    Args:
+        samples: Audio samples tensor
+        sample_rate: Sample rate in Hz
+        format: Audio format (e.g., "wav", "mp3", "flac")
+        file_like: File-like object that supports write() and seek() methods
+        bit_rate: Optional bit rate for encoding
+        num_channels: Optional number of output channels
+    """
+    assert _pybind_ops is not None
+    _pybind_ops.encode_audio_to_file_like(samples, sample_rate, format, file_like, bit_rate, num_channels)
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
