@@ -343,20 +343,15 @@ class TestAudioEncoder:
 
         torch.testing.assert_close(self.decode(encoded_tensor).data, samples)
 
-    def test_contiguity(self):
+    @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
+    def test_contiguity(self, method, tmp_path):
         # Ensure that 2 waveforms with the same values are encoded in the same
         # way, regardless of their memory layout. Here we encode 2 equal
         # waveforms, one is row-aligned while the other is column-aligned.
-        # TODO: Ideally we'd be testing all encoding methods here
 
         num_samples = 10_000  # per channel
         contiguous_samples = torch.rand(2, num_samples).contiguous()
         assert contiguous_samples.stride() == (num_samples, 1)
-
-        params = dict(format="flac", bit_rate=44_000)
-        encoded_from_contiguous = AudioEncoder(
-            contiguous_samples, sample_rate=16_000
-        ).to_tensor(**params)
 
         non_contiguous_samples = contiguous_samples.T.contiguous().T
         assert non_contiguous_samples.stride() == (1, 2)
@@ -365,9 +360,28 @@ class TestAudioEncoder:
             contiguous_samples, non_contiguous_samples, rtol=0, atol=0
         )
 
-        encoded_from_non_contiguous = AudioEncoder(
-            non_contiguous_samples, sample_rate=16_000
-        ).to_tensor(**params)
+        def encode_to_tensor(samples):
+            params = dict(bit_rate=44_000)
+            if method == "to_file":
+                dest = str(tmp_path / "output.flac")
+                AudioEncoder(samples, sample_rate=16_000).to_file(dest=dest, **params)
+                with open(dest, "rb") as f:
+                    return torch.frombuffer(f.read(), dtype=torch.uint8)
+            elif method == "to_tensor":
+                return AudioEncoder(samples, sample_rate=16_000).to_tensor(
+                    format="flac", **params
+                )
+            elif method == "to_file_like":
+                file_like = io.BytesIO()
+                AudioEncoder(samples, sample_rate=16_000).to_file_like(
+                    file_like, format="flac", **params
+                )
+                return torch.frombuffer(file_like.getvalue(), dtype=torch.uint8)
+            else:
+                raise ValueError(f"Unknown method: {method}")
+
+        encoded_from_contiguous = encode_to_tensor(contiguous_samples)
+        encoded_from_non_contiguous = encode_to_tensor(non_contiguous_samples)
 
         torch.testing.assert_close(
             encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0

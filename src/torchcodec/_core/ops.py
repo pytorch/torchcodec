@@ -4,7 +4,6 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import ctypes
 import io
 import json
 import warnings
@@ -174,7 +173,6 @@ def encode_audio_to_file_like(
     """
     assert _pybind_ops is not None
 
-    # Enforce float32 dtype requirement
     if samples.dtype != torch.float32:
         raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
 
