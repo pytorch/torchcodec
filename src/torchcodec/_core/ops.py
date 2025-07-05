@@ -178,20 +178,21 @@ def encode_audio_to_file_like(
     if samples.dtype != torch.float32:
         raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
 
-    samples_contiguous = samples.contiguous()
-    
-    data_ptr = samples_contiguous.data_ptr()
-    shape = list(samples_contiguous.shape)
+    samples = samples.contiguous()
 
     _pybind_ops.encode_audio_to_file_like(
-        data_ptr,
-        shape,
+        samples.data_ptr(),
+        list(samples.shape),
         sample_rate,
         format,
         file_like,
         bit_rate,
         num_channels,
     )
+
+    # This check is useless but it's critical to keep it to ensures that samples
+    # is still alive during the call to encode_audio_to_file_like.
+    assert samples.is_contiguous()
 
 
 # ==============================
