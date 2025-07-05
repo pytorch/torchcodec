@@ -43,25 +43,20 @@ int64_t create_from_file_like(
 }
 
 int64_t encode_audio_to_file_like(
-    py::bytes samples_data,
-    py::tuple samples_shape,
+    uintptr_t data_ptr,
+    py::list shape,
     int64_t sample_rate,
     const std::string& format,
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
-  // Convert Python data back to tensor
-  auto shape_vec = samples_shape.cast<std::vector<int64_t>>();
-  std::string samples_str = samples_data;
+  // Convert Python list to vector
+  auto shape_vec = shape.cast<std::vector<int64_t>>();
 
-  // Create tensor from raw data
+  // Create tensor from existing data pointer (enforcing float32)
   auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
-  auto samples =
-      torch::from_blob(
-          const_cast<void*>(static_cast<const void*>(samples_str.data())),
-          shape_vec,
-          tensor_options)
-          .clone(); // Clone to ensure memory ownership
+  auto samples = torch::from_blob(
+      reinterpret_cast<void*>(data_ptr), shape_vec, tensor_options);
 
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
@@ -86,8 +81,8 @@ PYBIND11_MODULE(decoder_core_pybind_ops, m) {
   m.def(
       "encode_audio_to_file_like",
       &encode_audio_to_file_like,
-      "samples_data"_a,
-      "samples_shape"_a,
+      "data_ptr"_a,
+      "shape"_a,
       "sample_rate"_a,
       "format"_a,
       "file_like"_a,

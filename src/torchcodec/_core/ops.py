@@ -4,6 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
+import ctypes
 import io
 import json
 import warnings
@@ -173,15 +174,18 @@ def encode_audio_to_file_like(
     """
     assert _pybind_ops is not None
 
-    # Convert tensor to raw bytes and shape info for pybind
+    # Enforce float32 dtype requirement
+    if samples.dtype != torch.float32:
+        raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
+
     samples_contiguous = samples.contiguous()
-    samples_numpy = samples_contiguous.detach().cpu().numpy()
-    samples_bytes = samples_numpy.tobytes()
-    samples_shape = tuple(samples_contiguous.shape)
+    
+    data_ptr = samples_contiguous.data_ptr()
+    shape = list(samples_contiguous.shape)
 
     _pybind_ops.encode_audio_to_file_like(
-        samples_bytes,
-        samples_shape,
+        data_ptr,
+        shape,
         sample_rate,
         format,
         file_like,
