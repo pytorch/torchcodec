@@ -192,6 +192,7 @@ function(make_torchcodec_libraries
     install(
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
     )
 endfunction()
 
