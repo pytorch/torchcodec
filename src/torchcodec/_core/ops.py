@@ -153,6 +153,46 @@ def create_from_file_like(
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
 
 
+def encode_audio_to_file_like(
+    samples: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    file_like: Union[io.RawIOBase, io.BufferedIOBase],
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
+) -> None:
+    """Encode audio samples to a file-like object.
+
+    Args:
+        samples: Audio samples tensor
+        sample_rate: Sample rate in Hz
+        format: Audio format (e.g., "wav", "mp3", "flac")
+        file_like: File-like object that supports write() and seek() methods
+        bit_rate: Optional bit rate for encoding
+        num_channels: Optional number of output channels
+    """
+    assert _pybind_ops is not None
+
+    if samples.dtype != torch.float32:
+        raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
+
+    samples = samples.contiguous()
+
+    _pybind_ops.encode_audio_to_file_like(
+        samples.data_ptr(),
+        list(samples.shape),
+        sample_rate,
+        format,
+        file_like,
+        bit_rate,
+        num_channels,
+    )
+
+    # This check is useless but it's critical to keep it to ensures that samples
+    # is still alive during the call to encode_audio_to_file_like.
+    assert samples.is_contiguous()
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
