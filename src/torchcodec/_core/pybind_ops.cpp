@@ -46,7 +46,7 @@ int64_t encode_audio_to_file_like(
     uintptr_t data_ptr,
     py::list shape,
     int64_t sample_rate,
-    const std::string& format,
+    std::string_view format,
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
