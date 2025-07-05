@@ -44,19 +44,16 @@ int64_t create_from_file_like(
 
 int64_t encode_audio_to_file_like(
     uintptr_t data_ptr,
-    py::list shape,
+    const std::vector<int64_t>& shape,
     int64_t sample_rate,
     std::string_view format,
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
-  // Convert Python list to vector
-  auto shape_vec = shape.cast<std::vector<int64_t>>();
-
   // Create tensor from existing data pointer (enforcing float32)
   auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
   auto samples = torch::from_blob(
-      reinterpret_cast<void*>(data_ptr), shape_vec, tensor_options);
+      reinterpret_cast<void*>(data_ptr), shape, tensor_options);
 
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
