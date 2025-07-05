@@ -46,6 +46,18 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
+    # On Windows, avoid the Release/Debug subdirectories in output
+    if(WIN32)
+        set_target_properties(${library_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+        )
+    endif()
+
     target_link_libraries(
         ${library_name}
         PUBLIC
