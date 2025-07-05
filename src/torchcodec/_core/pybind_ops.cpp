@@ -43,7 +43,7 @@ int64_t create_from_file_like(
 }
 
 int64_t encode_audio_to_file_like(
-    uintptr_t data_ptr,
+    int64_t data_ptr,
     const std::vector<int64_t>& shape,
     int64_t sample_rate,
     std::string_view format,
