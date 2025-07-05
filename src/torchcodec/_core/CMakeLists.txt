@@ -14,8 +14,19 @@ else()
     set(TORCHCODEC_WERROR_OPTION "-Werror")
 endif()
 
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+  # Avoid warnings about non-ASCII characters in source files.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4819")
+  # Important for when we add Windows CUDA: exporting all symbols is aparently
+  # limited to 65535 symbols, which (aparently) will not work for CUDA.
+  # https://github.com/pytorch/pytorch/pull/3650
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+# TODO put back previous line and set proper flags for windows. e.g. Wall is W4.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
 
 function(make_torchcodec_sublibrary
     library_name
