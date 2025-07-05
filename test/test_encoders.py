@@ -176,7 +176,7 @@ class TestAudioEncoder:
             ):
                 getattr(decoder, method)(**valid_params, num_channels=num_channels)
 
-    @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
+    @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
     @pytest.mark.parametrize("format", ("wav", "flac"))
     def test_round_trip(self, method, format, tmp_path):
         # Check that decode(encode(samples)) == samples on lossless formats
@@ -193,10 +193,16 @@ class TestAudioEncoder:
             encoded_path = str(tmp_path / f"output.{format}")
             encoded_source = encoded_path
             encoder.to_file(dest=encoded_path)
-        else:
+        elif method == "to_tensor":
             encoded_source = encoder.to_tensor(format=format)
             assert encoded_source.dtype == torch.uint8
             assert encoded_source.ndim == 1
+        elif method == "to_file_like":
+            file_like = io.BytesIO()
+            encoder.to_file_like(file_like, format=format)
+            encoded_source = file_like.getvalue()
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
         rtol, atol = (0, 1e-4) if format == "wav" else (None, None)
         torch.testing.assert_close(
@@ -208,7 +214,7 @@ class TestAudioEncoder:
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
     @pytest.mark.parametrize("num_channels", (None, 1, 2))
     @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
-    @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
+    @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
     def test_against_cli(
         self,
         asset,
@@ -244,8 +250,14 @@ class TestAudioEncoder:
         if method == "to_file":
             encoded_by_us = tmp_path / f"output.{format}"
             encoder.to_file(dest=str(encoded_by_us), **params)
-        else:
+        elif method == "to_tensor":
             encoded_by_us = encoder.to_tensor(format=format, **params)
+        elif method == "to_file_like":
+            file_like = io.BytesIO()
+            encoder.to_file_like(file_like, format=format, **params)
+            encoded_by_us = file_like.getvalue()
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
         captured = capfd.readouterr()
         if format == "wav":
@@ -281,15 +293,14 @@ class TestAudioEncoder:
 
         if method == "to_file":
             validate_frames_properties(actual=encoded_by_us, expected=encoded_by_ffmpeg)
-        else:
-            assert method == "to_tensor", "wrong test parametrization!"
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
     @pytest.mark.parametrize("num_channels", (None, 1, 2))
     @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
-    def test_to_tensor_against_to_file(
-        self, asset, bit_rate, num_channels, format, tmp_path
+    @pytest.mark.parametrize("method", ("to_tensor", "to_file_like"))
+    def test_against_to_file(
+        self, asset, bit_rate, num_channels, format, tmp_path, method
     ):
         if get_ffmpeg_major_version() == 4 and format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
@@ -299,12 +310,22 @@ class TestAudioEncoder:
         params = dict(bit_rate=bit_rate, num_channels=num_channels)
         encoded_file = tmp_path / f"output.{format}"
         encoder.to_file(dest=str(encoded_file), **params)
-        encoded_tensor = encoder.to_tensor(
-            format=format, bit_rate=bit_rate, num_channels=num_channels
-        )
+
+        if method == "to_tensor":
+            encoded_output = encoder.to_tensor(
+                format=format, bit_rate=bit_rate, num_channels=num_channels
+            )
+        elif method == "to_file_like":
+            file_like = io.BytesIO()
+            encoder.to_file_like(
+                file_like, format=format, bit_rate=bit_rate, num_channels=num_channels
+            )
+            encoded_output = file_like.getvalue()
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
         torch.testing.assert_close(
-            self.decode(encoded_file).data, self.decode(encoded_tensor).data
+            self.decode(encoded_file).data, self.decode(encoded_output).data
         )
 
     def test_encode_to_tensor_long_output(self):
@@ -354,7 +375,7 @@ class TestAudioEncoder:
 
     @pytest.mark.parametrize("num_channels_input", (1, 2))
     @pytest.mark.parametrize("num_channels_output", (1, 2, None))
-    @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
+    @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
     def test_num_channels(
         self, num_channels_input, num_channels_output, method, tmp_path
     ):
@@ -372,8 +393,14 @@ class TestAudioEncoder:
             encoded_path = str(tmp_path / f"output.{format}")
             encoded_source = encoded_path
             encoder.to_file(dest=encoded_path, **params)
-        else:
+        elif method == "to_tensor":
             encoded_source = encoder.to_tensor(format=format, **params)
+        elif method == "to_file_like":
+            file_like = io.BytesIO()
+            encoder.to_file_like(file_like, format=format, **params)
+            encoded_source = file_like.getvalue()
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
         if num_channels_output is None:
             num_channels_output = num_channels_input
@@ -389,168 +416,32 @@ class TestAudioEncoder:
             AudioEncoder(samples_2d, sample_rate=sample_rate).to_tensor("wav"),
         )
 
-    # Test cases for to_file_like method
-    def test_to_file_like_basic(self, tmp_path):
-        """Test basic functionality of to_file_like with BytesIO."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        # Test with BytesIO
-        buffer = io.BytesIO()
-        encoder.to_file_like(buffer, format="wav")
-
-        # Verify data was written
-        assert buffer.tell() > 0
-
-        # Verify we can decode the result
-        buffer.seek(0)
-        decoded_samples = self.decode(buffer.getvalue())
-
-        # For lossless format like WAV, should be very close
-        torch.testing.assert_close(
-            decoded_samples.data, source_samples, rtol=0, atol=1e-4
-        )
-
-    def test_to_file_like_different_formats(self, tmp_path):
-        """Test to_file_like with different audio formats."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        formats_to_test = ["wav", "flac", "mp3"]
-
-        for format_name in formats_to_test:
-            if get_ffmpeg_major_version() == 4 and format_name == "wav":
-                continue  # Skip WAV on FFmpeg 4 due to swresample issues
-
-            buffer = io.BytesIO()
-            encoder.to_file_like(buffer, format=format_name)
-
-            # Verify data was written
-            assert buffer.tell() > 0, f"No data written for format {format_name}"
-
-            # Verify we can decode the result (for lossless formats)
-            buffer.seek(0)
-            decoded_samples = self.decode(buffer.getvalue())
-            assert (
-                decoded_samples.data.shape[0] == source_samples.shape[0]
-            )  # Same number of channels
-
-    def test_to_file_like_with_parameters(self, tmp_path):
-        """Test to_file_like with different encoding parameters."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        # Test with different bit rates
-        for bit_rate in [128_000, 256_000]:
-            buffer = io.BytesIO()
-            encoder.to_file_like(buffer, format="mp3", bit_rate=bit_rate)
-            assert buffer.tell() > 0
-
-        # Test with different channel counts
-        for num_channels in [1, 2]:
-            buffer = io.BytesIO()
-            encoder.to_file_like(buffer, format="wav", num_channels=num_channels)
-            assert buffer.tell() > 0
-
-            # Verify channel count
-            buffer.seek(0)
-            decoded_samples = self.decode(buffer.getvalue())
-            assert decoded_samples.data.shape[0] == num_channels
-
-    def test_to_file_like_vs_to_tensor(self, tmp_path):
-        """Test that to_file_like produces the same output as to_tensor."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        # Get tensor output
-        tensor_output = encoder.to_tensor(format="wav")
-
-        # Get file-like output
-        buffer = io.BytesIO()
-        encoder.to_file_like(buffer, format="wav")
-        buffer.seek(0)
-        file_like_output = torch.frombuffer(buffer.getvalue(), dtype=torch.uint8)
-
-        # They should be identical
-        torch.testing.assert_close(tensor_output, file_like_output)
-
-    def test_to_file_like_vs_to_file(self, tmp_path):
-        """Test that to_file_like produces the same output as to_file."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        # Get file output
-        file_path = tmp_path / "test.wav"
-        encoder.to_file(dest=str(file_path))  # Convert to string
-
-        with open(file_path, "rb") as f:
-            file_output = f.read()
-
-        # Get file-like output
-        buffer = io.BytesIO()
-        encoder.to_file_like(buffer, format="wav")
-        buffer.seek(0)
-        file_like_output = buffer.getvalue()
-
-        # They should be identical
-        assert file_output == file_like_output
-
     def test_to_file_like_custom_file_object(self, tmp_path):
-        """Test to_file_like with a custom file-like object."""
-
         class CustomFileObject:
             def __init__(self):
-                self.data = b""
-                self.position = 0
+                self._file = io.BytesIO()
 
             def write(self, data):
-                if isinstance(data, (bytes, bytearray)):
-                    self.data += data
-                    self.position += len(data)
-                    return len(data)
-                else:
-                    raise TypeError("Expected bytes-like object")
+                return self._file.write(data)
 
             def seek(self, offset, whence=0):
-                if whence == 0:  # SEEK_SET
-                    self.position = offset
-                elif whence == 1:  # SEEK_CUR
-                    self.position += offset
-                elif whence == 2:  # SEEK_END
-                    self.position = len(self.data) + offset
-                return self.position
+                return self._file.seek(offset, whence)
+
+            def get_encoded_data(self):
+                return self._file.getvalue()
 
         asset = NASA_AUDIO_MP3
         source_samples = self.decode(asset).data
         encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
 
-        custom_file = CustomFileObject()
-        encoder.to_file_like(custom_file, format="wav")
+        file_like = CustomFileObject()
+        encoder.to_file_like(file_like, format="wav")
 
-        # Verify data was written
-        assert len(custom_file.data) > 0
+        decoded_samples = self.decode(file_like.get_encoded_data())
 
-        # Verify we can decode the result
-        decoded_samples = self.decode(custom_file.data)
-
-        # Allow for small differences in sample count due to encoding/padding
-        # Check that the shapes are approximately the same (within a few samples)
-        assert (
-            decoded_samples.data.shape[0] == source_samples.shape[0]
-        )  # Same number of channels
-        sample_diff = abs(decoded_samples.data.shape[1] - source_samples.shape[1])
-        assert sample_diff <= 10, f"Sample count difference too large: {sample_diff}"
-
-        # Compare the overlapping portion
-        min_samples = min(decoded_samples.data.shape[1], source_samples.shape[1])
         torch.testing.assert_close(
-            decoded_samples.data[:, :min_samples],
-            source_samples[:, :min_samples],
+            decoded_samples.data,
+            source_samples,
             rtol=0,
             atol=1e-4,
         )
@@ -563,27 +454,19 @@ class TestAudioEncoder:
 
         file_path = tmp_path / "test_file_like.wav"
 
-        # Use to_file_like with a real file
-        with open(file_path, "wb") as f:
-            encoder.to_file_like(f, format="wav")
+        with open(file_path, "wb") as file_like:
+            encoder.to_file_like(file_like, format="wav")
 
-        # Verify the file was created and has content
-        assert file_path.exists()
-        assert file_path.stat().st_size > 0
-
-        # Verify we can decode the result
         decoded_samples = self.decode(str(file_path))
         torch.testing.assert_close(
             decoded_samples.data, source_samples, rtol=0, atol=1e-4
         )
 
-    def test_to_file_like_bad_input(self):
-        """Test to_file_like with invalid inputs."""
+    def test_to_file_like_bad_methods(self):
         asset = NASA_AUDIO_MP3
         source_samples = self.decode(asset).data
         encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
 
-        # Test with object missing write method
         class NoWriteMethod:
             def seek(self, offset, whence=0):
                 return 0
@@ -593,7 +476,6 @@ class TestAudioEncoder:
         ):
             encoder.to_file_like(NoWriteMethod(), format="wav")
 
-        # Test with object missing seek method
         class NoSeekMethod:
             def write(self, data):
                 return len(data)
@@ -602,58 +484,3 @@ class TestAudioEncoder:
             RuntimeError, match="File like object must implement a seek method"
         ):
             encoder.to_file_like(NoSeekMethod(), format="wav")
-
-        # Test with invalid format
-        buffer = io.BytesIO()
-        with pytest.raises(RuntimeError, match="Check the desired format"):
-            encoder.to_file_like(buffer, format="invalid_format")
-
-        # Test with invalid bit rate
-        buffer = io.BytesIO()
-        with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
-            encoder.to_file_like(buffer, format="wav", bit_rate=-1)
-
-    def test_to_file_like_multiple_calls(self):
-        """Test that to_file_like can be called multiple times on the same encoder."""
-        asset = NASA_AUDIO_MP3
-        source_samples = self.decode(asset).data
-        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
-
-        # First call
-        buffer1 = io.BytesIO()
-        encoder.to_file_like(buffer1, format="wav")
-
-        # Second call with different format
-        buffer2 = io.BytesIO()
-        encoder.to_file_like(buffer2, format="flac")
-
-        # Both should have data
-        assert buffer1.tell() > 0
-        assert buffer2.tell() > 0
-
-        # Verify both can be decoded
-        buffer1.seek(0)
-        buffer2.seek(0)
-        decoded1 = self.decode(buffer1.getvalue())
-        decoded2 = self.decode(buffer2.getvalue())
-
-        # Both should be close to the original (within format limitations)
-        torch.testing.assert_close(decoded1.data, source_samples, rtol=0, atol=1e-4)
-        torch.testing.assert_close(decoded2.data, source_samples, rtol=0, atol=1e-4)
-
-    def test_to_file_like_empty_samples(self):
-        """Test to_file_like with very short audio samples."""
-        # Create very short audio sample
-        short_samples = torch.rand(2, 100)  # 100 samples per channel
-        encoder = AudioEncoder(short_samples, sample_rate=16_000)
-
-        buffer = io.BytesIO()
-        encoder.to_file_like(buffer, format="wav")
-
-        # Should still produce valid output
-        assert buffer.tell() > 0
-
-        # Verify it can be decoded
-        buffer.seek(0)
-        decoded_samples = self.decode(buffer.getvalue())
-        assert decoded_samples.data.shape[0] == 2  # Same number of channels
