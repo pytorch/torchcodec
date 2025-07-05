@@ -172,7 +172,16 @@ def encode_audio_to_file_like(
         num_channels: Optional number of output channels
     """
     assert _pybind_ops is not None
-    _pybind_ops.encode_audio_to_file_like(samples, sample_rate, format, file_like, bit_rate, num_channels)
+    
+    # Convert tensor to raw bytes and shape info for pybind
+    samples_contiguous = samples.contiguous()
+    samples_numpy = samples_contiguous.detach().cpu().numpy()
+    samples_bytes = samples_numpy.tobytes()
+    samples_shape = tuple(samples_contiguous.shape)
+    
+    _pybind_ops.encode_audio_to_file_like(
+        samples_bytes, samples_shape, sample_rate, format, file_like, bit_rate, num_channels
+    )
 
 
 # ==============================

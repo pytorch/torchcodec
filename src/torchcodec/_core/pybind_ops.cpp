@@ -6,6 +6,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <torch/extension.h>
 #include <cstdint>
 #include <string>
 
@@ -15,6 +16,7 @@
 #include "src/torchcodec/_core/StreamOptions.h"
 
 namespace py = pybind11;
+using namespace py::literals;
 
 namespace facebook::torchcodec {
 
@@ -40,13 +42,26 @@ int64_t create_from_file_like(
   return reinterpret_cast<int64_t>(decoder);
 }
 
-void encode_audio_to_file_like(
-    const torch::Tensor& samples,
+int64_t encode_audio_to_file_like(
+    py::bytes samples_data,
+    py::tuple samples_shape,
     int64_t sample_rate,
     const std::string& format,
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
+  
+  // Convert Python data back to tensor
+  auto shape_vec = samples_shape.cast<std::vector<int64_t>>();
+  std::string samples_str = samples_data;
+  
+  // Create tensor from raw data
+  auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
+  auto samples = torch::from_blob(
+      const_cast<void*>(static_cast<const void*>(samples_str.data())),
+      shape_vec,
+      tensor_options).clone(); // Clone to ensure memory ownership
+  
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
@@ -60,11 +75,16 @@ void encode_audio_to_file_like(
       std::move(avioContextHolder), 
       audioStreamOptions);
   encoder.encode();
+  
+  // Return 0 to indicate success
+  return 0;
 }
 
 PYBIND11_MODULE(decoder_core_pybind_ops, m) {
   m.def("create_from_file_like", &create_from_file_like);
-  m.def("encode_audio_to_file_like", &encode_audio_to_file_like);
+  m.def("encode_audio_to_file_like", &encode_audio_to_file_like,
+        "samples_data"_a, "samples_shape"_a, "sample_rate"_a, "format"_a, 
+        "file_like"_a, "bit_rate"_a = py::none(), "num_channels"_a = py::none());
 }
 
 } // namespace facebook::torchcodec

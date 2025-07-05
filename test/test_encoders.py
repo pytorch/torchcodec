@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import re
 import subprocess
@@ -384,3 +385,267 @@ class TestAudioEncoder:
             AudioEncoder(samples_1d, sample_rate=sample_rate).to_tensor("wav"),
             AudioEncoder(samples_2d, sample_rate=sample_rate).to_tensor("wav"),
         )
+
+    # Test cases for encode_to_file_like method
+    def test_encode_to_file_like_basic(self, tmp_path):
+        """Test basic functionality of encode_to_file_like with BytesIO."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # Test with BytesIO
+        buffer = io.BytesIO()
+        encoder.encode_to_file_like(buffer, format="wav")
+
+        # Verify data was written
+        assert buffer.tell() > 0
+
+        # Verify we can decode the result
+        buffer.seek(0)
+        decoded_samples = self.decode(buffer.getvalue())
+
+        # For lossless format like WAV, should be very close
+        torch.testing.assert_close(
+            decoded_samples.data, source_samples, rtol=0, atol=1e-4
+        )
+
+    def test_encode_to_file_like_different_formats(self, tmp_path):
+        """Test encode_to_file_like with different audio formats."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        formats_to_test = ["wav", "flac", "mp3"]
+
+        for format_name in formats_to_test:
+            if get_ffmpeg_major_version() == 4 and format_name == "wav":
+                continue  # Skip WAV on FFmpeg 4 due to swresample issues
+
+            buffer = io.BytesIO()
+            encoder.encode_to_file_like(buffer, format=format_name)
+
+            # Verify data was written
+            assert buffer.tell() > 0, f"No data written for format {format_name}"
+
+            # Verify we can decode the result (for lossless formats)
+            buffer.seek(0)
+            decoded_samples = self.decode(buffer.getvalue())
+            assert decoded_samples.data.shape[0] == source_samples.shape[0]  # Same number of channels
+
+    def test_encode_to_file_like_with_parameters(self, tmp_path):
+        """Test encode_to_file_like with different encoding parameters."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # Test with different bit rates
+        for bit_rate in [128_000, 256_000]:
+            buffer = io.BytesIO()
+            encoder.encode_to_file_like(buffer, format="mp3", bit_rate=bit_rate)
+            assert buffer.tell() > 0
+
+        # Test with different channel counts
+        for num_channels in [1, 2]:
+            buffer = io.BytesIO()
+            encoder.encode_to_file_like(buffer, format="wav", num_channels=num_channels)
+            assert buffer.tell() > 0
+
+            # Verify channel count
+            buffer.seek(0)
+            decoded_samples = self.decode(buffer.getvalue())
+            assert decoded_samples.data.shape[0] == num_channels
+
+    def test_encode_to_file_like_vs_to_tensor(self, tmp_path):
+        """Test that encode_to_file_like produces the same output as to_tensor."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # Get tensor output
+        tensor_output = encoder.to_tensor(format="wav")
+
+        # Get file-like output
+        buffer = io.BytesIO()
+        encoder.encode_to_file_like(buffer, format="wav")
+        buffer.seek(0)
+        file_like_output = torch.frombuffer(buffer.getvalue(), dtype=torch.uint8)
+
+        # They should be identical
+        torch.testing.assert_close(tensor_output, file_like_output)
+
+    def test_encode_to_file_like_vs_to_file(self, tmp_path):
+        """Test that encode_to_file_like produces the same output as to_file."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # Get file output
+        file_path = tmp_path / "test.wav"
+        encoder.to_file(dest=str(file_path))  # Convert to string
+
+        with open(file_path, "rb") as f:
+            file_output = f.read()
+
+        # Get file-like output
+        buffer = io.BytesIO()
+        encoder.encode_to_file_like(buffer, format="wav")
+        buffer.seek(0)
+        file_like_output = buffer.getvalue()
+
+        # They should be identical
+        assert file_output == file_like_output
+
+    def test_encode_to_file_like_custom_file_object(self, tmp_path):
+        """Test encode_to_file_like with a custom file-like object."""
+
+        class CustomFileObject:
+            def __init__(self):
+                self.data = b""
+                self.position = 0
+
+            def write(self, data):
+                if isinstance(data, (bytes, bytearray)):
+                    self.data += data
+                    self.position += len(data)
+                    return len(data)
+                else:
+                    raise TypeError("Expected bytes-like object")
+
+            def seek(self, offset, whence=0):
+                if whence == 0:  # SEEK_SET
+                    self.position = offset
+                elif whence == 1:  # SEEK_CUR
+                    self.position += offset
+                elif whence == 2:  # SEEK_END
+                    self.position = len(self.data) + offset
+                return self.position
+
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        custom_file = CustomFileObject()
+        encoder.encode_to_file_like(custom_file, format="wav")
+
+        # Verify data was written
+        assert len(custom_file.data) > 0
+
+        # Verify we can decode the result
+        decoded_samples = self.decode(custom_file.data)
+        
+        # Allow for small differences in sample count due to encoding/padding
+        # Check that the shapes are approximately the same (within a few samples)
+        assert decoded_samples.data.shape[0] == source_samples.shape[0]  # Same number of channels
+        sample_diff = abs(decoded_samples.data.shape[1] - source_samples.shape[1])
+        assert sample_diff <= 10, f"Sample count difference too large: {sample_diff}"
+        
+        # Compare the overlapping portion
+        min_samples = min(decoded_samples.data.shape[1], source_samples.shape[1])
+        torch.testing.assert_close(
+            decoded_samples.data[:, :min_samples], 
+            source_samples[:, :min_samples], 
+            rtol=0, atol=1e-4
+        )
+
+    def test_encode_to_file_like_real_file(self, tmp_path):
+        """Test encode_to_file_like with a real file opened in binary write mode."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        file_path = tmp_path / "test_file_like.wav"
+
+        # Use encode_to_file_like with a real file
+        with open(file_path, "wb") as f:
+            encoder.encode_to_file_like(f, format="wav")
+
+        # Verify the file was created and has content
+        assert file_path.exists()
+        assert file_path.stat().st_size > 0
+
+        # Verify we can decode the result
+        decoded_samples = self.decode(str(file_path))
+        torch.testing.assert_close(
+            decoded_samples.data, source_samples, rtol=0, atol=1e-4
+        )
+
+    def test_encode_to_file_like_bad_input(self):
+        """Test encode_to_file_like with invalid inputs."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # Test with object missing write method
+        class NoWriteMethod:
+            def seek(self, offset, whence=0):
+                return 0
+
+        with pytest.raises(RuntimeError, match="File like object must implement a write method"):
+            encoder.encode_to_file_like(NoWriteMethod(), format="wav")
+
+        # Test with object missing seek method
+        class NoSeekMethod:
+            def write(self, data):
+                return len(data)
+
+        with pytest.raises(RuntimeError, match="File like object must implement a seek method"):
+            encoder.encode_to_file_like(NoSeekMethod(), format="wav")
+
+        # Test with invalid format
+        buffer = io.BytesIO()
+        with pytest.raises(RuntimeError, match="Check the desired format"):
+            encoder.encode_to_file_like(buffer, format="invalid_format")
+
+        # Test with invalid bit rate
+        buffer = io.BytesIO()
+        with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
+            encoder.encode_to_file_like(buffer, format="wav", bit_rate=-1)
+
+    def test_encode_to_file_like_multiple_calls(self):
+        """Test that encode_to_file_like can be called multiple times on the same encoder."""
+        asset = NASA_AUDIO_MP3
+        source_samples = self.decode(asset).data
+        encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
+
+        # First call
+        buffer1 = io.BytesIO()
+        encoder.encode_to_file_like(buffer1, format="wav")
+
+        # Second call with different format
+        buffer2 = io.BytesIO()
+        encoder.encode_to_file_like(buffer2, format="flac")
+
+        # Both should have data
+        assert buffer1.tell() > 0
+        assert buffer2.tell() > 0
+
+        # Verify both can be decoded
+        buffer1.seek(0)
+        buffer2.seek(0)
+        decoded1 = self.decode(buffer1.getvalue())
+        decoded2 = self.decode(buffer2.getvalue())
+
+        # Both should be close to the original (within format limitations)
+        torch.testing.assert_close(
+            decoded1.data, source_samples, rtol=0, atol=1e-4
+        )
+        torch.testing.assert_close(
+            decoded2.data, source_samples, rtol=0, atol=1e-4
+        )
+
+    def test_encode_to_file_like_empty_samples(self):
+        """Test encode_to_file_like with very short audio samples."""
+        # Create very short audio sample
+        short_samples = torch.rand(2, 100)  # 100 samples per channel
+        encoder = AudioEncoder(short_samples, sample_rate=16_000)
+
+        buffer = io.BytesIO()
+        encoder.encode_to_file_like(buffer, format="wav")
+
+        # Should still produce valid output
+        assert buffer.tell() > 0
+
+        # Verify it can be decoded
+        buffer.seek(0)
+        decoded_samples = self.decode(buffer.getvalue())
+        assert decoded_samples.data.shape[0] == 2  # Same number of channels
