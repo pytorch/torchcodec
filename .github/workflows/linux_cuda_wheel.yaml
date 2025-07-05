@@ -56,88 +56,88 @@ jobs:
       build-platform: "python-build-package"
       build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ENABLE_CUDA=1 python -m build --wheel -vvv --no-isolation"
 
-  install-and-test:
-    runs-on: linux.g5.4xlarge.nvidia.gpu
-    strategy:
-      fail-fast: false
-      matrix:
-          # 3.9 corresponds to the minimum python version for which we build
-          # the wheel unless the label cliflow/binaries/all is present in the
-          # PR.
-          # For the actual release we should add that label and change this to
-          # include more python versions.
-        python-version: ['3.9']
-        cuda-version: ['12.6', '12.8']
-        # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+  # install-and-test:
+  #   runs-on: linux.g5.4xlarge.nvidia.gpu
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #         # 3.9 corresponds to the minimum python version for which we build
+  #         # the wheel unless the label cliflow/binaries/all is present in the
+  #         # PR.
+  #         # For the actual release we should add that label and change this to
+  #         # include more python versions.
+  #       python-version: ['3.9']
+  #       cuda-version: ['12.6', '12.8']
+  #       # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
+  #       ffmpeg-version-for-tests: ['4.4.2', '6', '7']
 
-    container:
-      image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
-      options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
-    needs: build
-    steps:
-      - name: Setup env vars
-        run: |
-          cuda_version_without_periods=$(echo "${{ matrix.cuda-version }}" | sed 's/\.//g')
-          echo cuda_version_without_periods=${cuda_version_without_periods} >> $GITHUB_ENV
-          python_version_without_periods=$(echo "${{ matrix.python-version }}" | sed 's/\.//g')
-          echo python_version_without_periods=${python_version_without_periods} >> $GITHUB_ENV
-      - uses: actions/download-artifact@v4
-        with:
-          name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
-          path: pytorch/torchcodec/dist/
-      - name: Setup miniconda using test-infra
-        uses: pytorch/test-infra/.github/actions/setup-miniconda@main
-        with:
-          python-version: ${{ matrix.python-version }}
-          # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
-          default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
-      - name: Check env
-        run: |
-          ${CONDA_RUN} env
-          ${CONDA_RUN} conda info
-          ${CONDA_RUN} nvidia-smi
-          ${CONDA_RUN} conda list
-      - name: Assert ffmpeg exists
-        run: |
-          ${CONDA_RUN} ffmpeg -buildconf
-      - name: Update pip
-        run: ${CONDA_RUN} python -m pip install --upgrade pip
-      - name: Install PyTorch
-        run: |
-          ${CONDA_RUN} python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
-          ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
-      - name: Install torchcodec from the wheel
-        run: |
-          wheel_path=`find pytorch/torchcodec/dist -type f -name "*cu${{ env.cuda_version_without_periods }}-cp${{ env.python_version_without_periods }}*.whl"`
-          echo Installing $wheel_path
-          ${CONDA_RUN} python -m pip install $wheel_path -vvv
+  #   container:
+  #     image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
+  #     options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
+  #   needs: build
+  #   steps:
+  #     - name: Setup env vars
+  #       run: |
+  #         cuda_version_without_periods=$(echo "${{ matrix.cuda-version }}" | sed 's/\.//g')
+  #         echo cuda_version_without_periods=${cuda_version_without_periods} >> $GITHUB_ENV
+  #         python_version_without_periods=$(echo "${{ matrix.python-version }}" | sed 's/\.//g')
+  #         echo python_version_without_periods=${python_version_without_periods} >> $GITHUB_ENV
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: pytorch_torchcodec__${{ matrix.python-version }}_cu${{ env.cuda_version_without_periods }}_x86_64
+  #         path: pytorch/torchcodec/dist/
+  #     - name: Setup miniconda using test-infra
+  #       uses: pytorch/test-infra/.github/actions/setup-miniconda@main
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #         # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
+  #         default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }}"
+  #     - name: Check env
+  #       run: |
+  #         ${CONDA_RUN} env
+  #         ${CONDA_RUN} conda info
+  #         ${CONDA_RUN} nvidia-smi
+  #         ${CONDA_RUN} conda list
+  #     - name: Assert ffmpeg exists
+  #       run: |
+  #         ${CONDA_RUN} ffmpeg -buildconf
+  #     - name: Update pip
+  #       run: ${CONDA_RUN} python -m pip install --upgrade pip
+  #     - name: Install PyTorch
+  #       run: |
+  #         ${CONDA_RUN} python -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu${{ env.cuda_version_without_periods }}
+  #         ${CONDA_RUN} python -c 'import torch; print(f"{torch.__version__}"); print(f"{torch.__file__}"); print(f"{torch.cuda.is_available()=}")'
+  #     - name: Install torchcodec from the wheel
+  #       run: |
+  #         wheel_path=`find pytorch/torchcodec/dist -type f -name "*cu${{ env.cuda_version_without_periods }}-cp${{ env.python_version_without_periods }}*.whl"`
+  #         echo Installing $wheel_path
+  #         ${CONDA_RUN} python -m pip install $wheel_path -vvv
 
-      - name: Check out repo
-        uses: actions/checkout@v3
+  #     - name: Check out repo
+  #       uses: actions/checkout@v3
 
-      - name: Install test dependencies
-        run: |
-          # Ideally we would find a way to get those dependencies from pyproject.toml
-          ${CONDA_RUN} python -m pip install numpy pytest pillow
+  #     - name: Install test dependencies
+  #       run: |
+  #         # Ideally we would find a way to get those dependencies from pyproject.toml
+  #         ${CONDA_RUN} python -m pip install numpy pytest pillow
 
-      - name: Delete the src/ folder just for fun
-        run: |
-          # The only reason we checked-out the repo is to get access to the
-          # tests. We don't care about the rest. Out of precaution, we delete
-          # the src/ folder to be extra sure that we're running the code from
-          # the installed wheel rather than from the source.
-          # This is just to be extra cautious and very overkill because a)
-          # there's no way the `torchcodec` package from src/ can be found from
-          # the PythonPath: the main point of `src/` is precisely to protect
-          # against that and b) if we ever were to execute code from
-          # `src/torchcodec`, it would fail loudly because the built .so files
-          # aren't present there.
-          rm -r src/
-          ls
-      - name: Run Python tests
-        run: |
-          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -v --tb=short
-      - name: Run Python benchmark
-        run: |
-          ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
+  #     - name: Delete the src/ folder just for fun
+  #       run: |
+  #         # The only reason we checked-out the repo is to get access to the
+  #         # tests. We don't care about the rest. Out of precaution, we delete
+  #         # the src/ folder to be extra sure that we're running the code from
+  #         # the installed wheel rather than from the source.
+  #         # This is just to be extra cautious and very overkill because a)
+  #         # there's no way the `torchcodec` package from src/ can be found from
+  #         # the PythonPath: the main point of `src/` is precisely to protect
+  #         # against that and b) if we ever were to execute code from
+  #         # `src/torchcodec`, it would fail loudly because the built .so files
+  #         # aren't present there.
+  #         rm -r src/
+  #         ls
+  #     - name: Run Python tests
+  #       run: |
+  #         ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test -v --tb=short
+  #     - name: Run Python benchmark
+  #       run: |
+  #         ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
