@@ -60,7 +60,7 @@ void encode_audio_to_file_like(
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
 
-  auto avioContextHolder = AVIOFileLikeContext::createForWriting(file_like);
+  auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(file_like);
 
   AudioEncoder encoder(
       samples,
