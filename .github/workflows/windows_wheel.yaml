@@ -107,6 +107,26 @@ jobs:
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
 
+          # On Windows, ensure the conda Library/bin directory is in PATH
+          # This is needed for Windows DLL loading to find FFmpeg DLLs
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            conda_env_path=$(conda info --base)/envs/test
+            library_bin_path="$conda_env_path/Library/bin"
+            echo "Adding conda Library/bin to PATH: $library_bin_path"
+            echo "$library_bin_path" >> $GITHUB_PATH
+
+            # Verify FFmpeg DLLs are accessible
+            echo "Checking if FFmpeg DLLs are in PATH:"
+            where avutil.dll || echo "avutil.dll not found in PATH"
+            where avcodec.dll || echo "avcodec.dll not found in PATH"
+            where avformat.dll || echo "avformat.dll not found in PATH"
+          fi
+
+      - name: Test torchcodec import after FFmpeg installation
+        run: |
+          echo "Testing torchcodec import after FFmpeg is installed and PATH is updated..."
+          python -c "import torchcodec; print('TorchCodec import successful!')"
+
       - name: Install test dependencies
         run: |
           # Ideally we would find a way to get those dependencies from pyproject.toml
