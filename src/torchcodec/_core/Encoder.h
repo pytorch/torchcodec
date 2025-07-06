@@ -11,12 +11,6 @@ class AudioEncoder {
 
   AudioEncoder(
       const torch::Tensor& samples,
-      // TODO-ENCODING: update this comment when we support an output sample
-      // rate. This will become the input sample rate.
-      // The *output* sample rate. We can't really decide for the user what it
-      // should be. Particularly, the sample rate of the input samples should
-      // match this, and that's up to the user. If sample rates don't match,
-      // encoding will still work but audio will be distorted.
       int sampleRate,
       std::string_view fileName,
       const AudioStreamOptions& audioStreamOptions);

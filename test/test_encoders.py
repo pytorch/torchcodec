@@ -2,6 +2,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from functools import partial
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from torchcodec.decoders import AudioDecoder
 from torchcodec.encoders import AudioEncoder
 
 from .utils import (
+    assert_tensor_close_on_at_least,
     get_ffmpeg_major_version,
     in_fbcode,
     NASA_AUDIO_MP3,
@@ -266,9 +268,7 @@ class TestAudioEncoder:
         if sample_rate != asset.sample_rate:
             rtol, atol = 0, 1e-3
             if sys.platform == "darwin":
-                assert_close = partial(
-                    utils.assert_tensor_close_on_at_least, percentage=99
-                )
+                assert_close = partial(assert_tensor_close_on_at_least, percentage=99)
         elif format == "wav":
             rtol, atol = 0, 1e-4
         elif format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
