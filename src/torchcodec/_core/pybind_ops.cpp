@@ -6,7 +6,6 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <torch/extension.h>
 #include <cstdint>
 #include <string>
 
@@ -16,7 +15,6 @@
 #include "src/torchcodec/_core/StreamOptions.h"
 
 namespace py = pybind11;
-using namespace py::literals;
 
 namespace facebook::torchcodec {
 
@@ -55,6 +53,8 @@ int64_t encode_audio_to_file_like(
   auto samples = torch::from_blob(
       reinterpret_cast<void*>(data_ptr), shape, tensor_options);
 
+  // TODO Fix implicit int conversion:
+  // https://github.com/pytorch/torchcodec/issues/679
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
@@ -78,13 +78,13 @@ PYBIND11_MODULE(decoder_core_pybind_ops, m) {
   m.def(
       "encode_audio_to_file_like",
       &encode_audio_to_file_like,
-      "data_ptr"_a,
-      "shape"_a,
-      "sample_rate"_a,
-      "format"_a,
-      "file_like"_a,
-      "bit_rate"_a = py::none(),
-      "num_channels"_a = py::none());
+      "data_ptr",
+      "shape",
+      "sample_rate",
+      "format",
+      "file_like",
+      "bit_rate",
+      "num_channels");
 }
 
 } // namespace facebook::torchcodec
