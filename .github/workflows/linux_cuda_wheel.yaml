@@ -98,6 +98,10 @@ jobs:
           ${CONDA_RUN} conda info
           ${CONDA_RUN} nvidia-smi
           ${CONDA_RUN} conda list
+      - name: Install X11 dependencies for FFmpeg 4
+        if: matrix.ffmpeg-version-for-tests == '4.4.2'
+        run: |
+          ${CONDA_RUN} conda install -y conda-forge::libxau conda-forge::libxdmcp conda-forge::libxcb conda-forge::xorg-libx11
       - name: Assert ffmpeg exists
         run: |
           ${CONDA_RUN} ffmpeg -buildconf
