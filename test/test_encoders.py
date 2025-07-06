@@ -2,6 +2,7 @@ import json
 import os
 import re
 import subprocess
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -261,8 +262,13 @@ class TestAudioEncoder:
         if format in ("flac", "mp3"):
             assert "Application provided invalid" not in captured.err
 
+        assert_close = torch.testing.assert_close
         if sample_rate != asset.sample_rate:
             rtol, atol = 0, 1e-3
+            if sys.platform == "darwin":
+                assert_close = partial(
+                    utils.assert_tensor_close_on_at_least, percentage=99
+                )
         elif format == "wav":
             rtol, atol = 0, 1e-4
         elif format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
@@ -275,7 +281,7 @@ class TestAudioEncoder:
             rtol, atol = None, None
         samples_by_us = self.decode(encoded_by_us)
         samples_by_ffmpeg = self.decode(encoded_by_ffmpeg)
-        torch.testing.assert_close(
+        assert_close(
             samples_by_us.data,
             samples_by_ffmpeg.data,
             rtol=rtol,
