@@ -21,9 +21,7 @@ namespace facebook::torchcodec {
 class __attribute__((visibility("default"))) AVIOFileLikeContext
     : public AVIOContextHolder {
  public:
-  explicit AVIOFileLikeContext(
-      py::object fileLike,
-      std::string_view neededMethod);
+  explicit AVIOFileLikeContext(py::object fileLike, bool isForWriting);
 
  private:
   static int read(void* opaque, uint8_t* buf, int buf_size);

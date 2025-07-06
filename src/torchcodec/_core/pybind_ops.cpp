@@ -34,7 +34,7 @@ int64_t create_from_file_like(
   }
 
   auto avioContextHolder =
-      std::make_unique<AVIOFileLikeContext>(file_like, /*neededMethod=*/"read");
+      std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/false);
 
   SingleStreamDecoder* decoder =
       new SingleStreamDecoder(std::move(avioContextHolder), realSeek);
@@ -61,8 +61,8 @@ void encode_audio_to_file_like(
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
 
-  auto avioContextHolder = std::make_unique<AVIOFileLikeContext>(
-      file_like, /*neededMethod=*/"write");
+  auto avioContextHolder =
+      std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/true);
 
   AudioEncoder encoder(
       samples,

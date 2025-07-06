@@ -9,25 +9,29 @@
 
 namespace facebook::torchcodec {
 
-AVIOFileLikeContext::AVIOFileLikeContext(
-    py::object fileLike,
-    std::string_view neededMethod)
+AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike, bool isForWriting)
     : fileLike_{UniquePyObject(new py::object(fileLike))} {
   {
     // TODO: Is it necessary to acquire the GIL here? Is it maybe even
     // harmful? At the moment, this is only called from within a pybind
     // function, and pybind guarantees we have the GIL.
     py::gil_scoped_acquire gil;
-    TORCH_CHECK(
-        py::hasattr(fileLike, neededMethod.data()),
-        "File like object must implement a ",
-        neededMethod,
-        " method.");
+
+    if (isForWriting) {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "write"),
+          "File like object must implement a write method for writing.");
+    } else {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "read"),
+          "File like object must implement a read method for reading.");
+    }
+
     TORCH_CHECK(
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  createAVIOContext(&read, &write, &seek, &fileLike_);
+  createAVIOContext(&read, &write, &seek, &fileLike_, isForWriting);
 }
 
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
