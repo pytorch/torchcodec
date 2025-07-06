@@ -42,6 +42,8 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload Windows wheel
+    # TODO
+    # We shouldn't use this, but this is needed for now. Note that this is where we are setting the BUILD_AGAINST_ALL_FFMPEG_FROM_S3 variable currently, we'll have to find a way around that.
     uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
     with:
       repository: pytorch/torchcodec
@@ -57,6 +59,7 @@ jobs:
       trigger-event: ${{ github.event_name }}
       build-platform: "python-build-package"
       # build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 python -m build --wheel -vvv --no-isolation"
+      # TODO see comment above
       build-command: "python -m build --wheel -vvv --no-isolation"
 
   install-and-test:
