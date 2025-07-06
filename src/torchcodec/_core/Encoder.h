@@ -25,13 +25,13 @@ class AudioEncoder {
       const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
-      std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+      std::unique_ptr<AVIOToTensorContext> AVIOToTensorContext,
       const AudioStreamOptions& audioStreamOptions);
   AudioEncoder(
       const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
-      std::unique_ptr<AVIOFileLikeContext> avioContextHolder,
+      std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext,
       const AudioStreamOptions& audioStreamOptions);
   void encode();
   torch::Tensor encodeToTensor();
@@ -56,11 +56,8 @@ class AudioEncoder {
 
   const torch::Tensor samples_;
 
-  // Stores the AVIOContext for the output tensor buffer.
-  std::unique_ptr<AVIOToTensorContext> avioTensorContextHolder_;
-
-  // Stores the AVIOContext for file-like object output.
-  std::unique_ptr<AVIOFileLikeContext> avioFileLikeContextHolder_;
+  std::unique_ptr<AVIOToTensorContext> avioToTensorContext_;
+  std::unique_ptr<AVIOFileLikeContext> avioFileLikeContext_;
 
   bool encodeWasCalled_ = false;
 };

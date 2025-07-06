@@ -40,7 +40,7 @@ int64_t create_from_file_like(
   return reinterpret_cast<int64_t>(decoder);
 }
 
-int64_t encode_audio_to_file_like(
+void encode_audio_to_file_like(
     int64_t data_ptr,
     const std::vector<int64_t>& shape,
     int64_t sample_rate,
@@ -48,13 +48,14 @@ int64_t encode_audio_to_file_like(
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt) {
-  // Create tensor from existing data pointer (enforcing float32)
+  // We assume float32 *and* contiguity, this must be enforced by the caller.
   auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
   auto samples = torch::from_blob(
       reinterpret_cast<void*>(data_ptr), shape, tensor_options);
 
   // TODO Fix implicit int conversion:
   // https://github.com/pytorch/torchcodec/issues/679
+  // same for sample_rate parameter below
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
@@ -68,9 +69,6 @@ int64_t encode_audio_to_file_like(
       std::move(avioContextHolder),
       audioStreamOptions);
   encoder.encode();
-
-  // Return 0 to indicate success
-  return 0;
 }
 
 PYBIND11_MODULE(decoder_core_pybind_ops, m) {

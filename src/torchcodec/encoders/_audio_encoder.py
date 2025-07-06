@@ -110,8 +110,11 @@ class AudioEncoder:
         """Encode samples into a file-like object.
 
         Args:
-            file_like: A file-like object that supports write() and seek() methods,
-                such as io.BytesIO(), an open file in binary write mode, etc.
+            file_like: A file-like object that supports ``write()`` and
+                ``seek()`` methods, such as io.BytesIO(), an open file in binary
+                write mode, etc. Methods must have the following signature:
+                ``write(data: bytes) -> int`` and ``seek(offset: int, whence:
+                int = 0) -> int``.
             format (str): The format of the encoded samples, e.g. "mp3", "wav"
                 or "flac".
             bit_rate (int, optional): The output bit rate. Encoders typically
