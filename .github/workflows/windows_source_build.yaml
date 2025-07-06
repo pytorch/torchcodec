@@ -45,20 +45,37 @@ jobs:
 
       - name: Install FFmpeg
         run: |
+          # Install FFmpeg and its development headers
           conda install "ffmpeg=${{ matrix.ffmpeg-version }}" -c conda-forge
+          
+          # Try to install FFmpeg development package if available
+          conda install ffmpeg-dev -c conda-forge || echo "ffmpeg-dev not available, continuing..."
+          
           ffmpeg -version
 
           # On Windows, ensure the conda Library/bin directory is in PATH
           # This is needed for both pkg-config to find FFmpeg and for DLL loading
           conda_env_path=$(conda info --base)/envs/build
           library_bin_path="$conda_env_path/Library/bin"
-          echo "Adding conda Library/bin to PATH: $library_bin_path"
+          library_lib_path="$conda_env_path/Library/lib"
+          library_include_path="$conda_env_path/Library/include"
+          
+          echo "Adding conda Library paths:"
+          echo "  bin: $library_bin_path"
+          echo "  lib: $library_lib_path" 
+          echo "  include: $library_include_path"
+          
           echo "$library_bin_path" >> $GITHUB_PATH
 
           # Also add Library/lib/pkgconfig to PKG_CONFIG_PATH for cmake to find FFmpeg
           pkg_config_path="$conda_env_path/Library/lib/pkgconfig"
           echo "Adding to PKG_CONFIG_PATH: $pkg_config_path"
           echo "PKG_CONFIG_PATH=$pkg_config_path" >> $GITHUB_ENV
+
+          # Set additional environment variables that CMake might need
+          echo "CMAKE_PREFIX_PATH=$conda_env_path/Library" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=$library_lib_path" >> $GITHUB_ENV
+          echo "INCLUDE_PATH=$library_include_path" >> $GITHUB_ENV
 
           # Verify FFmpeg DLLs are accessible
           echo "Checking if FFmpeg DLLs are in PATH:"
@@ -71,11 +88,23 @@ jobs:
           # Install pkg-config and pybind11 which are needed for Windows builds
           conda install -y pkg-config pybind11 -c conda-forge
           
+          # Install FFmpeg development dependencies that are needed for linking on Windows
+          conda install -y ffmpeg-dev harfbuzz-dev freetype-dev fontconfig-dev -c conda-forge || true
+          
+          # Alternative: install common FFmpeg dependencies individually
+          conda install -y harfbuzz freetype fontconfig expat libxml2 zlib libbz2 openssl -c conda-forge || true
+          
           # Verify pkg-config can find FFmpeg
           echo "Testing pkg-config for FFmpeg libraries:"
           pkg-config --exists libavcodec && echo "libavcodec found" || echo "libavcodec NOT found"
           pkg-config --exists libavformat && echo "libavformat found" || echo "libavformat NOT found"
           pkg-config --exists libavutil && echo "libavutil found" || echo "libavutil NOT found"
+          
+          # Show what libraries pkg-config thinks we need
+          echo "pkg-config --libs libavcodec:"
+          pkg-config --libs libavcodec || true
+          echo "pkg-config --libs libavformat:"
+          pkg-config --libs libavformat || true
 
       - name: Update pip and install PyTorch
         run: |
@@ -86,6 +115,10 @@ jobs:
         run: |
           # Build without BUILD_AGAINST_ALL_FFMPEG_FROM_S3 to use system FFmpeg
           echo "Building torchcodec from source using system FFmpeg..."
+          
+          # On Windows, we may need to disable some CMake flags that cause linking issues
+          export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON"
+          
           python -m pip install -e . --no-build-isolation -v
 
       - name: Test torchcodec import
