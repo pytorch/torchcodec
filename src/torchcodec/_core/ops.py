@@ -176,8 +176,21 @@ def encode_audio_to_file_like(
     if samples.dtype != torch.float32:
         raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
 
-    samples = samples.contiguous()
+    # We're having the same problem as with the decoder's create_from_file_like:
+    # We should be able to pass a tensor directly, but this leads to a pybind
+    # error. In order to work around this, we pass the pointer to the tensor's
+    # data, and its shape, in order to re-construct it in C++. For this to work:
+    # - the tensor must be float32
+    # - the tensor  must be contiguous, which is why we call contiguous().
+    #   In theory we could avoid this restriction by also passing the strides?
+    # - IMPORTANT: the input samples tensor and its underlying data must be
+    #   alive during the call.
+    #
+    # A more elegant solution would be to cast the tensor into a py::object, but
+    # casting the py::object backk to a tensor in C++ seems to lead to the same
+    # pybing error.
 
+    samples = samples.contiguous()
     _pybind_ops.encode_audio_to_file_like(
         samples.data_ptr(),
         list(samples.shape),
