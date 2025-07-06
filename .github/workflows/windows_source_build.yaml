@@ -1,0 +1,103 @@
+name: Build and test Windows from source
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+    tags:
+        - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash -l -eo pipefail {0}
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+        ffmpeg-version: ['4.4.4', '5.1.4', '6.1.1', '7.0.1']
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+
+      - name: Setup conda env
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          miniconda-version: "latest"
+          activate-environment: build
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install FFmpeg
+        run: |
+          conda install "ffmpeg=${{ matrix.ffmpeg-version }}" -c conda-forge
+          ffmpeg -version
+
+          # On Windows, ensure the conda Library/bin directory is in PATH
+          # This is needed for both pkg-config to find FFmpeg and for DLL loading
+          conda_env_path=$(conda info --base)/envs/build
+          library_bin_path="$conda_env_path/Library/bin"
+          echo "Adding conda Library/bin to PATH: $library_bin_path"
+          echo "$library_bin_path" >> $GITHUB_PATH
+
+          # Also add Library/lib/pkgconfig to PKG_CONFIG_PATH for cmake to find FFmpeg
+          pkg_config_path="$conda_env_path/Library/lib/pkgconfig"
+          echo "Adding to PKG_CONFIG_PATH: $pkg_config_path"
+          echo "PKG_CONFIG_PATH=$pkg_config_path" >> $GITHUB_ENV
+
+          # Verify FFmpeg DLLs are accessible
+          echo "Checking if FFmpeg DLLs are in PATH:"
+          where avutil.dll || echo "avutil.dll not found in PATH"
+          where avcodec.dll || echo "avcodec.dll not found in PATH"
+          where avformat.dll || echo "avformat.dll not found in PATH"
+
+      - name: Install build dependencies
+        run: |
+          # Install pkg-config and pybind11 which are needed for Windows builds
+          conda install -y pkg-config pybind11 -c conda-forge
+          
+          # Verify pkg-config can find FFmpeg
+          echo "Testing pkg-config for FFmpeg libraries:"
+          pkg-config --exists libavcodec && echo "libavcodec found" || echo "libavcodec NOT found"
+          pkg-config --exists libavformat && echo "libavformat found" || echo "libavformat NOT found"
+          pkg-config --exists libavutil && echo "libavutil found" || echo "libavutil NOT found"
+
+      - name: Update pip and install PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - name: Build torchcodec from source
+        run: |
+          # Build without BUILD_AGAINST_ALL_FFMPEG_FROM_S3 to use system FFmpeg
+          echo "Building torchcodec from source using system FFmpeg..."
+          python -m pip install -e . --no-build-isolation -v
+
+      - name: Test torchcodec import
+        run: |
+          echo "Testing torchcodec import..."
+          python -c "import torchcodec; print('TorchCodec import successful!')"
+          python -c "import torchcodec; print('FFmpeg versions:', torchcodec.get_ffmpeg_library_versions())"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install numpy pytest pillow
+
+      - name: Run Python tests
+        run: |
+          pytest test -v
