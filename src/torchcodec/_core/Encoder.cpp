@@ -135,10 +135,10 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
-    std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+    std::unique_ptr<AVIOToTensorContext> avioToTensorContext,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
-      avioToTensorContext_(std::move(avioContextHolder)) {
+      avioToTensorContext_(std::move(avioToTensorContext)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -162,13 +162,12 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
-    std::unique_ptr<AVIOFileLikeContext> avioContextHolder,
+    std::unique_ptr<AVIOFileLikeContext> avioFileLikeContext,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
-      avioFileLikeContext_(std::move(avioContextHolder)) {
+      avioFileLikeContext_(std::move(avioFileLikeContext)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
-
   int status = avformat_alloc_output_context2(
       &avFormatContext, nullptr, formatName.data(), nullptr);
 

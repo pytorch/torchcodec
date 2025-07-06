@@ -21,19 +21,27 @@ class AudioEncoder {
       int sampleRate,
       std::string_view fileName,
       const AudioStreamOptions& audioStreamOptions);
+
+  // We need one constructor for each type of AVIOContextHolder. We can't have a
+  // single constructor that accepts the base AVIOContextHolder class and hold
+  // that as attribute, because we are calling the getOutputTensor() method on
+  // the AVIOToTensorContext, which is not available in the base class.
   AudioEncoder(
       const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOToTensorContext> AVIOToTensorContext,
       const AudioStreamOptions& audioStreamOptions);
+
   AudioEncoder(
       const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
       std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext,
       const AudioStreamOptions& audioStreamOptions);
+
   void encode();
+
   torch::Tensor encodeToTensor();
 
  private:
