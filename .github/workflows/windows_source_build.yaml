@@ -147,7 +147,12 @@ jobs:
           
           # On Windows, try to work around the dependency linking issues
           # by setting CMAKE_ARGS to use dynamic linking where possible
-          export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON"
+          conda_env_path=$(conda info --base)/envs/build
+          library_lib_path="$conda_env_path/Library/lib"
+          
+          export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_LIBRARY_PATH=$library_lib_path"
+          
+          echo "CMAKE_ARGS: $CMAKE_ARGS"
           
           # Try to create symlinks for missing .lib files if the DLLs exist
           conda_env_path=$(conda info --base)/envs/build
