@@ -213,7 +213,7 @@ function(make_torchcodec_libraries
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
-ibrary to prevent
+    )
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
