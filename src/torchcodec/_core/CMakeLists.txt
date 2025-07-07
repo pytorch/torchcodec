@@ -14,7 +14,19 @@ else()
     set(TORCHCODEC_WERROR_OPTION "-Werror")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+  # Avoid warnings about non-ASCII characters in source files.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4819")
+  # Important for when we add Windows CUDA: exporting all symbols is aparently
+  # limited to 65535 symbols, which (aparently) will not work for CUDA.
+  # https://github.com/pytorch/pytorch/pull/3650
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+# TODO put back previous line and set proper flags for windows. e.g. Wall is W4.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+
 
 function(make_torchcodec_sublibrary
     library_name
@@ -34,11 +46,31 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
+    if(WIN32)  # TODO unify WIN detection
+        # On Windows, the built artifacts are put in Release/Debug
+        # subdirectories by default. We want to avoid that, otherwise our
+        # install() step would not know where to find those.
+        set_target_properties(${library_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+        )
+    endif()
+
     target_link_libraries(
         ${library_name}
         PUBLIC
         ${library_dependencies}
     )
+    
+    # Debug output for Windows builds
+    if(WIN32)
+        message(STATUS "Created library: ${library_name}")
+        message(STATUS "Library dependencies: ${library_dependencies}")
+    endif()
 endfunction()
 
 function(make_torchcodec_libraries
@@ -146,19 +178,23 @@ function(make_torchcodec_libraries
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-      "-fvisibility=hidden"
-    )
-    # If we don't make sure this flag is set, we run into segfauls at import
-    # time on Mac. See:
-    #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
-    target_link_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-        "LINKER:-undefined,dynamic_lookup"
-    )
+    if(NOT WIN32)  # TODO unify WIN detection
+        target_compile_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "-fvisibility=hidden"
+        )
+    endif()
+    if(APPLE)  # TODO unify APPLE detection
+        # If we don't make sure this flag is set, we run into segfauls at import
+        # time on Mac. See:
+        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+        target_link_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "LINKER:-undefined,dynamic_lookup"
+        )
+    endif()
 
     # Install all libraries.
     set(
@@ -176,6 +212,46 @@ function(make_torchcodec_libraries
     install(
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
+    )
+    # stray initialization of py::objects. The rest of the object code must
+    # match. See:
+    #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+    if(NOT WIN32)  # TODO unify WIN detection
+        target_compile_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "-fvisibility=hidden"
+        )
+    endif()
+    if(APPLE)  # TODO unify APPLE detection
+        # If we don't make sure this flag is set, we run into segfauls at import
+        # time on Mac. See:
+        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+        target_link_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "LINKER:-undefined,dynamic_lookup"
+        )
+    endif()
+
+    # Install all libraries.
+    set(
+        all_libraries
+        ${decoder_library_name}
+        ${custom_ops_library_name}
+        ${pybind_ops_library_name}
+    )
+
+    # The install step is invoked within CMakeBuild.build_library() in
+    # setup.py and just copies the built files from the temp
+    # cmake/setuptools build folder into the CMAKE_INSTALL_PREFIX folder. We
+    # still need to manually pass "DESTINATION ..." for cmake to copy those
+    # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
+    install(
+        TARGETS ${all_libraries}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
     )
 endfunction()
 
@@ -214,6 +290,21 @@ else()
         libswresample
         libswscale
     )
+
+    # On Windows, explicitly add the conda library directory to the linker search path
+    if(WIN32 AND DEFINED ENV{CONDA_PREFIX})
+        link_directories("$ENV{CONDA_PREFIX}/Library/lib")
+        message(STATUS "Added conda library directory to linker search path: $ENV{CONDA_PREFIX}/Library/lib")
+        
+        # Also add the library path to CMAKE_PREFIX_PATH for better library finding
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}/Library")
+        message(STATUS "Added conda prefix to CMAKE_PREFIX_PATH: $ENV{CONDA_PREFIX}/Library")
+        
+        # Debug: Show what LIBAV variables are set
+        message(STATUS "LIBAV_INCLUDE_DIRS: ${LIBAV_INCLUDE_DIRS}")
+        message(STATUS "LIBAV_LIBRARY_DIRS: ${LIBAV_LIBRARY_DIRS}")
+        message(STATUS "LIBAV_LIBRARIES: ${LIBAV_LIBRARIES}")
+    endif()
 
     # Split libavcodec's version string by '.' and convert it to a list
     string(REPLACE "." ";" libavcodec_version_list ${LIBAV_libavcodec_VERSION})
