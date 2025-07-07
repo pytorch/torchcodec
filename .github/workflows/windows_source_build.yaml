@@ -45,7 +45,7 @@ jobs:
 
       - name: Install FFmpeg
         run: |
-          # Install FFmpeg and its development headers
+          # Install FFmpeg and try to get development packages
           conda install "ffmpeg=${{ matrix.ffmpeg-version }}" -c conda-forge --quiet
           
           ffmpeg -version
@@ -73,6 +73,10 @@ jobs:
           echo "CMAKE_PREFIX_PATH=$conda_env_path/Library" >> $GITHUB_ENV
           echo "LIBRARY_PATH=$library_lib_path" >> $GITHUB_ENV
           echo "INCLUDE_PATH=$library_include_path" >> $GITHUB_ENV
+          
+          # Add the Library/lib directory to the linker path for Visual Studio
+          echo "LIB=$library_lib_path;$LIB" >> $GITHUB_ENV
+          echo "LIBPATH=$library_lib_path;$LIBPATH" >> $GITHUB_ENV
 
           # Verify FFmpeg DLLs are accessible
           echo "Checking if FFmpeg DLLs are in PATH:"
@@ -85,6 +89,23 @@ jobs:
           # Install pkg-config and pybind11 which are needed for Windows builds
           conda install -y pkg-config pybind11 -c conda-forge --quiet
           
+          # Inspect what's actually in the Library directory
+          echo "Contents of Library/lib:"
+          ls -la "$CONDA_PREFIX/Library/lib/" | head -20
+          echo "Looking for harfbuzz files:"
+          find "$CONDA_PREFIX/Library/" -name "*harfbuzz*" 2>/dev/null || echo "No harfbuzz files found"
+          echo "Looking for freetype files:"
+          find "$CONDA_PREFIX/Library/" -name "*freetype*" 2>/dev/null || echo "No freetype files found"
+          
+          # Check if the .lib files exist with the exact names pkg-config expects
+          conda_env_path=$(conda info --base)/envs/build
+          library_lib_path="$conda_env_path/Library/lib"
+          
+          echo "Checking for specific .lib files in $library_lib_path:"
+          ls -la "$library_lib_path/harfbuzz.lib" 2>/dev/null || echo "harfbuzz.lib not found"
+          ls -la "$library_lib_path/freetype.lib" 2>/dev/null || echo "freetype.lib not found"
+          ls -la "$library_lib_path/"*harfbuzz* 2>/dev/null || echo "No harfbuzz files in lib"
+          ls -la "$library_lib_path/"*freetype* 2>/dev/null || echo "No freetype files in lib"
           
           # Verify pkg-config can find FFmpeg
           echo "Testing pkg-config for FFmpeg libraries:"
@@ -124,8 +145,23 @@ jobs:
           # Build without BUILD_AGAINST_ALL_FFMPEG_FROM_S3 to use system FFmpeg
           echo "Building torchcodec from source using system FFmpeg..."
           
-          # On Windows, we may need to disable some CMake flags that cause linking issues
+          # On Windows, try to work around the dependency linking issues
+          # by setting CMAKE_ARGS to use dynamic linking where possible
           export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON"
+          
+          # Try to create symlinks for missing .lib files if the DLLs exist
+          conda_env_path=$(conda info --base)/envs/build
+          library_lib_path="$conda_env_path/Library/lib"
+          library_bin_path="$conda_env_path/Library/bin"
+          
+          # Check if we can create import libraries from DLLs for missing dependencies
+          if [ ! -f "$library_lib_path/harfbuzz.lib" ] && [ -f "$library_bin_path/harfbuzz.dll" ]; then
+            echo "Attempting to create harfbuzz.lib from harfbuzz.dll"
+            # This is a workaround - we'll try to use lib.exe to create an import library
+            # lib.exe /def:harfbuzz.def /out:harfbuzz.lib /machine:x64
+            # But this requires a .def file which we don't have
+            echo "harfbuzz.lib missing but harfbuzz.dll exists"
+          fi
           
           python -m pip install -e . --no-build-isolation -v
 
