@@ -89,6 +89,10 @@ jobs:
           # Install pkg-config and pybind11 which are needed for Windows builds
           conda install -y pkg-config pybind11 -c conda-forge --quiet
           
+          # Try to install missing dependencies that FFmpeg might need
+          echo "Installing additional dependencies that might be missing..."
+          conda install -y harfbuzz freetype zlib bzip2 -c conda-forge --quiet || echo "Some dependencies might already be installed"
+          
           # Inspect what's actually in the Library directory
           echo "Contents of Library/lib:"
           ls -la "$CONDA_PREFIX/Library/lib/" | head -20
@@ -124,10 +128,10 @@ jobs:
           pkg-config --libs libavutil || true
 
           echo "pkg-config --libs libswscale:"
-          pkg-config --libs libswscale|| true
+          pkg-config --libs libswscale || true
 
-          pkg-config --libs libswresample|| true
           echo "pkg-config --libs libswresample:"
+          pkg-config --libs libswresample || true
 
           echo "pkg-config --libs libavfilter:"
           pkg-config --libs libavfilter || true
@@ -140,35 +144,59 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Build torchcodec from source
+      - name: Create Windows build script
         run: |
-          # Build without BUILD_AGAINST_ALL_FFMPEG_FROM_S3 to use system FFmpeg
-          echo "Building torchcodec from source using system FFmpeg..."
+          # Create a build script that sets up the VS environment and runs the build
+          cat > build_with_vs.bat << 'EOF'
+          @echo off
           
-          # On Windows, try to work around the dependency linking issues
-          # by setting CMAKE_ARGS to use dynamic linking where possible
-          conda_env_path=$(conda info --base)/envs/build
-          library_lib_path="$conda_env_path/Library/lib"
+          :: Get conda environment info
+          for /f "tokens=*" %%i in ('conda info --base') do set CONDA_BASE=%%i
+          set CONDA_ENV_PATH=%CONDA_BASE%\envs\build
+          set LIBRARY_LIB_PATH=%CONDA_ENV_PATH%\Library\lib
+          set LIBRARY_BIN_PATH=%CONDA_ENV_PATH%\Library\bin
+          set LIBRARY_INCLUDE_PATH=%CONDA_ENV_PATH%\Library\include
           
-          export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_LIBRARY_PATH=$library_lib_path"
+          :: Add conda Library/bin to PATH for DLL loading
+          set PATH=%LIBRARY_BIN_PATH%;%PATH%
           
-          echo "CMAKE_ARGS: $CMAKE_ARGS"
+          :: Set PKG_CONFIG_PATH
+          set PKG_CONFIG_PATH=%CONDA_ENV_PATH%\Library\lib\pkgconfig
           
-          # Try to create symlinks for missing .lib files if the DLLs exist
-          conda_env_path=$(conda info --base)/envs/build
-          library_lib_path="$conda_env_path/Library/lib"
-          library_bin_path="$conda_env_path/Library/bin"
+          :: Set additional paths for the linker
+          set LIB=%LIBRARY_LIB_PATH%;%LIB%
+          set LIBPATH=%LIBRARY_LIB_PATH%;%LIBPATH%
+          set INCLUDE=%LIBRARY_INCLUDE_PATH%;%INCLUDE%
           
-          # Check if we can create import libraries from DLLs for missing dependencies
-          if [ ! -f "$library_lib_path/harfbuzz.lib" ] && [ -f "$library_bin_path/harfbuzz.dll" ]; then
-            echo "Attempting to create harfbuzz.lib from harfbuzz.dll"
-            # This is a workaround - we'll try to use lib.exe to create an import library
-            # lib.exe /def:harfbuzz.def /out:harfbuzz.lib /machine:x64
-            # But this requires a .def file which we don't have
-            echo "harfbuzz.lib missing but harfbuzz.dll exists"
-          fi
+          :: Set CMAKE_ARGS with more comprehensive settings
+          set CMAKE_ARGS=-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_LIBRARY_PATH=%LIBRARY_LIB_PATH% -DCMAKE_INCLUDE_PATH=%LIBRARY_INCLUDE_PATH% -DCMAKE_PREFIX_PATH=%LIBRARY_LIB_PATH%;%LIBRARY_INCLUDE_PATH% -DCMAKE_VERBOSE_MAKEFILE=ON
           
-          python -m pip install -e . --no-build-isolation -v
+          echo Building with CMAKE_ARGS: %CMAKE_ARGS%
+          echo LIB path: %LIB%
+          echo PKG_CONFIG_PATH: %PKG_CONFIG_PATH%
+          echo PATH (first few entries): 
+          echo %PATH% | cut -d; -f1-3
+          
+          :: Debug: Show what libraries are available
+          echo Available .lib files in conda lib directory:
+          dir "%LIBRARY_LIB_PATH%\*.lib" 2>nul || echo No .lib files found
+          
+          :: Debug: Test pkg-config within the script
+          echo Testing pkg-config from within build script:
+          pkg-config --exists libavcodec && echo libavcodec found || echo libavcodec NOT found
+          
+          :: Use vc_env_helper.bat to set up VS environment and build
+          call packaging\vc_env_helper.bat python -m pip install -e . --no-build-isolation -v
+          EOF
+
+      - name: Verify Visual Studio environment and build
+        shell: cmd
+        run: |
+          echo Checking Visual Studio installation...
+          call packaging\vc_env_helper.bat echo Visual Studio environment setup complete
+          
+          echo Running build with Visual Studio environment...
+          call build_with_vs.bat
 
       - name: Test torchcodec import
         run: |
