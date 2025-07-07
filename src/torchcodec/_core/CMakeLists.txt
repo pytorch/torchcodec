@@ -66,6 +66,7 @@ function(make_torchcodec_libraries
     set(decoder_sources
         AVIOContextHolder.cpp
         AVIOTensorContext.cpp
+        AVIOFileLikeContext.cpp
         FFMPEGCommon.cpp
         Frame.cpp
         DeviceInterface.cpp
@@ -141,15 +142,6 @@ function(make_torchcodec_libraries
                # a Python module on Mac.
         "${pybind_ops_sources}"
         "${pybind_ops_dependencies}"
-    )
-    # pybind11 limits the visibility of symbols in the shared library to prevent
-    # stray initialization of py::objects. The rest of the object code must
-    # match. See:
-    #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-      "-fvisibility=hidden"
     )
     # If we don't make sure this flag is set, we run into segfauls at import
     # time on Mac. See:

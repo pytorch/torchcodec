@@ -1,5 +1,6 @@
 #pragma once
 #include <torch/types.h>
+#include "src/torchcodec/_core/AVIOFileLikeContext.h"
 #include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/StreamOptions.h"
@@ -20,13 +21,27 @@ class AudioEncoder {
       int sampleRate,
       std::string_view fileName,
       const AudioStreamOptions& audioStreamOptions);
+
+  // We need one constructor for each type of AVIOContextHolder. We can't have a
+  // single constructor that accepts the base AVIOContextHolder class and hold
+  // that as attribute, because we are calling the getOutputTensor() method on
+  // the AVIOToTensorContext, which is not available in the base class.
   AudioEncoder(
       const torch::Tensor& samples,
       int sampleRate,
       std::string_view formatName,
-      std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+      std::unique_ptr<AVIOToTensorContext> AVIOToTensorContext,
       const AudioStreamOptions& audioStreamOptions);
+
+  AudioEncoder(
+      const torch::Tensor& samples,
+      int sampleRate,
+      std::string_view formatName,
+      std::unique_ptr<AVIOFileLikeContext> AVIOFileLikeContext,
+      const AudioStreamOptions& audioStreamOptions);
+
   void encode();
+
   torch::Tensor encodeToTensor();
 
  private:
@@ -49,8 +64,8 @@ class AudioEncoder {
 
   const torch::Tensor samples_;
 
-  // Stores the AVIOContext for the output tensor buffer.
-  std::unique_ptr<AVIOToTensorContext> avioContextHolder_;
+  std::unique_ptr<AVIOToTensorContext> avioToTensorContext_;
+  std::unique_ptr<AVIOFileLikeContext> avioFileLikeContext_;
 
   bool encodeWasCalled_ = false;
 };
