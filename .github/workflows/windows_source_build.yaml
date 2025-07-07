@@ -46,10 +46,10 @@ jobs:
       - name: Install FFmpeg
         run: |
           # Install FFmpeg and its development headers
-          conda install "ffmpeg=${{ matrix.ffmpeg-version }}" -c conda-forge
+          conda install "ffmpeg=${{ matrix.ffmpeg-version }}" -c conda-forge --quiet
           
           # Try to install FFmpeg development package if available
-          conda install ffmpeg-dev -c conda-forge || echo "ffmpeg-dev not available, continuing..."
+          conda install ffmpeg-dev -c conda-forge --quiet || echo "ffmpeg-dev not available, continuing..."
           
           ffmpeg -version
 
@@ -86,13 +86,13 @@ jobs:
       - name: Install build dependencies
         run: |
           # Install pkg-config and pybind11 which are needed for Windows builds
-          conda install -y pkg-config pybind11 -c conda-forge
+          conda install -y pkg-config pybind11 -c conda-forge --quiet
           
           # Install FFmpeg development dependencies that are needed for linking on Windows
-          conda install -y ffmpeg-dev harfbuzz-dev freetype-dev fontconfig-dev -c conda-forge || true
+          conda install -y ffmpeg-dev harfbuzz-dev freetype-dev fontconfig-dev -c conda-forge --quiet || true
           
           # Alternative: install common FFmpeg dependencies individually
-          conda install -y harfbuzz freetype fontconfig expat libxml2 zlib libbz2 openssl -c conda-forge || true
+          conda install -y harfbuzz freetype fontconfig expat libxml2 zlib libbz2 openssl -c conda-forge --quiet || true
           
           # Verify pkg-config can find FFmpeg
           echo "Testing pkg-config for FFmpeg libraries:"
