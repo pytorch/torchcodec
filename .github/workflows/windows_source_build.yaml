@@ -144,59 +144,42 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Create Windows build script
-        run: |
-          # Create a build script that sets up the VS environment and runs the build
-          cat > build_with_vs.bat << 'EOF'
-          @echo off
-          
-          :: Get conda environment info
-          for /f "tokens=*" %%i in ('conda info --base') do set CONDA_BASE=%%i
-          set CONDA_ENV_PATH=%CONDA_BASE%\envs\build
-          set LIBRARY_LIB_PATH=%CONDA_ENV_PATH%\Library\lib
-          set LIBRARY_BIN_PATH=%CONDA_ENV_PATH%\Library\bin
-          set LIBRARY_INCLUDE_PATH=%CONDA_ENV_PATH%\Library\include
-          
-          :: Add conda Library/bin to PATH for DLL loading
-          set PATH=%LIBRARY_BIN_PATH%;%PATH%
-          
-          :: Set PKG_CONFIG_PATH
-          set PKG_CONFIG_PATH=%CONDA_ENV_PATH%\Library\lib\pkgconfig
-          
-          :: Set additional paths for the linker
-          set LIB=%LIBRARY_LIB_PATH%;%LIB%
-          set LIBPATH=%LIBRARY_LIB_PATH%;%LIBPATH%
-          set INCLUDE=%LIBRARY_INCLUDE_PATH%;%INCLUDE%
-          
-          :: Set CMAKE_ARGS with more comprehensive settings
-          set CMAKE_ARGS=-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_LIBRARY_PATH=%LIBRARY_LIB_PATH% -DCMAKE_INCLUDE_PATH=%LIBRARY_INCLUDE_PATH% -DCMAKE_PREFIX_PATH=%LIBRARY_LIB_PATH%;%LIBRARY_INCLUDE_PATH% -DCMAKE_VERBOSE_MAKEFILE=ON
-          
-          echo Building with CMAKE_ARGS: %CMAKE_ARGS%
-          echo LIB path: %LIB%
-          echo PKG_CONFIG_PATH: %PKG_CONFIG_PATH%
-          echo PATH (first few entries): 
-          echo %PATH% | cut -d; -f1-3
-          
-          :: Debug: Show what libraries are available
-          echo Available .lib files in conda lib directory:
-          dir "%LIBRARY_LIB_PATH%\*.lib" 2>nul || echo No .lib files found
-          
-          :: Debug: Test pkg-config within the script
-          echo Testing pkg-config from within build script:
-          pkg-config --exists libavcodec && echo libavcodec found || echo libavcodec NOT found
-          
-          :: Use vc_env_helper.bat to set up VS environment and build
-          call packaging\vc_env_helper.bat python -m pip install -e . --no-build-isolation -v
-          EOF
+      - name: Setup Visual Studio environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-      - name: Verify Visual Studio environment and build
-        shell: cmd
+      - name: Build torchcodec from source
         run: |
-          echo Checking Visual Studio installation...
-          call packaging\vc_env_helper.bat echo Visual Studio environment setup complete
+          # Build without BUILD_AGAINST_ALL_FFMPEG_FROM_S3 to use system FFmpeg
+          echo "Building torchcodec from source using system FFmpeg..."
           
-          echo Running build with Visual Studio environment...
-          call build_with_vs.bat
+          # Verify that torch is available
+          python -c "import torch; print('PyTorch found:', torch.__version__)"
+          
+          # Set up environment variables for the build
+          conda_env_path=$(conda info --base)/envs/build
+          library_lib_path="$conda_env_path/Library/lib"
+          library_bin_path="$conda_env_path/Library/bin"
+          library_include_path="$conda_env_path/Library/include"
+          
+          # Set CMAKE_ARGS with proper library paths
+          export CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_LIBRARY_PATH=$library_lib_path -DCMAKE_INCLUDE_PATH=$library_include_path -DCMAKE_PREFIX_PATH=$library_lib_path;$library_include_path -DCMAKE_VERBOSE_MAKEFILE=ON"
+          
+          echo "CMAKE_ARGS: $CMAKE_ARGS"
+          echo "Python executable: $(which python)"
+          echo "Conda environment: $CONDA_PREFIX"
+          
+          # Debug: Show what libraries are available
+          echo "Available .lib files in conda lib directory:"
+          ls -la "$library_lib_path"/*.lib 2>/dev/null || echo "No .lib files found"
+          
+          # Debug: Test that torch is still available
+          echo "Testing PyTorch availability:"
+          python -c "import torch; print('PyTorch version:', torch.__version__)"
+          
+          # Build using pip install with the current conda environment
+          python -m pip install -e . --no-build-isolation -v
 
       - name: Test torchcodec import
         run: |
