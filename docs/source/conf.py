@@ -176,7 +176,7 @@ todo_include_todos = True
 html_theme = "pytorch_sphinx_theme2"
 html_theme_path = [pytorch_sphinx_theme2.get_html_theme_path()]
 
-ogp_site_url = "http://pytorch.org/<your-sub-site>"
+ogp_site_url = "http://pytorch.org/torchcodec"
 ogp_image = "https://pytorch.org/assets/images/social-share.jpg"
 
 
@@ -227,8 +227,8 @@ html_context = {
     "display_github": True,
     "github_url": "https://github.com",
     "github_user": "pytorch",
-    "github_repo": "<your-repo>",
-    "feedback_url": "https://github.com/pytorch/<path-to-your-repo>",
+    "github_repo": "torchcodec",
+    "feedback_url": "https://github.com/pytorch/torchcodec",
     "github_version": "main",
     "doc_path": "docs/source",
     "library_links": theme_variables.get("library_links", []),
