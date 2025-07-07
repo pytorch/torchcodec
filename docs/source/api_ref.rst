@@ -28,8 +28,8 @@ torchcodec.decoders
 .. currentmodule:: torchcodec.decoders
 
 
-For a video decoder tutorial, see: :ref:`sphx_glr_generated_examples_basic_example.py`.
-For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_audio_decoding.py`.
+For a video decoder tutorial, see: :ref:`sphx_glr_generated_examples_decoding_basic_example.py`.
+For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_decoding_audio_decoding.py`.
 
 
 .. autosummary::
@@ -49,6 +49,25 @@ For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_audio_deco
     VideoStreamMetadata
     AudioStreamMetadata
 
+.. _encoders:
+
+torchcodec.encoders
+-------------------
+
+.. currentmodule:: torchcodec.encoders
+
+
+For an audio decoder tutorial, see: :ref:`sphx_glr_generated_examples_encoding_audio_encoding.py`.
+
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+    :template: class.rst
+
+    AudioEncoder
+
+
 .. _samplers:
 
 torchcodec.samplers
@@ -57,7 +76,7 @@ torchcodec.samplers
 
 .. currentmodule:: torchcodec.samplers
 
-For a tutorial, see: :ref:`sphx_glr_generated_examples_sampling.py`.
+For a tutorial, see: :ref:`sphx_glr_generated_examples_decoding_sampling.py`.
 
 .. autosummary::
     :toctree: generated/

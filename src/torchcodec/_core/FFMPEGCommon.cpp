@@ -274,6 +274,7 @@ UniqueAVFrame convertAudioAVFrameSamples(
       convertedAVFrame,
       "Could not allocate frame for sample format conversion.");
 
+  convertedAVFrame->pts = srcAVFrame->pts;
   convertedAVFrame->format = static_cast<int>(outSampleFormat);
 
   convertedAVFrame->sample_rate = outSampleRate;
