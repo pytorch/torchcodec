@@ -98,7 +98,11 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
 
 } // namespace
 
-AudioEncoder::~AudioEncoder() {}
+AudioEncoder::~AudioEncoder() {
+  if (avFormatContext_ && avFormatContext_->pb && !avioContextHolder_) {
+    avio_close(avFormatContext_->pb);
+  }
+}
 
 AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
