@@ -95,11 +95,8 @@ class AudioEncoder {
 // │                         - num channels                                                   │
 // │                         - format                                                         │
 // │                         - sample rate                                                    │
-// │                        If sample rate,                                                   │
-// │                        stores data in                                                    │
-// │                        swr buffers                                                       │
-// │                        which will need                                                   │
-// │                        to be flushed                                                     │
+// │                        If sample rate is converted, stores data in swr buffers,          │
+// │                        which will need to be flushed by maybeFlushSwrBuffers()           │
 // │                                                                                          │
 // │                               ▲                                                          │
 // │                               │                 ┌─EncodeFrameThroughFifo()──────────────┐│
@@ -114,7 +111,10 @@ class AudioEncoder {
 // └──────────────────────────────────────────────┼──────────────────────┼────────────────────┘
 //                                                │                      │
 //  AVFrame from  maybeFlushSwrBuffers()       ───┘                      │
-//  Only if sample rate conversion was needed
-//                                                                 nullptr, to flush
-//                                                                 FFmpeg buffers
+//  Only if sample rate conversion was needed                       nullptr, to flush
+//  The call to maybeFlushSwrBuffers() will                         FFmpeg buffers
+//  also instruct to flush the FIFO, if it exists.
+//
+//
+//
 /* clang-format on */
