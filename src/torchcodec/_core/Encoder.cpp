@@ -351,7 +351,10 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
 void AudioEncoder::encodeFrameThroughFifo(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame,
-    bool andFlushFifo) {
+    // flushFifo is only set to true in maybeFlushSwrBuffers(), i.e. at the very
+    // end of the encoding process when we're flushing buffers. We also want to
+    // flush the FIFO so as to not leave any remaining samples in it.
+    bool flushFifo) {
   if (avAudioFifo_ == nullptr) {
     encodeFrame(autoAVPacket, avFrame);
     return;
@@ -373,8 +376,20 @@ void AudioEncoder::encodeFrameThroughFifo(
       outNumChannels_,
       avCodecContext_->sample_fmt);
 
+  // Explaining the while bound:
+  // - if we're not flushing the FIFO, i.e. in most cases, we want to pull
+  //   exactly `frame_size` samples from the FIFO, so we have to stop before it
+  //   contains less than `frame_size` samples.
+  // - if we're flushing the FIFO, we want to read from the FIFO until the very
+  //   last sample it contains.
+  //
+  // In both cases, for as long as we can, we're trying to pull exatly
+  // `frame_size` samples from the FIFO and send each `frame_size`-sized avFrame
+  // to encodeFrame(). Only the very last avFrame of the encoding process is
+  // allowed to contained less than frame_size samples. That only happens when
+  // flushFifo is true.
   while (av_audio_fifo_size(avAudioFifo_.get()) >=
-         (andFlushFifo ? 1 : avCodecContext_->frame_size)) {
+         (flushFifo ? 1 : avCodecContext_->frame_size)) {
     int samplesToRead = std::min(
         av_audio_fifo_size(avAudioFifo_.get()), newavFrame->nb_samples);
     int numSamplesRead = av_audio_fifo_read(
@@ -466,7 +481,9 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
       swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
   avFrame->nb_samples = actualNumRemainingSamples;
 
-  encodeFrameThroughFifo(autoAVPacket, avFrame, /*andFlushFifo=*/true);
+  // We're potentially sending avFrame through the FIFO (if it exists), in which
+  // case we also want to flush the FIFO itself.
+  encodeFrameThroughFifo(autoAVPacket, avFrame, /*flushFifo=*/true);
 }
 
 void AudioEncoder::flushBuffers() {

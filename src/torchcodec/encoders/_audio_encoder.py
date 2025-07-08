@@ -16,7 +16,7 @@ class AudioEncoder:
             which case ``num_channels = 1`` is assumed. Values must be float
             values in ``[-1, 1]``.
         sample_rate (int): The sample rate of the **input** ``samples``. The
-            sample rate of the necoded output can be specified using the
+            sample rate of the encoded output can be specified using the
             encoding methods (``to_file``, etc.).
     """
 

@@ -29,7 +29,7 @@ class AudioEncoder {
   void encodeFrameThroughFifo(
       AutoAVPacket& autoAVPacket,
       const UniqueAVFrame& avFrame,
-      bool andFlushFifo = false);
+      bool flushFifo = false);
   void encodeFrame(AutoAVPacket& autoAVPacket, const UniqueAVFrame& avFrame);
   void maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket);
   void flushBuffers();
@@ -80,6 +80,15 @@ class AudioEncoder {
 //  - the encoder expects a specific number of samples per AVFrame (fixed frame size)
 //    This is not the case for all encoders, e.g. WAV doesn't care about frame size.
 //
+// Also, the FIFO is either:
+// - used for every single frame during the encoding process, or
+// - not used at all.
+// There is no scenario where a given Encoder() instance would sometimes use a
+// FIFO, sometimes not.
+//
+// Drawing made with https://asciiflow.com/, can be copy/pasted there if it
+// needs editing:
+//
 // ┌─One─iteration─of─main─encoding─loop─(encode())───────────────────────────────────────────┐
 // │                                                                                          │
 // │                        Converts:                                                         │
@@ -95,12 +104,12 @@ class AudioEncoder {
 // │                               ▲                                                          │
 // │                               │                 ┌─EncodeFrameThroughFifo()──────────────┐│
 // │                               │                 │                                       ││
-// │    AVFrame  ──────►  MaybeConvertAVFrame()───▲──│─┬──────────────┬──▲────►encodeFrame() ││
+// │    AVFrame  ──────►  MaybeConvertAVFrame()───▲──│─┬──► NO FIFO ─►┬──▲────►encodeFrame() ││
 // │    with                                      │  │ │              │  │                   ││
 // │    input                                     │  │ │              │  │                   ││
 // │    samples                                   │  │ │              │  │                   ││
 // │                                              │  │ │              │  │                   ││
-// │                                              │  │ └────► FIFO ───┘  │                   ││
+// │                                              │  │ └────► FIFO ─►─┘  │                   ││
 // │                                              │  └───────────────────┼───────────────────┘│
 // └──────────────────────────────────────────────┼──────────────────────┼────────────────────┘
 //                                                │                      │
