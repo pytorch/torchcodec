@@ -151,6 +151,12 @@ function(make_torchcodec_libraries
         PUBLIC
       "-fvisibility=hidden"
     )
+    # TODO: comment explaining this
+    target_compile_definitions(
+        ${pybind_ops_library_name}
+        PRIVATE
+        PYBIND_OPS_MODULE_NAME=decoder_core_pybind_ops
+    )
     # If we don't make sure this flag is set, we run into segfauls at import
     # time on Mac. See:
     #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
