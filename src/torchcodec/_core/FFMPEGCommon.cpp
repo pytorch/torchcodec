@@ -210,6 +210,33 @@ void setChannelLayout(
 #endif
 }
 
+UniqueAVFrame allocateAVFrame(
+    int numSamples,
+    int sampleRate,
+    int numChannels,
+    AVSampleFormat sampleFormat) {
+  auto avFrame = UniqueAVFrame(av_frame_alloc());
+  TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
+
+  avFrame->nb_samples = numSamples;
+  avFrame->sample_rate = sampleRate;
+  setDefaultChannelLayout(avFrame, numChannels);
+  avFrame->format = sampleFormat;
+  auto status = av_frame_get_buffer(avFrame.get(), 0);
+
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't allocate avFrame's buffers: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  status = av_frame_make_writable(avFrame.get());
+  TORCH_CHECK(
+      status == AVSUCCESS,
+      "Couldn't make AVFrame writable: ",
+      getFFMPEGErrorStringFromErrorCode(status));
+  return avFrame;
+}
+
 SwrContext* createSwrContext(
     AVSampleFormat srcSampleFormat,
     AVSampleFormat outSampleFormat,

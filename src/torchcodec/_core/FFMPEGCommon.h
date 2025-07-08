@@ -15,6 +15,7 @@ extern "C" {
 #include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
+#include <libavutil/audio_fifo.h>
 #include <libavutil/avutil.h>
 #include <libavutil/dict.h>
 #include <libavutil/display.h>
@@ -73,6 +74,8 @@ using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
 using UniqueSwrContext =
     std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
+using UniqueAVAudioFifo = std::
+    unique_ptr<AVAudioFifo, Deleter<AVAudioFifo, void, av_audio_fifo_free>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
@@ -159,6 +162,12 @@ void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
     const UniqueAVFrame& srcAVFrame,
     int desiredNumChannels);
+
+UniqueAVFrame allocateAVFrame(
+    int numSamples,
+    int sampleRate,
+    int numChannels,
+    AVSampleFormat sampleFormat);
 
 SwrContext* createSwrContext(
     AVSampleFormat srcSampleFormat,
