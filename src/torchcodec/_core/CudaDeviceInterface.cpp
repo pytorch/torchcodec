@@ -6,7 +6,6 @@
 
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>
@@ -16,7 +15,7 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-bool g_cuda =
+static bool g_cuda =
     registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
       return new CudaDeviceInterface(device);
     });
@@ -166,9 +165,9 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
-  if (device_.type() != torch::kCUDA) {
-    throw std::runtime_error("Unsupported device: " + device_.str());
-  }
+  TORCH_CHECK(g_cuda, "CudaDeviceInterface was not registered!");
+  TORCH_CHECK(
+      device_.type() == torch::kCUDA, "Unsupported device: ", device_.str());
 }
 
 CudaDeviceInterface::~CudaDeviceInterface() {
@@ -193,6 +192,7 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {

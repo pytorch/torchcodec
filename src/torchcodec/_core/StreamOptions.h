@@ -43,6 +43,10 @@ struct VideoStreamOptions {
 struct AudioStreamOptions {
   AudioStreamOptions() {}
 
+  // Encoding only
+  std::optional<int> bitRate;
+  // Decoding and encoding:
+  std::optional<int> numChannels;
   std::optional<int> sampleRate;
 };
 

@@ -26,7 +26,8 @@ class AudioDecoder:
     Returned samples are float samples normalized in [-1, 1]
 
     Args:
-        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like object): The source of the video:
+        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like
+            object): The source of the video or audio:
 
             - If ``str``: a local path or a URL to a video or audio file.
             - If ``Pathlib.path``: a path to a local video or audio file.
@@ -34,12 +35,14 @@ class AudioDecoder:
             - If file-like object: we read video data from the object on demand. The object must
               expose the methods `read(self, size: int) -> bytes` and
               `seek(self, offset: int, whence: int) -> bytes`. Read more in:
-              :ref:`sphx_glr_generated_examples_file_like.py`.
+              :ref:`sphx_glr_generated_examples_decoding_file_like.py`.
         stream_index (int, optional): Specifies which stream in the file to decode samples from.
             Note that this index is absolute across all media types. If left unspecified, then
             the :term:`best stream` is used.
         sample_rate (int, optional): The desired output sample rate of the decoded samples.
-            By default, the samples are returned in their original sample rate.
+            By default, the sample rate of the source is used.
+        num_channels (int, optional): The desired number of channels of the decoded samples.
+            By default, the number of channels of the source is used.
 
     Attributes:
         metadata (AudioStreamMetadata): Metadata of the audio stream.
@@ -54,11 +57,15 @@ class AudioDecoder:
         *,
         stream_index: Optional[int] = None,
         sample_rate: Optional[int] = None,
+        num_channels: Optional[int] = None,
     ):
         self._decoder = create_decoder(source=source, seek_mode="approximate")
 
         core.add_audio_stream(
-            self._decoder, stream_index=stream_index, sample_rate=sample_rate
+            self._decoder,
+            stream_index=stream_index,
+            sample_rate=sample_rate,
+            num_channels=num_channels,
         )
 
         container_metadata = core.get_container_metadata(self._decoder)

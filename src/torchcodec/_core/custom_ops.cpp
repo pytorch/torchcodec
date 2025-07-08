@@ -10,7 +10,7 @@
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
@@ -29,9 +29,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "torchcodec._core.ops", "//pytorch/torchcodec:torchcodec");
   m.def("create_from_file(str filename, str? seek_mode=None) -> Tensor");
   m.def(
-      "encode_audio_to_file(Tensor wf, int sample_rate, str filename, int? bit_rate=None) -> ()");
+      "encode_audio_to_file(Tensor samples, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> ()");
   m.def(
-      "encode_audio_to_tensor(Tensor wf, int sample_rate, str format, int? bit_rate=None) -> Tensor");
+      "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
@@ -40,7 +40,7 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
   m.def(
-      "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None) -> ()");
+      "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None, int? num_channels=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
   m.def("get_next_frame(Tensor(a!) decoder) -> (Tensor, Tensor, Tensor)");
   m.def(
@@ -196,15 +196,13 @@ at::Tensor create_from_tensor(
   TORCH_CHECK(
       video_tensor.scalar_type() == torch::kUInt8,
       "video_tensor must be kUInt8");
-  void* data = video_tensor.mutable_data_ptr();
-  size_t length = video_tensor.numel();
 
   SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOBytesContext>(data, length);
+  auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
@@ -245,8 +243,10 @@ void _add_video_stream(
       videoStreamOptions.colorConversionLibrary =
           ColorConversionLibrary::SWSCALE;
     } else {
-      throw std::runtime_error(
-          "Invalid color_conversion_library=" + stdColorConversionLibrary +
+      TORCH_CHECK(
+          false,
+          "Invalid color_conversion_library=",
+          stdColorConversionLibrary,
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
@@ -280,9 +280,11 @@ void add_video_stream(
 void add_audio_stream(
     at::Tensor& decoder,
     std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<int64_t> sample_rate = std::nullopt) {
+    std::optional<int64_t> sample_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt) {
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.sampleRate = sample_rate;
+  audioStreamOptions.numChannels = num_channels;
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addAudioStream(stream_index.value_or(-1), audioStreamOptions);
@@ -386,26 +388,43 @@ OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
 }
 
 void encode_audio_to_file(
-    const at::Tensor wf,
+    const at::Tensor& samples,
     int64_t sample_rate,
     std::string_view file_name,
-    std::optional<int64_t> bit_rate = std::nullopt) {
-  AudioEncoder(wf, validateSampleRate(sample_rate), file_name, bit_rate)
+    std::optional<int64_t> bit_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
+  // TODO Fix implicit int conversion:
+  // https://github.com/pytorch/torchcodec/issues/679
+  AudioStreamOptions audioStreamOptions;
+  audioStreamOptions.bitRate = bit_rate;
+  audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
+  AudioEncoder(
+      samples, validateSampleRate(sample_rate), file_name, audioStreamOptions)
       .encode();
 }
 
 at::Tensor encode_audio_to_tensor(
-    const at::Tensor wf,
+    const at::Tensor& samples,
     int64_t sample_rate,
     std::string_view format,
-    std::optional<int64_t> bit_rate = std::nullopt) {
+    std::optional<int64_t> bit_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
   auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
+  // TODO Fix implicit int conversion:
+  // https://github.com/pytorch/torchcodec/issues/679
+  AudioStreamOptions audioStreamOptions;
+  audioStreamOptions.bitRate = bit_rate;
+  audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
   return AudioEncoder(
-             wf,
+             samples,
              validateSampleRate(sample_rate),
              format,
              std::move(avioContextHolder),
-             bit_rate)
+             audioStreamOptions)
       .encodeToTensor();
 }
 
@@ -441,18 +460,20 @@ std::string get_json_metadata(at::Tensor& decoder) {
 
   std::map<std::string, std::string> metadataMap;
   // serialize the metadata into a string std::stringstream ss;
-  double durationSeconds = 0;
+  double durationSecondsFromHeader = 0;
   if (maybeBestVideoStreamIndex.has_value() &&
       videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
-          .durationSeconds.has_value()) {
-    durationSeconds =
+          .durationSecondsFromHeader.has_value()) {
+    durationSecondsFromHeader =
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex]
-            .durationSeconds.value_or(0);
+            .durationSecondsFromHeader.value_or(0);
   } else {
     // Fallback to container-level duration if stream duration is not found.
-    durationSeconds = videoMetadata.durationSeconds.value_or(0);
+    durationSecondsFromHeader =
+        videoMetadata.durationSecondsFromHeader.value_or(0);
   }
-  metadataMap["durationSeconds"] = std::to_string(durationSeconds);
+  metadataMap["durationSecondsFromHeader"] =
+      std::to_string(durationSecondsFromHeader);
 
   if (videoMetadata.bitRate.has_value()) {
     metadataMap["bitRate"] = std::to_string(videoMetadata.bitRate.value());
@@ -461,19 +482,20 @@ std::string get_json_metadata(at::Tensor& decoder) {
   if (maybeBestVideoStreamIndex.has_value()) {
     auto streamMetadata =
         videoMetadata.allStreamMetadata[*maybeBestVideoStreamIndex];
-    if (streamMetadata.numFramesFromScan.has_value()) {
-      metadataMap["numFrames"] =
-          std::to_string(*streamMetadata.numFramesFromScan);
-    } else if (streamMetadata.numFrames.has_value()) {
-      metadataMap["numFrames"] = std::to_string(*streamMetadata.numFrames);
+    if (streamMetadata.numFramesFromContent.has_value()) {
+      metadataMap["numFramesFromHeader"] =
+          std::to_string(*streamMetadata.numFramesFromContent);
+    } else if (streamMetadata.numFramesFromHeader.has_value()) {
+      metadataMap["numFramesFromHeader"] =
+          std::to_string(*streamMetadata.numFramesFromHeader);
     }
-    if (streamMetadata.minPtsSecondsFromScan.has_value()) {
-      metadataMap["minPtsSecondsFromScan"] =
-          std::to_string(*streamMetadata.minPtsSecondsFromScan);
+    if (streamMetadata.beginStreamPtsSecondsFromContent.has_value()) {
+      metadataMap["beginStreamSecondsFromContent"] =
+          std::to_string(*streamMetadata.beginStreamPtsSecondsFromContent);
     }
-    if (streamMetadata.maxPtsSecondsFromScan.has_value()) {
-      metadataMap["maxPtsSecondsFromScan"] =
-          std::to_string(*streamMetadata.maxPtsSecondsFromScan);
+    if (streamMetadata.endStreamPtsSecondsFromContent.has_value()) {
+      metadataMap["endStreamSecondsFromContent"] =
+          std::to_string(*streamMetadata.endStreamPtsSecondsFromContent);
     }
     if (streamMetadata.codecName.has_value()) {
       metadataMap["codec"] = quoteValue(streamMetadata.codecName.value());
@@ -484,8 +506,9 @@ std::string get_json_metadata(at::Tensor& decoder) {
     if (streamMetadata.height.has_value()) {
       metadataMap["height"] = std::to_string(*streamMetadata.height);
     }
-    if (streamMetadata.averageFps.has_value()) {
-      metadataMap["averageFps"] = std::to_string(*streamMetadata.averageFps);
+    if (streamMetadata.averageFpsFromHeader.has_value()) {
+      metadataMap["averageFpsFromHeader"] =
+          std::to_string(*streamMetadata.averageFpsFromHeader);
     }
   }
   if (videoMetadata.bestVideoStreamIndex.has_value()) {
@@ -508,8 +531,9 @@ std::string get_container_json_metadata(at::Tensor& decoder) {
 
   std::map<std::string, std::string> map;
 
-  if (containerMetadata.durationSeconds.has_value()) {
-    map["durationSeconds"] = std::to_string(*containerMetadata.durationSeconds);
+  if (containerMetadata.durationSecondsFromHeader.has_value()) {
+    map["durationSecondsFromHeader"] =
+        std::to_string(*containerMetadata.durationSecondsFromHeader);
   }
 
   if (containerMetadata.bitRate.has_value()) {
@@ -543,34 +567,37 @@ std::string get_stream_json_metadata(
     throw std::out_of_range(
         "stream_index out of bounds: " + std::to_string(stream_index));
   }
+
   auto streamMetadata = allStreamMetadata[stream_index];
 
   std::map<std::string, std::string> map;
 
-  if (streamMetadata.durationSeconds.has_value()) {
-    map["durationSeconds"] = std::to_string(*streamMetadata.durationSeconds);
+  if (streamMetadata.durationSecondsFromHeader.has_value()) {
+    map["durationSecondsFromHeader"] =
+        std::to_string(*streamMetadata.durationSecondsFromHeader);
   }
   if (streamMetadata.bitRate.has_value()) {
     map["bitRate"] = std::to_string(*streamMetadata.bitRate);
   }
-  if (streamMetadata.numFramesFromScan.has_value()) {
-    map["numFramesFromScan"] =
-        std::to_string(*streamMetadata.numFramesFromScan);
+  if (streamMetadata.numFramesFromContent.has_value()) {
+    map["numFramesFromContent"] =
+        std::to_string(*streamMetadata.numFramesFromContent);
   }
-  if (streamMetadata.numFrames.has_value()) {
-    map["numFrames"] = std::to_string(*streamMetadata.numFrames);
+  if (streamMetadata.numFramesFromHeader.has_value()) {
+    map["numFramesFromHeader"] =
+        std::to_string(*streamMetadata.numFramesFromHeader);
   }
-  if (streamMetadata.beginStreamFromHeader.has_value()) {
-    map["beginStreamFromHeader"] =
-        std::to_string(*streamMetadata.beginStreamFromHeader);
+  if (streamMetadata.beginStreamSecondsFromHeader.has_value()) {
+    map["beginStreamSecondsFromHeader"] =
+        std::to_string(*streamMetadata.beginStreamSecondsFromHeader);
   }
-  if (streamMetadata.minPtsSecondsFromScan.has_value()) {
-    map["minPtsSecondsFromScan"] =
-        std::to_string(*streamMetadata.minPtsSecondsFromScan);
+  if (streamMetadata.beginStreamPtsSecondsFromContent.has_value()) {
+    map["beginStreamSecondsFromContent"] =
+        std::to_string(*streamMetadata.beginStreamPtsSecondsFromContent);
   }
-  if (streamMetadata.maxPtsSecondsFromScan.has_value()) {
-    map["maxPtsSecondsFromScan"] =
-        std::to_string(*streamMetadata.maxPtsSecondsFromScan);
+  if (streamMetadata.endStreamPtsSecondsFromContent.has_value()) {
+    map["endStreamSecondsFromContent"] =
+        std::to_string(*streamMetadata.endStreamPtsSecondsFromContent);
   }
   if (streamMetadata.codecName.has_value()) {
     map["codec"] = quoteValue(streamMetadata.codecName.value());
@@ -581,8 +608,15 @@ std::string get_stream_json_metadata(
   if (streamMetadata.height.has_value()) {
     map["height"] = std::to_string(*streamMetadata.height);
   }
-  if (streamMetadata.averageFps.has_value()) {
-    map["averageFps"] = std::to_string(*streamMetadata.averageFps);
+  if (streamMetadata.sampleAspectRatio.has_value()) {
+    map["sampleAspectRatioNum"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).num);
+    map["sampleAspectRatioDen"] =
+        std::to_string((*streamMetadata.sampleAspectRatio).den);
+  }
+  if (streamMetadata.averageFpsFromHeader.has_value()) {
+    map["averageFpsFromHeader"] =
+        std::to_string(*streamMetadata.averageFpsFromHeader);
   }
   if (streamMetadata.sampleRate.has_value()) {
     map["sampleRate"] = std::to_string(*streamMetadata.sampleRate);

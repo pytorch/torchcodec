@@ -4,7 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "src/torchcodec/_core/AVIOBytesContext.h"
+#include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 
 #include <c10/util/Flags.h>
@@ -50,9 +50,19 @@ class SingleStreamDecoderTest : public testing::TestWithParam<bool> {
       outputStringStream << input.rdbuf();
       content_ = outputStringStream.str();
 
-      void* buffer = content_.data();
-      size_t length = content_.length();
-      auto contextHolder = std::make_unique<AVIOBytesContext>(buffer, length);
+      // Note that we copy the data from the string into a new buffer. The
+      // tensor has ownership of that buffer. This is not strictly necessary,
+      // as the lifetime of the content_ string will outlast the decoder. But,
+      // we do it to test the common usage where the decoder should own the
+      // memory through the tensor.
+      int64_t length = content_.length();
+      char* data = new char[length];
+      std::memcpy(data, content_.data(), length);
+      auto deleter = [data](void*) { delete[] data; };
+      at::Tensor tensor = at::from_blob(
+          static_cast<void*>(data), {length}, deleter, {torch::kUInt8});
+
+      auto contextHolder = std::make_unique<AVIOFromTensorContext>(tensor);
       return std::make_unique<SingleStreamDecoder>(
           std::move(contextHolder), SingleStreamDecoder::SeekMode::approximate);
     } else {
@@ -80,19 +90,19 @@ TEST_P(SingleStreamDecoderTest, ReturnsFpsAndDurationForVideoInMetadata) {
   const auto& videoStream = metadata.allStreamMetadata[3];
   EXPECT_EQ(videoStream.mediaType, AVMEDIA_TYPE_VIDEO);
   EXPECT_EQ(videoStream.codecName, "h264");
-  EXPECT_NEAR(*videoStream.averageFps, 29.97f, 1e-1);
+  EXPECT_NEAR(*videoStream.averageFpsFromHeader, 29.97f, 1e-1);
   EXPECT_NEAR(*videoStream.bitRate, 128783, 1e-1);
-  EXPECT_NEAR(*videoStream.durationSeconds, 13.013, 1e-1);
-  EXPECT_EQ(videoStream.numFrames, 390);
-  EXPECT_FALSE(videoStream.minPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.maxPtsSecondsFromScan.has_value());
-  EXPECT_FALSE(videoStream.numFramesFromScan.has_value());
+  EXPECT_NEAR(*videoStream.durationSecondsFromHeader, 13.013, 1e-1);
+  EXPECT_EQ(videoStream.numFramesFromHeader, 390);
+  EXPECT_FALSE(videoStream.beginStreamPtsSecondsFromContent.has_value());
+  EXPECT_FALSE(videoStream.endStreamPtsSecondsFromContent.has_value());
+  EXPECT_FALSE(videoStream.numFramesFromContent.has_value());
   decoder->scanFileAndUpdateMetadataAndIndex();
   metadata = decoder->getContainerMetadata();
   const auto& videoStream1 = metadata.allStreamMetadata[3];
-  EXPECT_EQ(*videoStream1.minPtsSecondsFromScan, 0);
-  EXPECT_EQ(*videoStream1.maxPtsSecondsFromScan, 13.013);
-  EXPECT_EQ(*videoStream1.numFramesFromScan, 390);
+  EXPECT_EQ(*videoStream1.beginStreamPtsSecondsFromContent, 0);
+  EXPECT_EQ(*videoStream1.endStreamPtsSecondsFromContent, 13.013);
+  EXPECT_EQ(*videoStream1.numFramesFromContent, 390);
 }
 
 TEST(SingleStreamDecoderTest, MissingVideoFileThrowsException) {
@@ -434,7 +444,7 @@ TEST_P(SingleStreamDecoderTest, GetAudioMetadata) {
 
   const auto& audioStream = metadata.allStreamMetadata[0];
   EXPECT_EQ(audioStream.mediaType, AVMEDIA_TYPE_AUDIO);
-  EXPECT_NEAR(*audioStream.durationSeconds, 13.25, 1e-1);
+  EXPECT_NEAR(*audioStream.durationSecondsFromHeader, 13.25, 1e-1);
 }
 
 INSTANTIATE_TEST_SUITE_P(

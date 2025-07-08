@@ -1,9 +1,10 @@
 import abc
 import json
 import subprocess
+import typing
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from torchcodec._core import (
     get_next_frame,
     seek_to_pts,
 )
+from torchcodec._frame import FrameBatch
 from torchcodec.decoders import VideoDecoder, VideoStreamMetadata
 
 torch._dynamo.config.cache_size_limit = 100
@@ -146,8 +148,84 @@ class TorchVision(AbstractDecoder):
         return frames
 
 
+class OpenCVDecoder(AbstractDecoder):
+    def __init__(self, backend):
+        import cv2
+
+        self.cv2 = cv2
+
+        self._available_backends = {"FFMPEG": cv2.CAP_FFMPEG}
+        self._backend = self._available_backends.get(backend)
+
+        self._print_each_iteration_time = False
+
+    def decode_frames(self, video_file, pts_list):
+        cap = self.cv2.VideoCapture(video_file, self._backend)
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        fps = cap.get(self.cv2.CAP_PROP_FPS)
+        approx_frame_indices = [int(pts * fps) for pts in pts_list]
+
+        current_frame = 0
+        frames = []
+        while True:
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            if current_frame in approx_frame_indices:  # only decompress needed
+                ret, frame = cap.retrieve()
+                if ret:
+                    frame = self.convert_frame_to_rgb_tensor(frame)
+                    frames.append(frame)
+
+            if len(frames) == len(approx_frame_indices):
+                break
+            current_frame += 1
+        cap.release()
+        assert len(frames) == len(approx_frame_indices)
+        return frames
+
+    def decode_first_n_frames(self, video_file, n):
+        cap = self.cv2.VideoCapture(video_file, self._backend)
+        if not cap.isOpened():
+            raise ValueError("Could not open video stream")
+
+        frames = []
+        for i in range(n):
+            ok = cap.grab()
+            if not ok:
+                raise ValueError("Could not grab video frame")
+            ret, frame = cap.retrieve()
+            if ret:
+                frame = self.convert_frame_to_rgb_tensor(frame)
+                frames.append(frame)
+        cap.release()
+        assert len(frames) == n
+        return frames
+
+    def decode_and_resize(self, *args, **kwargs):
+        raise ValueError(
+            "OpenCV doesn't apply antialias while pytorch does by default, this is potentially an unfair comparison"
+        )
+
+    def convert_frame_to_rgb_tensor(self, frame):
+        # OpenCV uses BGR, change to RGB
+        frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+        # Update to C, H, W
+        frame = np.transpose(frame, (2, 0, 1))
+        # Convert to tensor
+        frame = torch.from_numpy(frame)
+        return frame
+
+
 class TorchCodecCore(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
         self._device = device
@@ -185,7 +263,12 @@ class TorchCodecCore(AbstractDecoder):
 
 
 class TorchCodecCoreNonBatch(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._num_threads = num_threads
         self._color_conversion_library = color_conversion_library
         self._device = device
@@ -254,7 +337,12 @@ class TorchCodecCoreNonBatch(AbstractDecoder):
 
 
 class TorchCodecCoreBatch(AbstractDecoder):
-    def __init__(self, num_threads=None, color_conversion_library=None, device="cpu"):
+    def __init__(
+        self,
+        num_threads: str | None = None,
+        color_conversion_library=None,
+        device="cpu",
+    ):
         self._print_each_iteration_time = False
         self._num_threads = int(num_threads) if num_threads else None
         self._color_conversion_library = color_conversion_library
@@ -293,10 +381,17 @@ class TorchCodecCoreBatch(AbstractDecoder):
 
 
 class TorchCodecPublic(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="exact"):
+    def __init__(
+        self,
+        num_ffmpeg_threads: str | None = None,
+        device="cpu",
+        seek_mode="exact",
+        stream_index: str | None = None,
+    ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
         self._seek_mode = seek_mode
+        self._stream_index = int(stream_index) if stream_index else None
 
         from torchvision.transforms import v2 as transforms_v2
 
@@ -311,6 +406,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         return decoder.get_frames_played_at(pts_list)
 
@@ -323,6 +419,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         frames = []
         count = 0
@@ -342,6 +439,7 @@ class TorchCodecPublic(AbstractDecoder):
             num_ffmpeg_threads=num_ffmpeg_threads,
             device=self._device,
             seek_mode=self._seek_mode,
+            stream_index=self._stream_index,
         )
         frames = decoder.get_frames_played_at(pts_list)
         frames = self.transforms_v2.functional.resize(frames.data, (height, width))
@@ -349,7 +447,12 @@ class TorchCodecPublic(AbstractDecoder):
 
 
 class TorchCodecPublicNonBatch(AbstractDecoder):
-    def __init__(self, num_ffmpeg_threads=None, device="cpu", seek_mode="approximate"):
+    def __init__(
+        self,
+        num_ffmpeg_threads: str | None = None,
+        device="cpu",
+        seek_mode="approximate",
+    ):
         self._num_ffmpeg_threads = num_ffmpeg_threads
         self._device = device
         self._seek_mode = seek_mode
@@ -452,7 +555,7 @@ class TorchCodecCoreCompiled(AbstractDecoder):
 
 
 class TorchAudioDecoder(AbstractDecoder):
-    def __init__(self):
+    def __init__(self, stream_index: str | None = None):
         import torchaudio  # noqa: F401
 
         self.torchaudio = torchaudio
@@ -460,11 +563,14 @@ class TorchAudioDecoder(AbstractDecoder):
         from torchvision.transforms import v2 as transforms_v2
 
         self.transforms_v2 = transforms_v2
+        self._stream_index = int(stream_index) if stream_index else None
 
     def decode_frames(self, video_file, pts_list):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "0"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "0"},
+            stream_index=self._stream_index,
         )
         frames = []
         for pts in pts_list:
@@ -477,7 +583,9 @@ class TorchAudioDecoder(AbstractDecoder):
     def decode_first_n_frames(self, video_file, n):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "0"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "0"},
+            stream_index=self._stream_index,
         )
         frames = []
         frame_cnt = 0
@@ -492,7 +600,9 @@ class TorchAudioDecoder(AbstractDecoder):
     def decode_and_resize(self, video_file, pts_list, height, width, device):
         stream_reader = self.torchaudio.io.StreamReader(src=video_file)
         stream_reader.add_basic_video_stream(
-            frames_per_chunk=1, decoder_option={"threads": "1"}
+            frames_per_chunk=1,
+            decoder_option={"threads": "1"},
+            stream_index=self._stream_index,
         )
         frames = []
         for pts in pts_list:
@@ -716,6 +826,42 @@ def convert_result_to_df_item(
     return df_item
 
 
+@dataclass
+class DecoderKind:
+    display_name: str
+    kind: typing.Type[AbstractDecoder]
+    default_options: dict[str, str] = field(default_factory=dict)
+
+
+decoder_registry = {
+    "decord": DecoderKind("DecordAccurate", DecordAccurate),
+    "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
+    "torchcodec_core": DecoderKind("TorchCodecCore", TorchCodecCore),
+    "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
+    "torchcodec_core_nonbatch": DecoderKind(
+        "TorchCodecCoreNonBatch", TorchCodecCoreNonBatch
+    ),
+    "torchcodec_core_compiled": DecoderKind(
+        "TorchCodecCoreCompiled", TorchCodecCoreCompiled
+    ),
+    "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
+    "torchcodec_public_nonbatch": DecoderKind(
+        "TorchCodecPublicNonBatch", TorchCodecPublicNonBatch
+    ),
+    "torchvision": DecoderKind(
+        # We don't compare against TorchVision's "pyav" backend because it doesn't support
+        # accurate seeks.
+        "TorchVision[backend=video_reader]",
+        TorchVision,
+        {"backend": "video_reader"},
+    ),
+    "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
+    "opencv": DecoderKind(
+        "OpenCV[backend=FFMPEG]", OpenCVDecoder, {"backend": "FFMPEG"}
+    ),
+}
+
+
 def run_benchmarks(
     decoder_dict: dict[str, AbstractDecoder],
     video_files_paths: list[Path],
@@ -745,7 +891,8 @@ def run_benchmarks(
         # are using different random pts values across videos.
         random_pts_list = (torch.rand(num_samples) * duration).tolist()
 
-        for decoder_name, decoder in decoder_dict.items():
+        # The decoder items are sorted to perform and display the benchmarks in a consistent order.
+        for decoder_name, decoder in sorted(decoder_dict.items(), key=lambda x: x[0]):
             print(f"video={video_file_path}, decoder={decoder_name}")
 
             if dataloader_parameters:
@@ -877,3 +1024,77 @@ def run_benchmarks(
     compare = benchmark.Compare(results)
     compare.print()
     return df_data
+
+
+def verify_outputs(decoders_to_run, video_paths, num_samples):
+    # Reuse TorchCodecPublic decoder stream_index option, if provided.
+    options = decoder_registry["torchcodec_public"].default_options
+    if torchcodec_decoder := next(
+        (
+            decoder
+            for name, decoder in decoders_to_run.items()
+            if "TorchCodecPublic" in name
+        ),
+        None,
+    ):
+        options["stream_index"] = (
+            str(torchcodec_decoder._stream_index)
+            if torchcodec_decoder._stream_index is not None
+            else ""
+        )
+    # Create default TorchCodecPublic decoder to use as a baseline
+    torchcodec_public_decoder = TorchCodecPublic(**options)
+
+    # Get frames using each decoder
+    for video_file_path in video_paths:
+        metadata = get_metadata(video_file_path)
+        metadata_label = f"{metadata.codec} {metadata.width}x{metadata.height}, {metadata.duration_seconds}s {metadata.average_fps}fps"
+        print(f"{metadata_label=}")
+
+        # Generate uniformly spaced PTS
+        duration = metadata.duration_seconds
+        pts_list = [i * duration / num_samples for i in range(num_samples)]
+
+        # Get the frames from TorchCodecPublic as the baseline
+        torchcodec_public_results = decode_and_adjust_frames(
+            torchcodec_public_decoder,
+            video_file_path,
+            num_samples=num_samples,
+            pts_list=pts_list,
+        )
+
+        for decoder_name, decoder in decoders_to_run.items():
+            print(f"video={video_file_path}, decoder={decoder_name}")
+
+            frames = decode_and_adjust_frames(
+                decoder,
+                video_file_path,
+                num_samples=num_samples,
+                pts_list=pts_list,
+            )
+            for f1, f2 in zip(torchcodec_public_results, frames):
+                torch.testing.assert_close(f1, f2)
+            print(f"Results of baseline TorchCodecPublic and {decoder_name} match!")
+
+
+def decode_and_adjust_frames(
+    decoder, video_file_path, *, num_samples: int, pts_list: list[float]
+):
+    frames = []
+    # Decode non-sequential frames using decode_frames function
+    non_seq_frames = decoder.decode_frames(video_file_path, pts_list)
+    # TorchCodec's batch APIs return a FrameBatch, so we need to extract the frames
+    if isinstance(non_seq_frames, FrameBatch):
+        non_seq_frames = non_seq_frames.data
+    frames.extend(non_seq_frames)
+
+    # Decode sequential frames using decode_first_n_frames function
+    seq_frames = decoder.decode_first_n_frames(video_file_path, num_samples)
+    if isinstance(seq_frames, FrameBatch):
+        seq_frames = seq_frames.data
+    frames.extend(seq_frames)
+
+    # Check and convert frames to C,H,W for consistency with other decoders.
+    if frames[0].shape[-1] == 3:
+        frames = [frame.permute(-1, *range(frame.dim() - 1)) for frame in frames]
+    return frames

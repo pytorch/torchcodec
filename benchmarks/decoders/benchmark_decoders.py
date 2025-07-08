@@ -8,60 +8,16 @@ import argparse
 import importlib.resources
 import os
 import platform
-import typing
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import torch
 
 from benchmark_decoders_library import (
-    AbstractDecoder,
-    DecordAccurate,
-    DecordAccurateBatch,
+    decoder_registry,
     plot_data,
     run_benchmarks,
-    TorchAudioDecoder,
-    TorchCodecCore,
-    TorchCodecCoreBatch,
-    TorchCodecCoreCompiled,
-    TorchCodecCoreNonBatch,
-    TorchCodecPublic,
-    TorchCodecPublicNonBatch,
-    TorchVision,
+    verify_outputs,
 )
-
-
-@dataclass
-class DecoderKind:
-    display_name: str
-    kind: typing.Type[AbstractDecoder]
-    default_options: dict[str, str] = field(default_factory=dict)
-
-
-decoder_registry = {
-    "decord": DecoderKind("DecordAccurate", DecordAccurate),
-    "decord_batch": DecoderKind("DecordAccurateBatch", DecordAccurateBatch),
-    "torchcodec_core": DecoderKind("TorchCodecCore", TorchCodecCore),
-    "torchcodec_core_batch": DecoderKind("TorchCodecCoreBatch", TorchCodecCoreBatch),
-    "torchcodec_core_nonbatch": DecoderKind(
-        "TorchCodecCoreNonBatch", TorchCodecCoreNonBatch
-    ),
-    "torchcodec_core_compiled": DecoderKind(
-        "TorchCodecCoreCompiled", TorchCodecCoreCompiled
-    ),
-    "torchcodec_public": DecoderKind("TorchCodecPublic", TorchCodecPublic),
-    "torchcodec_public_nonbatch": DecoderKind(
-        "TorchCodecPublicNonBatch", TorchCodecPublicNonBatch
-    ),
-    "torchvision": DecoderKind(
-        # We don't compare against TorchVision's "pyav" backend because it doesn't support
-        # accurate seeks.
-        "TorchVision[backend=video_reader]",
-        TorchVision,
-        {"backend": "video_reader"},
-    ),
-    "torchaudio": DecoderKind("TorchAudio", TorchAudioDecoder),
-}
 
 
 def in_fbcode() -> bool:
@@ -144,6 +100,12 @@ def main() -> None:
         type=str,
         default="benchmarks.png",
     )
+    parser.add_argument(
+        "--verify-outputs",
+        help="Verify that the outputs of the decoders are the same",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+    )
 
     args = parser.parse_args()
     specified_decoders = set(args.decoders.split(","))
@@ -173,29 +135,32 @@ def main() -> None:
             if entry.is_file() and entry.name.endswith(".mp4"):
                 video_paths.append(entry.path)
 
-    results = run_benchmarks(
-        decoders_to_run,
-        video_paths,
-        num_uniform_samples,
-        num_sequential_frames_from_start=[1, 10, 100],
-        min_runtime_seconds=args.min_run_seconds,
-        benchmark_video_creation=args.bm_video_creation,
-    )
-    data = {
-        "experiments": results,
-        "system_metadata": {
-            "cpu_count": os.cpu_count(),
-            "system": platform.system(),
-            "machine": platform.machine(),
-            "python_version": str(platform.python_version()),
-            "cuda": (
-                torch.cuda.get_device_properties(0).name
-                if torch.cuda.is_available()
-                else "not available"
-            ),
-        },
-    }
-    plot_data(data, args.plot_path)
+    if args.verify_outputs:
+        verify_outputs(decoders_to_run, video_paths, num_uniform_samples)
+    else:
+        results = run_benchmarks(
+            decoders_to_run,
+            video_paths,
+            num_uniform_samples,
+            num_sequential_frames_from_start=[1, 10, 100],
+            min_runtime_seconds=args.min_run_seconds,
+            benchmark_video_creation=args.bm_video_creation,
+        )
+        data = {
+            "experiments": results,
+            "system_metadata": {
+                "cpu_count": os.cpu_count(),
+                "system": platform.system(),
+                "machine": platform.machine(),
+                "python_version": str(platform.python_version()),
+                "cuda": (
+                    torch.cuda.get_device_properties(0).name
+                    if torch.cuda.is_available()
+                    else "not available"
+                ),
+            },
+        }
+        plot_data(data, args.plot_path)
 
 
 if __name__ == "__main__":

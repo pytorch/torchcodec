@@ -66,7 +66,7 @@ from torchcodec.decoders import VideoDecoder
 decoder = VideoDecoder(raw_video_bytes)
 
 # %%
-# The has not yet been decoded by the decoder, but we already have access to
+# The video has not yet been decoded by the decoder, but we already have access to
 # some metadata via the ``metadata`` attribute which is a
 # :class:`~torchcodec.decoders.VideoStreamMetadata` object.
 print(decoder.metadata)

@@ -15,6 +15,7 @@ extern "C" {
 #include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
+#include <libavutil/audio_fifo.h>
 #include <libavutil/avutil.h>
 #include <libavutil/dict.h>
 #include <libavutil/display.h>
@@ -73,6 +74,8 @@ using UniqueSwsContext =
     std::unique_ptr<SwsContext, Deleter<SwsContext, void, sws_freeContext>>;
 using UniqueSwrContext =
     std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
+using UniqueAVAudioFifo = std::
+    unique_ptr<AVAudioFifo, Deleter<AVAudioFifo, void, av_audio_fifo_free>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
@@ -151,26 +154,40 @@ void setDefaultChannelLayout(
     UniqueAVCodecContext& avCodecContext,
     int numChannels);
 
-void setChannelLayout(
-    UniqueAVFrame& dstAVFrame,
-    const UniqueAVCodecContext& avCodecContext);
+void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels);
+
+void validateNumChannels(const AVCodec& avCodec, int numChannels);
 
 void setChannelLayout(
     UniqueAVFrame& dstAVFrame,
-    const UniqueAVFrame& srcAVFrame);
+    const UniqueAVFrame& srcAVFrame,
+    int desiredNumChannels);
+
+UniqueAVFrame allocateAVFrame(
+    int numSamples,
+    int sampleRate,
+    int numChannels,
+    AVSampleFormat sampleFormat);
+
 SwrContext* createSwrContext(
-    UniqueAVCodecContext& avCodecContext,
-    AVSampleFormat sourceSampleFormat,
+    AVSampleFormat srcSampleFormat,
     AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate);
+    int srcSampleRate,
+    int desiredSampleRate,
+    const UniqueAVFrame& srcAVFrame,
+    int desiredNumChannels);
 
-UniqueAVFrame convertAudioAVFrameSampleFormatAndSampleRate(
+// Converts, if needed:
+// - sample format
+// - sample rate
+// - number of channels.
+// createSwrContext must have been previously called with matching parameters.
+UniqueAVFrame convertAudioAVFrameSamples(
     const UniqueSwrContext& swrContext,
     const UniqueAVFrame& srcAVFrame,
     AVSampleFormat desiredSampleFormat,
-    int sourceSampleRate,
-    int desiredSampleRate);
+    int desiredSampleRate,
+    int desiredNumChannels);
 
 // Returns true if sws_scale can handle unaligned data.
 bool canSwsScaleHandleUnalignedData();
