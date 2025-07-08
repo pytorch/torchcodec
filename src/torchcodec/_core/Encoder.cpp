@@ -98,14 +98,18 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
 
 } // namespace
 
-AudioEncoder::~AudioEncoder() {}
+AudioEncoder::~AudioEncoder() {
+  if (avFormatContext_ && avFormatContext_->pb && !avioContextHolder_) {
+    avio_close(avFormatContext_->pb);
+  }
+}
 
 AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
     int sampleRate,
     std::string_view fileName,
     const AudioStreamOptions& audioStreamOptions)
-    : samples_(validateSamples(samples)) {
+    : samples_(validateSamples(samples)), inSampleRate_(sampleRate) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -128,7 +132,7 @@ AudioEncoder::AudioEncoder(
       ", make sure it's a valid path? ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  initializeEncoder(sampleRate, audioStreamOptions);
+  initializeEncoder(audioStreamOptions);
 }
 
 AudioEncoder::AudioEncoder(
@@ -138,6 +142,7 @@ AudioEncoder::AudioEncoder(
     std::unique_ptr<AVIOToTensorContext> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
+      inSampleRate_(sampleRate),
       avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
@@ -155,11 +160,10 @@ AudioEncoder::AudioEncoder(
 
   avFormatContext_->pb = avioContextHolder_->getAVIOContext();
 
-  initializeEncoder(sampleRate, audioStreamOptions);
+  initializeEncoder(audioStreamOptions);
 }
 
 void AudioEncoder::initializeEncoder(
-    int sampleRate,
     const AudioStreamOptions& audioStreamOptions) {
   // We use the AVFormatContext's default codec for that
   // specific format/container.
@@ -187,8 +191,9 @@ void AudioEncoder::initializeEncoder(
   // not related to the input sampes.
   setDefaultChannelLayout(avCodecContext_, outNumChannels_);
 
-  validateSampleRate(*avCodec, sampleRate);
-  avCodecContext_->sample_rate = sampleRate;
+  outSampleRate_ = audioStreamOptions.sampleRate.value_or(inSampleRate_);
+  validateSampleRate(*avCodec, outSampleRate_);
+  avCodecContext_->sample_rate = outSampleRate_;
 
   // Input samples are expected to be FLTP. Not all encoders support FLTP, so we
   // may need to convert the samples into a supported output sample format,
@@ -213,6 +218,21 @@ void AudioEncoder::initializeEncoder(
       "avcodec_parameters_from_context failed: ",
       getFFMPEGErrorStringFromErrorCode(status));
   streamIndex_ = avStream->index;
+
+  // If sample rate conversion is needed and the encoder doesn't support
+  // variable frame size, we need to create an intermediate FIFO. See
+  // [Encoding loop, sample rate conversion and FIFO].
+  if (((avCodec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) == 0) &&
+      (inSampleRate_ != outSampleRate_)) {
+    // frame_size * 2 is a decent default size. FFmpeg automatically
+    // re-allocates the fifo if more space is needed.
+    auto avAudioFifo = av_audio_fifo_alloc(
+        avCodecContext_->sample_fmt,
+        outNumChannels_,
+        avCodecContext_->frame_size * 2);
+    TORCH_CHECK(avAudioFifo != nullptr, "Couldn't create AVAudioFifo.");
+    avAudioFifo_.reset(avAudioFifo);
+  }
 }
 
 torch::Tensor AudioEncoder::encodeToTensor() {
@@ -230,24 +250,15 @@ void AudioEncoder::encode() {
   TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
   encodeWasCalled_ = true;
 
-  UniqueAVFrame avFrame(av_frame_alloc());
-  TORCH_CHECK(avFrame != nullptr, "Couldn't allocate AVFrame.");
   //  Default to 256 like in torchaudio
   int numSamplesAllocatedPerFrame =
       avCodecContext_->frame_size > 0 ? avCodecContext_->frame_size : 256;
-  avFrame->nb_samples = numSamplesAllocatedPerFrame;
-  avFrame->format = AV_SAMPLE_FMT_FLTP;
-  avFrame->sample_rate = avCodecContext_->sample_rate;
+  UniqueAVFrame avFrame = allocateAVFrame(
+      numSamplesAllocatedPerFrame,
+      inSampleRate_,
+      static_cast<int>(samples_.sizes()[0]),
+      AV_SAMPLE_FMT_FLTP);
   avFrame->pts = 0;
-  // We set the channel layout of the frame to the default layout corresponding
-  // to the input samples' number of channels
-  setDefaultChannelLayout(avFrame, static_cast<int>(samples_.sizes()[0]));
-
-  auto status = av_frame_get_buffer(avFrame.get(), 0);
-  TORCH_CHECK(
-      status == AVSUCCESS,
-      "Couldn't allocate avFrame's buffers: ",
-      getFFMPEGErrorStringFromErrorCode(status));
 
   AutoAVPacket autoAVPacket;
 
@@ -257,19 +268,13 @@ void AudioEncoder::encode() {
   int numBytesPerSample = static_cast<int>(samples_.element_size());
   int numBytesPerChannel = numSamples * numBytesPerSample;
 
-  status = avformat_write_header(avFormatContext_.get(), nullptr);
+  auto status = avformat_write_header(avFormatContext_.get(), nullptr);
   TORCH_CHECK(
       status == AVSUCCESS,
       "Error in avformat_write_header: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
   while (numEncodedSamples < numSamples) {
-    status = av_frame_make_writable(avFrame.get());
-    TORCH_CHECK(
-        status == AVSUCCESS,
-        "Couldn't make AVFrame writable: ",
-        getFFMPEGErrorStringFromErrorCode(status));
-
     int numSamplesToEncode =
         std::min(numSamplesAllocatedPerFrame, numSamples - numEncodedSamples);
     int numBytesToEncode = numSamplesToEncode * numBytesPerSample;
@@ -290,11 +295,9 @@ void AudioEncoder::encode() {
     avFrame->nb_samples = numSamplesToEncode;
 
     UniqueAVFrame convertedAVFrame = maybeConvertAVFrame(avFrame);
-    encodeInnerLoop(autoAVPacket, convertedAVFrame);
+    encodeFrameThroughFifo(autoAVPacket, convertedAVFrame);
 
     numEncodedSamples += numSamplesToEncode;
-    // TODO-ENCODING set frame pts correctly, and test against it.
-    // avFrame->pts += static_cast<int64_t>(numSamplesToEncode);
   }
   TORCH_CHECK(numEncodedSamples == numSamples, "Hmmmmmm something went wrong.");
 
@@ -310,7 +313,8 @@ void AudioEncoder::encode() {
 UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
   if (static_cast<AVSampleFormat>(avFrame->format) ==
           avCodecContext_->sample_fmt &&
-      getNumChannels(avFrame) == outNumChannels_) {
+      getNumChannels(avFrame) == outNumChannels_ &&
+      avFrame->sample_rate == outSampleRate_) {
     // Note: the clone references the same underlying data, it's a cheap copy.
     return UniqueAVFrame(av_frame_clone(avFrame.get()));
   }
@@ -319,8 +323,8 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
     swrContext_.reset(createSwrContext(
         static_cast<AVSampleFormat>(avFrame->format),
         avCodecContext_->sample_fmt,
-        avFrame->sample_rate, // No sample rate conversion
         avFrame->sample_rate,
+        outSampleRate_,
         avFrame,
         outNumChannels_));
   }
@@ -328,22 +332,90 @@ UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
       swrContext_,
       avFrame,
       avCodecContext_->sample_fmt,
-      avFrame->sample_rate, // No sample rate conversion
+      outSampleRate_,
       outNumChannels_);
-  TORCH_CHECK(
-      convertedAVFrame->nb_samples == avFrame->nb_samples,
-      "convertedAVFrame->nb_samples=",
-      convertedAVFrame->nb_samples,
-      " differs from ",
-      "avFrame->nb_samples=",
-      avFrame->nb_samples,
-      "This is unexpected, please report on the TorchCodec bug tracker.");
+
+  if (avFrame->sample_rate == outSampleRate_) {
+    TORCH_CHECK(
+        convertedAVFrame->nb_samples == avFrame->nb_samples,
+        "convertedAVFrame->nb_samples=",
+        convertedAVFrame->nb_samples,
+        " differs from ",
+        "avFrame->nb_samples=",
+        avFrame->nb_samples,
+        "This is unexpected, please report on the TorchCodec bug tracker.");
+  }
   return convertedAVFrame;
 }
 
-void AudioEncoder::encodeInnerLoop(
+void AudioEncoder::encodeFrameThroughFifo(
+    AutoAVPacket& autoAVPacket,
+    const UniqueAVFrame& avFrame,
+    // flushFifo is only set to true in maybeFlushSwrBuffers(), i.e. at the very
+    // end of the encoding process when we're flushing buffers. We also want to
+    // flush the FIFO so as to not leave any remaining samples in it.
+    bool flushFifo) {
+  if (avAudioFifo_ == nullptr) {
+    encodeFrame(autoAVPacket, avFrame);
+    return;
+  }
+  int numSamplesWritten = av_audio_fifo_write(
+      avAudioFifo_.get(),
+      reinterpret_cast<void**>(avFrame->data),
+      avFrame->nb_samples);
+  TORCH_CHECK(
+      numSamplesWritten == avFrame->nb_samples,
+      "Tried to write ",
+      avFrame->nb_samples,
+      " samples, but only wrote ",
+      numSamplesWritten);
+
+  UniqueAVFrame newavFrame = allocateAVFrame(
+      avCodecContext_->frame_size,
+      outSampleRate_,
+      outNumChannels_,
+      avCodecContext_->sample_fmt);
+
+  // Explaining the while bound:
+  // - if we're not flushing the FIFO, i.e. in most cases, we want to pull
+  //   exactly `frame_size` samples from the FIFO, so we have to stop before it
+  //   contains less than `frame_size` samples.
+  // - if we're flushing the FIFO, we want to read from the FIFO until the very
+  //   last sample it contains.
+  //
+  // In both cases, for as long as we can, we're trying to pull exatly
+  // `frame_size` samples from the FIFO and send each `frame_size`-sized avFrame
+  // to encodeFrame(). Only the very last avFrame of the encoding process is
+  // allowed to contained less than frame_size samples. That only happens when
+  // flushFifo is true.
+  while (av_audio_fifo_size(avAudioFifo_.get()) >=
+         (flushFifo ? 1 : avCodecContext_->frame_size)) {
+    int samplesToRead = std::min(
+        av_audio_fifo_size(avAudioFifo_.get()), newavFrame->nb_samples);
+    int numSamplesRead = av_audio_fifo_read(
+        avAudioFifo_.get(),
+        reinterpret_cast<void**>(newavFrame->data),
+        samplesToRead);
+    TORCH_CHECK(
+        numSamplesRead == samplesToRead,
+        "Tried to read ",
+        samplesToRead,
+        " samples, but only read ",
+        numSamplesRead);
+
+    newavFrame->nb_samples = numSamplesRead;
+    encodeFrame(autoAVPacket, newavFrame);
+  }
+}
+
+void AudioEncoder::encodeFrame(
     AutoAVPacket& autoAVPacket,
     const UniqueAVFrame& avFrame) {
+  if (avFrame != nullptr) {
+    avFrame->pts = lastEncodedAVFramePts_;
+    lastEncodedAVFramePts_ += avFrame->nb_samples;
+  }
+
   auto status = avcodec_send_frame(avCodecContext_.get(), avFrame.get());
   TORCH_CHECK(
       status == AVSUCCESS,
@@ -382,11 +454,41 @@ void AudioEncoder::encodeInnerLoop(
   }
 }
 
+void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
+  // Similar to the decoder's method with the same name, but for encoding this
+  // time. That is, when sample conversion is involved, libswresample may have
+  // buffered some samples that we now need to flush and send to the encoder.
+  if (swrContext_ == nullptr && inSampleRate_ == outSampleRate_) {
+    return;
+  }
+  TORCH_CHECK(
+      swrContext_ != nullptr,
+      "swrContext is null, but sample rate conversion is needed. ",
+      "This is unexpected, please report on the TorchCodec bug tracker.");
+
+  int numRemainingSamples = // this is an upper bound
+      swr_get_out_samples(swrContext_.get(), 0);
+  if (numRemainingSamples == 0) {
+    return;
+  }
+
+  UniqueAVFrame avFrame = allocateAVFrame(
+      numRemainingSamples,
+      outSampleRate_,
+      outNumChannels_,
+      avCodecContext_->sample_fmt);
+  int actualNumRemainingSamples = swr_convert(
+      swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
+  avFrame->nb_samples = actualNumRemainingSamples;
+
+  // We're potentially sending avFrame through the FIFO (if it exists), in which
+  // case we also want to flush the FIFO itself.
+  encodeFrameThroughFifo(autoAVPacket, avFrame, /*flushFifo=*/true);
+}
+
 void AudioEncoder::flushBuffers() {
-  // We flush the main FFmpeg buffers, but not swresample buffers. Flushing
-  // swresample is only necessary when converting sample rates, which we don't
-  // do for encoding.
   AutoAVPacket autoAVPacket;
-  encodeInnerLoop(autoAVPacket, UniqueAVFrame(nullptr));
+  maybeFlushSwrBuffers(autoAVPacket);
+  encodeFrame(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec
