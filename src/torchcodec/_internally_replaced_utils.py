@@ -55,4 +55,3 @@ def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
 
 def _get_pybind_ops_module_name(ffmpeg_major_version: str) -> str:
     return "decoder_core_pybind_ops"
-
