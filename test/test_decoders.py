@@ -1139,7 +1139,6 @@ class TestVideoDecoder:
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
 
-
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_var_fps_single_frame(self, device):
         # We are explicitly only testing exact mode because we know approximate
@@ -1159,7 +1158,6 @@ class TestVideoDecoder:
         assert_frames_equal(frame_150, ref_frame_150)
         assert_frames_equal(frame_299, ref_frame_299)
 
-
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_var_fps_range(self, device):
         # We are explicitly only testing exact mode because we know approximate
@@ -1169,10 +1167,12 @@ class TestVideoDecoder:
         frames150_159 = decoder.get_frames_in_range(start=150, stop=160)
 
         ref_frames150_159 = VAR_FPS_VIDEO.get_frame_data_by_range(
-            start=150, stop=160,
+            start=150,
+            stop=160,
         ).to(device)
 
         assert_frames_equal(ref_frames150_159, frames150_159.data)
+
 
 class TestAudioDecoder:
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32))
