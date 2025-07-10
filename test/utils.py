@@ -122,7 +122,9 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
-    custom_frame_mappings_data: Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = None
+    custom_frame_mappings_data: Optional[
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ] = None
 
     def __post_init__(self):
         # We load the .frames attribute from the checked-in json files, if needed.

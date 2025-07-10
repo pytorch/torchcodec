@@ -223,8 +223,8 @@ void _add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> custom_frame_mappings =
-        std::nullopt,
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+        custom_frame_mappings = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt) {
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
@@ -270,8 +270,8 @@ void add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> custom_frame_mappings =
-        std::nullopt) {
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+        custom_frame_mappings = std::nullopt) {
   _add_video_stream(
       decoder,
       width,

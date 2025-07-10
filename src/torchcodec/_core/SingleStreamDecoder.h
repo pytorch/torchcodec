@@ -74,8 +74,8 @@ class SingleStreamDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
-      std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> customFrameMappings =
-          std::nullopt);
+      std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+          customFrameMappings = std::nullopt);
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());

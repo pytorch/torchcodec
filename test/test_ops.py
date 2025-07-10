@@ -457,12 +457,18 @@ class TestVideoDecoderOps:
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
         decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
-        different_lengths = ((torch.tensor([1, 2, 3]), torch.tensor([1, 2]), torch.tensor([1, 2, 3])))
+        different_lengths = (
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 2]),
+            torch.tensor([1, 2, 3]),
+        )
         with pytest.raises(
             RuntimeError,
             match="all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.",
         ):
-            add_video_stream(decoder, stream_index=0, custom_frame_mappings=different_lengths)
+            add_video_stream(
+                decoder, stream_index=0, custom_frame_mappings=different_lengths
+            )
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_mode_custom_frame_mappings(self, device):
