@@ -478,7 +478,7 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
       outNumChannels_,
       avCodecContext_->sample_fmt);
   int actualNumRemainingSamples = swr_convert(
-      swrContext_.get(), avFrame->data, avFrame->nb_samples, NULL, 0);
+      swrContext_.get(), avFrame->data, avFrame->nb_samples, nullptr, 0);
   avFrame->nb_samples = actualNumRemainingSamples;
 
   // We're potentially sending avFrame through the FIFO (if it exists), in which
