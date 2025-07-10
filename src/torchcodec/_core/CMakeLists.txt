@@ -151,7 +151,10 @@ function(make_torchcodec_libraries
         PUBLIC
       "-fvisibility=hidden"
     )
-    # TODO: comment explaining this
+    # The value we use here must match the value we return from
+    # _get_pybind_ops_module_name() on the Python side. If the values do not
+    # match, then we will be unable to import the C++ shared library as a
+    # Python module at runtime.
     target_compile_definitions(
         ${pybind_ops_library_name}
         PRIVATE

@@ -54,4 +54,8 @@ def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
 
 
 def _get_pybind_ops_module_name(ffmpeg_major_version: str) -> str:
+    # Note that this value must match the value used as PYBIND_OPS_MODULE_NAME
+    # when we compile _core/pybind_ops.cpp. If the values do not match, we will
+    # not be able to import the C++ shared library as a Python module at
+    # runtime.
     return "decoder_core_pybind_ops"
