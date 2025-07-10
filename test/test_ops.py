@@ -484,7 +484,9 @@ class TestVideoDecoderOps:
             decoder,
             device=device,
             stream_index=stream_index,
-            custom_frame_mappings=NASA_VIDEO.custom_frame_mappings,
+            custom_frame_mappings=NASA_VIDEO.get_custom_frame_mappings(
+                stream_index=stream_index
+            ),
         )
 
         frame0, _, _ = get_next_frame(decoder)

@@ -38,7 +38,7 @@ def test_get_metadata(seek_mode):
     decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
     # For custom_frame_mappings seek mode, add a video stream to update metadata
     custom_frame_mappings = (
-        NASA_VIDEO.custom_frame_mappings
+        NASA_VIDEO.get_custom_frame_mappings()
         if seek_mode == "custom_frame_mappings"
         else None
     )

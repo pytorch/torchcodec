@@ -122,9 +122,9 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
-    custom_frame_mappings_data: Optional[
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    ] = None
+    custom_frame_mappings_data: Dict[
+        int, Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+    ] = field(default_factory=dict)
 
     def __post_init__(self):
         # We load the .frames attribute from the checked-in json files, if needed.
@@ -227,19 +227,18 @@ class TestContainerFile:
 
         return self.frames[stream_index][idx]
 
-    # This property is used to get the frame mappings for the custom_frame_mappings seek mode.
-    @property
-    def custom_frame_mappings(
+    # This function is used to get the frame mappings for the custom_frame_mappings seek mode.
+    def get_custom_frame_mappings(
         self, stream_index: Optional[int] = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if stream_index is None:
             stream_index = self.default_stream_index
-        if self.custom_frame_mappings_data is None:
-            self.get_custom_frame_mappings(stream_index)
-        return self.custom_frame_mappings_data
+        if self.custom_frame_mappings_data.get(stream_index) is None:
+            self.generate_custom_frame_mappings(stream_index)
+        return self.custom_frame_mappings_data[stream_index]
 
-    def get_custom_frame_mappings(self, stream_index: int) -> None:
-        show_frames_result = json.loads(
+    def generate_custom_frame_mappings(self, stream_index: int) -> None:
+        result = json.loads(
             subprocess.run(
                 [
                     "ffprobe",
@@ -256,22 +255,17 @@ class TestContainerFile:
                 text=True,
             ).stdout
         )
-        custom_frame_mappings_data = ([], [], [])
-        frames = show_frames_result["frames"]
-        for frame in frames:
-            custom_frame_mappings_data[0].append(float(frame["pts"]))
-            custom_frame_mappings_data[1].append(frame["key_frame"])
-            custom_frame_mappings_data[2].append(float(frame["duration"]))
-
-        (pts_list, key_frame_list, duration_list) = custom_frame_mappings_data
+        pts_list = [float(frame["pts"]) for frame in result["frames"]]
+        is_key_frame_list = [frame["key_frame"] for frame in result["frames"]]
+        duration_list = [float(frame["duration"]) for frame in result["frames"]]
         # Zip the lists together, sort by pts, then unzip
         assert (
-            len(pts_list) == len(key_frame_list) == len(duration_list)
+            len(pts_list) == len(is_key_frame_list) == len(duration_list)
         ), "Mismatched lengths in frame index data"
-        combined = list(zip(pts_list, key_frame_list, duration_list))
+        combined = list(zip(pts_list, is_key_frame_list, duration_list))
         combined.sort(key=lambda x: x[0])
         pts_sorted, is_key_frame_sorted, duration_sorted = zip(*combined)
-        self.custom_frame_mappings_data = (
+        self.custom_frame_mappings_data[stream_index] = (
             torch.tensor(pts_sorted),
             torch.tensor(is_key_frame_sorted),
             torch.tensor(duration_sorted),
