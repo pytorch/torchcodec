@@ -32,22 +32,19 @@ def _get_container_metadata(path, seek_mode):
 
 
 @pytest.mark.parametrize(
-    "metadata_getter",
-    (
-        get_container_metadata_from_header,
-        functools.partial(_get_container_metadata, seek_mode="approximate"),
-        functools.partial(_get_container_metadata, seek_mode="exact"),
-    ),
+    "seek_mode",
+    ["approximate", "exact", "frame_index"]
 )
-def test_get_metadata(metadata_getter):
-    with_scan = (
-        metadata_getter.keywords["seek_mode"] == "exact"
-        if isinstance(metadata_getter, functools.partial)
-        else False
-    )
+def test_get_metadata(seek_mode):
+    from torchcodec._core import add_video_stream
+    decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
+    # For frame_index seek mode, add a video stream to update metadata
+    frame_index = NASA_VIDEO.frame_index if seek_mode == "frame_index" else None
+    # Add the best video stream (index 3 for NASA_VIDEO)
+    add_video_stream(decoder, stream_index=NASA_VIDEO.default_stream_index, frame_index=frame_index)
+    metadata = get_container_metadata(decoder)
 
-    metadata = metadata_getter(NASA_VIDEO.path)
-    # metadata = metadata_getter(NASA_VIDEO.path)
+    with_scan = seek_mode == "exact" or seek_mode == "frame_index"
 
     assert len(metadata.streams) == 6
     assert metadata.best_video_stream_index == 3
@@ -82,7 +79,7 @@ def test_get_metadata(metadata_getter):
     assert best_video_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_video_stream_metadata.bit_rate == 128783
     assert best_video_stream_metadata.average_fps == pytest.approx(29.97, abs=0.001)
-    assert best_video_stream_metadata.pixel_aspect_ratio is None
+    assert best_video_stream_metadata.pixel_aspect_ratio == Fraction(1, 1)
     assert best_video_stream_metadata.codec == "h264"
     assert best_video_stream_metadata.num_frames_from_content == (
         390 if with_scan else None

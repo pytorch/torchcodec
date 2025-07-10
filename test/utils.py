@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 
 from dataclasses import dataclass, field
@@ -121,6 +122,7 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
+    frame_index_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None
 
     def __post_init__(self):
         # We load the .frames attribute from the checked-in json files, if needed.
@@ -222,6 +224,37 @@ class TestContainerFile:
             stream_index = self.default_stream_index
 
         return self.frames[stream_index][idx]
+    
+    # This property is used to get the frame index metadata for the frame_index seek mode.
+    @property 
+    def frame_index(self, stream_index: Optional[int] = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+        if self.frame_index_data is None:
+            self.get_frame_index(stream_index)
+        return self.frame_index_data
+    
+    def get_frame_index(self, stream_index: int) -> None:
+        show_frames_result = json.loads(
+            subprocess.run(
+                ["ffprobe", "-i", f"{self.path}","-select_streams",f"{stream_index}","-show_frames","-of","json"],
+                check=True, capture_output=True, text=True,
+            ).stdout
+        )
+        frame_index_data = ([], [], [])
+        frames = show_frames_result["frames"]
+        for frame in frames:
+            frame_index_data[0].append(float(frame["pts"]))
+            frame_index_data[1].append(frame["key_frame"])
+            frame_index_data[2].append(float(frame["duration"]))
+
+        (pts_list, key_frame_list, duration_list) = frame_index_data
+        # Zip the lists together, sort by pts, then unzip
+        assert len(pts_list) == len(key_frame_list) == len(duration_list), "Mismatched lengths in frame index data"
+        combined = list(zip(pts_list, key_frame_list, duration_list))
+        combined.sort(key=lambda x: x[0])
+        pts_sorted, key_frame_sorted, duration_sorted = zip(*combined)
+        self.frame_index_data = (torch.tensor(pts_sorted), torch.tensor(key_frame_sorted), torch.tensor(duration_sorted))
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
