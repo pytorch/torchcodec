@@ -321,10 +321,10 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 
 void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
     int streamIndex,
-    CustomFrameMappings customFrameMappings) {
-  auto& all_frames = customFrameMappings.all_frames;
-  auto& is_key_frame = customFrameMappings.is_key_frame;
-  auto& duration = customFrameMappings.duration;
+    std::tuple<at::Tensor, at::Tensor, at::Tensor> customFrameMappings) {
+  auto& all_frames = std::get<0>(customFrameMappings);
+  auto& is_key_frame = std::get<1>(customFrameMappings);
+  auto& duration = std::get<2>(customFrameMappings);
   TORCH_CHECK(
       all_frames.size(0) == is_key_frame.size(0) &&
           is_key_frame.size(0) == duration.size(0),
@@ -468,7 +468,8 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<CustomFrameMappings> customFrameMappings) {
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+        customFrameMappings) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
