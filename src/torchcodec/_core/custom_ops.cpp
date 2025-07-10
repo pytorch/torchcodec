@@ -36,9 +36,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
   m.def(
-      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None, (Tensor, Tensor, Tensor)? frame_index=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? frame_index=None, str? color_conversion_library=None) -> ()");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None, (Tensor, Tensor, Tensor)? frame_index=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? frame_index=None) -> ()");
   m.def(
       "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None, int? num_channels=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
@@ -223,9 +223,9 @@ void _add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
-    std::optional<std::string_view> color_conversion_library = std::nullopt,
     std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index =
-        std::nullopt) {
+        std::nullopt,
+    std::optional<std::string_view> color_conversion_library = std::nullopt) {
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
   videoStreamOptions.height = height;
@@ -270,7 +270,6 @@ void add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
-    std::optional<std::string_view> color_conversion_library = std::nullopt,
     std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index =
         std::nullopt) {
   _add_video_stream(
@@ -281,7 +280,6 @@ void add_video_stream(
       dimension_order,
       stream_index,
       device,
-      color_conversion_library,
       frame_index);
 }
 
