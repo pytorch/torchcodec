@@ -180,7 +180,7 @@ at::Tensor create_from_file(
   if (seek_mode.has_value()) {
     realSeek = seekModeFromString(seek_mode.value());
   }
-  
+
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(filenameStr, realSeek);
 
@@ -224,7 +224,8 @@ void _add_video_stream(
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index = std::nullopt) {
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index =
+        std::nullopt) {
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
   videoStreamOptions.height = height;
@@ -256,7 +257,8 @@ void _add_video_stream(
   }
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions, frame_index);
+  videoDecoder->addVideoStream(
+      stream_index.value_or(-1), videoStreamOptions, frame_index);
 }
 
 // Add a new video stream at `stream_index` using the provided options.
@@ -269,7 +271,8 @@ void add_video_stream(
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index = std::nullopt) {
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frame_index =
+        std::nullopt) {
   _add_video_stream(
       decoder,
       width,

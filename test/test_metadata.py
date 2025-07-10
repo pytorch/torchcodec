@@ -31,17 +31,17 @@ def _get_container_metadata(path, seek_mode):
     return get_container_metadata(decoder)
 
 
-@pytest.mark.parametrize(
-    "seek_mode",
-    ["approximate", "exact", "frame_index"]
-)
+@pytest.mark.parametrize("seek_mode", ["approximate", "exact", "frame_index"])
 def test_get_metadata(seek_mode):
     from torchcodec._core import add_video_stream
+
     decoder = create_from_file(str(NASA_VIDEO.path), seek_mode=seek_mode)
     # For frame_index seek mode, add a video stream to update metadata
     frame_index = NASA_VIDEO.frame_index if seek_mode == "frame_index" else None
     # Add the best video stream (index 3 for NASA_VIDEO)
-    add_video_stream(decoder, stream_index=NASA_VIDEO.default_stream_index, frame_index=frame_index)
+    add_video_stream(
+        decoder, stream_index=NASA_VIDEO.default_stream_index, frame_index=frame_index
+    )
     metadata = get_container_metadata(decoder)
 
     with_scan = seek_mode == "exact" or seek_mode == "frame_index"

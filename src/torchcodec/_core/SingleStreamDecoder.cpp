@@ -319,8 +319,9 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   scannedAllStreams_ = true;
 }
 
-
-void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(int streamIndex, std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex){
+void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(
+    int streamIndex,
+    std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex) {
   if (readFrameIndex_) {
     return;
   }
@@ -333,12 +334,12 @@ void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(int streamIndex, 
   // Get the last index for key_frames and duration
   auto last_idx = all_frames.size(0) - 1;
   streamMetadata.beginStreamPtsFromContent = all_frames[0].item<int64_t>();
-  streamMetadata.endStreamPtsFromContent = all_frames[last_idx].item<int64_t>() + duration[last_idx].item<int64_t>();
+  streamMetadata.endStreamPtsFromContent =
+      all_frames[last_idx].item<int64_t>() + duration[last_idx].item<int64_t>();
 
   auto avStream = formatContext_->streams[streamIndex];
   streamMetadata.beginStreamPtsSecondsFromContent =
-      *streamMetadata.beginStreamPtsFromContent *
-      av_q2d(avStream->time_base);
+      *streamMetadata.beginStreamPtsFromContent * av_q2d(avStream->time_base);
 
   streamMetadata.endStreamPtsSecondsFromContent =
       *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
@@ -347,8 +348,11 @@ void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(int streamIndex, 
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
     // FrameInfo struct utilizes PTS
     FrameInfo frameInfo = {all_frames[i].item<int64_t>()};
-    frameInfo.isKeyFrame = (i < key_frames.size(0) && key_frames[i].item<int64_t>() == 1);
-    frameInfo.nextPts = (i + 1 < all_frames.size(0)) ? all_frames[i + 1].item<int64_t>() : INT64_MAX;
+    frameInfo.isKeyFrame =
+        (i < key_frames.size(0) && key_frames[i].item<int64_t>() == 1);
+    frameInfo.nextPts = (i + 1 < all_frames.size(0))
+        ? all_frames[i + 1].item<int64_t>()
+        : INT64_MAX;
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
   }
   readFrameIndex_ = true;
@@ -466,7 +470,7 @@ void SingleStreamDecoder::addStream(
 
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
-    const VideoStreamOptions& videoStreamOptions, 
+    const VideoStreamOptions& videoStreamOptions,
     std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frameIndex) {
   addStream(
       streamIndex,
@@ -494,7 +498,9 @@ void SingleStreamDecoder::addVideoStream(
       streamInfo.codecContext->sample_aspect_ratio;
 
   if (seekMode_ == SeekMode::frame_index) {
-    TORCH_CHECK(frameIndex.has_value(), "Please provide a frame index when using frame_index seek mode.");
+    TORCH_CHECK(
+        frameIndex.has_value(),
+        "Please provide a frame index when using frame_index seek mode.");
     readFrameIndexUpdateMetadataAndIndex(streamIndex, frameIndex.value());
   }
 }
@@ -638,7 +644,7 @@ FrameBatchOutput SingleStreamDecoder::getFramesInRange(
     int64_t stop,
     int64_t step) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-  
+
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
@@ -1487,7 +1493,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
           });
 
       return frame - streamInfo.allFrames.begin();
-    } 
+    }
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];

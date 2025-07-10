@@ -458,12 +458,19 @@ class TestVideoDecoderOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_mode_frame_index(self, device):
-        stream_index = 3 # frame index seek mode requires a stream index
+        stream_index = 3  # frame index seek mode requires a stream index
         decoder = create_from_file(str(NASA_VIDEO.path), "frame_index")
-        add_video_stream(decoder, device=device, stream_index=stream_index, frame_index=NASA_VIDEO.frame_index)
-        
+        add_video_stream(
+            decoder,
+            device=device,
+            stream_index=stream_index,
+            frame_index=NASA_VIDEO.frame_index,
+        )
+
         frame0, _, _ = get_next_frame(decoder)
-        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0, stream_index=stream_index)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(
+            0, stream_index=stream_index
+        )
         assert_frames_equal(frame0, reference_frame0.to(device))
 
         frame6, _, _ = get_frame_at_pts(decoder, 6.006)
@@ -481,7 +488,7 @@ class TestVideoDecoderOps:
         ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
         bulk_frames0_9, *_ = get_frames_in_range(decoder, start=0, stop=9)
         assert_frames_equal(bulk_frames0_9, ref_frames0_9.to(device))
-        
+
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
     def test_color_conversion_library(self, color_conversion_library):
         decoder = create_from_file(str(NASA_VIDEO.path))
