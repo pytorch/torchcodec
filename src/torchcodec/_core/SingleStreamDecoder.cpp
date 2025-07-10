@@ -321,10 +321,10 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 
 void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
     int streamIndex,
-    std::tuple<at::Tensor, at::Tensor, at::Tensor> customFrameMappings) {
-  auto& all_frames = std::get<0>(customFrameMappings);
-  auto& is_key_frame = std::get<1>(customFrameMappings);
-  auto& duration = std::get<2>(customFrameMappings);
+    CustomFrameMappings customFrameMappings) {
+  auto& all_frames = customFrameMappings.all_frames;
+  auto& is_key_frame = customFrameMappings.is_key_frame;
+  auto& duration = customFrameMappings.duration;
   TORCH_CHECK(
       all_frames.size(0) == is_key_frame.size(0) &&
           is_key_frame.size(0) == duration.size(0),
@@ -347,7 +347,7 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
     // FrameInfo struct utilizes PTS
     FrameInfo frameInfo = {all_frames[i].item<int64_t>()};
-    frameInfo.isKeyFrame = (is_key_frame[i].item<int64_t>() == 1);
+    frameInfo.isKeyFrame = (is_key_frame[i].item<bool>() == true);
     frameInfo.nextPts = (i + 1 < all_frames.size(0))
         ? all_frames[i + 1].item<int64_t>()
         : INT64_MAX;
@@ -468,8 +468,7 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
-        customFrameMappings) {
+    std::optional<CustomFrameMappings> customFrameMappings) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,

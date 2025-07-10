@@ -53,19 +53,32 @@ class SingleStreamDecoder {
   // the allFrames and keyFrames vectors.
   void scanFileAndUpdateMetadataAndIndex();
 
-  // Reads the user provided frame index and updates each StreamInfo's index,
-  // i.e. the allFrames and keyFrames vectors, and the
-  // endStreamPtsSecondsFromContent
-  void readCustomFrameMappingsUpdateMetadataAndIndex(
-      int streamIndex,
-      std::tuple<at::Tensor, at::Tensor, at::Tensor> customFrameMappings);
-
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
   // Returns the key frame indices as a tensor. The tensor is 1D and contains
   // int64 values, where each value is the frame index for a key frame.
   torch::Tensor getKeyFrameIndices();
+
+  struct CustomFrameMappings {
+    // all_frames is a 1D tensor of int64 values, where each value is the PTS
+    // for a frame in the stream.
+    // The size of all tensors in this struct must match.
+    torch::Tensor all_frames;
+    // is_key_frame is a 1D tensor of bool values, and indicates
+    // whether the corresponding frame in all_frames is a key frame.
+    torch::Tensor is_key_frame;
+    // duration is a 1D tensor of int64 values, where each value is the duration
+    // of the corresponding frame in all_frames.
+    torch::Tensor duration;
+  };
+
+  // Reads the user provided frame index and updates each StreamInfo's index,
+  // i.e. the allFrames and keyFrames vectors, and
+  // endStreamPtsSecondsFromContent
+  void readCustomFrameMappingsUpdateMetadataAndIndex(
+      int streamIndex,
+      CustomFrameMappings customFrameMappings);
 
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
@@ -74,8 +87,7 @@ class SingleStreamDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
-      std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
-          customFrameMappings = std::nullopt);
+      std::optional<CustomFrameMappings> customFrameMappings = std::nullopt);
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());

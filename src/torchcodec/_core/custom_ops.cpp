@@ -255,10 +255,17 @@ void _add_video_stream(
   if (device.has_value()) {
     videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
+  std::optional<SingleStreamDecoder::CustomFrameMappings> converted_mappings =
+      custom_frame_mappings.has_value()
+      ? std::make_optional(SingleStreamDecoder::CustomFrameMappings{
+            std::get<0>(custom_frame_mappings.value()),
+            std::get<1>(custom_frame_mappings.value()),
+            std::get<2>(custom_frame_mappings.value())})
+      : std::nullopt;
 
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions, custom_frame_mappings);
+      stream_index.value_or(-1), videoStreamOptions, converted_mappings);
 }
 
 // Add a new video stream at `stream_index` using the provided options.
