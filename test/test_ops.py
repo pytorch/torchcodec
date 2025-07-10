@@ -448,31 +448,31 @@ class TestVideoDecoderOps:
             )
             assert pts_is_equal
 
-    def test_seek_mode_frame_index_fails(self):
-        decoder = create_from_file(str(NASA_VIDEO.path), "frame_index")
+    def test_seek_mode_custom_frame_mappings_fails(self):
+        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
         with pytest.raises(
             RuntimeError,
-            match="Please provide a frame index when using frame_index seek mode.",
+            match="Please provide frame mappings when using custom_frame_mappings seek mode.",
         ):
-            add_video_stream(decoder, stream_index=0, frame_index=None)
+            add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
-        decoder = create_from_file(str(NASA_VIDEO.path), "frame_index")
+        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
         different_lengths = ((torch.tensor([1, 2, 3]), torch.tensor([1, 2]), torch.tensor([1, 2, 3])))
         with pytest.raises(
             RuntimeError,
             match="all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.",
         ):
-            add_video_stream(decoder, stream_index=0, frame_index=different_lengths)
+            add_video_stream(decoder, stream_index=0, custom_frame_mappings=different_lengths)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
-    def test_seek_mode_frame_index(self, device):
+    def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # frame index seek mode requires a stream index
-        decoder = create_from_file(str(NASA_VIDEO.path), "frame_index")
+        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
         add_video_stream(
             decoder,
             device=device,
             stream_index=stream_index,
-            frame_index=NASA_VIDEO.frame_index,
+            custom_frame_mappings=NASA_VIDEO.custom_frame_mappings,
         )
 
         frame0, _, _ = get_next_frame(decoder)

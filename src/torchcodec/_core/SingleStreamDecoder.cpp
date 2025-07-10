@@ -319,12 +319,12 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   scannedAllStreams_ = true;
 }
 
-void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(
+void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
     int streamIndex,
-    std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex) {
-  auto& all_frames = std::get<0>(frameIndex);
-  auto& is_key_frame = std::get<1>(frameIndex);
-  auto& duration = std::get<2>(frameIndex);
+    std::tuple<at::Tensor, at::Tensor, at::Tensor> customFrameMappings) {
+  auto& all_frames = std::get<0>(customFrameMappings);
+  auto& is_key_frame = std::get<1>(customFrameMappings);
+  auto& duration = std::get<2>(customFrameMappings);
   TORCH_CHECK(
       all_frames.size(0) == is_key_frame.size(0) && is_key_frame.size(0) == duration.size(0),
       "all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.");
@@ -468,7 +468,7 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frameIndex) {
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> customFrameMappings) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
@@ -494,11 +494,11 @@ void SingleStreamDecoder::addVideoStream(
   streamMetadata.sampleAspectRatio =
       streamInfo.codecContext->sample_aspect_ratio;
 
-  if (seekMode_ == SeekMode::frame_index) {
+  if (seekMode_ == SeekMode::custom_frame_mappings) {
     TORCH_CHECK(
-        frameIndex.has_value(),
-        "Please provide a frame index when using frame_index seek mode.");
-    readFrameIndexUpdateMetadataAndIndex(streamIndex, frameIndex.value());
+        customFrameMappings.has_value(),
+        "Please provide frame mappings when using custom_frame_mappings seek mode.");
+    readCustomFrameMappingsUpdateMetadataAndIndex(streamIndex, customFrameMappings.value());
   }
 }
 
@@ -1451,7 +1451,7 @@ int SingleStreamDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
 int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact: {
       auto frame = std::lower_bound(
           streamInfo.allFrames.begin(),
@@ -1479,7 +1479,7 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
 int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact: {
       auto frame = std::upper_bound(
           streamInfo.allFrames.begin(),
@@ -1507,7 +1507,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
 int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamInfo.allFrames[frameIndex].pts;
     case SeekMode::approximate: {
@@ -1532,7 +1532,7 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
 std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
@@ -1546,7 +1546,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
 double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.beginStreamPtsSecondsFromContent.value();
     case SeekMode::approximate:
@@ -1559,7 +1559,7 @@ double SingleStreamDecoder::getMinSeconds(
 std::optional<double> SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
-    case SeekMode::frame_index:
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
@@ -1695,8 +1695,8 @@ SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
     return SingleStreamDecoder::SeekMode::exact;
   } else if (seekMode == "approximate") {
     return SingleStreamDecoder::SeekMode::approximate;
-  } else if (seekMode == "frame_index") {
-    return SingleStreamDecoder::SeekMode::frame_index;
+  } else if (seekMode == "custom_frame_mappings") {
+    return SingleStreamDecoder::SeekMode::custom_frame_mappings;
   } else {
     TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
   }
