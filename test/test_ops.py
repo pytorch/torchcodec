@@ -449,14 +449,18 @@ class TestVideoDecoderOps:
             assert pts_is_equal
 
     def test_seek_mode_custom_frame_mappings_fails(self):
-        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
         with pytest.raises(
             RuntimeError,
             match="Please provide frame mappings when using custom_frame_mappings seek mode.",
         ):
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
-        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
         different_lengths = (
             torch.tensor([1, 2, 3]),
             torch.tensor([1, 2]),
@@ -473,7 +477,9 @@ class TestVideoDecoderOps:
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # frame index seek mode requires a stream index
-        decoder = create_from_file(str(NASA_VIDEO.path), "custom_frame_mappings")
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
         add_video_stream(
             decoder,
             device=device,
