@@ -29,7 +29,7 @@ class SingleStreamDecoder {
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
-  enum class SeekMode { exact, approximate };
+  enum class SeekMode { exact, approximate, frame_index };
 
   // Creates a SingleStreamDecoder from the video at videoFilePath.
   explicit SingleStreamDecoder(
@@ -53,6 +53,10 @@ class SingleStreamDecoder {
   // the allFrames and keyFrames vectors.
   void scanFileAndUpdateMetadataAndIndex();
 
+  // Reads the user provided frame index and updates each StreamInfo's index, i.e.
+  // the allFrames and keyFrames vectors, and the endStreamPtsSecondsFromContent
+  void readFrameIndexUpdateMetadataAndIndex(int streamIndex, std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex);
+
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
@@ -66,7 +70,8 @@ class SingleStreamDecoder {
 
   void addVideoStream(
       int streamIndex,
-      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
+      std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frameIndex = std::nullopt);
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
@@ -343,6 +348,8 @@ class SingleStreamDecoder {
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
+  // Tracks that frame index has been ingested
+  bool readFrameIndex_ = false;
 };
 
 // Prints the SingleStreamDecoder::DecodeStats to the ostream.

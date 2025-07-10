@@ -206,6 +206,7 @@ def _add_video_stream_abstract(
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
     color_conversion_library: Optional[str] = None,
+    frame_index: Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = None
 ) -> None:
     return
 
@@ -220,6 +221,8 @@ def add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+    color_conversion_library: Optional[str] = None,
+    frame_index: Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = None
 ) -> None:
     return
 

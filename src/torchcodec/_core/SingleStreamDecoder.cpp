@@ -319,6 +319,41 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   scannedAllStreams_ = true;
 }
 
+
+void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(int streamIndex, std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex){
+  if (readFrameIndex_) {
+    return;
+  }
+  auto& all_frames = std::get<0>(frameIndex);
+  auto& key_frames = std::get<1>(frameIndex);
+  auto& duration = std::get<2>(frameIndex);
+
+  auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
+
+  // Get the last index for key_frames and duration
+  auto last_idx = all_frames.size(0) - 1;
+  streamMetadata.beginStreamPtsFromContent = all_frames[0].item<int64_t>();
+  streamMetadata.endStreamPtsFromContent = all_frames[last_idx].item<int64_t>() + duration[last_idx].item<int64_t>();
+
+  auto avStream = formatContext_->streams[streamIndex];
+  streamMetadata.beginStreamPtsSecondsFromContent =
+      *streamMetadata.beginStreamPtsFromContent *
+      av_q2d(avStream->time_base);
+
+  streamMetadata.endStreamPtsSecondsFromContent =
+      *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+
+  streamMetadata.numFramesFromContent = all_frames.size(0);
+  for (int64_t i = 0; i < all_frames.size(0); ++i) {
+    // FrameInfo struct utilizes PTS
+    FrameInfo frameInfo = {all_frames[i].item<int64_t>()};
+    frameInfo.isKeyFrame = (i < key_frames.size(0) && key_frames[i].item<int64_t>() == 1);
+    frameInfo.nextPts = (i + 1 < all_frames.size(0)) ? all_frames[i + 1].item<int64_t>() : INT64_MAX;
+    streamInfos_[streamIndex].allFrames.push_back(frameInfo);
+  }
+  readFrameIndex_ = true;
+}
+
 ContainerMetadata SingleStreamDecoder::getContainerMetadata() const {
   return containerMetadata_;
 }
@@ -431,7 +466,8 @@ void SingleStreamDecoder::addStream(
 
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
-    const VideoStreamOptions& videoStreamOptions) {
+    const VideoStreamOptions& videoStreamOptions, 
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>> frameIndex) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
@@ -456,6 +492,11 @@ void SingleStreamDecoder::addVideoStream(
   streamMetadata.height = streamInfo.codecContext->height;
   streamMetadata.sampleAspectRatio =
       streamInfo.codecContext->sample_aspect_ratio;
+
+  if (seekMode_ == SeekMode::frame_index) {
+    TORCH_CHECK(frameIndex.has_value(), "Please provide a frame index when using frame_index seek mode.");
+    readFrameIndexUpdateMetadataAndIndex(streamIndex, frameIndex.value());
+  }
 }
 
 void SingleStreamDecoder::addAudioStream(
@@ -597,7 +638,7 @@ FrameBatchOutput SingleStreamDecoder::getFramesInRange(
     int64_t stop,
     int64_t step) {
   validateActiveStream(AVMEDIA_TYPE_VIDEO);
-
+  
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
@@ -1407,6 +1448,7 @@ int SingleStreamDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
 int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact: {
       auto frame = std::lower_bound(
           streamInfo.allFrames.begin(),
@@ -1434,6 +1476,7 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
 int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact: {
       auto frame = std::upper_bound(
           streamInfo.allFrames.begin(),
@@ -1444,7 +1487,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
           });
 
       return frame - streamInfo.allFrames.begin();
-    }
+    } 
     case SeekMode::approximate: {
       auto& streamMetadata =
           containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -1461,6 +1504,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
 int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact:
       return streamInfo.allFrames[frameIndex].pts;
     case SeekMode::approximate: {
@@ -1485,6 +1529,7 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
 std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact:
       return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
@@ -1498,6 +1543,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
 double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact:
       return streamMetadata.beginStreamPtsSecondsFromContent.value();
     case SeekMode::approximate:
@@ -1510,6 +1556,7 @@ double SingleStreamDecoder::getMinSeconds(
 std::optional<double> SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::frame_index:
     case SeekMode::exact:
       return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
@@ -1645,6 +1692,8 @@ SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
     return SingleStreamDecoder::SeekMode::exact;
   } else if (seekMode == "approximate") {
     return SingleStreamDecoder::SeekMode::approximate;
+  } else if (seekMode == "frame_index") {
+    return SingleStreamDecoder::SeekMode::frame_index;
   } else {
     TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
   }
