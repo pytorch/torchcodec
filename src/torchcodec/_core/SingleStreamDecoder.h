@@ -352,8 +352,6 @@ class SingleStreamDecoder {
   bool scannedAllStreams_ = false;
   // Tracks that we've already been initialized.
   bool initialized_ = false;
-  // Tracks that frame index has been ingested
-  bool readFrameIndex_ = false;
 };
 
 // Prints the SingleStreamDecoder::DecodeStats to the ostream.

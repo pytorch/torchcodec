@@ -322,20 +322,18 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(
     int streamIndex,
     std::tuple<at::Tensor, at::Tensor, at::Tensor> frameIndex) {
-  if (readFrameIndex_) {
-    return;
-  }
   auto& all_frames = std::get<0>(frameIndex);
-  auto& key_frames = std::get<1>(frameIndex);
+  auto& is_key_frame = std::get<1>(frameIndex);
   auto& duration = std::get<2>(frameIndex);
+  TORCH_CHECK(
+      all_frames.size(0) == is_key_frame.size(0) && is_key_frame.size(0) == duration.size(0),
+      "all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.");
 
   auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
 
-  // Get the last index for key_frames and duration
-  auto last_idx = all_frames.size(0) - 1;
   streamMetadata.beginStreamPtsFromContent = all_frames[0].item<int64_t>();
   streamMetadata.endStreamPtsFromContent =
-      all_frames[last_idx].item<int64_t>() + duration[last_idx].item<int64_t>();
+      all_frames[-1].item<int64_t>() + duration[-1].item<int64_t>();
 
   auto avStream = formatContext_->streams[streamIndex];
   streamMetadata.beginStreamPtsSecondsFromContent =
@@ -349,13 +347,12 @@ void SingleStreamDecoder::readFrameIndexUpdateMetadataAndIndex(
     // FrameInfo struct utilizes PTS
     FrameInfo frameInfo = {all_frames[i].item<int64_t>()};
     frameInfo.isKeyFrame =
-        (i < key_frames.size(0) && key_frames[i].item<int64_t>() == 1);
+        (is_key_frame[i].item<int64_t>() == 1);
     frameInfo.nextPts = (i + 1 < all_frames.size(0))
         ? all_frames[i + 1].item<int64_t>()
         : INT64_MAX;
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
   }
-  readFrameIndex_ = true;
 }
 
 ContainerMetadata SingleStreamDecoder::getContainerMetadata() const {
