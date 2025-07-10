@@ -33,6 +33,7 @@ jobs:
       test-infra-repository: pytorch/test-infra
       test-infra-ref: release/2.7
       with-xpu: disable
+      channel: release
       with-rocm: disable
       with-cuda: disable
       build-python-only: "disable"
