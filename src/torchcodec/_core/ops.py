@@ -46,7 +46,7 @@ def load_torchcodec_shared_libraries():
     exceptions = []
     for ffmpeg_major_version in (7, 6, 5, 4):
         pybind_ops_module_name = _get_pybind_ops_module_name(ffmpeg_major_version)
-        decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
+        decoder_library_name = f"libtorchcodec_core{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
