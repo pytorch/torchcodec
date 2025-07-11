@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 
 from dataclasses import dataclass, field
@@ -123,6 +124,9 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
+    custom_frame_mappings_data: Dict[
+        int, Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+    ] = field(default_factory=dict)
 
     def __post_init__(self):
         # We load the .frames attribute from the checked-in json files, if needed.
@@ -224,6 +228,50 @@ class TestContainerFile:
             stream_index = self.default_stream_index
 
         return self.frames[stream_index][idx]
+
+    # This function is used to get the frame mappings for the custom_frame_mappings seek mode.
+    def get_custom_frame_mappings(
+        self, stream_index: Optional[int] = None
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+        if self.custom_frame_mappings_data.get(stream_index) is None:
+            self.generate_custom_frame_mappings(stream_index)
+        return self.custom_frame_mappings_data[stream_index]
+
+    def generate_custom_frame_mappings(self, stream_index: int) -> None:
+        result = json.loads(
+            subprocess.run(
+                [
+                    "ffprobe",
+                    "-i",
+                    f"{self.path}",
+                    "-select_streams",
+                    f"{stream_index}",
+                    "-show_frames",
+                    "-of",
+                    "json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+        )
+        pts_list = [float(frame["pts"]) for frame in result["frames"]]
+        is_key_frame_list = [frame["key_frame"] for frame in result["frames"]]
+        duration_list = [float(frame["duration"]) for frame in result["frames"]]
+        # Zip the lists together, sort by pts, then unzip
+        assert (
+            len(pts_list) == len(is_key_frame_list) == len(duration_list)
+        ), "Mismatched lengths in frame index data"
+        combined = list(zip(pts_list, is_key_frame_list, duration_list))
+        combined.sort(key=lambda x: x[0])
+        pts_sorted, is_key_frame_sorted, duration_sorted = zip(*combined)
+        self.custom_frame_mappings_data[stream_index] = (
+            torch.tensor(pts_sorted),
+            torch.tensor(is_key_frame_sorted),
+            torch.tensor(duration_sorted),
+        )
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:

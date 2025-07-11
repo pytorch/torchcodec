@@ -36,9 +36,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
   m.def(
-      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, str? color_conversion_library=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None, str? color_conversion_library=None) -> ()");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None) -> ()");
   m.def(
       "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None, int? num_channels=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
@@ -223,6 +223,8 @@ void _add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+        custom_frame_mappings = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt) {
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.width = width;
@@ -253,9 +255,9 @@ void _add_video_stream(
   if (device.has_value()) {
     videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
-
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
-  videoDecoder->addVideoStream(stream_index.value_or(-1), videoStreamOptions);
+  videoDecoder->addVideoStream(
+      stream_index.value_or(-1), videoStreamOptions, custom_frame_mappings);
 }
 
 // Add a new video stream at `stream_index` using the provided options.
@@ -266,7 +268,9 @@ void add_video_stream(
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
-    std::optional<std::string_view> device = std::nullopt) {
+    std::optional<std::string_view> device = std::nullopt,
+    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+        custom_frame_mappings = std::nullopt) {
   _add_video_stream(
       decoder,
       width,
@@ -274,7 +278,8 @@ void add_video_stream(
       num_threads,
       dimension_order,
       stream_index,
-      device);
+      device,
+      custom_frame_mappings);
 }
 
 void add_audio_stream(
