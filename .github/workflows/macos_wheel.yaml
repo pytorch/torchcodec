@@ -26,12 +26,12 @@ defaults:
 jobs:
 
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.7
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@release/2.7-torchcodec
     with:
       package-type: wheel
       os: macos-arm64
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.7
+      test-infra-ref: release/2.7-torchcodec
       with-xpu: disable
       with-rocm: disable
       with-cuda: disable
@@ -42,12 +42,12 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload Mac wheel
-    uses: pytorch/test-infra/.github/workflows/build_wheels_macos.yml@release/2.7
+    uses: pytorch/test-infra/.github/workflows/build_wheels_macos.yml@release/2.7-torchcodec
     with:
       repository: pytorch/torchcodec
       ref: ""
       test-infra-repository: pytorch/test-infra
-      test-infra-ref: release/2.7
+      test-infra-ref: release/2.7-torchcodec
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       post-script: packaging/post_build_script.sh

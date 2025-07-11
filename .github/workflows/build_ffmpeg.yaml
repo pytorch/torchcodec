@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
-    uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@release/2.7
+    uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@release/2.7-torchcodec
     permissions:
       id-token: write
       contents: read
@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1"]
-    uses: pytorch/test-infra/.github/workflows/macos_job.yml@release/2.7
+    uses: pytorch/test-infra/.github/workflows/macos_job.yml@release/2.7-torchcodec
     with:
       job-name: Build
       upload-artifact: ffmpeg-lgpl-macos-${{ matrix.ffmpeg-version }}
