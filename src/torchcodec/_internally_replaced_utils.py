@@ -61,4 +61,4 @@ def _get_pybind_ops_module_name(ffmpeg_major_version: str) -> str:
     #
     # The parameter ffmpeg_major_version is unused externally, but used
     # internally.
-    return "decoder_core_pybind_ops"
+    return "core_pybind_ops"
