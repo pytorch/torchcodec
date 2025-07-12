@@ -162,15 +162,14 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 #endif
 }
 
-NppStreamContext createNppStreamContext(
-    cudaStream_t rawStream,
-    int deviceIndex) {
+NppStreamContext createNppStreamContext(int deviceIndex) {
+  // Build an NppStreamContext, either via the old helper or by hand on CUDA
+  // 12.9+
+
   NppStreamContext nppCtx{};
 #if CUDA_VERSION < 12090
   NppStatus ctxStat = nppGetStreamContext(&nppCtx);
   TORCH_CHECK(ctxStat == NPP_SUCCESS, "nppGetStreamContext failed");
-  // override if you want to force a particular stream
-  nppCtx.hStream = rawStream;
 #else
   // CUDA 12.9+: helper was removed, we need to build it manually
   cudaDeviceProp prop{};
@@ -185,7 +184,6 @@ NppStreamContext createNppStreamContext(
   nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
   nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
   nppCtx.nStreamFlags = 0;
-  nppCtx.hStream = rawStream;
 #endif
   return nppCtx;
 }
@@ -253,11 +251,11 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device_);
 
-  cudaStream_t rawStream = at::cuda::getCurrentCUDAStream().stream();
-
-  // Build an NppStreamContext, either via the old helper or by hand on
-  // CUDA 12.9+
-  NppStreamContext nppCtx = createNppStreamContext(rawStream, device_.index());
+  if (!nppCtxInitialized_) {
+    nppCtx_ = createNppStreamContext(device_.index());
+    nppCtxInitialized_ = true;
+  }
+  nppCtx_.hStream = at::cuda::getCurrentCUDAStream().stream();
 
   // Prepare ROI + pointers
   NppiSize oSizeROI = {width, height};
@@ -273,7 +271,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx);
+        nppCtx_);
   } else {
     status = nppiNV12ToRGB_8u_P2C3R_Ctx(
         input,
@@ -281,7 +279,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx);
+        nppCtx_);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 
