@@ -174,7 +174,10 @@ NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
   // CUDA 12.9+: helper was removed, we need to build it manually
   cudaDeviceProp prop{};
   cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
-  TORCH_CHECK(err == cudaSuccess, "cudaGetDeviceProperties failed");
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaGetDeviceProperties failed: ",
+      cudaGetErrorString(err));
 
   nppCtx.nCudaDeviceId = deviceIndex;
   nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
@@ -252,7 +255,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   c10::cuda::CUDAGuard deviceGuard(device_);
 
   if (!nppCtxInitialized_) {
-    nppCtx_ = createNppStreamContext(device_.index());
+    nppCtx_ = createNppStreamContext(
+        static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
     nppCtxInitialized_ = true;
   }
   nppCtx_.hStream = at::cuda::getCurrentCUDAStream().stream();
