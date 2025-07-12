@@ -367,7 +367,7 @@ class TestAudioEncoder:
     @pytest.mark.parametrize("num_channels_input", (1, 2))
     @pytest.mark.parametrize("num_channels_output", (1, 2, None))
     @pytest.mark.parametrize("method", ("to_file", "to_tensor"))
-    @pytest.mark.parametrize("i", range(1000))
+    @pytest.mark.parametrize("i", range(10_000))
     def test_num_channels(
         self, num_channels_input, num_channels_output, method, tmp_path, i
     ):
