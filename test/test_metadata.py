@@ -254,7 +254,7 @@ def test_repr():
   num_frames_from_header: 390
   num_frames_from_content: 390
   average_fps_from_header: 29.97003
-  pixel_aspect_ratio: 1
+  pixel_aspect_ratio: 1/1
   duration_seconds: 13.013
   begin_stream_seconds: 0.0
   end_stream_seconds: 13.013
