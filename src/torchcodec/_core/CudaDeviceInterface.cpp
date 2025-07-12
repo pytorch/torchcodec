@@ -161,6 +161,36 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
       device, nonNegativeDeviceIndex, type);
 #endif
 }
+
+NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
+  // Build an NppStreamContext, either via the old helper or by hand on CUDA
+  // 12.9+
+
+  NppStreamContext nppCtx{};
+#if CUDA_VERSION < 12090
+  NppStatus ctxStat = nppGetStreamContext(&nppCtx);
+  TORCH_CHECK(ctxStat == NPP_SUCCESS, "nppGetStreamContext failed");
+#else
+  // CUDA 12.9+: helper was removed, we need to build it manually
+  cudaDeviceProp prop{};
+  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaGetDeviceProperties failed: ",
+      cudaGetErrorString(err));
+
+  nppCtx.nCudaDeviceId = deviceIndex;
+  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
+  nppCtx.nStreamFlags = 0;
+#endif
+  return nppCtx;
+}
+
 } // namespace
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
@@ -224,41 +254,43 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device_);
 
+  if (!nppCtxInitialized_) {
+    nppCtx_ = createNppStreamContext(
+        static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
+    nppCtxInitialized_ = true;
+  }
+  nppCtx_.hStream = at::cuda::getCurrentCUDAStream().stream();
+
+  // Prepare ROI + pointers
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
   auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
+
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-    status = nppiNV12ToRGB_709CSC_8u_P2C3R(
+    status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
         input,
         avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
-        oSizeROI);
+        oSizeROI,
+        nppCtx_);
   } else {
-    status = nppiNV12ToRGB_8u_P2C3R(
+    status = nppiNV12ToRGB_8u_P2C3R_Ctx(
         input,
         avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
-        oSizeROI);
+        oSizeROI,
+        nppCtx_);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 
-  // Make the pytorch stream wait for the npp kernel to finish before using the
-  // output.
-  at::cuda::CUDAEvent nppDoneEvent;
-  at::cuda::CUDAStream nppStreamWrapper =
-      c10::cuda::getStreamFromExternal(nppGetStream(), device_.index());
-  nppDoneEvent.record(nppStreamWrapper);
-  nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
-
   auto end = std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<double, std::micro> duration = end - start;
-  VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
-          << " took: " << duration.count() << "us" << std::endl;
+  auto duration = std::chrono::duration<double, std::micro>(end - start);
+  VLOG(9) << "NPP Conversion of frame h=" << height << " w=" << width
+          << " took: " << duration.count() << "us";
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9
