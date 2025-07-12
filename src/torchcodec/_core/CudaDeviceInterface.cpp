@@ -161,6 +161,35 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
       device, nonNegativeDeviceIndex, type);
 #endif
 }
+
+NppStreamContext createNppStreamContext(
+    cudaStream_t rawStream,
+    int deviceIndex) {
+  NppStreamContext nppCtx{};
+#if CUDA_VERSION < 12090
+  NppStatus ctxStat = nppGetStreamContext(&nppCtx);
+  TORCH_CHECK(ctxStat == NPP_SUCCESS, "nppGetStreamContext failed");
+  // override if you want to force a particular stream
+  nppCtx.hStream = rawStream;
+#else
+  // CUDA 12.9+: helper was removed, we need to build it manually
+  cudaDeviceProp prop{};
+  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  TORCH_CHECK(err == cudaSuccess, "cudaGetDeviceProperties failed");
+
+  nppCtx.nCudaDeviceId = deviceIndex;
+  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
+  nppCtx.nStreamFlags = 0;
+  nppCtx.hStream = rawStream;
+#endif
+  return nppCtx;
+}
+
 } // namespace
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
@@ -228,31 +257,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
 
   // Build an NppStreamContext, either via the old helper or by hand on
   // CUDA 12.9+
-  NppStreamContext nppCtx{};
-#if CUDA_VERSION < 12090
-  NppStatus ctxStat = nppGetStreamContext(&nppCtx);
-  TORCH_CHECK(ctxStat == NPP_SUCCESS, "nppGetStreamContext failed");
-  // override if you want to force a particular stream
-  nppCtx.hStream = rawStream;
-#else
-  // CUDA 12.9+: helper was removed, we need to build it manually
-  int dev = 0;
-  cudaError_t err = cudaGetDevice(&dev);
-  TORCH_CHECK(err == cudaSuccess, "cudaGetDevice failed");
-  cudaDeviceProp prop{};
-  err = cudaGetDeviceProperties(&prop, dev);
-  TORCH_CHECK(err == cudaSuccess, "cudaGetDeviceProperties failed");
-
-  nppCtx.nCudaDeviceId = dev;
-  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
-  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
-  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
-  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
-  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
-  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
-  nppCtx.nStreamFlags = 0;
-  nppCtx.hStream = rawStream;
-#endif
+  NppStreamContext nppCtx = createNppStreamContext(rawStream, device_.index());
 
   // Prepare ROI + pointers
   NppiSize oSizeROI = {width, height};
