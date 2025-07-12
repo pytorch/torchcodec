@@ -162,7 +162,7 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 #endif
 }
 
-NppStreamContext createNppStreamContext(int deviceIndex) {
+NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
   // Build an NppStreamContext, either via the old helper or by hand on CUDA
   // 12.9+
 
