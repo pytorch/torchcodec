@@ -196,10 +196,41 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  // We check that avFrame->format == AV_PIX_FMT_CUDA. This only ensures the
+  // AVFrame is on GPU memory. It can be on CPU memory if the video isn't
+  // supported by NVDEC for whatever reason: NVDEC falls back to CPU decoding in
+  // this case, and our check fails.
+  // TODO: we could send the frame back into the CPU path, and rely on
+  // swscale/filtergraph to run the color conversion to properly output the
+  // frame.
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
-      "Expected format to be AV_PIX_FMT_CUDA, got " +
-          std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
+      "Expected format to be AV_PIX_FMT_CUDA, got ",
+      std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)),
+      ". When that happens, it is probably because the video is not supported by NVDEC. "
+      "Try using the CPU device instead.");
+
+  // Above we checked that the AVFrame was on GPU, but that's not enough, we
+  // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
+  // because this is what the NPP color conversion routines expect.
+  // TODO: we should investigate how to can perform color conversion for
+  // non-8bit videos. This is supported on CPU.
+  TORCH_CHECK(
+      avFrame->hw_frames_ctx != nullptr,
+      "The AVFrame does not have a hw_frames_ctx. "
+      "That's unexpected, please report this to the TorchCodec repo.");
+
+  AVPixelFormat actualFormat =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data)
+          ->sw_format;
+  TORCH_CHECK(
+      actualFormat == AV_PIX_FMT_NV12,
+      "The AVFrame is ",
+      std::string(av_get_pix_fmt_name(actualFormat)),
+      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
+      "the video isn't 8bit, which is not supported on CUDA at the moment. "
+      "Try using the CPU device instead.");
+
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
