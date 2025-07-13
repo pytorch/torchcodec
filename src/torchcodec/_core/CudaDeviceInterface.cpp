@@ -206,9 +206,13 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected format to be AV_PIX_FMT_CUDA, got ",
-      std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)),
+      (av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
+           ? av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
+           : "unknown"),
       ". When that happens, it is probably because the video is not supported by NVDEC. "
-      "Try using the CPU device instead.");
+      "Try using the CPU device instead. "
+      "If the video is 10bit, we are tracking 10bit support in "
+      "https://github.com/pytorch/torchcodec/issues/776");
 
   // Above we checked that the AVFrame was on GPU, but that's not enough, we
   // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
@@ -226,10 +230,13 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   TORCH_CHECK(
       actualFormat == AV_PIX_FMT_NV12,
       "The AVFrame is ",
-      std::string(av_get_pix_fmt_name(actualFormat)),
+      (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+                                         : "unknown"),
       ", but we expected AV_PIX_FMT_NV12. This typically happens when "
       "the video isn't 8bit, which is not supported on CUDA at the moment. "
-      "Try using the CPU device instead.");
+      "Try using the CPU device instead. "
+      "If the video is 10bit, we are tracking 10bit support in "
+      "https://github.com/pytorch/torchcodec/issues/776");
 
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);

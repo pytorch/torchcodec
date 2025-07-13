@@ -26,12 +26,15 @@ from .utils import (
     AV1_VIDEO,
     cpu_and_cuda,
     get_ffmpeg_major_version,
+    H264_10BITS,
+    H265_10BITS,
     H265_VIDEO,
     in_fbcode,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
+    needs_cuda,
     SINE_MONO_S16,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
@@ -1137,6 +1140,31 @@ class TestVideoDecoder:
         decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
+
+    @needs_cuda
+    @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
+    def test_10bit_videos_cuda(self, asset):
+        # Assert that we raise proper error on different kinds of 10bit videos.
+
+        # TODO we should investigate how to support 10bit videos on GPU.
+        # See https://github.com/pytorch/torchcodec/issues/776
+
+        decoder = VideoDecoder(asset.path, device="cuda")
+
+        if asset is H265_10BITS:
+            match = "The AVFrame is p010le, but we expected AV_PIX_FMT_NV12."
+        else:
+            match = "Expected format to be AV_PIX_FMT_CUDA, got yuv420p10le."
+        with pytest.raises(RuntimeError, match=match):
+            decoder.get_frame_at(0)
+
+    @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
+    def test_10bit_videos_cpu(self, asset):
+        # This just validates that we can decode 10-bit videos on CPU.
+        # TODO validate against the ref that the decoded frames are correct
+
+        decoder = VideoDecoder(asset.path)
+        decoder.get_frame_at(10)
 
 
 class TestAudioDecoder:
