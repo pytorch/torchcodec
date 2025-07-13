@@ -69,7 +69,7 @@ jobs:
         python-version: ['3.9']
         cuda-version: ['12.6', '12.8']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
-        ffmpeg-version-for-tests: ['4.4.2', '6', '7']
+        ffmpeg-version-for-tests: ['4.4.2', '5', '6', '7']
 
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
@@ -91,6 +91,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
+          # Note: xorg-libxau was addded to fix a problem with ffmpeg 4. We should consider removing it.
           default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }} conda-forge::xorg-libxau"
       - name: Check env
         run: |
