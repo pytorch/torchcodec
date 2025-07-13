@@ -1445,7 +1445,7 @@ class TestAudioDecoder:
 
         cm = (
             pytest.raises(RuntimeError, match="The frame has 0 channels, expected 1.")
-            if get_ffmpeg_major_version() == 4
+            if get_ffmpeg_major_version() in (4, 5)
             else contextlib.nullcontext()
         )
         with cm:
