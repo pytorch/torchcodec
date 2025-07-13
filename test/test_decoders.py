@@ -360,7 +360,7 @@ class TestVideoDecoder:
             ]
         )
         for sliced, ref in zip(all_frames, decoder):
-            if not (device == "cuda" and get_ffmpeg_major_version() == 4):
+            if not (device == "cuda" and get_ffmpeg_major_version() in (4, 5)):
                 # TODO: remove the "if".
                 # See https://github.com/pytorch/torchcodec/issues/428
                 assert_frames_equal(sliced, ref)
@@ -563,7 +563,7 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_at_av1(self, device):
-        if device == "cuda" and get_ffmpeg_major_version() == 4:
+        if device == "cuda" and get_ffmpeg_major_version() in (4, 5):
             return
 
         decoder = VideoDecoder(AV1_VIDEO.path, device=device)
@@ -1445,7 +1445,7 @@ class TestAudioDecoder:
 
         cm = (
             pytest.raises(RuntimeError, match="The frame has 0 channels, expected 1.")
-            if get_ffmpeg_major_version() == 4
+            if get_ffmpeg_major_version() in (4, 5)
             else contextlib.nullcontext()
         )
         with cm:
