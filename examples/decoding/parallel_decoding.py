@@ -20,14 +20,16 @@ parallelization strategies:
 We'll use `joblib <https://joblib.readthedocs.io/en/latest/>`_ for
 parallelization, as it provides very convenient APIs for distributing work
 across multiple processes or threads. But this is just one of many ways to
-parallelize work Python. You can absolutely use your own thread or process pool.
+parallelize work in Python. You can absolutely use a different thread or process
+pool manager.
 """
 
 # %%
-# Setup and dependencies
-# ----------------------
-#
-# First, let's import the required libraries and set up our dependencies.
+# Let's first define some utility functions for benchmarking and data
+# processing.  We'll also download a video and create a longer version by
+# repeating it multiple times. This simulates working with long videos that
+# require efficient processing. You can ignore that part and jump right below to
+# :ref:`start_parallel_decoding`.
 
 from typing import List
 import torch
@@ -41,13 +43,6 @@ from datetime import timedelta
 from joblib import Parallel, delayed, cpu_count
 from torchcodec.decoders import VideoDecoder
 
-
-# %%
-# Let's first define some utility functions for benchmarking and data
-# processing.  We'll also download a video and create a longer version by
-# repeating it multiple times. This simulates working with long videos that
-# require efficient processing. You can ignore that part and jump right below to
-# :ref:`start_parallel_decoding`.
 
 def bench(f, *args, num_exp=3, warmup=1, **kwargs):
     """Benchmark a function by running it multiple times and measuring execution time."""
@@ -130,11 +125,12 @@ print(f"Total frames: {metadata.num_frames}")
 
 # %%
 # .. _start_parallel_decoding:
+#
 # Frame sampling strategy
 # -----------------------
 #
 # For this tutorial, we'll sample frames at a target rate of 2 FPS from our long
-# video.  This simulates a common scenario where you need to process a subset of
+# video. This simulates a common scenario where you need to process a subset of
 # frames for LLM infenrence.
 
 TARGET_FPS = 2
@@ -182,7 +178,7 @@ NUM_CPUS = cpu_count()
 times, result_ffmpeg = bench(decode_with_ffmpeg_parallelism, all_indices, num_threads=NUM_CPUS)
 ffmpeg_time = report_stats(times, unit="s")
 speedup = sequential_time / ffmpeg_time
-print(f"Speedup vs sequential: {speedup:.2f}x")
+print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} FFmpeg threads.")
 
 
 # %%
@@ -205,7 +201,7 @@ def decode_with_multiprocessing(indices: List[int], num_processes: int, video_pa
 times, result_multiprocessing = bench(decode_with_multiprocessing, all_indices, num_processes=NUM_CPUS)
 multiprocessing_time = report_stats(times, unit="s")
 speedup = sequential_time / multiprocessing_time
-print(f"Speedup vs sequential: {speedup:.2f}x")
+print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} processe.")
 
 
 # %%
@@ -230,7 +226,7 @@ def decode_with_multithreading(indices: List[int], num_threads: int, video_path=
 times, result_multithreading = bench(decode_with_multithreading, all_indices, num_threads=NUM_CPUS)
 multithreading_time = report_stats(times, unit="s")
 speedup = sequential_time / multithreading_time
-print(f"Speedup vs sequential: {speedup:.2f}x")
+print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} threads.")
 
 
 # %%
