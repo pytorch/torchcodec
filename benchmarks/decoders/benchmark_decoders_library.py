@@ -241,7 +241,7 @@ class TorchCodecCore(AbstractDecoder):
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
         frames, *_ = get_frames_by_pts(
-            decoder, stream_index=best_video_stream, timestamps=pts_list
+            decoder, timestamps=pts_list
         )
         return frames
 
@@ -359,7 +359,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         metadata = json.loads(get_json_metadata(decoder))
         best_video_stream = metadata["bestVideoStreamIndex"]
         frames, *_ = get_frames_by_pts(
-            decoder, stream_index=best_video_stream, timestamps=pts_list
+            decoder, timestamps=pts_list
         )
         return frames
 
@@ -375,7 +375,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
         best_video_stream = metadata["bestVideoStreamIndex"]
         indices_list = list(range(n))
         frames, *_ = get_frames_at_indices(
-            decoder, stream_index=best_video_stream, frame_indices=indices_list
+            decoder, frame_indices=indices_list
         )
         return frames
 
