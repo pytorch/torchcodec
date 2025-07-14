@@ -122,7 +122,7 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
-    custom_frame_mappings_data: Dict[
+    _custom_frame_mappings_data: Dict[
         int, Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
     ] = field(default_factory=dict)
 
@@ -233,9 +233,9 @@ class TestContainerFile:
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if stream_index is None:
             stream_index = self.default_stream_index
-        if self.custom_frame_mappings_data.get(stream_index) is None:
+        if self._custom_frame_mappings_data.get(stream_index) is None:
             self.generate_custom_frame_mappings(stream_index)
-        return self.custom_frame_mappings_data[stream_index]
+        return self._custom_frame_mappings_data[stream_index]
 
     def generate_custom_frame_mappings(self, stream_index: int) -> None:
         result = json.loads(
@@ -265,7 +265,7 @@ class TestContainerFile:
         combined = list(zip(pts_list, is_key_frame_list, duration_list))
         combined.sort(key=lambda x: x[0])
         pts_sorted, is_key_frame_sorted, duration_sorted = zip(*combined)
-        self.custom_frame_mappings_data[stream_index] = (
+        self._custom_frame_mappings_data[stream_index] = (
             torch.tensor(pts_sorted),
             torch.tensor(is_key_frame_sorted),
             torch.tensor(duration_sorted),
