@@ -58,7 +58,7 @@ class SingleStreamDecoder {
   // endStreamPtsSecondsFromContent
   void readCustomFrameMappingsUpdateMetadataAndIndex(
       int streamIndex,
-      std::tuple<at::Tensor, at::Tensor, at::Tensor> customFrameMappings);
+      FrameMappings customFrameMappings);
 
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
@@ -74,8 +74,7 @@ class SingleStreamDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
-      std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
-          customFrameMappings = std::nullopt);
+      std::optional<FrameMappings> customFrameMappings = std::nullopt);
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());

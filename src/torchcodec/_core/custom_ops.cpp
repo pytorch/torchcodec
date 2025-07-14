@@ -105,6 +105,14 @@ OpsFrameOutput makeOpsFrameOutput(FrameOutput& frame) {
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
+FrameMappings makeFrameMappings(
+    std::tuple<at::Tensor, at::Tensor, at::Tensor> custom_frame_mappings) {
+  return FrameMappings{
+      std::get<0>(custom_frame_mappings),
+      std::get<1>(custom_frame_mappings),
+      std::get<2>(custom_frame_mappings)};
+}
+
 // All elements of this tuple are tensors of the same leading dimension. The
 // tuple represents the frames for N total frames, where N is the dimension of
 // each stacked tensor. The elments are:
@@ -255,9 +263,13 @@ void _add_video_stream(
   if (device.has_value()) {
     videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
+  std::optional<FrameMappings> converted_mappings =
+      custom_frame_mappings.has_value()
+      ? std::make_optional(makeFrameMappings(custom_frame_mappings.value()))
+      : std::nullopt;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions, custom_frame_mappings);
+      stream_index.value_or(-1), videoStreamOptions, converted_mappings);
 }
 
 // Add a new video stream at `stream_index` using the provided options.
