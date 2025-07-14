@@ -346,12 +346,15 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
   streamMetadata.numFramesFromContent = all_frames.size(0);
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
     // FrameInfo struct utilizes PTS
-    FrameInfo frameInfo = {all_frames[i].item<int64_t>()};
+    FrameInfo frameInfo = {.pts=all_frames[i].item<int64_t>()};
     frameInfo.isKeyFrame = (is_key_frame[i].item<bool>() == true);
     frameInfo.nextPts = (i + 1 < all_frames.size(0))
         ? all_frames[i + 1].item<int64_t>()
         : INT64_MAX;
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
+    if (frameInfo.isKeyFrame) {
+      streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
+    } 
   }
 }
 
