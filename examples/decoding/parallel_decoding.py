@@ -87,29 +87,35 @@ def split_indices(indices: List[int], num_chunks: int) -> List[List[int]]:
     return chunks
 
 
-# Video source: https://www.pexels.com/video/dog-eating-854132/
-# License: CC0. Author: Coverr.
-url = "https://videos.pexels.com/video-files/854132/854132-sd_640_360_25fps.mp4"
-response = requests.get(url, headers={"User-Agent": ""})
-if response.status_code != 200:
-    raise RuntimeError(f"Failed to download video. {response.status_code = }.")
+def generate_long_video(temp_dir: str):
+    # Video source: https://www.pexels.com/video/dog-eating-854132/
+    # License: CC0. Author: Coverr.
+    url = "https://videos.pexels.com/video-files/854132/854132-sd_640_360_25fps.mp4"
+    response = requests.get(url, headers={"User-Agent": ""})
+    if response.status_code != 200:
+        raise RuntimeError(f"Failed to download video. {response.status_code = }.")
+
+    short_video_path = Path(temp_dir) / "short_video.mp4"
+    with open(short_video_path, 'wb') as f:
+        for chunk in response.iter_content():
+            f.write(chunk)
+
+    # Create a longer video by repeating the short one 50 times
+    long_video_path = Path(temp_dir) / "long_video.mp4"
+    ffmpeg_command = [
+        "ffmpeg", "-y",
+        "-stream_loop", "49",  # repeat video 50 times
+        "-i", str(short_video_path),
+        "-c", "copy",
+        str(long_video_path)
+    ]
+    subprocess.run(ffmpeg_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    return short_video_path, long_video_path
+
 
 temp_dir = tempfile.mkdtemp()
-short_video_path = Path(temp_dir) / "short_video.mp4"
-with open(short_video_path, 'wb') as f:
-    for chunk in response.iter_content():
-        f.write(chunk)
-
-# Create a longer video by repeating the short one 50 times
-long_video_path = Path(temp_dir) / "long_video.mp4"
-ffmpeg_command = [
-    "ffmpeg", "-y",
-    "-stream_loop", "49",  # repeat video 50 times
-    "-i", str(short_video_path),
-    "-c", "copy",
-    str(long_video_path)
-]
-subprocess.run(ffmpeg_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+short_video_path, long_video_path = generate_long_video(temp_dir)
 
 decoder = VideoDecoder(long_video_path, seek_mode="approximate")
 metadata = decoder.metadata
@@ -129,9 +135,9 @@ print(f"Total frames: {metadata.num_frames}")
 # Frame sampling strategy
 # -----------------------
 #
-# For this tutorial, we'll sample frames at a target rate of 2 FPS from our long
-# video. This simulates a common scenario where you need to process a subset of
-# frames for LLM infenrence.
+# For this tutorial, we'll sample a frame every 2 seconds from our long video.
+# This simulates a common scenario where you need to process a subset of frames
+# for LLM inference.
 
 TARGET_FPS = 2
 step = max(1, round(metadata.average_fps / TARGET_FPS))
@@ -167,7 +173,11 @@ sequential_time = report_stats(times, unit="s")
 # via the ``num_ffmpeg_threads`` parameter. This approach uses multiple
 # threads within FFmpeg itself to accelerate decoding operations.
 
-def decode_with_ffmpeg_parallelism(indices: List[int], num_threads: int, video_path=long_video_path):
+def decode_with_ffmpeg_parallelism(
+    indices: List[int],
+    num_threads: int,
+    video_path=long_video_path
+):
     """Decode frames using FFmpeg's internal threading."""
     decoder = VideoDecoder(video_path, num_ffmpeg_threads=num_threads, seek_mode="approximate")
     return decoder.get_frames_at(indices)
@@ -178,7 +188,7 @@ NUM_CPUS = cpu_count()
 times, result_ffmpeg = bench(decode_with_ffmpeg_parallelism, all_indices, num_threads=NUM_CPUS)
 ffmpeg_time = report_stats(times, unit="s")
 speedup = sequential_time / ffmpeg_time
-print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} FFmpeg threads.")
+print(f"Speedup compared to sequential: {speedup:.2f}x with {NUM_CPUS} FFmpeg threads.")
 
 
 # %%
@@ -187,10 +197,15 @@ print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} FFmpeg threads.")
 #
 # Process-based parallelism distributes work across multiple Python processes.
 
-def decode_with_multiprocessing(indices: List[int], num_processes: int, video_path=long_video_path):
+def decode_with_multiprocessing(
+    indices: List[int],
+    num_processes: int,
+    video_path=long_video_path
+):
     """Decode frames using multiple processes with joblib."""
     chunks = split_indices(indices, num_chunks=num_processes)
 
+    # loky is a multi-processing backend for joblib: https://github.com/joblib/loky
     results = Parallel(n_jobs=num_processes, backend="loky", verbose=0)(
         delayed(decode_sequentially)(chunk, video_path) for chunk in chunks
     )
@@ -201,7 +216,7 @@ def decode_with_multiprocessing(indices: List[int], num_processes: int, video_pa
 times, result_multiprocessing = bench(decode_with_multiprocessing, all_indices, num_processes=NUM_CPUS)
 multiprocessing_time = report_stats(times, unit="s")
 speedup = sequential_time / multiprocessing_time
-print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} processes.")
+print(f"Speedup compared to sequential: {speedup:.2f}x with {NUM_CPUS} processes.")
 
 
 # %%
@@ -211,7 +226,11 @@ print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} processes.")
 # Thread-based parallelism uses multiple threads within a single process.
 # TorchCodec releases the GIL, so this can be very effective.
 
-def decode_with_multithreading(indices: List[int], num_threads: int, video_path=long_video_path):
+def decode_with_multithreading(
+    indices: List[int],
+    num_threads: int,
+    video_path=long_video_path
+):
     """Decode frames using multiple threads with joblib."""
     chunks = split_indices(indices, num_chunks=num_threads)
 
@@ -226,7 +245,7 @@ def decode_with_multithreading(indices: List[int], num_threads: int, video_path=
 times, result_multithreading = bench(decode_with_multithreading, all_indices, num_threads=NUM_CPUS)
 multithreading_time = report_stats(times, unit="s")
 speedup = sequential_time / multithreading_time
-print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} threads.")
+print(f"Speedup compared to sequential: {speedup:.2f}x with {NUM_CPUS} threads.")
 
 
 # %%
