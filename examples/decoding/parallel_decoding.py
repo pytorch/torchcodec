@@ -201,7 +201,7 @@ def decode_with_multiprocessing(indices: List[int], num_processes: int, video_pa
 times, result_multiprocessing = bench(decode_with_multiprocessing, all_indices, num_processes=NUM_CPUS)
 multiprocessing_time = report_stats(times, unit="s")
 speedup = sequential_time / multiprocessing_time
-print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} processe.")
+print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} processes.")
 
 
 # %%
@@ -235,23 +235,10 @@ print(f"Speedup vs sequential: {speedup:.2f}x with {NUM_CPUS} threads.")
 #
 # Let's verify that all methods produce identical results.
 
-try:
-    torch.testing.assert_close(result_sequential.data, result_ffmpeg.data, atol=0, rtol=0)
-    print("✓ FFmpeg parallelism produces identical results")
-except AssertionError:
-    print("✗ FFmpeg parallelism results differ from sequential")
-
-try:
-    torch.testing.assert_close(result_sequential.data, result_multiprocessing, atol=0, rtol=0)
-    print("✓ Multiprocessing produces identical results")
-except AssertionError:
-    print("✗ Multiprocessing results differ from sequential")
-
-try:
-    torch.testing.assert_close(result_sequential.data, result_multithreading, atol=0, rtol=0)
-    print("✓ Multithreading produces identical results")
-except AssertionError:
-    print("✗ Multithreading results differ from sequential")
+torch.testing.assert_close(result_sequential.data, result_ffmpeg.data, atol=0, rtol=0)
+torch.testing.assert_close(result_sequential.data, result_multiprocessing, atol=0, rtol=0)
+torch.testing.assert_close(result_sequential.data, result_multithreading, atol=0, rtol=0)
+print("All good!")
 
 # %%
 import shutil
