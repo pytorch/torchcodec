@@ -476,7 +476,7 @@ class TestVideoDecoderOps:
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_mode_custom_frame_mappings(self, device):
-        stream_index = 3  # frame index seek mode requires a stream index
+        stream_index = 3  # custom_frame_index seek mode requires a stream index
         decoder = create_from_file(
             str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
         )

@@ -198,6 +198,41 @@ int SingleStreamDecoder::getBestStreamIndex(AVMediaType mediaType) {
 // VIDEO METADATA QUERY API
 // --------------------------------------------------------------------------
 
+void SingleStreamDecoder::sortAllFrames() {
+  for (auto& [streamIndex, streamInfo] : streamInfos_) {
+    std::sort(
+        streamInfo.keyFrames.begin(),
+        streamInfo.keyFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+    std::sort(
+        streamInfo.allFrames.begin(),
+        streamInfo.allFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+
+    size_t keyFrameIndex = 0;
+    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
+      streamInfo.allFrames[i].frameIndex = i;
+      if (streamInfo.allFrames[i].isKeyFrame) {
+        TORCH_CHECK(
+            keyFrameIndex < streamInfo.keyFrames.size(),
+            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
+        ++keyFrameIndex;
+      }
+      if (i + 1 < streamInfo.allFrames.size()) {
+        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
+      }
+    }
+    TORCH_CHECK(
+        keyFrameIndex == streamInfo.keyFrames.size(),
+        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+  }
+}
+
 void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scannedAllStreams_) {
     return;
@@ -283,39 +318,7 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
       getFFMPEGErrorStringFromErrorCode(status));
 
   // Sort all frames by their pts.
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    std::sort(
-        streamInfo.keyFrames.begin(),
-        streamInfo.keyFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-    std::sort(
-        streamInfo.allFrames.begin(),
-        streamInfo.allFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-
-    size_t keyFrameIndex = 0;
-    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
-      streamInfo.allFrames[i].frameIndex = i;
-      if (streamInfo.allFrames[i].isKeyFrame) {
-        TORCH_CHECK(
-            keyFrameIndex < streamInfo.keyFrames.size(),
-            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
-        ++keyFrameIndex;
-      }
-      if (i + 1 < streamInfo.allFrames.size()) {
-        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
-      }
-    }
-    TORCH_CHECK(
-        keyFrameIndex == streamInfo.keyFrames.size(),
-        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-  }
-
+  sortAllFrames();
   scannedAllStreams_ = true;
 }
 
@@ -356,6 +359,8 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
     }
   }
+  // Sort all frames by their pts
+  sortAllFrames();
 }
 
 ContainerMetadata SingleStreamDecoder::getContainerMetadata() const {

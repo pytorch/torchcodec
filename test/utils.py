@@ -255,20 +255,20 @@ class TestContainerFile:
                 text=True,
             ).stdout
         )
-        pts_list = [float(frame["pts"]) for frame in result["frames"]]
-        is_key_frame_list = [frame["key_frame"] for frame in result["frames"]]
-        duration_list = [float(frame["duration"]) for frame in result["frames"]]
-        # Zip the lists together, sort by pts, then unzip
+        pts_list = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
+        is_key_frame_list = torch.tensor(
+            [frame["key_frame"] for frame in result["frames"]]
+        )
+        duration_list = torch.tensor(
+            [float(frame["duration"]) for frame in result["frames"]]
+        )
         assert (
             len(pts_list) == len(is_key_frame_list) == len(duration_list)
         ), "Mismatched lengths in frame index data"
-        combined = list(zip(pts_list, is_key_frame_list, duration_list))
-        combined.sort(key=lambda x: x[0])
-        pts_sorted, is_key_frame_sorted, duration_sorted = zip(*combined)
         self._custom_frame_mappings_data[stream_index] = (
-            torch.tensor(pts_sorted),
-            torch.tensor(is_key_frame_sorted),
-            torch.tensor(duration_sorted),
+            pts_list,
+            is_key_frame_list,
+            duration_list,
         )
 
     @property

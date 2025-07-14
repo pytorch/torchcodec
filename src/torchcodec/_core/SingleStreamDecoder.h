@@ -60,6 +60,9 @@ class SingleStreamDecoder {
       int streamIndex,
       FrameMappings customFrameMappings);
 
+  // Sorts the keyFrames and allFrames vectors in each StreamInfo by pts.
+  void sortAllFrames();
+
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
