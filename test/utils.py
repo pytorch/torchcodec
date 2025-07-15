@@ -246,6 +246,8 @@ class TestContainerFile:
                     f"{self.path}",
                     "-select_streams",
                     f"{stream_index}",
+                    "-show_entries",
+                    "frame=pts,duration,stream_index,key_frame",
                     "-show_frames",
                     "-of",
                     "json",
