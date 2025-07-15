@@ -69,12 +69,21 @@ Decoding
         How to efficiently decode videos from the cloud
 
      .. grid-item-card:: :octicon:`file-code;1em`
+        Parallel decoding
+        :img-top: _static/img/card-background.svg
+        :link: generated_examples/decoding/parallel_decoding.html
+        :link-type: url
+
+        How to decode a video with multiple processes or threads.
+
+     .. grid-item-card:: :octicon:`file-code;1em`
         Clip sampling
         :img-top: _static/img/card-background.svg
         :link: generated_examples/decoding/sampling.html
         :link-type: url
 
         How to sample regular and random clips from a video
+
 
 Encoding
 ^^^^^^^^
