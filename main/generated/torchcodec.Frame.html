@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Frame &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>Frame &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -327,6 +327,7 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="../api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -410,15 +411,15 @@
 <h1>Frame<a class="headerlink" href="#frame" title="Permalink to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.Frame">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.</span></span><span class="sig-name descname"><span class="pre">Frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.6)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">pts_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/_frame.html#Frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.Frame" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.</span></span><span class="sig-name descname"><span class="pre">Frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.7)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">pts_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/_frame.html#Frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.Frame" title="Permalink to this definition">¶</a></dt>
 <dd><p>A single video frame with associated metadata.</p>
 <p>Examples using <code class="docutils literal notranslate"><span class="pre">Frame</span></code>:</p>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode a video using the VideoDecoder class."><img alt="" src="../_images/sphx_glr_basic_example_thumb.png" />
-<p><a class="reference internal" href="../generated_examples/basic_example.html#sphx-glr-generated-examples-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a></p>
+<p><a class="reference internal" href="../generated_examples/decoding/basic_example.html#sphx-glr-generated-examples-decoding-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a></p>
   <div class="sphx-glr-thumbnail-title">Decoding a video with VideoDecoder</div>
 </div></div><dl class="py attribute">
 <dt class="sig sig-object py" id="torchcodec.Frame.data">
-<span class="sig-name descname"><span class="pre">data</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.6)"><span class="pre">Tensor</span></a></em><a class="headerlink" href="#torchcodec.Frame.data" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">data</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.7)"><span class="pre">Tensor</span></a></em><a class="headerlink" href="#torchcodec.Frame.data" title="Permalink to this definition">¶</a></dt>
 <dd><p>The frame data as (3-D <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>).</p>
 </dd></dl>
 

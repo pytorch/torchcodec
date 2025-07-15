@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Interactive examples &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>Interactive examples &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -39,7 +39,7 @@
   <link rel="stylesheet" href="../_static/css/custom_torchcodec.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Decoding audio streams with AudioDecoder" href="audio_decoding.html" />
+    <link rel="next" title="Decoding" href="decoding/index.html" />
     <link rel="prev" title="Glossary" href="../glossary.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -327,6 +327,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -406,21 +407,35 @@
               
   <section id="interactive-examples">
 <span id="gallery"></span><h1>Interactive examples<a class="headerlink" href="#interactive-examples" title="Permalink to this heading">¶</a></h1>
-<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode an audio file using the AudioDecoder class."><img alt="" src="../_images/sphx_glr_audio_decoding_thumb.png" />
-<p><a class="reference internal" href="audio_decoding.html#sphx-glr-generated-examples-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a></p>
+<div class="sphx-glr-thumbnails"></div><section id="decoding">
+<h2>Decoding<a class="headerlink" href="#decoding" title="Permalink to this heading">¶</a></h2>
+<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode a video using the VideoDecoder class."><img alt="" src="../_images/sphx_glr_basic_example_thumb.png" />
+<p><a class="reference internal" href="decoding/basic_example.html#sphx-glr-generated-examples-decoding-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Decoding a video with VideoDecoder</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode an audio file using the AudioDecoder class."><img alt="" src="../_images/sphx_glr_audio_decoding_thumb.png" />
+<p><a class="reference internal" href="decoding/audio_decoding.html#sphx-glr-generated-examples-decoding-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a></p>
   <div class="sphx-glr-thumbnail-title">Decoding audio streams with AudioDecoder</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="TorchCodec can use supported Nvidia hardware (see support matrix here) to speed-up video decoding. This is called &quot;CUDA Decoding&quot; and it uses Nvidia&#x27;s NVDEC hardware decoder and CUDA kernels to respectively decompress and convert to RGB. CUDA Decoding can be faster than CPU Decoding for the actual decoding step and also for subsequent transform steps like scaling, cropping or rotating. This is because the decode step leaves the decoded tensor in GPU memory so the GPU doesn&#x27;t have to fetch from main memory before running the transform steps. Encoded packets are often much smaller than decoded frames so CUDA decoding also uses less PCI-e bandwidth."><img alt="" src="../_images/sphx_glr_basic_cuda_example_thumb.png" />
-<p><a class="reference internal" href="basic_cuda_example.html#sphx-glr-generated-examples-basic-cuda-example-py"><span class="std std-ref">Accelerated video decoding on GPUs with CUDA and NVDEC</span></a></p>
+<p><a class="reference internal" href="decoding/basic_cuda_example.html#sphx-glr-generated-examples-decoding-basic-cuda-example-py"><span class="std std-ref">Accelerated video decoding on GPUs with CUDA and NVDEC</span></a></p>
   <div class="sphx-glr-thumbnail-title">Accelerated video decoding on GPUs with CUDA and NVDEC</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode a video using the VideoDecoder class."><img alt="" src="../_images/sphx_glr_basic_example_thumb.png" />
-<p><a class="reference internal" href="basic_example.html#sphx-glr-generated-examples-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Decoding a video with VideoDecoder</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to sample video clips from a video. A clip generally denotes a sequence or batch of frames, and is typically passed as input to video models."><img alt="" src="../_images/sphx_glr_sampling_thumb.png" />
-<p><a class="reference internal" href="sampling.html#sphx-glr-generated-examples-sampling-py"><span class="std std-ref">How to sample video clips</span></a></p>
-  <div class="sphx-glr-thumbnail-title">How to sample video clips</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we will show how to decode streaming data. That is, when files do not reside locally, we will show how to only download the data segments that are needed to decode the frames you care about. We accomplish this capability with Python file-like objects. Our example uses a video file, so we use the VideoDecoder class to decode it. But all of the lessons here also apply to audio files and the AudioDecoder class as well."><img alt="" src="../_images/sphx_glr_file_like_thumb.png" />
+<p><a class="reference internal" href="decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Streaming data through file-like support</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we will describe the seek_mode parameter of the VideoDecoder class. This parameter offers a trade-off between the speed of the VideoDecoder creation, against the seeking accuracy of the retreived frames (i.e. in approximate mode, requesting the i&#x27;th frame may not necessarily return frame i)."><img alt="" src="../_images/sphx_glr_approximate_mode_thumb.png" />
-<p><a class="reference internal" href="approximate_mode.html#sphx-glr-generated-examples-approximate-mode-py"><span class="std std-ref">Exact vs Approximate seek mode: Performance and accuracy comparison</span></a></p>
+<p><a class="reference internal" href="decoding/approximate_mode.html#sphx-glr-generated-examples-decoding-approximate-mode-py"><span class="std std-ref">Exact vs Approximate seek mode: Performance and accuracy comparison</span></a></p>
   <div class="sphx-glr-thumbnail-title">Exact vs Approximate seek mode: Performance and accuracy comparison</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to sample video clips from a video. A clip generally denotes a sequence or batch of frames, and is typically passed as input to video models."><img alt="" src="../_images/sphx_glr_sampling_thumb.png" />
+<p><a class="reference internal" href="decoding/sampling.html#sphx-glr-generated-examples-decoding-sampling-py"><span class="std std-ref">How to sample video clips</span></a></p>
+  <div class="sphx-glr-thumbnail-title">How to sample video clips</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this tutorial, we&#x27;ll explore different approaches to parallelize video decoding of a large number of frames from a single video. We&#x27;ll compare three parallelization strategies:"><img alt="" src="../_images/sphx_glr_parallel_decoding_thumb.png" />
+<p><a class="reference internal" href="decoding/parallel_decoding.html#sphx-glr-generated-examples-decoding-parallel-decoding-py"><span class="std std-ref">Parallel video decoding: multi-processing and multi-threading</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Parallel video decoding: multi-processing and multi-threading</div>
+</div></div></section>
+<section id="encoding">
+<h2>Encoding<a class="headerlink" href="#encoding" title="Permalink to this heading">¶</a></h2>
+<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to encode audio samples to a file or to raw bytes using the AudioEncoder class."><img alt="" src="../_images/sphx_glr_audio_encoding_thumb.png" />
+<p><a class="reference internal" href="encoding/audio_encoding.html#sphx-glr-generated-examples-encoding-audio-encoding-py"><span class="std std-ref">Encoding audio samples with AudioEncoder</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Encoding audio samples with AudioEncoder</div>
 </div></div><div class="toctree-wrapper compound">
 </div>
 <div class="sphx-glr-footer sphx-glr-footer-gallery docutils container">
@@ -433,6 +448,7 @@
 </div>
 <p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
 </section>
+</section>
 
 
              </article>
@@ -442,7 +458,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="audio_decoding.html" class="btn btn-neutral float-right" title="Decoding audio streams with AudioDecoder" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="decoding/index.html" class="btn btn-neutral float-right" title="Decoding" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
         <a href="../glossary.html" class="btn btn-neutral" title="Glossary" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
@@ -477,7 +493,11 @@
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Interactive examples</a></li>
+<li><a class="reference internal" href="#">Interactive examples</a><ul>
+<li><a class="reference internal" href="#decoding">Decoding</a></li>
+<li><a class="reference internal" href="#encoding">Encoding</a></li>
+</ul>
+</li>
 </ul>
 
             </div>

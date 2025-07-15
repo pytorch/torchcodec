@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>AudioDecoder &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>AudioDecoder &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -327,6 +327,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -410,7 +411,7 @@
 <h1>AudioDecoder<a class="headerlink" href="#audiodecoder" title="Permalink to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.decoders.AudioDecoder">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.13)"><span class="pre">Union</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.13)"><span class="pre">Path</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#bytes" title="(in Python v3.13)"><span class="pre">bytes</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.6)"><span class="pre">Tensor</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stream_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_audio_decoder.html#AudioDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioDecoder" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.13)"><span class="pre">Union</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.13)"><span class="pre">Path</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/io.html#io.RawIOBase" title="(in Python v3.13)"><span class="pre">RawIOBase</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BufferedReader</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#bytes" title="(in Python v3.13)"><span class="pre">bytes</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.7)"><span class="pre">Tensor</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stream_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_audio_decoder.html#AudioDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioDecoder" title="Permalink to this definition">¶</a></dt>
 <dd><p>A single-stream audio decoder.</p>
 <p>This can be used to decode audio from pure audio files (e.g. mp3, wav,
 etc.), or from videos that contain audio streams (e.g. mp4 videos).</p>
@@ -418,18 +419,57 @@ etc.), or from videos that contain audio streams (e.g. mp4 videos).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>source</strong> (str, <code class="docutils literal notranslate"><span class="pre">Pathlib.path</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>, or bytes) – <p>The source of the audio:</p>
+<li><p><strong>(</strong><strong>str</strong> (<em>source</em>) – <p>object): The source of the video or audio:</p>
 <ul>
 <li><p>If <code class="docutils literal notranslate"><span class="pre">str</span></code>: a local path or a URL to a video or audio file.</p></li>
 <li><p>If <code class="docutils literal notranslate"><span class="pre">Pathlib.path</span></code>: a path to a local video or audio file.</p></li>
 <li><p>If <code class="docutils literal notranslate"><span class="pre">bytes</span></code> object or <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>: the raw encoded audio data.</p></li>
+<li><p>If file-like object: we read video data from the object on demand. The object must
+expose the methods <cite>read(self, size: int) -&gt; bytes</cite> and
+<cite>seek(self, offset: int, whence: int) -&gt; bytes</cite>. Read more in:
+<a class="reference internal" href="../generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a>.</p></li>
+</ul>
+</p></li>
+<li><p><strong>Pathlib.path</strong> – <p>object): The source of the video or audio:</p>
+<ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">str</span></code>: a local path or a URL to a video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">Pathlib.path</span></code>: a path to a local video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">bytes</span></code> object or <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>: the raw encoded audio data.</p></li>
+<li><p>If file-like object: we read video data from the object on demand. The object must
+expose the methods <cite>read(self, size: int) -&gt; bytes</cite> and
+<cite>seek(self, offset: int, whence: int) -&gt; bytes</cite>. Read more in:
+<a class="reference internal" href="../generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a>.</p></li>
+</ul>
+</p></li>
+<li><p><strong>bytes</strong> – <p>object): The source of the video or audio:</p>
+<ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">str</span></code>: a local path or a URL to a video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">Pathlib.path</span></code>: a path to a local video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">bytes</span></code> object or <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>: the raw encoded audio data.</p></li>
+<li><p>If file-like object: we read video data from the object on demand. The object must
+expose the methods <cite>read(self, size: int) -&gt; bytes</cite> and
+<cite>seek(self, offset: int, whence: int) -&gt; bytes</cite>. Read more in:
+<a class="reference internal" href="../generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a>.</p></li>
+</ul>
+</p></li>
+<li><p><strong>file-like</strong> (<em>torch.Tensor or</em>) – <p>object): The source of the video or audio:</p>
+<ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">str</span></code>: a local path or a URL to a video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">Pathlib.path</span></code>: a path to a local video or audio file.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">bytes</span></code> object or <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>: the raw encoded audio data.</p></li>
+<li><p>If file-like object: we read video data from the object on demand. The object must
+expose the methods <cite>read(self, size: int) -&gt; bytes</cite> and
+<cite>seek(self, offset: int, whence: int) -&gt; bytes</cite>. Read more in:
+<a class="reference internal" href="../generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a>.</p></li>
 </ul>
 </p></li>
 <li><p><strong>stream_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><em>optional</em>) – Specifies which stream in the file to decode samples from.
 Note that this index is absolute across all media types. If left unspecified, then
 the <a class="reference internal" href="../glossary.html#term-best-stream"><span class="xref std std-term">best stream</span></a> is used.</p></li>
 <li><p><strong>sample_rate</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><em>optional</em>) – The desired output sample rate of the decoded samples.
-By default, the samples are returned in their original sample rate.</p></li>
+By default, the sample rate of the source is used.</p></li>
+<li><p><strong>num_channels</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><em>optional</em>) – The desired number of channels of the decoded samples.
+By default, the number of channels of the source is used.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Variables<span class="colon">:</span></dt>
@@ -443,8 +483,14 @@ unspecified, this is the <a class="reference internal" href="../glossary.html#te
 </dl>
 <p>Examples using <code class="docutils literal notranslate"><span class="pre">AudioDecoder</span></code>:</p>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode an audio file using the AudioDecoder class."><img alt="" src="../_images/sphx_glr_audio_decoding_thumb.png" />
-<p><a class="reference internal" href="../generated_examples/audio_decoding.html#sphx-glr-generated-examples-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a></p>
+<p><a class="reference internal" href="../generated_examples/decoding/audio_decoding.html#sphx-glr-generated-examples-decoding-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a></p>
   <div class="sphx-glr-thumbnail-title">Decoding audio streams with AudioDecoder</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we will show how to decode streaming data. That is, when files do not reside locally, we will show how to only download the data segments that are needed to decode the frames you care about. We accomplish this capability with Python file-like objects. Our example uses a video file, so we use the VideoDecoder class to decode it. But all of the lessons here also apply to audio files and the AudioDecoder class as well."><img alt="" src="../_images/sphx_glr_file_like_thumb.png" />
+<p><a class="reference internal" href="../generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Streaming data through file-like support</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to encode audio samples to a file or to raw bytes using the AudioEncoder class."><img alt="" src="../_images/sphx_glr_audio_encoding_thumb.png" />
+<p><a class="reference internal" href="../generated_examples/encoding/audio_encoding.html#sphx-glr-generated-examples-encoding-audio-encoding-py"><span class="std std-ref">Encoding audio samples with AudioEncoder</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Encoding audio samples with AudioEncoder</div>
 </div></div><dl class="py method">
 <dt class="sig sig-object py" id="torchcodec.decoders.AudioDecoder.get_all_samples">
 <span class="sig-name descname"><span class="pre">get_all_samples</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="torchcodec.AudioSamples.html#torchcodec.AudioSamples" title="torchcodec._frame.AudioSamples"><span class="pre">AudioSamples</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_audio_decoder.html#AudioDecoder.get_all_samples"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioDecoder.get_all_samples" title="Permalink to this definition">¶</a></dt>

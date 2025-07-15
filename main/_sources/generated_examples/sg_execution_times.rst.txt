@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:44.805** total execution time for 5 files **from generated_examples**:
+**00:00.000** total execution time for 0 files **from generated_examples**:
 
 .. container::
 
@@ -32,18 +32,6 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_generated_examples_approximate_mode.py` (``approximate_mode.py``)
-     - 00:34.547
-     - 0.0
-   * - :ref:`sphx_glr_generated_examples_basic_cuda_example.py` (``basic_cuda_example.py``)
-     - 00:05.251
-     - 0.0
-   * - :ref:`sphx_glr_generated_examples_basic_example.py` (``basic_example.py``)
-     - 00:02.546
-     - 0.0
-   * - :ref:`sphx_glr_generated_examples_audio_decoding.py` (``audio_decoding.py``)
-     - 00:01.781
-     - 0.0
-   * - :ref:`sphx_glr_generated_examples_sampling.py` (``sampling.py``)
-     - 00:00.680
-     - 0.0
+   * - N/A
+     - N/A
+     - N/A

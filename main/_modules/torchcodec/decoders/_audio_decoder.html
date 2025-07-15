@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torchcodec.decoders._audio_decoder &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>torchcodec.decoders._audio_decoder &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -324,6 +324,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -406,13 +407,13 @@
 <span class="c1"># This source code is licensed under the BSD-style license found in the</span>
 <span class="c1"># LICENSE file in the root directory of this source tree.</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tensor</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AudioSamples</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec.decoders</span><span class="w"> </span><span class="kn">import</span> <span class="n">_core</span> <span class="k">as</span> <span class="n">core</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec</span><span class="w"> </span><span class="kn">import</span> <span class="n">_core</span> <span class="k">as</span> <span class="n">core</span><span class="p">,</span> <span class="n">AudioSamples</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec.decoders._decoder_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">create_decoder</span><span class="p">,</span>
     <span class="n">ERROR_REPORTING_INSTRUCTIONS</span><span class="p">,</span>
@@ -428,16 +429,23 @@
 <span class="sd">    Returned samples are float samples normalized in [-1, 1]</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the audio:</span>
+<span class="sd">        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like</span>
+<span class="sd">            object): The source of the video or audio:</span>
 
 <span class="sd">            - If ``str``: a local path or a URL to a video or audio file.</span>
 <span class="sd">            - If ``Pathlib.path``: a path to a local video or audio file.</span>
 <span class="sd">            - If ``bytes`` object or ``torch.Tensor``: the raw encoded audio data.</span>
+<span class="sd">            - If file-like object: we read video data from the object on demand. The object must</span>
+<span class="sd">              expose the methods `read(self, size: int) -&gt; bytes` and</span>
+<span class="sd">              `seek(self, offset: int, whence: int) -&gt; bytes`. Read more in:</span>
+<span class="sd">              :ref:`sphx_glr_generated_examples_decoding_file_like.py`.</span>
 <span class="sd">        stream_index (int, optional): Specifies which stream in the file to decode samples from.</span>
 <span class="sd">            Note that this index is absolute across all media types. If left unspecified, then</span>
 <span class="sd">            the :term:`best stream` is used.</span>
 <span class="sd">        sample_rate (int, optional): The desired output sample rate of the decoded samples.</span>
-<span class="sd">            By default, the samples are returned in their original sample rate.</span>
+<span class="sd">            By default, the sample rate of the source is used.</span>
+<span class="sd">        num_channels (int, optional): The desired number of channels of the decoded samples.</span>
+<span class="sd">            By default, the number of channels of the source is used.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        metadata (AudioStreamMetadata): Metadata of the audio stream.</span>
@@ -448,15 +456,19 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span><span class="p">,</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">stream_index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_rate</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_channels</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span> <span class="o">=</span> <span class="n">create_decoder</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">seek_mode</span><span class="o">=</span><span class="s2">&quot;approximate&quot;</span><span class="p">)</span>
 
         <span class="n">core</span><span class="o">.</span><span class="n">add_audio_stream</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">stream_index</span><span class="o">=</span><span class="n">stream_index</span><span class="p">,</span> <span class="n">sample_rate</span><span class="o">=</span><span class="n">sample_rate</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span>
+            <span class="n">stream_index</span><span class="o">=</span><span class="n">stream_index</span><span class="p">,</span>
+            <span class="n">sample_rate</span><span class="o">=</span><span class="n">sample_rate</span><span class="p">,</span>
+            <span class="n">num_channels</span><span class="o">=</span><span class="n">num_channels</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="n">container_metadata</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_container_metadata</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">)</span>

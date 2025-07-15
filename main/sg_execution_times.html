@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Computation times &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>Computation times &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -325,6 +325,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -404,7 +405,7 @@
               
   <section id="computation-times">
 <span id="sphx-glr-sg-execution-times"></span><h1>Computation times<a class="headerlink" href="#computation-times" title="Permalink to this heading">¶</a></h1>
-<p><strong>00:44.805</strong> total execution time for 5 files <strong>from all galleries</strong>:</p>
+<p><strong>03:29.588</strong> total execution time for 8 files <strong>from all galleries</strong>:</p>
 <div class="docutils container">
 <style scoped>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet" />
@@ -425,24 +426,36 @@ $(document).ready( function () {
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/approximate_mode.html#sphx-glr-generated-examples-approximate-mode-py"><span class="std std-ref">Exact vs Approximate seek mode: Performance and accuracy comparison</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/approximate_mode.py</span></code>)</p></td>
-<td><p>00:34.547</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/decoding/parallel_decoding.html#sphx-glr-generated-examples-decoding-parallel-decoding-py"><span class="std std-ref">Parallel video decoding: multi-processing and multi-threading</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/parallel_decoding.py</span></code>)</p></td>
+<td><p>02:01.981</p></td>
 <td><p>0.0</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/basic_cuda_example.html#sphx-glr-generated-examples-basic-cuda-example-py"><span class="std std-ref">Accelerated video decoding on GPUs with CUDA and NVDEC</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/basic_cuda_example.py</span></code>)</p></td>
-<td><p>00:05.251</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/decoding/file_like.html#sphx-glr-generated-examples-decoding-file-like-py"><span class="std std-ref">Streaming data through file-like support</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/file_like.py</span></code>)</p></td>
+<td><p>00:40.094</p></td>
 <td><p>0.0</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/basic_example.html#sphx-glr-generated-examples-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/basic_example.py</span></code>)</p></td>
-<td><p>00:02.546</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/decoding/approximate_mode.html#sphx-glr-generated-examples-decoding-approximate-mode-py"><span class="std std-ref">Exact vs Approximate seek mode: Performance and accuracy comparison</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/approximate_mode.py</span></code>)</p></td>
+<td><p>00:35.314</p></td>
 <td><p>0.0</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/audio_decoding.html#sphx-glr-generated-examples-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/audio_decoding.py</span></code>)</p></td>
-<td><p>00:01.781</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/decoding/basic_cuda_example.html#sphx-glr-generated-examples-decoding-basic-cuda-example-py"><span class="std std-ref">Accelerated video decoding on GPUs with CUDA and NVDEC</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/basic_cuda_example.py</span></code>)</p></td>
+<td><p>00:06.664</p></td>
 <td><p>0.0</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/sampling.html#sphx-glr-generated-examples-sampling-py"><span class="std std-ref">How to sample video clips</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/sampling.py</span></code>)</p></td>
-<td><p>00:00.680</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/decoding/basic_example.html#sphx-glr-generated-examples-decoding-basic-example-py"><span class="std std-ref">Decoding a video with VideoDecoder</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/basic_example.py</span></code>)</p></td>
+<td><p>00:03.125</p></td>
+<td><p>0.0</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/decoding/audio_decoding.html#sphx-glr-generated-examples-decoding-audio-decoding-py"><span class="std std-ref">Decoding audio streams with AudioDecoder</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/audio_decoding.py</span></code>)</p></td>
+<td><p>00:01.755</p></td>
+<td><p>0.0</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated_examples/decoding/sampling.html#sphx-glr-generated-examples-decoding-sampling-py"><span class="std std-ref">How to sample video clips</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/decoding/sampling.py</span></code>)</p></td>
+<td><p>00:00.612</p></td>
+<td><p>0.0</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated_examples/encoding/audio_encoding.html#sphx-glr-generated-examples-encoding-audio-encoding-py"><span class="std std-ref">Encoding audio samples with AudioEncoder</span></a> (<code class="docutils literal notranslate"><span class="pre">../../examples/encoding/audio_encoding.py</span></code>)</p></td>
+<td><p>00:00.043</p></td>
 <td><p>0.0</p></td>
 </tr>
 </tbody>

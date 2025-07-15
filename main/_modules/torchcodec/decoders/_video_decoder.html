@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torchcodec.decoders._video_decoder &mdash; TorchCodec 0.3.0.dev20250324+cu126 Documentation</title>
+  <title>torchcodec.decoders._video_decoder &mdash; TorchCodec 0.5.0.dev20250715+cu126 Documentation</title>
   
 
   
@@ -324,6 +324,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_torchcodec.html">torchcodec</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_decoders.html">torchcodec.decoders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api_ref_encoders.html">torchcodec.encoders</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../api_ref_samplers.html">torchcodec.samplers</a></li>
 </ul>
 
@@ -406,14 +407,14 @@
 <span class="c1"># This source code is licensed under the BSD-style license found in the</span>
 <span class="c1"># LICENSE file in the root directory of this source tree.</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numbers</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">device</span><span class="p">,</span> <span class="n">Tensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">device</span> <span class="k">as</span> <span class="n">torch_device</span><span class="p">,</span> <span class="n">Tensor</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec</span><span class="w"> </span><span class="kn">import</span> <span class="n">Frame</span><span class="p">,</span> <span class="n">FrameBatch</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec.decoders</span><span class="w"> </span><span class="kn">import</span> <span class="n">_core</span> <span class="k">as</span> <span class="n">core</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec</span><span class="w"> </span><span class="kn">import</span> <span class="n">_core</span> <span class="k">as</span> <span class="n">core</span><span class="p">,</span> <span class="n">Frame</span><span class="p">,</span> <span class="n">FrameBatch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torchcodec.decoders._decoder_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">create_decoder</span><span class="p">,</span>
     <span class="n">ERROR_REPORTING_INSTRUCTIONS</span><span class="p">,</span>
@@ -424,11 +425,15 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A single-stream video decoder.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        source (str, ``Pathlib.path``, ``torch.Tensor``, or bytes): The source of the video.</span>
+<span class="sd">        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like object): The source of the video:</span>
 
 <span class="sd">            - If ``str``: a local path or a URL to a video file.</span>
 <span class="sd">            - If ``Pathlib.path``: a path to a local video file.</span>
 <span class="sd">            - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.</span>
+<span class="sd">            - If file-like object: we read video data from the object on demand. The object must</span>
+<span class="sd">              expose the methods `read(self, size: int) -&gt; bytes` and</span>
+<span class="sd">              `seek(self, offset: int, whence: int) -&gt; bytes`. Read more in:</span>
+<span class="sd">              :ref:`sphx_glr_generated_examples_decoding_file_like.py`.</span>
 <span class="sd">        stream_index (int, optional): Specifies which stream in the video to decode frames from.</span>
 <span class="sd">            Note that this index is absolute across all media types. If left unspecified, then</span>
 <span class="sd">            the :term:`best stream` is used.</span>
@@ -457,7 +462,7 @@
 <span class="sd">            accurate as it uses the file&#39;s metadata to calculate where i</span>
 <span class="sd">            probably is. Default: &quot;exact&quot;.</span>
 <span class="sd">            Read more about this parameter in:</span>
-<span class="sd">            :ref:`sphx_glr_generated_examples_approximate_mode.py`</span>
+<span class="sd">            :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`</span>
 
 
 <span class="sd">    Attributes:</span>
@@ -469,12 +474,12 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">source</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span><span class="p">,</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">stream_index</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">dimension_order</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;NCHW&quot;</span><span class="p">,</span> <span class="s2">&quot;NHWC&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;NCHW&quot;</span><span class="p">,</span>
         <span class="n">num_ffmpeg_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-        <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">device</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch_device</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">seek_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span> <span class="s2">&quot;approximate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;exact&quot;</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="n">allowed_seek_modes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span> <span class="s2">&quot;approximate&quot;</span><span class="p">)</span>
@@ -495,6 +500,9 @@
 
         <span class="k">if</span> <span class="n">num_ffmpeg_threads</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">num_ffmpeg_threads</span><span class="w"> </span><span class="si">= }</span><span class="s2"> should be an int.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">torch_device</span><span class="p">):</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
         <span class="n">core</span><span class="o">.</span><span class="n">add_video_stream</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span>
@@ -545,6 +553,15 @@
 <div class="viewcode-block" id="VideoDecoder.__getitem__"><a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.__getitem__">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">numbers</span><span class="o">.</span><span class="n">Integral</span><span class="p">,</span> <span class="nb">slice</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frame or frames as tensors, at the given index or range.</span>
 
+<span class="sd">        .. note::</span>
+
+<span class="sd">            If you need to decode multiple frames, we recommend using the batch</span>
+<span class="sd">            methods instead, since they are faster:</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`, and</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.</span>
+
 <span class="sd">        Args:</span>
 <span class="sd">            key(int or slice): The index or range of frame(s) to retrieve.</span>
 
@@ -566,12 +583,23 @@
 <div class="viewcode-block" id="VideoDecoder.get_frame_at"><a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frame_at">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_frame_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Frame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a single frame at the given index.</span>
 
+<span class="sd">        .. note::</span>
+
+<span class="sd">            If you need to decode multiple frames, we recommend using the batch</span>
+<span class="sd">            methods instead, since they are faster:</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.</span>
+
 <span class="sd">        Args:</span>
 <span class="sd">            index (int): The index of the frame to retrieve.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Frame: The frame at the given index.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
@@ -589,19 +617,15 @@
 <div class="viewcode-block" id="VideoDecoder.get_frames_at"><a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frames_at">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frames at the given indices.</span>
 
-<span class="sd">        .. note::</span>
-
-<span class="sd">            Calling this method is more efficient that repeated individual calls</span>
-<span class="sd">            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_at`. This</span>
-<span class="sd">            method makes sure not to decode the same frame twice, and also</span>
-<span class="sd">            avoids &quot;backwards seek&quot; operations, which are slow.</span>
-
 <span class="sd">        Args:</span>
 <span class="sd">            indices (list of int): The indices of the frames to retrieve.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: The frames at the given indices.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">index</span> <span class="k">if</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">index</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">indices</span>
+        <span class="p">]</span>
 
         <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_at_indices</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">frame_indices</span><span class="o">=</span><span class="n">indices</span>
@@ -647,6 +671,15 @@
 <div class="viewcode-block" id="VideoDecoder.get_frame_played_at"><a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frame_played_at">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_frame_played_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seconds</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Frame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a single frame played at the given timestamp in seconds.</span>
 
+<span class="sd">        .. note::</span>
+
+<span class="sd">            If you need to decode multiple frames, we recommend using the batch</span>
+<span class="sd">            methods instead, since they are faster:</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_at`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_in_range`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_at`,</span>
+<span class="sd">            :meth:`~torchcodec.decoders.VideoDecoder.get_frames_played_in_range`.</span>
+
 <span class="sd">        Args:</span>
 <span class="sd">            seconds (float): The time stamp in seconds when the frame is played.</span>
 
@@ -670,13 +703,6 @@
 
 <div class="viewcode-block" id="VideoDecoder.get_frames_played_at"><a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frames_played_at">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_played_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seconds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frames played at the given timestamps in seconds.</span>
-
-<span class="sd">        .. note::</span>
-
-<span class="sd">            Calling this method is more efficient that repeated individual calls</span>
-<span class="sd">            to :meth:`~torchcodec.decoders.VideoDecoder.get_frame_played_at`.</span>
-<span class="sd">            This method makes sure not to decode the same frame twice, and also</span>
-<span class="sd">            avoids &quot;backwards seek&quot; operations, which are slow.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            seconds (list of float): The timestamps in seconds when the frames are played.</span>

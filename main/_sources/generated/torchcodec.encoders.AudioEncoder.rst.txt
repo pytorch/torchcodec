@@ -1,0 +1,11 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.encoders
+
+
+AudioEncoder
+============
+
+.. autoclass:: AudioEncoder
+    :members:
+    :special-members: __getitem__
