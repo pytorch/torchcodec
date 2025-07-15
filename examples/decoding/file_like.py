@@ -58,7 +58,7 @@ def bench(f, average_over=10, warmup=2):
 #
 # We are going to investigate the cost of having to download an entire video
 # before decoding any frames versus being able to stream the video's data
-# while decoding. To demonsrate an extreme case, we're going to always decode
+# while decoding. To demonstrate an extreme case, we're going to always decode
 # just the first frame of the video, while we vary how we get that video's
 # data.
 #
