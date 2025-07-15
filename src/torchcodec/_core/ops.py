@@ -15,6 +15,7 @@ from torch.library import get_ctx, register_fake
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
+    _get_pybind_ops_module_name,
     _load_pybind11_module,
 )
 
@@ -43,9 +44,9 @@ def load_torchcodec_shared_libraries():
     #      libraries do not meet those conditions.
 
     exceptions = []
-    pybind_ops_module_name = "decoder_core_pybind_ops"
     for ffmpeg_major_version in (7, 6, 5, 4):
-        decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
+        pybind_ops_module_name = _get_pybind_ops_module_name(ffmpeg_major_version)
+        decoder_library_name = f"libtorchcodec_core{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
