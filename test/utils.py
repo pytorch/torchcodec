@@ -255,20 +255,18 @@ class TestContainerFile:
                 text=True,
             ).stdout
         )
-        pts_list = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
-        is_key_frame_list = torch.tensor(
-            [frame["key_frame"] for frame in result["frames"]]
-        )
-        duration_list = torch.tensor(
+        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
+        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
+        duration = torch.tensor(
             [float(frame["duration"]) for frame in result["frames"]]
         )
         assert (
-            len(pts_list) == len(is_key_frame_list) == len(duration_list)
+            len(all_frames) == len(is_key_frame) == len(duration)
         ), "Mismatched lengths in frame index data"
         self._custom_frame_mappings_data[stream_index] = (
-            pts_list,
-            is_key_frame_list,
-            duration_list,
+            all_frames,
+            is_key_frame,
+            duration,
         )
 
     @property
