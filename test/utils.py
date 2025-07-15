@@ -255,10 +255,18 @@ class TestContainerFile:
                 text=True,
             ).stdout
         )
-        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
-        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
+        all_frames = torch.tensor(
+            [float(frame["pts"]) for frame in result["frames"] if "pts" in frame]
+        )
+        is_key_frame = torch.tensor(
+            [frame["key_frame"] for frame in result["frames"] if "key_frame" in frame]
+        )
         duration = torch.tensor(
-            [float(frame["duration"]) for frame in result["frames"]]
+            [
+                float(frame["duration"])
+                for frame in result["frames"]
+                if "duration" in frame
+            ]
         )
         assert (
             len(all_frames) == len(is_key_frame) == len(duration)
