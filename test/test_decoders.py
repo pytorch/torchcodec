@@ -36,6 +36,7 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    VAR_FPS_VIDEO,
 )
 
 
@@ -1137,6 +1138,40 @@ class TestVideoDecoder:
         decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_var_fps_single_frame(self, device):
+        # We are explicitly only testing exact mode because we know approximate
+        # mode will return the wrong frames.
+        decoder = VideoDecoder(VAR_FPS_VIDEO.path, seek_mode="exact", device=device)
+        assert len(decoder) == 300
+
+        frame_0 = decoder[0]
+        frame_150 = decoder[150]
+        frame_299 = decoder[299]
+
+        ref_frame_0 = VAR_FPS_VIDEO.get_frame_data_by_index(0).to(device)
+        ref_frame_150 = VAR_FPS_VIDEO.get_frame_data_by_index(150).to(device)
+        ref_frame_299 = VAR_FPS_VIDEO.get_frame_data_by_index(299).to(device)
+
+        assert_frames_equal(frame_0, ref_frame_0)
+        assert_frames_equal(frame_150, ref_frame_150)
+        assert_frames_equal(frame_299, ref_frame_299)
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_var_fps_range(self, device):
+        # We are explicitly only testing exact mode because we know approximate
+        # mode will return the wrong frames.
+        decoder = VideoDecoder(VAR_FPS_VIDEO.path, seek_mode="exact", device=device)
+
+        frames150_159 = decoder.get_frames_in_range(start=150, stop=160)
+
+        ref_frames150_159 = VAR_FPS_VIDEO.get_frame_data_by_range(
+            start=150,
+            stop=160,
+        ).to(device)
+
+        assert_frames_equal(ref_frames150_159, frames150_159.data)
 
 
 class TestAudioDecoder:
