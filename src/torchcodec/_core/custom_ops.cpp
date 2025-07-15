@@ -105,9 +105,9 @@ OpsFrameOutput makeOpsFrameOutput(FrameOutput& frame) {
       torch::tensor(frame.durationSeconds, torch::dtype(torch::kFloat64)));
 }
 
-FrameMappings makeFrameMappings(
+SingleStreamDecoder::FrameMappings makeFrameMappings(
     std::tuple<at::Tensor, at::Tensor, at::Tensor> custom_frame_mappings) {
-  return FrameMappings{
+  return SingleStreamDecoder::FrameMappings{
       std::get<0>(custom_frame_mappings),
       std::get<1>(custom_frame_mappings),
       std::get<2>(custom_frame_mappings)};
@@ -263,7 +263,7 @@ void _add_video_stream(
   if (device.has_value()) {
     videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
-  std::optional<FrameMappings> converted_mappings =
+  std::optional<SingleStreamDecoder::FrameMappings> converted_mappings =
       custom_frame_mappings.has_value()
       ? std::make_optional(makeFrameMappings(custom_frame_mappings.value()))
       : std::nullopt;
