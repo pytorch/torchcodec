@@ -66,6 +66,10 @@ class SingleStreamDecoder {
   // FrameMappings is used for the custom_frame_mappings seek mode to store
   // metadata of frames in a stream. The size of all tensors in this struct must
   // match.
+
+  // --------------------------------------------------------------------------
+  // ADDING STREAMS API
+  // --------------------------------------------------------------------------
   struct FrameMappings {
     // 1D tensor of int64, each value is the PTS of a frame in timebase units.
     torch::Tensor all_frames;
@@ -76,17 +80,6 @@ class SingleStreamDecoder {
     // in all_frames in timebase units.
     torch::Tensor duration;
   };
-
-  // Reads the user provided frame index and updates each StreamInfo's index,
-  // i.e. the allFrames and keyFrames vectors, and
-  // endStreamPtsSecondsFromContent
-  void readCustomFrameMappingsUpdateMetadataAndIndex(
-      int streamIndex,
-      FrameMappings customFrameMappings);
-
-  // --------------------------------------------------------------------------
-  // ADDING STREAMS API
-  // --------------------------------------------------------------------------
 
   void addVideoStream(
       int streamIndex,
@@ -251,6 +244,13 @@ class SingleStreamDecoder {
   // --------------------------------------------------------------------------
 
   void initializeDecoder();
+
+  // Reads the user provided frame index and updates each StreamInfo's index,
+  // i.e. the allFrames and keyFrames vectors, and
+  // endStreamPtsSecondsFromContent
+  void readCustomFrameMappingsUpdateMetadataAndIndex(
+      int streamIndex,
+      FrameMappings customFrameMappings);
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------

@@ -199,6 +199,10 @@ int SingleStreamDecoder::getBestStreamIndex(AVMediaType mediaType) {
 // --------------------------------------------------------------------------
 
 void SingleStreamDecoder::sortAllFrames() {
+  // Sort the allFrames and keyFrames vecs in each stream, and also sets
+  // additional fields of the FrameInfo entries like nextPts and frameIndex
+  // This is called at the end of a scan, or when setting a user-defined frame
+  // mapping.
   for (auto& [streamIndex, streamInfo] : streamInfos_) {
     std::sort(
         streamInfo.keyFrames.begin(),
@@ -350,7 +354,7 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
     FrameInfo frameInfo;
     frameInfo.pts = all_frames[i].item<int64_t>();
-    frameInfo.isKeyFrame = (is_key_frame[i].item<bool>() == true);
+    frameInfo.isKeyFrame = is_key_frame[i].item<bool>();
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
     if (frameInfo.isKeyFrame) {
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
