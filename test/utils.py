@@ -231,6 +231,11 @@ class TestContainerFile:
     def get_custom_frame_mappings(
         self, stream_index: Optional[int] = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # Ensure all tests using this function are skipped if the FFmpeg version is 4 or 5
+        # FFprobe on FFmpeg 4 and 5 does not return complete metadata
+        if get_ffmpeg_major_version() == 4 or get_ffmpeg_major_version() == 5:
+            pytest.skip("FFprobe on FFmpeg 4 and 5 does not return complete metadata")
+
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
@@ -246,8 +251,6 @@ class TestContainerFile:
                     f"{self.path}",
                     "-select_streams",
                     f"{stream_index}",
-                    "-show_entries",
-                    "frame=pts,duration,stream_index,key_frame",
                     "-show_frames",
                     "-of",
                     "json",
@@ -257,18 +260,10 @@ class TestContainerFile:
                 text=True,
             ).stdout
         )
-        all_frames = torch.tensor(
-            [float(frame["pts"]) for frame in result["frames"] if "pts" in frame]
-        )
-        is_key_frame = torch.tensor(
-            [frame["key_frame"] for frame in result["frames"] if "key_frame" in frame]
-        )
+        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
+        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
         duration = torch.tensor(
-            [
-                float(frame["duration"])
-                for frame in result["frames"]
-                if "duration" in frame
-            ]
+            [float(frame["duration"]) for frame in result["frames"]]
         )
         assert (
             len(all_frames) == len(is_key_frame) == len(duration)
