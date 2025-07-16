@@ -29,7 +29,7 @@ class SingleStreamDecoder {
   // CONSTRUCTION API
   // --------------------------------------------------------------------------
 
-  enum class SeekMode { exact, approximate };
+  enum class SeekMode { exact, approximate, custom_frame_mappings };
 
   // Creates a SingleStreamDecoder from the video at videoFilePath.
   explicit SingleStreamDecoder(
@@ -53,6 +53,9 @@ class SingleStreamDecoder {
   // the allFrames and keyFrames vectors.
   void scanFileAndUpdateMetadataAndIndex();
 
+  // Sorts the keyFrames and allFrames vectors in each StreamInfo by pts.
+  void sortAllFrames();
+
   // Returns the metadata for the container.
   ContainerMetadata getContainerMetadata() const;
 
@@ -60,13 +63,28 @@ class SingleStreamDecoder {
   // int64 values, where each value is the frame index for a key frame.
   torch::Tensor getKeyFrameIndices();
 
+  // FrameMappings is used for the custom_frame_mappings seek mode to store
+  // metadata of frames in a stream. The size of all tensors in this struct must
+  // match.
+
   // --------------------------------------------------------------------------
   // ADDING STREAMS API
   // --------------------------------------------------------------------------
+  struct FrameMappings {
+    // 1D tensor of int64, each value is the PTS of a frame in timebase units.
+    torch::Tensor all_frames;
+    // 1D tensor of bool, each value indicates if the corresponding frame in
+    // all_frames is a key frame.
+    torch::Tensor is_key_frame;
+    // 1D tensor of int64, each value is the duration of the corresponding frame
+    // in all_frames in timebase units.
+    torch::Tensor duration;
+  };
 
   void addVideoStream(
       int streamIndex,
-      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions());
+      const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
+      std::optional<FrameMappings> customFrameMappings = std::nullopt);
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
@@ -226,6 +244,13 @@ class SingleStreamDecoder {
   // --------------------------------------------------------------------------
 
   void initializeDecoder();
+
+  // Reads the user provided frame index and updates each StreamInfo's index,
+  // i.e. the allFrames and keyFrames vectors, and
+  // endStreamPtsSecondsFromContent
+  void readCustomFrameMappingsUpdateMetadataAndIndex(
+      int streamIndex,
+      FrameMappings customFrameMappings);
   // --------------------------------------------------------------------------
   // DECODING APIS AND RELATED UTILS
   // --------------------------------------------------------------------------

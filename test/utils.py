@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pathlib
+import subprocess
 import sys
 
 from dataclasses import dataclass, field
@@ -123,6 +124,9 @@ class TestContainerFile:
     default_stream_index: int
     stream_infos: Dict[int, Union[TestVideoStreamInfo, TestAudioStreamInfo]]
     frames: Dict[int, Dict[int, TestFrameInfo]]
+    _custom_frame_mappings_data: Dict[
+        int, Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+    ] = field(default_factory=dict)
 
     def __post_init__(self):
         # We load the .frames attribute from the checked-in json files, if needed.
@@ -224,6 +228,48 @@ class TestContainerFile:
             stream_index = self.default_stream_index
 
         return self.frames[stream_index][idx]
+
+    # This function is used to get the frame mappings for the custom_frame_mappings seek mode.
+    def get_custom_frame_mappings(
+        self, stream_index: Optional[int] = None
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if stream_index is None:
+            stream_index = self.default_stream_index
+        if self._custom_frame_mappings_data.get(stream_index) is None:
+            self.generate_custom_frame_mappings(stream_index)
+        return self._custom_frame_mappings_data[stream_index]
+
+    def generate_custom_frame_mappings(self, stream_index: int) -> None:
+        result = json.loads(
+            subprocess.run(
+                [
+                    "ffprobe",
+                    "-i",
+                    f"{self.path}",
+                    "-select_streams",
+                    f"{stream_index}",
+                    "-show_frames",
+                    "-of",
+                    "json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+        )
+        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
+        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
+        duration = torch.tensor(
+            [float(frame["duration"]) for frame in result["frames"]]
+        )
+        assert (
+            len(all_frames) == len(is_key_frame) == len(duration)
+        ), "Mismatched lengths in frame index data"
+        self._custom_frame_mappings_data[stream_index] = (
+            all_frames,
+            is_key_frame,
+            duration,
+        )
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
