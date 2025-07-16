@@ -230,12 +230,23 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-    status = nppiNV12ToRGB_709CSC_8u_P2C3R(
-        input,
-        avFrame->linesize[0],
-        static_cast<Npp8u*>(dst.data_ptr()),
-        dst.stride(0),
-        oSizeROI);
+    if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
+      // BT.709 full range
+      status = nppiNV12ToRGB_709HDTV_8u_P2C3R(
+          input,
+          avFrame->linesize[0],
+          static_cast<Npp8u*>(dst.data_ptr()),
+          dst.stride(0),
+          oSizeROI);
+    } else {
+      // BT.709 studio range
+      status = nppiNV12ToRGB_709CSC_8u_P2C3R(
+          input,
+          avFrame->linesize[0],
+          static_cast<Npp8u*>(dst.data_ptr()),
+          dst.stride(0),
+          oSizeROI);
+    }
   } else {
     status = nppiNV12ToRGB_8u_P2C3R(
         input,
