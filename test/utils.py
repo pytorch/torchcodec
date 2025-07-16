@@ -231,11 +231,6 @@ class TestContainerFile:
     def get_custom_frame_mappings(
         self, stream_index: Optional[int] = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # Ensure all tests using this function are skipped if the FFmpeg version is 4 or 5
-        # FFprobe on FFmpeg 4 and 5 does not return complete metadata
-        if get_ffmpeg_major_version() == 4 or get_ffmpeg_major_version() == 5:
-            pytest.skip("FFprobe on FFmpeg 4 and 5 does not return complete metadata")
-
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:

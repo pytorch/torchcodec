@@ -20,7 +20,7 @@ from torchcodec._core import (
 )
 from torchcodec.decoders import AudioDecoder, VideoDecoder
 
-from .utils import NASA_AUDIO_MP3, NASA_VIDEO
+from .utils import NASA_AUDIO_MP3, NASA_VIDEO, get_ffmpeg_major_version
 
 
 # TODO: Expected values in these tests should be based on the assets's
@@ -58,6 +58,8 @@ def test_get_metadata(metadata_getter):
         if isinstance(metadata_getter, functools.partial)
         else None
     )
+    if (seek_mode == "custom_frame_mappings") and get_ffmpeg_major_version() in (4, 5):
+        pytest.skip(reason="ffprobe isn't accurate on ffmpeg 4 and 5")
     with_added_video_stream = seek_mode == "custom_frame_mappings"
     metadata = metadata_getter(NASA_VIDEO.path)
 

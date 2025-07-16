@@ -47,6 +47,7 @@ from .utils import (
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
+    get_ffmpeg_major_version,
     needs_cuda,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
@@ -474,6 +475,7 @@ class TestVideoDecoderOps:
                 decoder, stream_index=0, custom_frame_mappings=different_lengths
             )
 
+    @pytest.mark.skipif(get_ffmpeg_major_version() in (4, 5), reason="ffprobe isn't accurate on ffmpeg 4 and 5")
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # custom_frame_index seek mode requires a stream index
