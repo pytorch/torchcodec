@@ -25,6 +25,7 @@ from .utils import (
     assert_frames_equal,
     AV1_VIDEO,
     cpu_and_cuda,
+    FULL_COLOR_RANGE,
     get_ffmpeg_major_version,
     H265_VIDEO,
     in_fbcode,
@@ -32,6 +33,7 @@ from .utils import (
     NASA_AUDIO_MP3,
     NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
+    needs_cuda,
     SINE_MONO_S16,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
@@ -1137,6 +1139,14 @@ class TestVideoDecoder:
         decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
+
+    @needs_cuda
+    def test_full_range_bt709_video(self):
+        decoder_gpu = VideoDecoder(FULL_COLOR_RANGE.path, device="cuda")
+        decoder_cpu = VideoDecoder(FULL_COLOR_RANGE.path, device="cpu")
+
+        assert_frames_equal(decoder_gpu[0].data.cpu(), decoder_cpu[0].data)
+        assert_frames_equal(decoder_gpu[10].data.cpu(), decoder_cpu[10].data)
 
 
 class TestAudioDecoder:

@@ -563,3 +563,12 @@ AV1_VIDEO = TestVideo(
         },
     },
 )
+
+FULL_COLOR_RANGE = TestVideo(
+    filename="full_range_709.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=1280, height=720, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
+)
