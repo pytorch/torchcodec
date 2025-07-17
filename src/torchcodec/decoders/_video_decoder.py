@@ -196,13 +196,6 @@ class VideoDecoder:
         Returns:
             Frame: The frame at the given index.
         """
-        if index < 0:
-            index += self._num_frames
-
-        if not 0 <= index < self._num_frames:
-            raise IndexError(
-                f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
-            )
         data, pts_seconds, duration_seconds = core.get_frame_at_index(
             self._decoder, frame_index=index
         )
@@ -221,15 +214,6 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames at the given indices.
         """
-        for i, index in enumerate(indices):
-            index = index if index >= 0 else index + self._num_frames
-            if not 0 <= index < self._num_frames:
-                raise IndexError(
-                    f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
-                )
-            else:
-                indices[i] = index
-
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
             self._decoder, frame_indices=indices
         )
@@ -253,8 +237,8 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames within the specified range.
         """
-        start = start if start >= 0 else start + self._num_frames
-        stop = min(stop if stop >= 0 else stop + self._num_frames, self._num_frames)
+        # Adjust start / stop indices to enable indexing semantics, ex. [-10, 1000] returns the last 10 frames
+        start, stop, step = slice(start, stop, step).indices(self._num_frames)
         if not 0 <= start < self._num_frames:
             raise IndexError(
                 f"Start index {start} is out of bounds; must be in the range [0, {self._num_frames})."
