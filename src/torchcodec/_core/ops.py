@@ -28,9 +28,6 @@ def load_torchcodec_shared_libraries():
     # ffmpeg major version. This should cover all potential ffmpeg versions
     # installed on the user's machine.
     #
-    # On fbcode, _get_extension_path() is overridden and directly points to the
-    # correct .so file, so this for-loop succeeds on the first iteration.
-    #
     # Note that we use two different methods for loading shared libraries:
     #
     #   1. torch.ops.load_library(): For PyTorch custom ops and the C++ only
