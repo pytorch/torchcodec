@@ -126,13 +126,6 @@ class VideoDecoder:
     def _getitem_int(self, key: int) -> Tensor:
         assert isinstance(key, int)
 
-        if key < 0:
-            key += self._num_frames
-        if key >= self._num_frames or key < 0:
-            raise IndexError(
-                f"Index {key} is out of bounds; length is {self._num_frames}"
-            )
-
         frame_data, *_ = core.get_frame_at_index(self._decoder, frame_index=key)
         return frame_data
 

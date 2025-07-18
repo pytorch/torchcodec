@@ -378,10 +378,10 @@ class TestVideoDecoder:
     def test_getitem_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(IndexError, match="Invalid frame index"):
             frame = decoder[1000]  # noqa
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(IndexError, match="Invalid frame index"):
             frame = decoder[-1000]  # noqa
 
         with pytest.raises(TypeError, match="Unsupported key type"):
