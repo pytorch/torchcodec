@@ -489,7 +489,7 @@ class TestVideoDecoder:
 
         with pytest.raises(
             IndexError,
-            match="must be greater than or equal to 0, or be a valid negative index",
+            match="negative indices must have an absolute value less than the number of frames",
         ):
             frame = decoder.get_frame_at(-10000)  # noqa
 
@@ -554,7 +554,7 @@ class TestVideoDecoder:
 
         with pytest.raises(
             IndexError,
-            match="must be greater than or equal to 0, or be a valid negative index",
+            match="negative indices must have an absolute value less than the number of frames",
         ):
             decoder.get_frames_at([-10000])
 
