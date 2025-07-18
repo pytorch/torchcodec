@@ -239,16 +239,6 @@ class VideoDecoder:
         """
         # Adjust start / stop indices to enable indexing semantics, ex. [-10, 1000] returns the last 10 frames
         start, stop, step = slice(start, stop, step).indices(self._num_frames)
-        if not 0 <= start < self._num_frames:
-            raise IndexError(
-                f"Start index {start} is out of bounds; must be in the range [0, {self._num_frames})."
-            )
-        if stop < start:
-            raise IndexError(
-                f"Stop index ({stop}) must not be less than the start index ({start})."
-            )
-        if not step > 0:
-            raise IndexError(f"Step ({step}) must be greater than 0.")
         frames = core.get_frames_in_range(
             self._decoder,
             start=start,
