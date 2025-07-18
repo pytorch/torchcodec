@@ -1627,7 +1627,8 @@ void SingleStreamDecoder::validateFrameIndex(
     throw std::out_of_range(
         "Invalid frame index=" + std::to_string(frameIndex) +
         " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-        "; must be greater than or equal to 0, or be a valid negative index");
+        "; negative indices must have an absolute value less than the number of frames, "
+        "and the number of frames must be known.");
   }
 
   // Note that if we do not have the number of frames available in our metadata,

@@ -202,7 +202,7 @@ class TestVideoDecoderOps:
         add_video_stream(decoder, device=device)
         with pytest.raises(
             IndexError,
-            match="must be greater than or equal to 0, or be a valid negative index",
+            match="negative indices must have an absolute value less than the number of frames",
         ):
             invalid_frames, *_ = get_frames_at_indices(
                 decoder, frame_indices=[-10000, -3000]
