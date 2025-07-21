@@ -53,12 +53,12 @@ def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
     return importlib.util.module_from_spec(spec)
 
 
+# Note that the return value from this function must match the value used as
+# PYBIND_OPS_MODULE_NAME when we compile _core/pybind_ops.cpp. If the values
+# do not match, we will not be able to import the C++ shared library as a
+# Python module at runtime.
+#
+# The parameter ffmpeg_major_version is unused externally, but used
+# internally.
 def _get_pybind_ops_module_name(ffmpeg_major_version: int) -> str:
-    # Note that this value must match the value used as PYBIND_OPS_MODULE_NAME
-    # when we compile _core/pybind_ops.cpp. If the values do not match, we will
-    # not be able to import the C++ shared library as a Python module at
-    # runtime.
-    #
-    # The parameter ffmpeg_major_version is unused externally, but used
-    # internally.
     return "core_pybind_ops"
