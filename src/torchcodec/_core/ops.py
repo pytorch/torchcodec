@@ -23,13 +23,10 @@ _pybind_ops: Optional[ModuleType] = None
 
 
 def load_torchcodec_shared_libraries():
-    # Successively try to load libtorchcodec_*7.so, libtorchcodec_*6.so,
-    # libtorchcodec_*5.so, and libtorchcodec_*4.so. Each of these correspond to an
-    # ffmpeg major version. This should cover all potential ffmpeg versions
-    # installed on the user's machine.
-    #
-    # On fbcode, _get_extension_path() is overridden and directly points to the
-    # correct .so file, so this for-loop succeeds on the first iteration.
+    # Successively try to load the shared libraries for each version of FFmpeg
+    # that we support. We always start with the highest version, working our way
+    # down to the lowest version. Once we can load ALL shared libraries for a
+    # version of FFmpeg, we have succeeded and we stop.
     #
     # Note that we use two different methods for loading shared libraries:
     #
@@ -208,6 +205,9 @@ def _add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+    custom_frame_mappings: Optional[
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ] = None,
     color_conversion_library: Optional[str] = None,
 ) -> None:
     return
@@ -223,6 +223,9 @@ def add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+    custom_frame_mappings: Optional[
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ] = None,
 ) -> None:
     return
 
