@@ -1,0 +1,12 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec
+
+
+Frame
+=====
+
+.. autoclass:: Frame
+    :members:
+    :undoc-members: __init__
+    :inherited-members:

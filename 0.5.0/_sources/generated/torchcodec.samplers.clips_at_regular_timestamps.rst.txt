@@ -1,0 +1,9 @@
+﻿.. role:: hidden
+    :class: hidden-section
+.. currentmodule:: torchcodec.samplers
+
+
+clips_at_regular_timestamps
+===========================
+
+.. autofunction:: clips_at_regular_timestamps
