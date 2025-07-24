@@ -367,6 +367,28 @@ NASA_VIDEO = TestVideo(
     frames={},  # Automatically loaded from json file
 )
 
+# Video generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=200x200:rate=30 -c:v libx265 -pix_fmt yuv420p10le -preset fast -crf 23 h265_10bits.mp4
+H265_10BITS = TestVideo(
+    filename="h265_10bits.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=200, height=200, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
+)
+
+# Video generated with:
+# peg -f lavfi -i testsrc2=duration=1:size=200x200:rate=30 -c:v libx264 -pix_fmt yuv420p10le -preset fast -crf 23 h264_10bits.mp4
+H264_10BITS = TestVideo(
+    filename="h264_10bits.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=200, height=200, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
+)
+
 
 @dataclass
 class TestAudio(TestContainerFile):
