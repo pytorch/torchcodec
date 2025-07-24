@@ -99,8 +99,18 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
 } // namespace
 
 AudioEncoder::~AudioEncoder() {
-  if (avFormatContext_ && avFormatContext_->pb && !avioContextHolder_) {
-    avio_close(avFormatContext_->pb);
+  close_avio();
+}
+
+void AudioEncoder::close_avio() {
+  if (avFormatContext_ && avFormatContext_->pb) {
+    avio_flush(avFormatContext_->pb);
+
+    if (!avioContextHolder_) {
+      avio_close(avFormatContext_->pb);
+      // avoids closing again in destructor, which would segfault.
+      avFormatContext_->pb = nullptr;
+    }
   }
 }
 
@@ -308,6 +318,8 @@ void AudioEncoder::encode() {
       status == AVSUCCESS,
       "Error in: av_write_trailer",
       getFFMPEGErrorStringFromErrorCode(status));
+
+  close_avio();
 }
 
 UniqueAVFrame AudioEncoder::maybeConvertAVFrame(const UniqueAVFrame& avFrame) {
