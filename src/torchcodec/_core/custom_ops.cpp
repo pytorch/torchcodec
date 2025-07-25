@@ -108,9 +108,9 @@ OpsFrameOutput makeOpsFrameOutput(FrameOutput& frame) {
 SingleStreamDecoder::FrameMappings makeFrameMappings(
     std::tuple<at::Tensor, at::Tensor, at::Tensor> custom_frame_mappings) {
   return SingleStreamDecoder::FrameMappings{
-      std::get<0>(custom_frame_mappings),
-      std::get<1>(custom_frame_mappings),
-      std::get<2>(custom_frame_mappings)};
+      std::move(std::get<0>(custom_frame_mappings)),
+      std::move(std::get<1>(custom_frame_mappings)),
+      std::move(std::get<2>(custom_frame_mappings))};
 }
 
 // All elements of this tuple are tensors of the same leading dimension. The
@@ -281,7 +281,7 @@ void add_video_stream(
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
-    std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
+    const std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>&
         custom_frame_mappings = std::nullopt) {
   _add_video_stream(
       decoder,
