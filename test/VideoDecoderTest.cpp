@@ -267,9 +267,9 @@ TEST_P(SingleStreamDecoderTest, SeeksCloseToEof) {
   ourDecoder->addVideoStream(-1);
   ourDecoder->setCursorPtsInSeconds(388388. / 30'000);
   auto output = ourDecoder->getNextFrame();
-  EXPECT_EQ(output.ptsSeconds, 388'388. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 388'388. / 30'000);
   output = ourDecoder->getNextFrame();
-  EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 389'389. / 30'000);
   EXPECT_THROW(ourDecoder->getNextFrame(), std::exception);
 }
 
@@ -300,7 +300,7 @@ TEST_P(SingleStreamDecoderTest, GetsFramePlayedAtTimestamp) {
   // Sanity check: make sure duration is strictly positive.
   EXPECT_GT(kPtsPlusDurationOfLastFrame, kPtsOfLastFrameInVideoStream);
   output = ourDecoder->getFramePlayedAt(kPtsPlusDurationOfLastFrame - 1e-6);
-  EXPECT_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, kPtsOfLastFrameInVideoStream);
 }
 
 TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
@@ -311,7 +311,7 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->setCursorPtsInSeconds(6.0);
   auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor6FromOurDecoder = output.data;
-  EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 180'180. / 30'000);
   torch::Tensor tensor6FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.000000.pt");
   EXPECT_TRUE(torch::equal(tensor6FromOurDecoder, tensor6FromFFMPEG));
@@ -327,7 +327,7 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->setCursorPtsInSeconds(6.1);
   output = ourDecoder->getNextFrame();
   torch::Tensor tensor61FromOurDecoder = output.data;
-  EXPECT_EQ(output.ptsSeconds, 183'183. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 183'183. / 30'000);
   torch::Tensor tensor61FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time6.100000.pt");
   EXPECT_TRUE(torch::equal(tensor61FromOurDecoder, tensor61FromFFMPEG));
@@ -347,7 +347,7 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->setCursorPtsInSeconds(10.0);
   output = ourDecoder->getNextFrame();
   torch::Tensor tensor10FromOurDecoder = output.data;
-  EXPECT_EQ(output.ptsSeconds, 300'300. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 300'300. / 30'000);
   torch::Tensor tensor10FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time10.000000.pt");
   EXPECT_TRUE(torch::equal(tensor10FromOurDecoder, tensor10FromFFMPEG));
@@ -364,7 +364,7 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->setCursorPtsInSeconds(6.0);
   output = ourDecoder->getNextFrame();
   tensor6FromOurDecoder = output.data;
-  EXPECT_EQ(output.ptsSeconds, 180'180. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 180'180. / 30'000);
   EXPECT_TRUE(torch::equal(tensor6FromOurDecoder, tensor6FromFFMPEG));
   EXPECT_EQ(ourDecoder->getDecodeStats().numSeeksAttempted, 1);
   // We cannot skip a seek here because timestamp=6 has a different keyframe
@@ -379,7 +379,7 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   ourDecoder->setCursorPtsInSeconds(kPtsOfLastFrameInVideoStream);
   output = ourDecoder->getNextFrame();
   torch::Tensor tensor7FromOurDecoder = output.data;
-  EXPECT_EQ(output.ptsSeconds, 389'389. / 30'000);
+  EXPECT_DOUBLE_EQ(output.ptsSeconds, 389'389. / 30'000);
   torch::Tensor tensor7FromFFMPEG =
       readTensorFromDisk("nasa_13013.mp4.time12.979633.pt");
   EXPECT_TRUE(torch::equal(tensor7FromOurDecoder, tensor7FromFFMPEG));

@@ -18,7 +18,7 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  return static_cast<double>(pts) * timeBase.num / timeBase.den;
+  return static_cast<double>(pts) * av_q2d(timeBase);
 }
 
 int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
@@ -129,11 +129,11 @@ void SingleStreamDecoder::initializeDecoder() {
 
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
       streamMetadata.durationSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->duration;
+          ptsToSeconds(avStream->duration, avStream->time_base);
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
       streamMetadata.beginStreamSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->start_time;
+          ptsToSeconds(avStream->start_time, avStream->time_base);
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -304,13 +304,12 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
         streamInfos_[streamIndex].allFrames.size();
 
     if (streamMetadata.beginStreamPtsFromContent.has_value()) {
-      streamMetadata.beginStreamPtsSecondsFromContent =
-          *streamMetadata.beginStreamPtsFromContent *
-          av_q2d(avStream->time_base);
+      streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
     }
     if (streamMetadata.endStreamPtsFromContent.has_value()) {
-      streamMetadata.endStreamPtsSecondsFromContent =
-          *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+      streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.endStreamPtsFromContent, avStream->time_base);
     }
   }
 
@@ -344,11 +343,11 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
       all_frames[-1].item<int64_t>() + duration[-1].item<int64_t>();
 
   auto avStream = formatContext_->streams[streamIndex];
-  streamMetadata.beginStreamPtsSecondsFromContent =
-      *streamMetadata.beginStreamPtsFromContent * av_q2d(avStream->time_base);
+  streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
 
-  streamMetadata.endStreamPtsSecondsFromContent =
-      *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+  streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.endStreamPtsFromContent, avStream->time_base);
 
   streamMetadata.numFramesFromContent = all_frames.size(0);
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
