@@ -126,13 +126,6 @@ class VideoDecoder:
     def _getitem_int(self, key: int) -> Tensor:
         assert isinstance(key, int)
 
-        if key < 0:
-            key += self._num_frames
-        if key >= self._num_frames or key < 0:
-            raise IndexError(
-                f"Index {key} is out of bounds; length is {self._num_frames}"
-            )
-
         frame_data, *_ = core.get_frame_at_index(self._decoder, frame_index=key)
         return frame_data
 
@@ -196,13 +189,6 @@ class VideoDecoder:
         Returns:
             Frame: The frame at the given index.
         """
-        if index < 0:
-            index += self._num_frames
-
-        if not 0 <= index < self._num_frames:
-            raise IndexError(
-                f"Index {index} is out of bounds; must be in the range [0, {self._num_frames})."
-            )
         data, pts_seconds, duration_seconds = core.get_frame_at_index(
             self._decoder, frame_index=index
         )
@@ -221,10 +207,6 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames at the given indices.
         """
-        indices = [
-            index if index >= 0 else index + self._num_frames for index in indices
-        ]
-
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
             self._decoder, frame_indices=indices
         )
@@ -248,16 +230,8 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames within the specified range.
         """
-        if not 0 <= start < self._num_frames:
-            raise IndexError(
-                f"Start index {start} is out of bounds; must be in the range [0, {self._num_frames})."
-            )
-        if stop < start:
-            raise IndexError(
-                f"Stop index ({stop}) must not be less than the start index ({start})."
-            )
-        if not step > 0:
-            raise IndexError(f"Step ({step}) must be greater than 0.")
+        # Adjust start / stop indices to enable indexing semantics, ex. [-10, 1000] returns the last 10 frames
+        start, stop, step = slice(start, stop, step).indices(self._num_frames)
         frames = core.get_frames_in_range(
             self._decoder,
             start=start,
