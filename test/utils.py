@@ -609,3 +609,14 @@ AV1_VIDEO = TestVideo(
         },
     },
 )
+
+VAR_FPS_VIDEO = TestVideo(
+    filename="var_fps_video.mp4",
+    default_stream_index=0,
+    # This metadata is extracted manually.
+    #  $ ffprobe -v error -hide_banner -select_streams v:0 -show_frames -of json test/resources/var_fps_video.mp4 > out.json
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={},
+)
