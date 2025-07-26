@@ -42,6 +42,10 @@ git clone git@github.com:pytorch/torchcodec.git
 # Or, using https instead of ssh: git clone https://github.com/pytorch/torchcodec.git
 cd torchcodec
 
+# Optional, but recommended: define a persistent build directory which speeds-up
+# subsequent builds.
+export TORCHCODEC_CMAKE_BUILD_DIR="${PWD}/build"
+
 pip install -e ".[dev]" --no-build-isolation -vv
 # Or, for cuda support: ENABLE_CUDA=1 pip install -e ".[dev]" --no-build-isolation -vv
 ```
