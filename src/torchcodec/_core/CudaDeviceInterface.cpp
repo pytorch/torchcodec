@@ -227,16 +227,31 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
+  static const Npp32f bt709ColorTwist[3][4] = {
+    {1.0f, 0.0f, 1.402f, 0.0f},                // R = 1*Y + 0*Cb + 1.402*Cr; Y offset = 0
+    {1.0f, -0.344136f, -0.714136f, -128.0f},   // G = 1*Y - 0.344136*Cb - 0.714136*Cr; Cb offset = 
+    {1.0f, 1.772f, 0.0f, -128.0f}              // B = 1*Y + 1.772*Cb + 0*Cr; Cr offset = -128
+  };
+
   NppStatus status;
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
     if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
-      // BT.709 full range
-      status = nppiNV12ToRGB_709HDTV_8u_P2C3R(
+      // BT.709 full range using custom ColorTwist to match libswscale
+      // Create NPP stream context for the _Ctx function
+      NppStreamContext nppStreamCtx;
+      nppGetStreamContext(&nppStreamCtx);
+      
+      // ColorTwist function expects step arrays for planar input format
+      int srcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
+      
+      status = nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx(
           input,
-          avFrame->linesize[0],
+          srcStep,
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
-          oSizeROI);
+          oSizeROI,
+          bt709ColorTwist,
+          nppStreamCtx);
     } else {
       // BT.709 studio range
       status = nppiNV12ToRGB_709CSC_8u_P2C3R(
