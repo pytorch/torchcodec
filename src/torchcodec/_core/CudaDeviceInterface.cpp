@@ -163,15 +163,15 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 }
 
 NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
-  // Build an NppStreamContext, either via the old helper or by hand on CUDA
-  // 12.9+
+  // From 12.9, NPP recommends using a user-created NppStreamContext and using
+  // the `_Ctx()` calls:
+  // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
+  // And the nppGetStreamContext() helper is deprecated. We are explicitly
+  // supposed to create the NppStreamContext manually from the CUDA device
+  // properties:
+  // https://github.com/NVIDIA/CUDALibrarySamples/blob/d97803a40fab83c058bb3d68b6c38bd6eebfff43/NPP/README.md?plain=1#L54-L72
 
   NppStreamContext nppCtx{};
-#if CUDA_VERSION < 12090
-  NppStatus ctxStat = nppGetStreamContext(&nppCtx);
-  TORCH_CHECK(ctxStat == NPP_SUCCESS, "nppGetStreamContext failed");
-#else
-  // CUDA 12.9+: helper was removed, we need to build it manually
   cudaDeviceProp prop{};
   cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
   TORCH_CHECK(
@@ -187,7 +187,6 @@ NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
   nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
   nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
   nppCtx.nStreamFlags = 0;
-#endif
   return nppCtx;
 }
 
