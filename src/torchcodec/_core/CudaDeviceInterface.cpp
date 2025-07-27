@@ -306,12 +306,34 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
             avFrame->data[1]) // UV plane (16-bit interleaved)
     };
 
-    // BT.709 matrix - try different chroma offset for P010LE
-    const Npp32f aTwist[3][4] = {
+    // Choose color matrix based on colorspace
+    const Npp32f (*aTwist)[4];
+    
+    // TODO use even more accurage values from
+    // https://ffmpeg.org/doxygen/trunk/yuv2rgb_8c_source.html#l00047
+    // Need to devide by 65536 to get the floats
+    // BT.709 matrix (HDTV)
+    static const Npp32f bt709Matrix[3][4] = {
         {1.0f, 0.0f, 1.402f, 0.0f},
-        {1.0f, -0.344136f, -0.714136f, -32768.0f}, // Try double offset
-        {1.0f, 1.772f, 0.0f, -32768.0f} // Try double offset
+        {1.0f, -0.344136f, -0.714136f, -32768.0f},
+        {1.0f, 1.772f, 0.0f, -32768.0f}
     };
+    
+    // BT.601 matrix (SDTV)
+    static const Npp32f bt601Matrix[3][4] = {
+        {1.0f, 0.0f, 1.596f, 0.0f},
+        {1.0f, -0.392f, -0.813f, -32768.0f},
+        {1.0f, 2.017f, 0.0f, -32768.0f}
+    };
+    
+    if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+        printf("It's BT.709 colorspace\n");
+        aTwist = bt709Matrix;
+    } else {
+        // Default to BT.601 for other colorspaces (including AVCOL_SPC_BT470BG, AVCOL_SPC_SMPTE170M)
+        printf("It's BT.601 colorspace\n");
+        aTwist = bt601Matrix;
+    }
 
     // Create NPP stream context
     NppStreamContext nppStreamCtx;
