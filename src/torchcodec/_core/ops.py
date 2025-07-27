@@ -15,6 +15,7 @@ from torch.library import get_ctx, register_fake
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     _get_extension_path,
+    _get_pybind_ops_module_name,
     _load_pybind11_module,
 )
 
@@ -22,13 +23,10 @@ _pybind_ops: Optional[ModuleType] = None
 
 
 def load_torchcodec_shared_libraries():
-    # Successively try to load libtorchcodec_*7.so, libtorchcodec_*6.so,
-    # libtorchcodec_*5.so, and libtorchcodec_*4.so. Each of these correspond to an
-    # ffmpeg major version. This should cover all potential ffmpeg versions
-    # installed on the user's machine.
-    #
-    # On fbcode, _get_extension_path() is overridden and directly points to the
-    # correct .so file, so this for-loop succeeds on the first iteration.
+    # Successively try to load the shared libraries for each version of FFmpeg
+    # that we support. We always start with the highest version, working our way
+    # down to the lowest version. Once we can load ALL shared libraries for a
+    # version of FFmpeg, we have succeeded and we stop.
     #
     # Note that we use two different methods for loading shared libraries:
     #
@@ -43,9 +41,9 @@ def load_torchcodec_shared_libraries():
     #      libraries do not meet those conditions.
 
     exceptions = []
-    pybind_ops_module_name = "decoder_core_pybind_ops"
     for ffmpeg_major_version in (7, 6, 5, 4):
-        decoder_library_name = f"libtorchcodec_decoder{ffmpeg_major_version}"
+        pybind_ops_module_name = _get_pybind_ops_module_name(ffmpeg_major_version)
+        decoder_library_name = f"libtorchcodec_core{ffmpeg_major_version}"
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
@@ -168,6 +166,7 @@ def encode_audio_to_file_abstract(
     filename: str,
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
 ) -> None:
     return
 
@@ -179,6 +178,7 @@ def encode_audio_to_tensor_abstract(
     format: str,
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
 ) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
@@ -205,6 +205,9 @@ def _add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+    custom_frame_mappings: Optional[
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ] = None,
     color_conversion_library: Optional[str] = None,
 ) -> None:
     return
@@ -220,6 +223,9 @@ def add_video_stream_abstract(
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
     device: Optional[str] = None,
+    custom_frame_mappings: Optional[
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ] = None,
 ) -> None:
     return
 

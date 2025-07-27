@@ -1,5 +1,4 @@
 import abc
-import json
 import subprocess
 import typing
 import urllib.request
@@ -20,7 +19,6 @@ from torchcodec._core import (
     create_from_file,
     get_frames_at_indices,
     get_frames_by_pts,
-    get_json_metadata,
     get_next_frame,
     seek_to_pts,
 )
@@ -238,11 +236,7 @@ class TorchCodecCore(AbstractDecoder):
             color_conversion_library=self._color_conversion_library,
             device=self._device,
         )
-        metadata = json.loads(get_json_metadata(decoder))
-        best_video_stream = metadata["bestVideoStreamIndex"]
-        frames, *_ = get_frames_by_pts(
-            decoder, stream_index=best_video_stream, timestamps=pts_list
-        )
+        frames, *_ = get_frames_by_pts(decoder, timestamps=pts_list)
         return frames
 
     def decode_first_n_frames(self, video_file, n):
@@ -356,11 +350,7 @@ class TorchCodecCoreBatch(AbstractDecoder):
             color_conversion_library=self._color_conversion_library,
             device=self._device,
         )
-        metadata = json.loads(get_json_metadata(decoder))
-        best_video_stream = metadata["bestVideoStreamIndex"]
-        frames, *_ = get_frames_by_pts(
-            decoder, stream_index=best_video_stream, timestamps=pts_list
-        )
+        frames, *_ = get_frames_by_pts(decoder, timestamps=pts_list)
         return frames
 
     def decode_first_n_frames(self, video_file, n):
@@ -371,12 +361,8 @@ class TorchCodecCoreBatch(AbstractDecoder):
             color_conversion_library=self._color_conversion_library,
             device=self._device,
         )
-        metadata = json.loads(get_json_metadata(decoder))
-        best_video_stream = metadata["bestVideoStreamIndex"]
         indices_list = list(range(n))
-        frames, *_ = get_frames_at_indices(
-            decoder, stream_index=best_video_stream, frame_indices=indices_list
-        )
+        frames, *_ = get_frames_at_indices(decoder, frame_indices=indices_list)
         return frames
 
 

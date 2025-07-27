@@ -265,7 +265,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
-  auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
 
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
@@ -286,11 +285,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         nppCtx_);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
-
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration<double, std::micro>(end - start);
-  VLOG(9) << "NPP Conversion of frame h=" << height << " w=" << width
-          << " took: " << duration.count() << "us";
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9

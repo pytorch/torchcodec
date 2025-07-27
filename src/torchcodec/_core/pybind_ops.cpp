@@ -38,7 +38,11 @@ int64_t create_from_file_like(
   return reinterpret_cast<int64_t>(decoder);
 }
 
-PYBIND11_MODULE(decoder_core_pybind_ops, m) {
+#ifndef PYBIND_OPS_MODULE_NAME
+#error PYBIND_OPS_MODULE_NAME must be defined!
+#endif
+
+PYBIND11_MODULE(PYBIND_OPS_MODULE_NAME, m) {
   m.def("create_from_file_like", &create_from_file_like);
 }
 

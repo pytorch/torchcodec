@@ -48,22 +48,22 @@ function(make_torchcodec_libraries
     # We create three shared libraries per version of FFmpeg, where the version
     # is denoted by N:
     #
-    # 1. libtorchcodec_decoderN.{ext}: Base library which contains the
+    # 1. libtorchcodec_coreN.{ext}: Base library which contains the
     #    implementation of VideoDecoder and everything VideoDecoder needs. On
     #    Linux, {ext} is so. On Mac, it is dylib.
     #
     # 2. libtorchcodec_custom_opsN.{ext}: Implementation of the PyTorch custom
-    #    ops. Depends on libtorchcodec_decoderN.{ext}. On Linux, {ext} is so.
+    #    ops. Depends on libtorchcodec_coreN.{ext}. On Linux, {ext} is so.
     #    On Mac, it is dylib.
     #
     # 3. libtorchcodec_pybind_opsN.{ext}: Implementation of the pybind11 ops. We
     #    keep these separate from the PyTorch custom ops because we have to
     #    load these libraries separately on the Python side. Depends on
-    #    libtorchcodec_decoderN.{ext}. On BOTH Linux and Mac {ext} is so.
+    #    libtorchcodec_coreN.{ext}. On BOTH Linux and Mac {ext} is so.
 
-    # 1. Create libtorchcodec_decoderN.{ext}.
-    set(decoder_library_name "libtorchcodec_decoder${ffmpeg_major_version}")
-    set(decoder_sources
+    # 1. Create libtorchcodec_coreN.{ext}.
+    set(core_library_name "libtorchcodec_core${ffmpeg_major_version}")
+    set(core_sources
         AVIOContextHolder.cpp
         AVIOTensorContext.cpp
         FFMPEGCommon.cpp
@@ -71,32 +71,30 @@ function(make_torchcodec_libraries
         DeviceInterface.cpp
         CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
-        # TODO: lib name should probably not be "*_decoder*" now that it also
-        # contains an encoder
         Encoder.cpp
     )
 
     if(ENABLE_CUDA)
-	    list(APPEND decoder_sources CudaDeviceInterface.cpp)
+	    list(APPEND core_sources CudaDeviceInterface.cpp)
     endif()
 
-    set(decoder_library_dependencies
+    set(core_library_dependencies
         ${ffmpeg_target}
         ${TORCH_LIBRARIES}
     )
 
     if(ENABLE_CUDA)
-        list(APPEND decoder_library_dependencies
+        list(APPEND core_library_dependencies
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
     endif()
 
     make_torchcodec_sublibrary(
-        "${decoder_library_name}"
+        "${core_library_name}"
         SHARED
-        "${decoder_sources}"
-        "${decoder_library_dependencies}"
+        "${core_sources}"
+        "${core_library_dependencies}"
     )
 
     # 2. Create libtorchcodec_custom_opsN.{ext}.
@@ -106,7 +104,7 @@ function(make_torchcodec_libraries
         custom_ops.cpp
     )
     set(custom_ops_dependencies
-        ${decoder_library_name}
+        ${core_library_name}
         ${Python3_LIBRARIES}
     )
     make_torchcodec_sublibrary(
@@ -123,7 +121,7 @@ function(make_torchcodec_libraries
         pybind_ops.cpp
     )
     set(pybind_ops_dependencies
-       ${decoder_library_name}
+       ${core_library_name}
        pybind11::module # This library dependency makes sure we have the right
                         # Python libraries included as well as all of the right
                         # settings so that we can successfully load the shared
@@ -151,6 +149,15 @@ function(make_torchcodec_libraries
         PUBLIC
       "-fvisibility=hidden"
     )
+    # The value we use here must match the value we return from
+    # _get_pybind_ops_module_name() on the Python side. If the values do not
+    # match, then we will be unable to import the C++ shared library as a
+    # Python module at runtime.
+    target_compile_definitions(
+        ${pybind_ops_library_name}
+        PRIVATE
+        PYBIND_OPS_MODULE_NAME=core_pybind_ops
+    )
     # If we don't make sure this flag is set, we run into segfauls at import
     # time on Mac. See:
     #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
@@ -163,7 +170,7 @@ function(make_torchcodec_libraries
     # Install all libraries.
     set(
         all_libraries
-        ${decoder_library_name}
+        ${core_library_name}
         ${custom_ops_library_name}
         ${pybind_ops_library_name}
     )
@@ -240,7 +247,7 @@ else()
     # Expose these values updwards so that the test compilation does not need
     # to re-figure it out. FIXME: it's not great that we just copy-paste the
     # library names.
-    set(libtorchcodec_library_name "libtorchcodec_decoder${ffmpeg_major_version}" PARENT_SCOPE)
+    set(libtorchcodec_library_name "libtorchcodec_core${ffmpeg_major_version}" PARENT_SCOPE)
     set(libtorchcodec_custom_ops_name "libtorchcodec_custom_ops${ffmpeg_major_version}" PARENT_SCOPE)
     set(libav_include_dirs ${LIBAV_INCLUDE_DIRS} PARENT_SCOPE)
 endif()
