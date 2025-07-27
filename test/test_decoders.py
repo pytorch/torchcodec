@@ -1143,7 +1143,7 @@ class TestVideoDecoder:
 
     @needs_cuda
     # @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
-    @pytest.mark.parametrize("asset", (H265_10BITS,))  # H265_10BITS))
+    @pytest.mark.parametrize("asset", (H264_10BITS,))  # H265_10BITS))
     def test_10bit_videos_cuda(self, asset):
         # Assert that we raise proper error on different kinds of 10bit videos.
 
@@ -1154,6 +1154,7 @@ class TestVideoDecoder:
 
         decoder = VideoDecoder(asset.path, device="cuda")
         gpu_frame = decoder.get_frame_at(0)
+        print(gpu_frame.data.device)
         write_png(gpu_frame.data.cpu(), "gpu.png")
 
         decoder = VideoDecoder(asset.path, device="cpu")

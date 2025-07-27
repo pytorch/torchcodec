@@ -199,20 +199,18 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   // We check that avFrame->format == AV_PIX_FMT_CUDA. This only ensures the
   // AVFrame is on GPU memory. It can be on CPU memory if the video isn't
   // supported by NVDEC for whatever reason: NVDEC falls back to CPU decoding in
-  // this case, and our check fails.
-  // TODO: we could send the frame back into the CPU path, and rely on
-  // swscale/filtergraph to run the color conversion to properly output the
-  // frame.
-  TORCH_CHECK(
-      avFrame->format == AV_PIX_FMT_CUDA,
-      "Expected format to be AV_PIX_FMT_CUDA, got ",
-      (av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
-           ? av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
-           : "unknown"),
-      ". When that happens, it is probably because the video is not supported by NVDEC. "
-      "Try using the CPU device instead. "
-      "If the video is 10bit, we are tracking 10bit support in "
-      "https://github.com/pytorch/torchcodec/issues/776");
+  // this case. In this case, we fall back to CPU processing.
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
+    
+    FrameOutput cpuFrameOutput;
+    cpuInterface->convertAVFrameToFrameOutput(
+        videoStreamOptions, timeBase, avFrame, cpuFrameOutput, std::nullopt);
+    
+    frameOutput.data = cpuFrameOutput.data.to(device_);
+    return;
+  }
 
   // Above we checked that the AVFrame was on GPU, but that's not enough, we
   // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
