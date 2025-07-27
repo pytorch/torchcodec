@@ -241,13 +241,13 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
   torch::Tensor intermediateTensor;
-  
+
   if (actualFormat == AV_PIX_FMT_P010LE) {
     // For 10-bit, we need a 16-bit intermediate tensor, then convert to 8-bit
     intermediateTensor = torch::empty(
-        {height, width, 3}, 
+        {height, width, 3},
         torch::TensorOptions().dtype(torch::kUInt16).device(device_));
-    
+
     if (preAllocatedOutputTensor.has_value()) {
       dst = preAllocatedOutputTensor.value();
     } else {
@@ -281,7 +281,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   if (actualFormat == AV_PIX_FMT_NV12) {
     // 8-bit NV12 format
     Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
-    
+
     if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
       status = nppiNV12ToRGB_709CSC_8u_P2C3R(
           input,
@@ -301,23 +301,25 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // 10-bit semi-planar format (like NV12 but 16-bit)
     // P010LE has Y plane + interleaved UV plane, 10-bit data in high bits
     const Npp16u* input[2] = {
-        reinterpret_cast<const Npp16u*>(avFrame->data[0]),  // Y plane (16-bit)
-        reinterpret_cast<const Npp16u*>(avFrame->data[1])   // UV plane (16-bit interleaved)
+        reinterpret_cast<const Npp16u*>(avFrame->data[0]), // Y plane (16-bit)
+        reinterpret_cast<const Npp16u*>(
+            avFrame->data[1]) // UV plane (16-bit interleaved)
     };
 
-    // Use exact BT.709 matrix as provided - NPP should handle the scaling internally
+    // BT.709 matrix - try different chroma offset for P010LE
     const Npp32f aTwist[3][4] = {
-        {1.0f, 0.0f, 1.402f, 0.0f},                // R = Y + 1.402*Cr
-        {1.0f, -0.344136f, -0.714136f, -128.0f},   // G = Y - 0.344*Cb - 0.714*Cr; Cb offset = -128
-        {1.0f, 1.772f, 0.0f, -128.0f}              // B = Y + 1.772*Cb; Cr offset = -128
+        {1.0f, 0.0f, 1.402f, 0.0f},
+        {1.0f, -0.344136f, -0.714136f, -32768.0f}, // Try double offset
+        {1.0f, 1.772f, 0.0f, -32768.0f} // Try double offset
     };
 
     // Create NPP stream context
     NppStreamContext nppStreamCtx;
     nppStreamCtx.hStream = nppGetStream();
-    
-    int rSrcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};  // Y and UV strides
-    
+
+    int rSrcStep[2] = {
+        avFrame->linesize[0], avFrame->linesize[1]}; // Y and UV strides
+
     status = nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx(
         input,
         rSrcStep,
@@ -326,13 +328,16 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         oSizeROI,
         aTwist,
         nppStreamCtx);
-    
-    // Convert 16-bit to 8-bit: P010LE has 10-bit data, so divide by 4 to convert to 8-bit
+
+    // Convert 16-bit to 8-bit: P010LE has 10-bit data, so divide by 4 to
+    // convert to 8-bit
     if (status == NPP_SUCCESS) {
-      dst = (intermediateTensor.div(256)).to(torch::kUInt8);  // Divide by 4 for 10-bit -> 8-bit conversion
+      dst =
+          (intermediateTensor.div(256))
+              .to(torch::kUInt8); // Divide by 4 for 10-bit -> 8-bit conversion
     }
   }
-  
+
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
 
   // Make the pytorch stream wait for the npp kernel to finish before using the
