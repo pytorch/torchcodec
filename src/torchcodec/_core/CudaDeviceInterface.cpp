@@ -227,10 +227,12 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
+  // Conversion matrix taken from https://mymusing.co/bt-709-yuv-to-rgb-conversion-color/
+  // The -128 offset is needed to first center the U and V channels around 0
   static const Npp32f bt709ColorTwist[3][4] = {
-    {1.0f, 0.0f, 1.402f, 0.0f},                // R = 1*Y + 0*Cb + 1.402*Cr; Y offset = 0
-    {1.0f, -0.344136f, -0.714136f, -128.0f},   // G = 1*Y - 0.344136*Cb - 0.714136*Cr; Cb offset = 
-    {1.0f, 1.772f, 0.0f, -128.0f}              // B = 1*Y + 1.772*Cb + 0*Cr; Cr offset = -128
+    {1.0f, 0.0f, 1.5748f, 0.0f},     
+    {1.0f, -0.187324, -0.468124, -128.0f},  
+    {1.0f, 1.8556, 0.0f, -128.0f}         
   };
 
   NppStatus status;
@@ -238,6 +240,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
       // BT.709 full range using custom ColorTwist to match libswscale
       // Create NPP stream context for the _Ctx function
+      printf("it's a BT.709 full range frame\n");
       NppStreamContext nppStreamCtx;
       nppGetStreamContext(&nppStreamCtx);
       
@@ -253,6 +256,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
           bt709ColorTwist,
           nppStreamCtx);
     } else {
+      printf("it's a BT.709 studio range frame\n");
       // BT.709 studio range
       status = nppiNV12ToRGB_709CSC_8u_P2C3R(
           input,

@@ -1146,11 +1146,10 @@ class TestVideoDecoder:
         decoder_cpu = VideoDecoder(FULL_COLOR_RANGE.path, device="cpu")
 
         a, b = decoder_gpu[0].data.cpu(), decoder_cpu[0].data
-        from torchvision.io import write_png
-        write_png(a, "gpu.png")
-        write_png(b, "cpu.png")
-        torch.testing.assert_close(a, b, rtol=0, atol=2)
-        # assert_frames_equal(decoder_gpu[10].data.cpu(), decoder_cpu[10].data)
+        for frame_index in (0, 10, 20, 5):
+            gpu_frame = decoder_gpu.get_frame_at(frame_index).data.cpu()
+            cpu_frame = decoder_cpu.get_frame_at(frame_index).data
+            torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
 
 
 class TestAudioDecoder:
