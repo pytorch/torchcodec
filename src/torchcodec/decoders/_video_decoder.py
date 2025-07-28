@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import io
+import json
 import numbers
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
@@ -79,6 +80,7 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
+        custom_frame_mappings: Optional[Union[Path, str]] = None,
     ):
         allowed_seek_modes = ("exact", "approximate")
         if seek_mode not in allowed_seek_modes:
@@ -86,6 +88,16 @@ class VideoDecoder:
                 f"Invalid seek mode ({seek_mode}). "
                 f"Supported values are {', '.join(allowed_seek_modes)}."
             )
+        if custom_frame_mappings and seek_mode != "exact":
+            raise ValueError(
+                "Custom frame mappings are only supported in 'exact' seek mode."
+                "While setting custom frame mappings, do not set `seek_mode`."
+            )
+        custom_frame_mappings_data = (
+            read_custom_frame_mappings(custom_frame_mappings)
+            if custom_frame_mappings is not None
+            else None
+        )
 
         self._decoder = create_decoder(source=source, seek_mode=seek_mode)
 
@@ -108,6 +120,7 @@ class VideoDecoder:
             dimension_order=dimension_order,
             num_threads=num_ffmpeg_threads,
             device=device,
+            custom_frame_mappings=custom_frame_mappings_data,
         )
 
         (
@@ -376,4 +389,36 @@ def _get_and_validate_stream_metadata(
         begin_stream_seconds,
         end_stream_seconds,
         num_frames,
+    )
+
+
+def read_custom_frame_mappings(
+    custom_frame_mappings: Union[Path, str]
+) -> tuple[Tensor, Tensor, Tensor]:
+    try:
+        if hasattr(custom_frame_mappings, "read"):
+            input_data = json.load(custom_frame_mappings)
+        else:
+            input_data = json.loads(custom_frame_mappings)
+    except json.JSONDecodeError:
+        raise ValueError(
+            "Invalid custom frame mappings. "
+            "It should be a valid JSON string or a path to a JSON file."
+        )
+    all_frames, is_key_frame, duration = zip(
+        *[
+            (float(frame["pts"]), frame["key_frame"], float(frame["duration"]))
+            for frame in input_data["frames"]
+        ]
+    )
+    all_frames = Tensor(all_frames)
+    is_key_frame = Tensor(is_key_frame)
+    duration = Tensor(duration)
+    assert (
+        len(all_frames) == len(is_key_frame) == len(duration)
+    ), "Mismatched lengths in frame index data"
+    return (
+        all_frames,
+        is_key_frame,
+        duration,
     )
