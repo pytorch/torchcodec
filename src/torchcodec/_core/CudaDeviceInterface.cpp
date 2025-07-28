@@ -203,11 +203,11 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     auto cpuDevice = torch::Device(torch::kCPU);
     auto cpuInterface = createDeviceInterface(cpuDevice);
-    
+
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
         videoStreamOptions, timeBase, avFrame, cpuFrameOutput, std::nullopt);
-    
+
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
   }
@@ -222,143 +222,64 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "The AVFrame does not have a hw_frames_ctx. "
       "That's unexpected, please report this to the TorchCodec repo.");
 
-  AVPixelFormat actualFormat =
-      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data)
-          ->sw_format;
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
   TORCH_CHECK(
-      actualFormat == AV_PIX_FMT_NV12 || actualFormat == AV_PIX_FMT_P010LE,
+      actualFormat == AV_PIX_FMT_NV12,
       "The AVFrame is ",
       (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
                                          : "unknown"),
-      ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
-      "Try using the CPU device instead.");
+      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
+      "the video isn't 8bit, which is not supported on CUDA at the moment. "
+      "Try using the CPU device instead. "
+      "If the video is 10bit, we are tracking 10bit support in "
+      "https://github.com/pytorch/torchcodec/issues/776");
 
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
-  torch::Tensor intermediateTensor;
-
-  if (actualFormat == AV_PIX_FMT_P010LE) {
-    // For 10-bit, we need a 16-bit intermediate tensor, then convert to 8-bit
-    intermediateTensor = torch::empty(
-        {height, width, 3},
-        torch::TensorOptions().dtype(torch::kUInt16).device(device_));
-
-    if (preAllocatedOutputTensor.has_value()) {
-      dst = preAllocatedOutputTensor.value();
-    } else {
-      dst = allocateEmptyHWCTensor(height, width, device_);
-    }
+  if (preAllocatedOutputTensor.has_value()) {
+    dst = preAllocatedOutputTensor.value();
+    auto shape = dst.sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
+            (shape[2] == 3),
+        "Expected tensor of shape ",
+        height,
+        "x",
+        width,
+        "x3, got ",
+        shape);
   } else {
-    // For 8-bit formats, use the output tensor directly
-    if (preAllocatedOutputTensor.has_value()) {
-      dst = preAllocatedOutputTensor.value();
-      auto shape = dst.sizes();
-      TORCH_CHECK(
-          (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
-              (shape[2] == 3),
-          "Expected tensor of shape ",
-          height,
-          "x",
-          width,
-          "x3, got ",
-          shape);
-    } else {
-      dst = allocateEmptyHWCTensor(height, width, device_);
-    }
+    dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
   // Use the user-requested GPU for running the NPP kernel.
   c10::cuda::CUDAGuard deviceGuard(device_);
 
   NppiSize oSizeROI = {width, height};
+  Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
+
   NppStatus status;
-
-  if (actualFormat == AV_PIX_FMT_NV12) {
-    // 8-bit NV12 format
-    Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
-
-    if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-      status = nppiNV12ToRGB_709CSC_8u_P2C3R(
-          input,
-          avFrame->linesize[0],
-          static_cast<Npp8u*>(dst.data_ptr()),
-          dst.stride(0),
-          oSizeROI);
-    } else {
-      status = nppiNV12ToRGB_8u_P2C3R(
-          input,
-          avFrame->linesize[0],
-          static_cast<Npp8u*>(dst.data_ptr()),
-          dst.stride(0),
-          oSizeROI);
-    }
-  } else if (actualFormat == AV_PIX_FMT_P010LE) {
-    // 10-bit semi-planar format (like NV12 but 16-bit)
-    // P010LE has Y plane + interleaved UV plane, 10-bit data in high bits
-    const Npp16u* input[2] = {
-        reinterpret_cast<const Npp16u*>(avFrame->data[0]), // Y plane (16-bit)
-        reinterpret_cast<const Npp16u*>(
-            avFrame->data[1]) // UV plane (16-bit interleaved)
-    };
-
-    // Choose color matrix based on colorspace
-    const Npp32f (*aTwist)[4];
-    
-    // TODO use even more accurage values from
-    // https://ffmpeg.org/doxygen/trunk/yuv2rgb_8c_source.html#l00047
-    // Need to devide by 65536 to get the floats
-    // BT.709 matrix (HDTV)
-    static const Npp32f bt709Matrix[3][4] = {
-        {1.0f, 0.0f, 1.402f, 0.0f},
-        {1.0f, -0.344136f, -0.714136f, -32768.0f},
-        {1.0f, 1.772f, 0.0f, -32768.0f}
-    };
-    
-    // BT.601 matrix (SDTV)
-    static const Npp32f bt601Matrix[3][4] = {
-        {1.0f, 0.0f, 1.596f, 0.0f},
-        {1.0f, -0.392f, -0.813f, -32768.0f},
-        {1.0f, 2.017f, 0.0f, -32768.0f}
-    };
-    
-    if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-        printf("It's BT.709 colorspace\n");
-        aTwist = bt709Matrix;
-    } else {
-        // Default to BT.601 for other colorspaces (including AVCOL_SPC_BT470BG, AVCOL_SPC_SMPTE170M)
-        printf("It's BT.601 colorspace\n");
-        aTwist = bt601Matrix;
-    }
-
-    // Create NPP stream context
-    NppStreamContext nppStreamCtx;
-    nppStreamCtx.hStream = nppGetStream();
-
-    int rSrcStep[2] = {
-        avFrame->linesize[0], avFrame->linesize[1]}; // Y and UV strides
-
-    status = nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx(
+  if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+    status = nppiNV12ToRGB_709CSC_8u_P2C3R(
         input,
-        rSrcStep,
-        reinterpret_cast<Npp16u*>(intermediateTensor.data_ptr()),
-        intermediateTensor.stride(0) * sizeof(uint16_t),
-        oSizeROI,
-        aTwist,
-        nppStreamCtx);
-
-    // Convert 16-bit to 8-bit: P010LE has 10-bit data, so divide by 4 to
-    // convert to 8-bit
-    if (status == NPP_SUCCESS) {
-      dst =
-          (intermediateTensor.div(256))
-              .to(torch::kUInt8); // Divide by 4 for 10-bit -> 8-bit conversion
-    }
+        avFrame->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI);
+  } else {
+    status = nppiNV12ToRGB_8u_P2C3R(
+        input,
+        avFrame->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI);
   }
-
-  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
+  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 
   // Make the pytorch stream wait for the npp kernel to finish before using the
   // output.

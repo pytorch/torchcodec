@@ -1142,29 +1142,33 @@ class TestVideoDecoder:
             torch.testing.assert_close(decoder[0], decoder[10])
 
     @needs_cuda
-    # @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
-    @pytest.mark.parametrize("asset", (H264_10BITS,))  # H265_10BITS))
-    def test_10bit_videos_cuda(self, asset):
+    def test_10bit_videos_cuda(self):
         # Assert that we raise proper error on different kinds of 10bit videos.
 
         # TODO we should investigate how to support 10bit videos on GPU.
         # See https://github.com/pytorch/torchcodec/issues/776
 
-        from torchvision.io import write_png
+        asset = H265_10BITS
 
         decoder = VideoDecoder(asset.path, device="cuda")
-        gpu_frame = decoder.get_frame_at(0)
-        print(gpu_frame.data.device)
-        write_png(gpu_frame.data.cpu(), "gpu.png")
+        with pytest.raises(
+            RuntimeError,
+            match="The AVFrame is p010le, but we expected AV_PIX_FMT_NV12.",
+        ):
+            decoder.get_frame_at(0)
 
-        decoder = VideoDecoder(asset.path, device="cpu")
-        cpu_frame = decoder.get_frame_at(0)
-        write_png(cpu_frame.data, "cpu.png")
+    @needs_cuda
+    def test_10bit_gpu_fallsback_to_cpu(self):
+        asset = H264_10BITS
 
-        if asset is H265_10BITS:
-            match = "The AVFrame is p010le, but we expected AV_PIX_FMT_NV12."
-        else:
-            match = "Expected format to be AV_PIX_FMT_CUDA, got yuv420p10le."
+        decoder_gpu = VideoDecoder(asset.path, device="cuda")
+        decoder_cpu = VideoDecoder(asset.path)
+
+        for frame_index in (0, 10, 20, 5):
+            frame_gpu = decoder_gpu.get_frame_at(frame_index).data.cpu()
+            frame_cpu = decoder_cpu.get_frame_at(frame_index).data
+
+            assert_frames_equal(frame_gpu, frame_cpu)
 
     @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
     def test_10bit_videos_cpu(self, asset):
