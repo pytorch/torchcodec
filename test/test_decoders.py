@@ -7,6 +7,7 @@
 import contextlib
 import gc
 import json
+from functools import partial
 from unittest.mock import patch
 
 import numpy
@@ -1278,6 +1279,86 @@ class TestVideoDecoder:
 
         decoder = VideoDecoder(asset.path)
         decoder.get_frame_at(10)
+
+    def setup_frame_mappings(tmp_path: str, file: bool, stream_index: int):
+        json_path = tmp_path / "custom_frame_mappings.json"
+        custom_frame_mappings = NASA_VIDEO.generate_custom_frame_mappings(stream_index)
+        if file:
+            # Write the custom frame mappings to a JSON file
+            with open(json_path, "w") as f:
+                f.write(custom_frame_mappings)
+            return json_path
+        else:
+            # Return the custom frame mappings as a JSON string
+            return custom_frame_mappings
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("stream_index", [0, 3])
+    @pytest.mark.parametrize(
+        "method",
+        (
+            partial(setup_frame_mappings, file=True),
+            partial(setup_frame_mappings, file=False),
+        ),
+    )
+    def test_custom_frame_mappings(self, tmp_path, device, stream_index, method):
+        custom_frame_mappings = method(tmp_path=tmp_path, stream_index=stream_index)
+        # Optionally open the custom frame mappings file if it is a file path
+        # or use a null context if it is a string.
+        with (
+            open(custom_frame_mappings, "r")
+            if hasattr(custom_frame_mappings, "read")
+            else contextlib.nullcontext()
+        ) as custom_frame_mappings:
+            decoder = VideoDecoder(
+                NASA_VIDEO.path,
+                stream_index=stream_index,
+                device=device,
+                custom_frame_mappings=custom_frame_mappings,
+            )
+            frame_0 = decoder.get_frame_at(0)
+            frame_5 = decoder.get_frame_at(5)
+            assert_frames_equal(
+                frame_0.data,
+                NASA_VIDEO.get_frame_data_by_index(0, stream_index=stream_index).to(
+                    device
+                ),
+            )
+            assert_frames_equal(
+                frame_5.data,
+                NASA_VIDEO.get_frame_data_by_index(5, stream_index=stream_index).to(
+                    device
+                ),
+            )
+            frames0_5 = decoder.get_frames_played_in_range(
+                frame_0.pts_seconds, frame_5.pts_seconds
+            )
+            assert_frames_equal(
+                frames0_5.data,
+                NASA_VIDEO.get_frame_data_by_range(0, 5, stream_index=stream_index).to(
+                    device
+                ),
+            )
+
+            decoder = VideoDecoder(
+                H265_VIDEO.path,
+                stream_index=0,
+                custom_frame_mappings=H265_VIDEO.generate_custom_frame_mappings(0),
+            )
+            ref_frame6 = H265_VIDEO.get_frame_data_by_index(5)
+            assert_frames_equal(ref_frame6, decoder.get_frame_played_at(0.5).data)
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_custom_frame_mappings_init_fails(self, device):
+        # Init fails if "approximate" seek mode is used with custom frame mappings
+        with pytest.raises(ValueError, match="seek_mode"):
+            VideoDecoder(
+                NASA_VIDEO.path,
+                stream_index=3,
+                device=device,
+                seek_mode="approximate",
+                custom_frame_mappings=NASA_VIDEO.generate_custom_frame_mappings(3),
+            )
 
 
 class TestAudioDecoder:

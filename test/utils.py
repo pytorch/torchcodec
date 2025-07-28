@@ -267,27 +267,29 @@ class TestContainerFile:
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
-            self.generate_custom_frame_mappings(stream_index)
+            self.create_custom_frame_mappings(stream_index)
         return self._custom_frame_mappings_data[stream_index]
 
-    def generate_custom_frame_mappings(self, stream_index: int) -> None:
-        result = json.loads(
-            subprocess.run(
-                [
-                    "ffprobe",
-                    "-i",
-                    f"{self.path}",
-                    "-select_streams",
-                    f"{stream_index}",
-                    "-show_frames",
-                    "-of",
-                    "json",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-        )
+    def generate_custom_frame_mappings(self, stream_index: int) -> str:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-i",
+                f"{self.path}",
+                "-select_streams",
+                f"{stream_index}",
+                "-show_frames",
+                "-of",
+                "json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return result
+
+    def create_custom_frame_mappings(self, stream_index: int) -> None:
+        result = json.loads(self.generate_custom_frame_mappings(stream_index))
         all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
         is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
         duration = torch.tensor(
