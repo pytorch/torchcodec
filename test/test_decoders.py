@@ -1173,7 +1173,7 @@ class TestVideoDecoder:
         decoder_gpu = VideoDecoder(asset.path, device="cuda")
         decoder_cpu = VideoDecoder(asset.path)
 
-        frame_indices = [0, 10, 20, 5] 
+        frame_indices = [0, 10, 20, 5]
         for frame_index in frame_indices:
             frame_gpu = decoder_gpu.get_frame_at(frame_index).data
             assert frame_gpu.device.type == "cuda"
