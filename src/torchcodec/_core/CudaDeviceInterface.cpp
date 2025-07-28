@@ -224,9 +224,9 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "The AVFrame does not have a hw_frames_ctx. "
       "That's unexpected, please report this to the TorchCodec repo.");
 
-  AVPixelFormat actualFormat =
-      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data)
-          ->sw_format;
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
   TORCH_CHECK(
       actualFormat == AV_PIX_FMT_NV12,
       "The AVFrame is ",
