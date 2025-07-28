@@ -265,7 +265,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
-  auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
     status = nppiNV12ToRGB_709CSC_8u_P2C3R(
@@ -291,12 +290,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       c10::cuda::getStreamFromExternal(nppGetStream(), device_.index());
   nppDoneEvent.record(nppStreamWrapper);
   nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
-
-  auto end = std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<double, std::micro> duration = end - start;
-  VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
-          << " took: " << duration.count() << "us" << std::endl;
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9

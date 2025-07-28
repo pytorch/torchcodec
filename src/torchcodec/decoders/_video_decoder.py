@@ -38,6 +38,7 @@ class VideoDecoder:
             This can be either "NCHW" (default) or "NHWC", where N is the batch
             size, C is the number of channels, H is the height, and W is the
             width of the frames.
+
             .. note::
 
                 Frames are natively decoded in NHWC format by the underlying
