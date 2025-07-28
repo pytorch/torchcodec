@@ -1173,12 +1173,20 @@ class TestVideoDecoder:
         decoder_gpu = VideoDecoder(asset.path, device="cuda")
         decoder_cpu = VideoDecoder(asset.path)
 
-        for frame_index in (0, 10, 20, 5):
+        frame_indices = [0, 10, 20, 5] 
+        for frame_index in frame_indices:
             frame_gpu = decoder_gpu.get_frame_at(frame_index).data
             assert frame_gpu.device.type == "cuda"
             frame_cpu = decoder_cpu.get_frame_at(frame_index).data
-
             assert_frames_equal(frame_gpu.cpu(), frame_cpu)
+
+        # We also check a batch API just to be on the safe side, making sure the
+        # pre-allocated tensor is passed down correctly to the CPU
+        # implementation.
+        frames_gpu = decoder_gpu.get_frames_at(frame_indices).data
+        assert frames_gpu.device.type == "cuda"
+        frames_cpu = decoder_cpu.get_frames_at(frame_indices).data
+        assert_frames_equal(frames_gpu.cpu(), frames_cpu)
 
     @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
     def test_10bit_videos_cpu(self, asset):

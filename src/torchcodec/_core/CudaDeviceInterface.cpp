@@ -210,7 +210,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
-        videoStreamOptions, timeBase, avFrame, cpuFrameOutput, std::nullopt);
+        videoStreamOptions, timeBase, avFrame, cpuFrameOutput, preAllocatedOutputTensor);
 
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
