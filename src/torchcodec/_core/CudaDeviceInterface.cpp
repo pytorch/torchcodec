@@ -196,11 +196,15 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  // We check that avFrame->format == AV_PIX_FMT_CUDA. This only ensures the
-  // AVFrame is on GPU memory. It can be on CPU memory if the video isn't
-  // supported by NVDEC for whatever reason: NVDEC falls back to CPU decoding in
-  // this case. In this case, we fall back to CPU processing.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
+    // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
+    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
+    // gives us if it wasn't able to decode a frame, for whatever reason.
+    // Typically that happens if the video's encoder isn't supported by NVDEC.
+    // Below, we choose to convert the frame's color-space using the CPU
+    // codepath, and send it back to the GPU at the very end.
+    // TODO: A possibly better solution would be to send the frame to the GPU
+    // first, and do the color conversion there.
     auto cpuDevice = torch::Device(torch::kCPU);
     auto cpuInterface = createDeviceInterface(cpuDevice);
 
