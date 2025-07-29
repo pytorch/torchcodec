@@ -579,6 +579,12 @@ FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
+
+  std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
+  if (numFrames.has_value()) {
+    // If the frameIndex is negative, we convert it to a positive index
+    frameIndex = frameIndex >= 0 ? frameIndex : frameIndex + numFrames.value();
+  }
   validateFrameIndex(streamMetadata, frameIndex);
 
   int64_t pts = getPts(frameIndex);
@@ -620,8 +626,6 @@ FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
   for (size_t f = 0; f < frameIndices.size(); ++f) {
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
-
-    validateFrameIndex(streamMetadata, indexInVideo);
 
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
@@ -1618,21 +1622,24 @@ void SingleStreamDecoder::validateScannedAllStreams(const std::string& msg) {
 void SingleStreamDecoder::validateFrameIndex(
     const StreamMetadata& streamMetadata,
     int64_t frameIndex) {
-  TORCH_CHECK(
-      frameIndex >= 0,
-      "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-          "; must be greater than or equal to 0");
+  if (frameIndex < 0) {
+    throw std::out_of_range(
+        "Invalid frame index=" + std::to_string(frameIndex) +
+        " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+        "; negative indices must have an absolute value less than the number of frames, "
+        "and the number of frames must be known.");
+  }
 
   // Note that if we do not have the number of frames available in our metadata,
   // then we assume that the frameIndex is valid.
   std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
   if (numFrames.has_value()) {
-    TORCH_CHECK(
-        frameIndex < numFrames.value(),
-        "Invalid frame index=" + std::to_string(frameIndex) +
-            " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-            "; must be less than " + std::to_string(numFrames.value()));
+    if (frameIndex >= numFrames.value()) {
+      throw std::out_of_range(
+          "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+          "; must be less than " + std::to_string(numFrames.value()));
+    }
   }
 }
 

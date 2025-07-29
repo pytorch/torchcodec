@@ -126,6 +126,10 @@ class TestVideoDecoderOps:
             INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame6, reference_frame6.to(device))
+        # Negative indices are supported
+        frame389 = get_frame_at_index(decoder, frame_index=-1)
+        reference_frame389 = NASA_VIDEO.get_frame_data_by_index(389)
+        assert_frames_equal(frame389[0], reference_frame389.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_with_info_at_index(self, device):
@@ -177,6 +181,32 @@ class TestVideoDecoderOps:
         frames[0] += 20
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices_negative_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
+        frames389and387and1, *_ = get_frames_at_indices(
+            decoder, frame_indices=[-1, -3, -389]
+        )
+        reference_frame389 = NASA_VIDEO.get_frame_data_by_index(389)
+        reference_frame387 = NASA_VIDEO.get_frame_data_by_index(387)
+        reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
+        assert_frames_equal(frames389and387and1[0], reference_frame389.to(device))
+        assert_frames_equal(frames389and387and1[1], reference_frame387.to(device))
+        assert_frames_equal(frames389and387and1[2], reference_frame1.to(device))
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices_fail_on_invalid_negative_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
+        with pytest.raises(
+            IndexError,
+            match="negative indices must have an absolute value less than the number of frames",
+        ):
+            invalid_frames, *_ = get_frames_at_indices(
+                decoder, frame_indices=[-10000, -3000]
+            )
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_by_pts(self, device):
