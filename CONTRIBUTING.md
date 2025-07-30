@@ -55,10 +55,11 @@ pip install -e ".[dev]" --no-build-isolation -vv
 To run python tests run:
 
 ```bash
-pytest test -vvv
+pytest
 ```
 
-Tip: use the `-k "not slow"` flag to skip slow tests.
+Some tests are marked as 'slow' and aren't run by default. You can use `pytest
+-m slow` to run those, or `pytest -m ""` to run all tests, slow or not.
 
 To run the C++ tests run:
 
