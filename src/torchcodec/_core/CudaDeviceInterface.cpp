@@ -196,37 +196,38 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  // We check that avFrame->format == AV_PIX_FMT_CUDA. This only ensures the
-  // AVFrame is on GPU memory. It can be on CPU memory if the video isn't
-  // supported by NVDEC for whatever reason: NVDEC falls back to CPU decoding in
-  // this case, and our check fails.
-  // TODO: we could send the frame back into the CPU path, and rely on
-  // swscale/filtergraph to run the color conversion to properly output the
-  // frame.
-  TORCH_CHECK(
-      avFrame->format == AV_PIX_FMT_CUDA,
-      "Expected format to be AV_PIX_FMT_CUDA, got ",
-      (av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
-           ? av_get_pix_fmt_name((AVPixelFormat)avFrame->format)
-           : "unknown"),
-      ". When that happens, it is probably because the video is not supported by NVDEC. "
-      "Try using the CPU device instead. "
-      "If the video is 10bit, we are tracking 10bit support in "
-      "https://github.com/pytorch/torchcodec/issues/776");
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
+    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
+    // gives us if it wasn't able to decode a frame, for whatever reason.
+    // Typically that happens if the video's encoder isn't supported by NVDEC.
+    // Below, we choose to convert the frame's color-space using the CPU
+    // codepath, and send it back to the GPU at the very end.
+    // TODO: A possibly better solution would be to send the frame to the GPU
+    // first, and do the color conversion there.
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
 
-  // Above we checked that the AVFrame was on GPU, but that's not enough, we
-  // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
-  // because this is what the NPP color conversion routines expect.
-  // TODO: we should investigate how to can perform color conversion for
-  // non-8bit videos. This is supported on CPU.
+    FrameOutput cpuFrameOutput;
+    cpuInterface->convertAVFrameToFrameOutput(
+        videoStreamOptions,
+        timeBase,
+        avFrame,
+        cpuFrameOutput,
+        preAllocatedOutputTensor);
+
+    frameOutput.data = cpuFrameOutput.data.to(device_);
+    return;
+  }
+
   TORCH_CHECK(
       avFrame->hw_frames_ctx != nullptr,
       "The AVFrame does not have a hw_frames_ctx. "
       "That's unexpected, please report this to the TorchCodec repo.");
 
-  AVPixelFormat actualFormat =
-      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data)
-          ->sw_format;
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
   TORCH_CHECK(
       actualFormat == AV_PIX_FMT_NV12 || actualFormat == AV_PIX_FMT_P010LE,
       "The AVFrame is ",
