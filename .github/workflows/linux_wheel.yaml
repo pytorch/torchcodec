@@ -123,4 +123,4 @@ jobs:
           ls
       - name: Run Python tests
         run: |
-          pytest test -vvv
+          pytest test --ignore-addopts -v
