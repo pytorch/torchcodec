@@ -485,7 +485,7 @@ class TestVideoDecoderOps:
         )
         with pytest.raises(
             RuntimeError,
-            match="Please provide frame mappings when using custom_frame_mappings seek mode.",
+            match="Missing frame mappings when custom_frame_mappings seek mode is set.",
         ):
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
