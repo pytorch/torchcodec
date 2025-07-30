@@ -228,29 +228,19 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   auto hwFramesCtx =
       reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
   AVPixelFormat actualFormat = hwFramesCtx->sw_format;
-  TORCH_CHECK(
-      actualFormat == AV_PIX_FMT_NV12 || actualFormat == AV_PIX_FMT_P010LE,
-      "The AVFrame is ",
-      (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
-                                         : "unknown"),
-      ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
-      "Try using the CPU device instead.");
+  // TORCH_CHECK(
+  //     actualFormat == AV_PIX_FMT_NV12 || actualFormat == AV_PIX_FMT_P010LE,
+  //     "The AVFrame is ",
+  //     (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+  //                                        : "unknown"),
+  //     ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
+  //     "Try using the CPU device instead.");
 
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
   int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
-  torch::Tensor intermediateTensor;
-
-  if (actualFormat == AV_PIX_FMT_P010LE) {
-    // For 10-bit, we need a 16-bit intermediate tensor, then convert to 8-bit
-    intermediateTensor = torch::empty(
-        {height, width, 3},
-        torch::TensorOptions().dtype(torch::kUInt16).device(device_));
-  }
-
-  // For 8-bit formats, use the output tensor directly
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
     auto shape = dst.sizes();
@@ -274,7 +264,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppStatus status;
 
   if (actualFormat == AV_PIX_FMT_NV12) {
-    // 8-bit NV12 format
+    // For 8-bit videos
     Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
     if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
@@ -293,68 +283,72 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
           oSizeROI);
     }
   } else if (actualFormat == AV_PIX_FMT_P010LE) {
-    // 10-bit semi-planar format (like NV12 but 16-bit)
-    // P010LE has Y plane + interleaved UV plane, 10-bit data in high bits
+    // AV_PIX_FMT_P010LE is like NV12, but with 10 bits per component instead
+    // of 8. The data is actually stored in 16 bits. With Npp, the only way to
+    // convert 16-bit YUV data to RGB is to use
+    // nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx
+    // The 'ColorTwist' part is the color-conversion matrix, which defines how
+    // to numerically convert YUV values to RGB values.
     const Npp16u* input[2] = {
-        reinterpret_cast<const Npp16u*>(avFrame->data[0]), // Y plane (16-bit)
-        reinterpret_cast<const Npp16u*>(
-            avFrame->data[1]) // UV plane (16-bit interleaved)
-    };
+        reinterpret_cast<const Npp16u*>(avFrame->data[0]),
+        reinterpret_cast<const Npp16u*>(avFrame->data[1])};
 
     // Choose color matrix based on colorspace
     const Npp32f(*aTwist)[4];
 
-    // TODO use even more accurage values from
-    // https://ffmpeg.org/doxygen/trunk/yuv2rgb_8c_source.html#l00047
-    // Need to devide by 65536 to get the floats
-    // BT.709 matrix (HDTV)
-    static const Npp32f bt709Matrix[3][4] = {
-        {1.0f, 0.0f, 1.402f, 0.0f},
-        {1.0f, -0.344136f, -0.714136f, -32768.0f},
-        {1.0f, 1.772f, 0.0f, -32768.0f}};
-
-    // BT.601 matrix (SDTV)
+    // TODO tune matrix
     static const Npp32f bt601Matrix[3][4] = {
         {1.0f, 0.0f, 1.596f, 0.0f},
         {1.0f, -0.392f, -0.813f, -32768.0f},
         {1.0f, 2.017f, 0.0f, -32768.0f}};
 
     if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-      printf("It's BT.709 colorspace\n");
-      aTwist = bt709Matrix;
+      TORCH_CHECK(false, "TODO: 10bit BT.709 colorspace support");
     } else {
-      // Default to BT.601 for other colorspaces (including AVCOL_SPC_BT470BG,
-      // AVCOL_SPC_SMPTE170M)
-      printf("It's BT.601 colorspace\n");
       aTwist = bt601Matrix;
     }
 
-    // Create NPP stream context
+    // TODO update this
     NppStreamContext nppStreamCtx;
     nppStreamCtx.hStream = nppGetStream();
 
-    int rSrcStep[2] = {
-        avFrame->linesize[0], avFrame->linesize[1]}; // Y and UV strides
+    int aSrcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
+
+    torch::Tensor intermediateTensor = torch::empty(
+        {height, width, 3},
+        torch::TensorOptions().dtype(torch::kUInt16).device(device_));
 
     status = nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx(
         input,
-        rSrcStep,
+        aSrcStep,
         reinterpret_cast<Npp16u*>(intermediateTensor.data_ptr()),
         intermediateTensor.stride(0) * sizeof(uint16_t),
         oSizeROI,
         aTwist,
         nppStreamCtx);
 
-    // Convert 16-bit to 8-bit: P010LE has 10-bit data, so divide by 4 to
-    // convert to 8-bit
-    if (status == NPP_SUCCESS) {
-      dst =
-          (intermediateTensor.div(256))
-              .to(torch::kUInt8); // Divide by 4 for 10-bit -> 8-bit conversion
-    }
-  }
+    TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
 
-  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
+    // The output is in 16-bit, so we need to convert it to 8-bit.
+    // Ideally we'd just use `>> 8` but it's not supported by uint16
+    // torch tensors.
+    // Yes, that's losing precision. That's what our CPU implem does too.
+    dst = intermediateTensor.div(256).to(torch::kUInt8);
+  } else {
+    // For now we only support AV_PIX_FMT_NV12 and AV_PIX_FMT_P010LE formats.
+    // But there is also AV_PIX_FMT_P010BE, AV_PIX_FMT_P016LE,
+    // AV_PIX_FMT_P016BE, and AV_PIX_FMT_NV21, which we should be able to
+    // support, in theory. It's unclear how useful these formats are, so we
+    // throw an error and invite users to report to us, which will allow us to
+    // prioritize support for these formats.
+    TORCH_CHECK(
+        false,
+        "The AVFrame pixel format is ",
+        (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+                                           : "unknown"),
+        ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
+        "If you're seeing this, please report this to the TorchCodec repo.");
+  }
 
   // Make the pytorch stream wait for the npp kernel to finish before using the
   // output.

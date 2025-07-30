@@ -1211,7 +1211,6 @@ class TestVideoDecoder:
         cpu_frame = decoder.get_frame_at(0)
         write_png(cpu_frame.data, "cpu.png")
 
-
     @needs_cuda
     def test_10bit_gpu_fallsback_to_cpu(self):
         # Test for 10-bit videos that aren't supported by NVDEC: we decode and
