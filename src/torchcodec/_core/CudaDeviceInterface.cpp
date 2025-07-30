@@ -311,7 +311,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   NppStreamContext nppCtx = createNppStreamContext(
       static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
-  // Prepare ROI + pointers
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
