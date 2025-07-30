@@ -162,7 +162,7 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
 #endif
 }
 
-NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
+NppStreamContext createNppStreamContext(int deviceIndex) {
   // From 12.9, NPP recommends using a user-created NppStreamContext and using
   // the `_Ctx()` calls:
   // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
@@ -186,7 +186,16 @@ NppStreamContext createNppStreamContext([[maybe_unused]] int deviceIndex) {
   nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
   nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
   nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
-  nppCtx.nStreamFlags = 0;
+
+  // TODO when implementing the cache logic, move these out. See other TODO
+  // below.
+  nppCtx.hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
+  err = cudaStreamGetFlags(nppCtx.hStream, &nppCtx.nStreamFlags);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaStreamGetFlags failed: ",
+      cudaGetErrorString(err));
+
   return nppCtx;
 }
 
@@ -294,15 +303,13 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // Use the user-requested GPU for running the NPP kernel.
-  c10::cuda::CUDAGuard deviceGuard(device_);
-
-  if (!nppCtxInitialized_) {
-    nppCtx_ = createNppStreamContext(
-        static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
-    nppCtxInitialized_ = true;
-  }
-  nppCtx_.hStream = at::cuda::getCurrentCUDAStream().stream();
+  // TODO cache the NppStreamContext! It currently gets re-recated for every
+  // single frame. The cache should be per-device, similar to the existing
+  // hw_device_ctx cache. When implementing the cache logic, the
+  // NppStreamContext hStream and nStreamFlags should not be part of the cache
+  // because they may change across calls.
+  NppStreamContext nppCtx = createNppStreamContext(
+      static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
   // Prepare ROI + pointers
   NppiSize oSizeROI = {width, height};
@@ -317,7 +324,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx_);
+        nppCtx);
   } else {
     status = nppiNV12ToRGB_8u_P2C3R_Ctx(
         input,
@@ -325,7 +332,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx_);
+        nppCtx);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 }
