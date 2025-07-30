@@ -123,4 +123,4 @@ jobs:
           ls
       - name: Run Python tests
         run: |
-          pytest test --ignore-addopts -v
+          pytest --override-ini="addopts=-v" test

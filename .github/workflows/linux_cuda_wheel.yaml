@@ -138,7 +138,7 @@ jobs:
           ls
       - name: Run Python tests
         run: |
-          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest test --ignore-addopts -v --tb=short
+          ${CONDA_RUN} FAIL_WITHOUT_CUDA=1 pytest --override-ini="addopts=-v" test --tb=short
       - name: Run Python benchmark
         run: |
           ${CONDA_RUN} time python benchmarks/decoders/gpu_benchmark.py --devices=cuda:0,cpu --resize_devices=none
