@@ -1197,21 +1197,51 @@ class TestVideoDecoder:
             torch.testing.assert_close(decoder[0], decoder[10])
 
     @needs_cuda
-    @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
-    def test_10bit_videos_cuda(self, asset):
+    def test_10bit_videos_cuda(self):
         # Assert that we raise proper error on different kinds of 10bit videos.
 
         # TODO we should investigate how to support 10bit videos on GPU.
         # See https://github.com/pytorch/torchcodec/issues/776
 
-        decoder = VideoDecoder(asset.path, device="cuda")
+        asset = H265_10BITS
 
-        if asset is H265_10BITS:
-            match = "The AVFrame is p010le, but we expected AV_PIX_FMT_NV12."
-        else:
-            match = "Expected format to be AV_PIX_FMT_CUDA, got yuv420p10le."
-        with pytest.raises(RuntimeError, match=match):
+        decoder = VideoDecoder(asset.path, device="cuda")
+        with pytest.raises(
+            RuntimeError,
+            match="The AVFrame is p010le, but we expected AV_PIX_FMT_NV12.",
+        ):
             decoder.get_frame_at(0)
+
+    @needs_cuda
+    def test_10bit_gpu_fallsback_to_cpu(self):
+        # Test for 10-bit videos that aren't supported by NVDEC: we decode and
+        # do the color conversion on the CPU.
+        # Here we just assert that the GPU results are the same as the CPU
+        # results.
+        # TODO see other TODO below in test_10bit_videos_cpu: we should validate
+        # the frames against a reference.
+
+        # We know from previous tests that the H264_10BITS video isn't supported
+        # by NVDEC, so NVDEC decodes it on the CPU.
+        asset = H264_10BITS
+
+        decoder_gpu = VideoDecoder(asset.path, device="cuda")
+        decoder_cpu = VideoDecoder(asset.path)
+
+        frame_indices = [0, 10, 20, 5]
+        for frame_index in frame_indices:
+            frame_gpu = decoder_gpu.get_frame_at(frame_index).data
+            assert frame_gpu.device.type == "cuda"
+            frame_cpu = decoder_cpu.get_frame_at(frame_index).data
+            assert_frames_equal(frame_gpu.cpu(), frame_cpu)
+
+        # We also check a batch API just to be on the safe side, making sure the
+        # pre-allocated tensor is passed down correctly to the CPU
+        # implementation.
+        frames_gpu = decoder_gpu.get_frames_at(frame_indices).data
+        assert frames_gpu.device.type == "cuda"
+        frames_cpu = decoder_cpu.get_frames_at(frame_indices).data
+        assert_frames_equal(frames_gpu.cpu(), frames_cpu)
 
     @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
     def test_10bit_videos_cpu(self, asset):
