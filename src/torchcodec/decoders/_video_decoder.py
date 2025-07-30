@@ -90,11 +90,14 @@ class VideoDecoder:
                 f"Invalid seek mode ({seek_mode}). "
                 f"Supported values are {', '.join(allowed_seek_modes)}."
             )
-        if custom_frame_mappings and seek_mode != "exact":
-            raise ValueError(
-                "Custom frame mappings are only supported in 'exact' seek mode."
-                "While setting custom frame mappings, do not set `seek_mode`."
-            )
+        if custom_frame_mappings:
+            if seek_mode != "exact":
+                raise ValueError(
+                    "Custom frame mappings are only supported in 'exact' seek mode. "
+                    "While setting custom frame mappings, do not set `seek_mode`."
+                )
+            # Set seek mode to avoid exact mode scan
+            seek_mode = "custom_frame_mappings"
         custom_frame_mappings_data = (
             read_custom_frame_mappings(custom_frame_mappings)
             if custom_frame_mappings is not None
