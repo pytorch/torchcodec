@@ -225,10 +225,54 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
+    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
+    // gives us if it wasn't able to decode a frame, for whatever reason.
+    // Typically that happens if the video's encoder isn't supported by NVDEC.
+    // Below, we choose to convert the frame's color-space using the CPU
+    // codepath, and send it back to the GPU at the very end.
+    // TODO: A possibly better solution would be to send the frame to the GPU
+    // first, and do the color conversion there.
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
+
+    FrameOutput cpuFrameOutput;
+    cpuInterface->convertAVFrameToFrameOutput(
+        videoStreamOptions,
+        timeBase,
+        avFrame,
+        cpuFrameOutput,
+        preAllocatedOutputTensor);
+
+    frameOutput.data = cpuFrameOutput.data.to(device_);
+    return;
+  }
+
+  // Above we checked that the AVFrame was on GPU, but that's not enough, we
+  // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
+  // because this is what the NPP color conversion routines expect.
+  // TODO: we should investigate how to can perform color conversion for
+  // non-8bit videos. This is supported on CPU.
   TORCH_CHECK(
-      avFrame->format == AV_PIX_FMT_CUDA,
-      "Expected format to be AV_PIX_FMT_CUDA, got " +
-          std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
+      avFrame->hw_frames_ctx != nullptr,
+      "The AVFrame does not have a hw_frames_ctx. "
+      "That's unexpected, please report this to the TorchCodec repo.");
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+  TORCH_CHECK(
+      actualFormat == AV_PIX_FMT_NV12,
+      "The AVFrame is ",
+      (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+                                         : "unknown"),
+      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
+      "the video isn't 8bit, which is not supported on CUDA at the moment. "
+      "Try using the CPU device instead. "
+      "If the video is 10bit, we are tracking 10bit support in "
+      "https://github.com/pytorch/torchcodec/issues/776");
+
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
