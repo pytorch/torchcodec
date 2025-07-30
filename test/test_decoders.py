@@ -1210,10 +1210,6 @@ class TestVideoDecoder:
         cpu_frame = decoder.get_frame_at(0)
         write_png(cpu_frame.data, "cpu.png")
 
-        if asset is H265_10BITS:
-            match = "The AVFrame is p010le, but we expected AV_PIX_FMT_NV12."
-        else:
-            match = "Expected format to be AV_PIX_FMT_CUDA, got yuv420p10le."
 
     @needs_cuda
     def test_10bit_gpu_fallsback_to_cpu(self):

@@ -248,29 +248,23 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     intermediateTensor = torch::empty(
         {height, width, 3},
         torch::TensorOptions().dtype(torch::kUInt16).device(device_));
+  }
 
-    if (preAllocatedOutputTensor.has_value()) {
-      dst = preAllocatedOutputTensor.value();
-    } else {
-      dst = allocateEmptyHWCTensor(height, width, device_);
-    }
+  // For 8-bit formats, use the output tensor directly
+  if (preAllocatedOutputTensor.has_value()) {
+    dst = preAllocatedOutputTensor.value();
+    auto shape = dst.sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
+            (shape[2] == 3),
+        "Expected tensor of shape ",
+        height,
+        "x",
+        width,
+        "x3, got ",
+        shape);
   } else {
-    // For 8-bit formats, use the output tensor directly
-    if (preAllocatedOutputTensor.has_value()) {
-      dst = preAllocatedOutputTensor.value();
-      auto shape = dst.sizes();
-      TORCH_CHECK(
-          (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
-              (shape[2] == 3),
-          "Expected tensor of shape ",
-          height,
-          "x",
-          width,
-          "x3, got ",
-          shape);
-    } else {
-      dst = allocateEmptyHWCTensor(height, width, device_);
-    }
+    dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
   // Use the user-requested GPU for running the NPP kernel.
@@ -308,8 +302,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     };
 
     // Choose color matrix based on colorspace
-    const Npp32f (*aTwist)[4];
-    
+    const Npp32f(*aTwist)[4];
+
     // TODO use even more accurage values from
     // https://ffmpeg.org/doxygen/trunk/yuv2rgb_8c_source.html#l00047
     // Need to devide by 65536 to get the floats
@@ -317,23 +311,22 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     static const Npp32f bt709Matrix[3][4] = {
         {1.0f, 0.0f, 1.402f, 0.0f},
         {1.0f, -0.344136f, -0.714136f, -32768.0f},
-        {1.0f, 1.772f, 0.0f, -32768.0f}
-    };
-    
+        {1.0f, 1.772f, 0.0f, -32768.0f}};
+
     // BT.601 matrix (SDTV)
     static const Npp32f bt601Matrix[3][4] = {
         {1.0f, 0.0f, 1.596f, 0.0f},
         {1.0f, -0.392f, -0.813f, -32768.0f},
-        {1.0f, 2.017f, 0.0f, -32768.0f}
-    };
-    
+        {1.0f, 2.017f, 0.0f, -32768.0f}};
+
     if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-        printf("It's BT.709 colorspace\n");
-        aTwist = bt709Matrix;
+      printf("It's BT.709 colorspace\n");
+      aTwist = bt709Matrix;
     } else {
-        // Default to BT.601 for other colorspaces (including AVCOL_SPC_BT470BG, AVCOL_SPC_SMPTE170M)
-        printf("It's BT.601 colorspace\n");
-        aTwist = bt601Matrix;
+      // Default to BT.601 for other colorspaces (including AVCOL_SPC_BT470BG,
+      // AVCOL_SPC_SMPTE170M)
+      printf("It's BT.601 colorspace\n");
+      aTwist = bt601Matrix;
     }
 
     // Create NPP stream context
