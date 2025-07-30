@@ -294,6 +294,9 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
+  // Use the user-requested GPU for running the NPP kernel.
+  c10::cuda::CUDAGuard deviceGuard(device_);
+
   if (!nppCtxInitialized_) {
     nppCtx_ = createNppStreamContext(
         static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
