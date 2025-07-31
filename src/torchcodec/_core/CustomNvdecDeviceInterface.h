@@ -8,9 +8,9 @@
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 
-// Forward declarations for NVIDIA Video Codec SDK
-// We'll include the actual headers in the .cpp file
-class NvDecoder;
+// Include NVIDIA Video Codec SDK headers
+#include <cuviddec.h>
+#include <nvcuvid.h>
 
 namespace facebook::torchcodec {
 
@@ -45,7 +45,14 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   }
 
  private:
-  NvDecoder* nvdecDecoder_ = nullptr;
+  // NVDEC decoder context and parser
+  CUvideoparser videoParser_ = nullptr;
+  CUvideodecoder videoDecoder_ = nullptr;
+  CUcontext cudaContext_ = nullptr;
+  
+  // Video format info
+  CUVIDEOFORMAT videoFormat_;
+  bool isInitialized_ = false;
   
   // Custom context initialization for direct NVDEC usage
   void initializeNvdecDecoder(AVCodecID codecId);
