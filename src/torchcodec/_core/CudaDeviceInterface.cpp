@@ -15,7 +15,7 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-static bool g_cuda =
+static bool g_cuda_default =
     registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
       return new CudaDeviceInterface(device);
     });
@@ -203,7 +203,7 @@ NppStreamContext createNppStreamContext(int deviceIndex) {
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
-  TORCH_CHECK(g_cuda, "CudaDeviceInterface was not registered!");
+  TORCH_CHECK(g_cuda_default, "CudaDeviceInterface was not registered!");
   TORCH_CHECK(
       device_.type() == torch::kCUDA, "Unsupported device: ", device_.str());
 }

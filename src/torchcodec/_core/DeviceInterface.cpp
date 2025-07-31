@@ -11,7 +11,7 @@
 namespace facebook::torchcodec {
 
 namespace {
-using DeviceInterfaceMap = std::map<torch::DeviceType, CreateDeviceInterfaceFn>;
+using DeviceInterfaceMap = std::map<DeviceInterfaceKey, CreateDeviceInterfaceFn>;
 static std::mutex g_interface_mutex;
 
 DeviceInterfaceMap& getDeviceMap() {
@@ -29,19 +29,30 @@ std::string getDeviceType(const std::string& device) {
 
 } // namespace
 
+// New registration function with variant support
 bool registerDeviceInterface(
-    torch::DeviceType deviceType,
+    const DeviceInterfaceKey& key,
     CreateDeviceInterfaceFn createInterface) {
   std::scoped_lock lock(g_interface_mutex);
   DeviceInterfaceMap& deviceMap = getDeviceMap();
 
   TORCH_CHECK(
-      deviceMap.find(deviceType) == deviceMap.end(),
-      "Device interface already registered for ",
-      deviceType);
-  deviceMap.insert({deviceType, createInterface});
+      deviceMap.find(key) == deviceMap.end(),
+      "Device interface already registered for device type ",
+      key.deviceType,
+      " variant '",
+      key.variant,
+      "'");
+  deviceMap.insert({key, createInterface});
 
   return true;
+}
+
+// Backward-compatible registration function
+bool registerDeviceInterface(
+    torch::DeviceType deviceType,
+    CreateDeviceInterfaceFn createInterface) {
+  return registerDeviceInterface(DeviceInterfaceKey(deviceType), createInterface);
 }
 
 torch::Device createTorchDevice(const std::string device) {
@@ -52,9 +63,9 @@ torch::Device createTorchDevice(const std::string device) {
   auto deviceInterface = std::find_if(
       deviceMap.begin(),
       deviceMap.end(),
-      [&](const std::pair<torch::DeviceType, CreateDeviceInterfaceFn>& arg) {
+      [&](const std::pair<DeviceInterfaceKey, CreateDeviceInterfaceFn>& arg) {
         return device.rfind(
-                   torch::DeviceTypeName(arg.first, /*lcase*/ true), 0) == 0;
+                   torch::DeviceTypeName(arg.first.deviceType, /*lcase*/ true), 0) == 0;
       });
   TORCH_CHECK(
       deviceInterface != deviceMap.end(), "Unsupported device: ", device);
@@ -62,18 +73,35 @@ torch::Device createTorchDevice(const std::string device) {
   return torch::Device(device);
 }
 
+// Creation function with variant support (default = "default" for backward compatibility)
 std::unique_ptr<DeviceInterface> createDeviceInterface(
-    const torch::Device& device) {
-  auto deviceType = device.type();
+    const torch::Device& device,
+    const std::string& variant) {
+  DeviceInterfaceKey key(device.type(), variant);
   std::scoped_lock lock(g_interface_mutex);
   DeviceInterfaceMap& deviceMap = getDeviceMap();
 
+  auto it = deviceMap.find(key);
+  if (it != deviceMap.end()) {
+    return std::unique_ptr<DeviceInterface>(it->second(device));
+  }
+  
+  // Fallback to default variant if specific variant not found
+  if (variant != "default") {
+    key.variant = "default";
+    it = deviceMap.find(key);
+    if (it != deviceMap.end()) {
+      return std::unique_ptr<DeviceInterface>(it->second(device));
+    }
+  }
+  
   TORCH_CHECK(
-      deviceMap.find(deviceType) != deviceMap.end(),
-      "Unsupported device: ",
-      device);
-
-  return std::unique_ptr<DeviceInterface>(deviceMap[deviceType](device));
+      false, 
+      "No device interface found for device type: ", 
+      device.type(), 
+      " variant: '", 
+      variant,
+      "'");
 }
 
 } // namespace facebook::torchcodec
