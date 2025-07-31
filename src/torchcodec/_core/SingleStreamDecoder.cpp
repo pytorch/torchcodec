@@ -1204,15 +1204,28 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       continue;
     }
 
-    // We got a valid packet. Send it to the decoder, and we'll receive it in
-    // the next iteration.
-    status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    TORCH_CHECK(
-        status >= AVSUCCESS,
-        "Could not push packet to decoder: ",
-        getFFMPEGErrorStringFromErrorCode(status));
+    // Check if device interface can handle packet decoding directly
+    if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly()) {
+      // Use custom packet decoding (e.g., direct NVDEC)
+      UniqueAVFrame decodedFrame = deviceInterface_->decodePacketDirectly(packet);
+      if (decodedFrame && filterFunction(decodedFrame)) {  
+        // We got the frame we're looking for from direct decoding
+        avFrame = std::move(decodedFrame);
+        decodeStats_.numPacketsSentToDecoder++;
+        break;
+      }
+      // If custom decoding didn't produce the desired frame, continue the loop
+      decodeStats_.numPacketsSentToDecoder++;
+    } else {
+      // Use standard FFmpeg decoding path
+      status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+      TORCH_CHECK(
+          status >= AVSUCCESS,
+          "Could not push packet to decoder: ",
+          getFFMPEGErrorStringFromErrorCode(status));
 
-    decodeStats_.numPacketsSentToDecoder++;
+      decodeStats_.numPacketsSentToDecoder++;
+    }
   }
 
   if (status < AVSUCCESS) {

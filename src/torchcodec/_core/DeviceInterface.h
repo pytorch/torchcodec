@@ -66,6 +66,17 @@ class DeviceInterface {
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
 
+  // Extension points for custom decoding paths
+  // Override to return true if this device interface can decode packets directly
+  virtual bool canDecodePacketDirectly() const { return false; }
+  
+  // Override to decode AVPacket directly (bypassing FFmpeg codec)
+  // Only called if canDecodePacketDirectly() returns true
+  virtual UniqueAVFrame decodePacketDirectly(ReferenceAVPacket& /* packet */) {
+    TORCH_CHECK(false, "Direct packet decoding not implemented for this device interface");
+    return UniqueAVFrame(nullptr);
+  }
+
  protected:
   torch::Device device_;
 };

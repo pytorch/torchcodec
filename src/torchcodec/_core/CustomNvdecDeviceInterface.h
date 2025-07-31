@@ -34,9 +34,15 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
       std::optional<torch::Tensor> preAllocatedOutputTensor =
           std::nullopt) override;
 
-  // Custom decode method that takes AVPacket directly from FFmpeg demuxer
-  // and uses NVDEC directly for decoding
-  UniqueAVFrame decodePacket(ReferenceAVPacket& packet);
+  // Extension point overrides for direct packet decoding
+  bool canDecodePacketDirectly() const override { return true; }
+  
+  UniqueAVFrame decodePacketDirectly(ReferenceAVPacket& packet) override;
+
+  // Legacy method name - kept for compatibility
+  UniqueAVFrame decodePacket(ReferenceAVPacket& packet) {
+    return decodePacketDirectly(packet);
+  }
 
  private:
   NvDecoder* nvdecDecoder_ = nullptr;

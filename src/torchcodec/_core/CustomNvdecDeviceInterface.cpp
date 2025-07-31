@@ -112,7 +112,7 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   // nvdecDecoder_ = /* create NvDecoder instance */;
 }
 
-UniqueAVFrame CustomNvdecDeviceInterface::decodePacket(ReferenceAVPacket& packet) {
+UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(ReferenceAVPacket& packet) {
   TORCH_CHECK(nvdecDecoder_ != nullptr, "NVDEC decoder not initialized");
   
   // TODO: Implement direct NVDEC decoding
