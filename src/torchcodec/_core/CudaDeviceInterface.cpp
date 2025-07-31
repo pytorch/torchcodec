@@ -161,6 +161,44 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
       device, nonNegativeDeviceIndex, type);
 #endif
 }
+
+NppStreamContext createNppStreamContext(int deviceIndex) {
+  // From 12.9, NPP recommends using a user-created NppStreamContext and using
+  // the `_Ctx()` calls:
+  // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
+  // And the nppGetStreamContext() helper is deprecated. We are explicitly
+  // supposed to create the NppStreamContext manually from the CUDA device
+  // properties:
+  // https://github.com/NVIDIA/CUDALibrarySamples/blob/d97803a40fab83c058bb3d68b6c38bd6eebfff43/NPP/README.md?plain=1#L54-L72
+
+  NppStreamContext nppCtx{};
+  cudaDeviceProp prop{};
+  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaGetDeviceProperties failed: ",
+      cudaGetErrorString(err));
+
+  nppCtx.nCudaDeviceId = deviceIndex;
+  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
+
+  // TODO when implementing the cache logic, move these out. See other TODO
+  // below.
+  nppCtx.hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
+  err = cudaStreamGetFlags(nppCtx.hStream, &nppCtx.nStreamFlags);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaStreamGetFlags failed: ",
+      cudaGetErrorString(err));
+
+  return nppCtx;
+}
+
 } // namespace
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
@@ -257,8 +295,13 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // Use the user-requested GPU for running the NPP kernel.
-  c10::cuda::CUDAGuard deviceGuard(device_);
+  // TODO cache the NppStreamContext! It currently gets re-recated for every
+  // single frame. The cache should be per-device, similar to the existing
+  // hw_device_ctx cache. When implementing the cache logic, the
+  // NppStreamContext hStream and nStreamFlags should not be part of the cache
+  // because they may change across calls.
+  NppStreamContext nppCtx = createNppStreamContext(
+      static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
   NppiSize oSizeROI = {width, height};
   NppStatus status;
@@ -268,20 +311,24 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
     if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-      status = nppiNV12ToRGB_709CSC_8u_P2C3R(
+      status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
           input,
           avFrame->linesize[0],
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
-          oSizeROI);
+          oSizeROI,
+          nppCtx);
     } else {
-      status = nppiNV12ToRGB_8u_P2C3R(
+      status = nppiNV12ToRGB_8u_P2C3R_Ctx(
           input,
           avFrame->linesize[0],
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
-          oSizeROI);
+          oSizeROI,
+          nppCtx);
     }
+    TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+
   } else if (actualFormat == AV_PIX_FMT_P010LE) {
     // AV_PIX_FMT_P010LE is like NV12, but with 10 bits per component instead
     // of 8. The data is actually stored in 16 bits. With Npp, the only way to
@@ -349,14 +396,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
         "If you're seeing this, please report this to the TorchCodec repo.");
   }
-
-  // Make the pytorch stream wait for the npp kernel to finish before using the
-  // output.
-  at::cuda::CUDAEvent nppDoneEvent;
-  at::cuda::CUDAStream nppStreamWrapper =
-      c10::cuda::getStreamFromExternal(nppGetStream(), device_.index());
-  nppDoneEvent.record(nppStreamWrapper);
-  nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9

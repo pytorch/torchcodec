@@ -1197,7 +1197,6 @@ class TestVideoDecoder:
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
 
-
     @needs_cuda
     @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
     def test_10bit_videos_cuda(self, asset):
