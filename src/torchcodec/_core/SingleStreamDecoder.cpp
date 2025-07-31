@@ -18,7 +18,7 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  // av_q2d is intentionally not used for increased precision
+  // To perform the multiplication before the division, av_q2d is not used
   return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
