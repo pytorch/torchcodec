@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string_view>
 #include "torch/types.h"
+#include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 
 namespace facebook::torchcodec {
 namespace {
@@ -390,7 +391,8 @@ void SingleStreamDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
     const torch::Device& device,
-    std::optional<int> ffmpegThreadCount) {
+    std::optional<int> ffmpegThreadCount,
+    const std::string& deviceVariant) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
@@ -418,7 +420,8 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface_ = createDeviceInterface(device);
+  deviceVariant_ = deviceVariant;
+  deviceInterface_ = createDeviceInterface(device, deviceVariant);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -476,12 +479,14 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<FrameMappings> customFrameMappings) {
+    std::optional<FrameMappings> customFrameMappings,
+    const std::string& deviceVariant) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
       videoStreamOptions.device,
-      videoStreamOptions.ffmpegThreadCount);
+      videoStreamOptions.ffmpegThreadCount,
+      deviceVariant);
 
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
