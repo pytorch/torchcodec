@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "torch/types.h"
 
 namespace facebook::torchcodec {
@@ -391,7 +392,8 @@ void SingleStreamDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
     const torch::Device& device,
-    std::optional<int> ffmpegThreadCount) {
+    std::optional<int> ffmpegThreadCount,
+    const std::string& deviceVariant) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
@@ -419,7 +421,8 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface_ = createDeviceInterface(device);
+  deviceVariant_ = deviceVariant;
+  deviceInterface_ = createDeviceInterface(device, deviceVariant);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -477,12 +480,14 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<FrameMappings> customFrameMappings) {
+    std::optional<FrameMappings> customFrameMappings,
+    const std::string& deviceVariant) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
       videoStreamOptions.device,
-      videoStreamOptions.ffmpegThreadCount);
+      videoStreamOptions.ffmpegThreadCount,
+      deviceVariant);
 
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -1200,15 +1205,29 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       continue;
     }
 
-    // We got a valid packet. Send it to the decoder, and we'll receive it in
-    // the next iteration.
-    status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    TORCH_CHECK(
-        status >= AVSUCCESS,
-        "Could not push packet to decoder: ",
-        getFFMPEGErrorStringFromErrorCode(status));
+    // Check if device interface can handle packet decoding directly
+    if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly()) {
+      // Use custom packet decoding (e.g., direct NVDEC)
+      UniqueAVFrame decodedFrame =
+          deviceInterface_->decodePacketDirectly(packet);
+      if (decodedFrame && filterFunction(decodedFrame)) {
+        // We got the frame we're looking for from direct decoding
+        avFrame = std::move(decodedFrame);
+        decodeStats_.numPacketsSentToDecoder++;
+        break;
+      }
+      // If custom decoding didn't produce the desired frame, continue the loop
+      decodeStats_.numPacketsSentToDecoder++;
+    } else {
+      // Use standard FFmpeg decoding path
+      status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+      TORCH_CHECK(
+          status >= AVSUCCESS,
+          "Could not push packet to decoder: ",
+          getFFMPEGErrorStringFromErrorCode(status));
 
-    decodeStats_.numPacketsSentToDecoder++;
+      decodeStats_.numPacketsSentToDecoder++;
+    }
   }
 
   if (status < AVSUCCESS) {

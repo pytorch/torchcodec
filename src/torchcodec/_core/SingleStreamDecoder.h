@@ -84,7 +84,8 @@ class SingleStreamDecoder {
   void addVideoStream(
       int streamIndex,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
-      std::optional<FrameMappings> customFrameMappings = std::nullopt);
+      std::optional<FrameMappings> customFrameMappings = std::nullopt,
+      const std::string& deviceVariant = "default");
   void addAudioStream(
       int streamIndex,
       const AudioStreamOptions& audioStreamOptions = AudioStreamOptions());
@@ -318,7 +319,8 @@ class SingleStreamDecoder {
       int streamIndex,
       AVMediaType mediaType,
       const torch::Device& device = torch::kCPU,
-      std::optional<int> ffmpegThreadCount = std::nullopt);
+      std::optional<int> ffmpegThreadCount = std::nullopt,
+      const std::string& deviceVariant = "default");
 
   // Returns the "best" stream index for a given media type. The "best" is
   // determined by various heuristics in FFMPEG.
@@ -352,6 +354,7 @@ class SingleStreamDecoder {
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
   std::unique_ptr<DeviceInterface> deviceInterface_;
+  std::string deviceVariant_ = "default";
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
