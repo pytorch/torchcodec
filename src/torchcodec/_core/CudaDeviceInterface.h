@@ -31,6 +31,18 @@ class CudaDeviceInterface : public DeviceInterface {
 
  private:
   AVBufferRef* ctx_ = nullptr;
+
+  void colorConvert8bitFrame(
+      UniqueAVFrame& avFrame,
+      torch::Tensor& dst,
+      const NppiSize& oSizeROI,
+      const NppStreamContext& nppCtx);
+
+  void colorConvert10bitFrame(
+      UniqueAVFrame& avFrame,
+      torch::Tensor& dst,
+      const NppiSize& oSizeROI,
+      const NppStreamContext& nppCtx);
 };
 
 } // namespace facebook::torchcodec
