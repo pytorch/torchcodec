@@ -18,7 +18,8 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  return static_cast<double>(pts) * av_q2d(timeBase);
+  // av_q2d is intentionally not used for increased precision
+  return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
 int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {

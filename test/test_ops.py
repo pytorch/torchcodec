@@ -781,7 +781,7 @@ class TestAudioDecoderOps:
                 frame, asset.get_frame_data_by_index(frame_index)
             )
             frame_info = asset.get_frame_info(frame_index)
-            assert pts_seconds == pytest.approx(frame_info.pts_seconds)
+            assert pts_seconds == frame_info.pts_seconds
             assert duration_seconds == frame_info.duration_seconds
             frame_index += 1
 
@@ -985,7 +985,7 @@ class TestAudioDecoderOps:
                 frames, asset.get_frame_data_by_index(frame_index)
             )
 
-            assert pts_seconds == pytest.approx(start_seconds)
+            assert pts_seconds == start_seconds
 
     def test_sample_rate_conversion(self):
         def get_all_frames(asset, sample_rate=None, stop_seconds=None):
