@@ -88,7 +88,7 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
-        
+
         # Find NVIDIA Video Codec SDK library
         find_library(CUDA_NVCUVID_LIBRARY
             NAMES nvcuvid
@@ -106,7 +106,7 @@ function(make_torchcodec_libraries
                 /usr/lib64
                 /usr/lib
         )
-        
+
         # Find NVIDIA Video Codec SDK headers
         find_path(NVCODEC_INCLUDE_DIR
             NAMES cuviddec.h nvcuvid.h
@@ -121,18 +121,18 @@ function(make_torchcodec_libraries
                 Video_Codec_SDK_12.2.72/Interface
                 Video_Codec_SDK/Interface
         )
-        
+
         if(NOT CUDA_NVCUVID_LIBRARY)
             message(FATAL_ERROR "Cannot find libnvcuvid, you may need to manually register and download at https://developer.nvidia.com/nvidia-video-codec-sdk. Then copy libnvcuvid to cuda_toolkit_root/lib64/")
         endif()
-        
+
         if(NOT NVCODEC_INCLUDE_DIR)
             message(FATAL_ERROR "Cannot find NVIDIA Video Codec SDK headers (cuviddec.h, nvcuvid.h). Please download the NVIDIA Video Codec SDK from https://developer.nvidia.com/nvidia-video-codec-sdk and copy the headers to your CUDA include directory.")
         endif()
-        
+
         message(STATUS "Found NVIDIA Video Codec SDK library: ${CUDA_NVCUVID_LIBRARY}")
         message(STATUS "Found NVIDIA Video Codec SDK headers: ${NVCODEC_INCLUDE_DIR}")
-        
+
         # Add nvcuvid library to dependencies
         list(APPEND core_library_dependencies ${CUDA_NVCUVID_LIBRARY})
     endif()

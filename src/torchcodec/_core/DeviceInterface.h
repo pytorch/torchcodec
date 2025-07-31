@@ -20,19 +20,20 @@ namespace facebook::torchcodec {
 // Key for device interface registration with device type + variant support
 struct DeviceInterfaceKey {
   torch::DeviceType deviceType;
-  std::string variant = "default";  // e.g., "default", "custom_nvdec", etc.
-  
+  std::string variant = "default"; // e.g., "default", "custom_nvdec", etc.
+
   bool operator<(const DeviceInterfaceKey& other) const {
     if (deviceType != other.deviceType) {
       return deviceType < other.deviceType;
     }
     return variant < other.variant;
   }
-  
+
   // Convenience constructors
   DeviceInterfaceKey(torch::DeviceType type) : deviceType(type) {}
-  DeviceInterfaceKey(torch::DeviceType type, const std::string& var) 
-    : deviceType(type), variant(var) {}
+
+  DeviceInterfaceKey(torch::DeviceType type, const std::string& var)
+      : deviceType(type), variant(var) {}
 };
 
 // Note that all these device functions should only be called if the device is
@@ -67,13 +68,18 @@ class DeviceInterface {
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
 
   // Extension points for custom decoding paths
-  // Override to return true if this device interface can decode packets directly
-  virtual bool canDecodePacketDirectly() const { return false; }
-  
+  // Override to return true if this device interface can decode packets
+  // directly
+  virtual bool canDecodePacketDirectly() const {
+    return false;
+  }
+
   // Override to decode AVPacket directly (bypassing FFmpeg codec)
   // Only called if canDecodePacketDirectly() returns true
   virtual UniqueAVFrame decodePacketDirectly(ReferenceAVPacket& /* packet */) {
-    TORCH_CHECK(false, "Direct packet decoding not implemented for this device interface");
+    TORCH_CHECK(
+        false,
+        "Direct packet decoding not implemented for this device interface");
     return UniqueAVFrame(nullptr);
   }
 
@@ -96,7 +102,8 @@ bool registerDeviceInterface(
 
 torch::Device createTorchDevice(const std::string device);
 
-// Creation function with variant support (default = "default" for backward compatibility)
+// Creation function with variant support (default = "default" for backward
+// compatibility)
 std::unique_ptr<DeviceInterface> createDeviceInterface(
     const torch::Device& device,
     const std::string& variant = "default");

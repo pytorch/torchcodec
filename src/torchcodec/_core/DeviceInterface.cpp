@@ -11,7 +11,8 @@
 namespace facebook::torchcodec {
 
 namespace {
-using DeviceInterfaceMap = std::map<DeviceInterfaceKey, CreateDeviceInterfaceFn>;
+using DeviceInterfaceMap =
+    std::map<DeviceInterfaceKey, CreateDeviceInterfaceFn>;
 static std::mutex g_interface_mutex;
 
 DeviceInterfaceMap& getDeviceMap() {
@@ -52,7 +53,8 @@ bool registerDeviceInterface(
 bool registerDeviceInterface(
     torch::DeviceType deviceType,
     CreateDeviceInterfaceFn createInterface) {
-  return registerDeviceInterface(DeviceInterfaceKey(deviceType), createInterface);
+  return registerDeviceInterface(
+      DeviceInterfaceKey(deviceType), createInterface);
 }
 
 torch::Device createTorchDevice(const std::string device) {
@@ -65,7 +67,8 @@ torch::Device createTorchDevice(const std::string device) {
       deviceMap.end(),
       [&](const std::pair<DeviceInterfaceKey, CreateDeviceInterfaceFn>& arg) {
         return device.rfind(
-                   torch::DeviceTypeName(arg.first.deviceType, /*lcase*/ true), 0) == 0;
+                   torch::DeviceTypeName(arg.first.deviceType, /*lcase*/ true),
+                   0) == 0;
       });
   TORCH_CHECK(
       deviceInterface != deviceMap.end(), "Unsupported device: ", device);
@@ -73,7 +76,8 @@ torch::Device createTorchDevice(const std::string device) {
   return torch::Device(device);
 }
 
-// Creation function with variant support (default = "default" for backward compatibility)
+// Creation function with variant support (default = "default" for backward
+// compatibility)
 std::unique_ptr<DeviceInterface> createDeviceInterface(
     const torch::Device& device,
     const std::string& variant) {
@@ -85,7 +89,7 @@ std::unique_ptr<DeviceInterface> createDeviceInterface(
   if (it != deviceMap.end()) {
     return std::unique_ptr<DeviceInterface>(it->second(device));
   }
-  
+
   // Fallback to default variant if specific variant not found
   if (variant != "default") {
     key.variant = "default";
@@ -94,12 +98,12 @@ std::unique_ptr<DeviceInterface> createDeviceInterface(
       return std::unique_ptr<DeviceInterface>(it->second(device));
     }
   }
-  
+
   TORCH_CHECK(
-      false, 
-      "No device interface found for device type: ", 
-      device.type(), 
-      " variant: '", 
+      false,
+      "No device interface found for device type: ",
+      device.type(),
+      " variant: '",
       variant,
       "'");
 }

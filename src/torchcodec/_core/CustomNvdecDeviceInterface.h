@@ -35,8 +35,10 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
   // Extension point overrides for direct packet decoding
-  bool canDecodePacketDirectly() const override { return true; }
-  
+  bool canDecodePacketDirectly() const override {
+    return true;
+  }
+
   UniqueAVFrame decodePacketDirectly(ReferenceAVPacket& packet) override;
 
   // Legacy method name - kept for compatibility
@@ -49,20 +51,20 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   CUvideoparser videoParser_ = nullptr;
   CUvideodecoder videoDecoder_ = nullptr;
   CUcontext cudaContext_ = nullptr;
-  
+
   // Video format info
   CUVIDEOFORMAT videoFormat_;
   bool isInitialized_ = false;
-  
+
   // Custom context initialization for direct NVDEC usage
   void initializeNvdecDecoder(AVCodecID codecId);
-  
+
   // Convert NVDEC output to AVFrame for compatibility with existing pipeline
   UniqueAVFrame convertNvdecOutputToAVFrame(
-      uint8_t* decodedFrame, 
-      int width, 
-      int height, 
-      int64_t pts, 
+      uint8_t* decodedFrame,
+      int width,
+      int height,
+      int64_t pts,
       int64_t duration);
 };
 

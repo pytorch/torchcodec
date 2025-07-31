@@ -12,8 +12,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include "torch/types.h"
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
+#include "torch/types.h"
 
 namespace facebook::torchcodec {
 namespace {
@@ -1207,8 +1207,9 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
     // Check if device interface can handle packet decoding directly
     if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly()) {
       // Use custom packet decoding (e.g., direct NVDEC)
-      UniqueAVFrame decodedFrame = deviceInterface_->decodePacketDirectly(packet);
-      if (decodedFrame && filterFunction(decodedFrame)) {  
+      UniqueAVFrame decodedFrame =
+          deviceInterface_->decodePacketDirectly(packet);
+      if (decodedFrame && filterFunction(decodedFrame)) {
         // We got the frame we're looking for from direct decoding
         avFrame = std::move(decodedFrame);
         decodeStats_.numPacketsSentToDecoder++;
