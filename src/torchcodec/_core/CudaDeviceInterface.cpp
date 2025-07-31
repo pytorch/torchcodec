@@ -258,22 +258,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     return;
   }
 
-  TORCH_CHECK(
-      avFrame->hw_frames_ctx != nullptr,
-      "The AVFrame does not have a hw_frames_ctx. "
-      "That's unexpected, please report this to the TorchCodec repo.");
-
-  auto hwFramesCtx =
-      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
-  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
-  // TORCH_CHECK(
-  //     actualFormat == AV_PIX_FMT_NV12 || actualFormat == AV_PIX_FMT_P010LE,
-  //     "The AVFrame is ",
-  //     (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
-  //                                        : "unknown"),
-  //     ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
-  //     "Try using the CPU device instead.");
-
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
@@ -294,6 +278,14 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   } else {
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
+  TORCH_CHECK(
+      avFrame->hw_frames_ctx != nullptr,
+      "The AVFrame does not have a hw_frames_ctx. "
+      "That's unexpected, please report this to the TorchCodec repo.");
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
 
   // TODO cache the NppStreamContext! It currently gets re-recated for every
   // single frame. The cache should be per-device, similar to the existing
@@ -304,83 +296,11 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
   NppiSize oSizeROI = {width, height};
-  NppStatus status;
 
   if (actualFormat == AV_PIX_FMT_NV12) {
-    // For 8-bit videos
-    Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
-
-    if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-      status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
-          input,
-          avFrame->linesize[0],
-          static_cast<Npp8u*>(dst.data_ptr()),
-          dst.stride(0),
-          oSizeROI,
-          nppCtx);
-    } else {
-      status = nppiNV12ToRGB_8u_P2C3R_Ctx(
-          input,
-          avFrame->linesize[0],
-          static_cast<Npp8u*>(dst.data_ptr()),
-          dst.stride(0),
-          oSizeROI,
-          nppCtx);
-    }
-    TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
-
+    colorConvert8bitFrame(avFrame, dst, oSizeROI, nppCtx);
   } else if (actualFormat == AV_PIX_FMT_P010LE) {
-    // AV_PIX_FMT_P010LE is like NV12, but with 10 bits per component instead
-    // of 8. The data is actually stored in 16 bits. With Npp, the only way to
-    // convert 16-bit YUV data to RGB is to use
-    // nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx
-    // The 'ColorTwist' part is the color-conversion matrix, which defines how
-    // to numerically convert YUV values to RGB values.
-    const Npp16u* input[2] = {
-        reinterpret_cast<const Npp16u*>(avFrame->data[0]),
-        reinterpret_cast<const Npp16u*>(avFrame->data[1])};
-
-    // Choose color matrix based on colorspace
-    const Npp32f(*aTwist)[4];
-
-    // TODO tune matrix
-    static const Npp32f bt601Matrix[3][4] = {
-        {1.0f, 0.0f, 1.596f, 0.0f},
-        {1.0f, -0.392f, -0.813f, -32768.0f},
-        {1.0f, 2.017f, 0.0f, -32768.0f}};
-
-    if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-      TORCH_CHECK(false, "TODO: 10bit BT.709 colorspace support");
-    } else {
-      aTwist = bt601Matrix;
-    }
-
-    // TODO update this
-    NppStreamContext nppStreamCtx;
-    nppStreamCtx.hStream = nppGetStream();
-
-    int aSrcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
-
-    torch::Tensor intermediateTensor = torch::empty(
-        {height, width, 3},
-        torch::TensorOptions().dtype(torch::kUInt16).device(device_));
-
-    status = nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx(
-        input,
-        aSrcStep,
-        reinterpret_cast<Npp16u*>(intermediateTensor.data_ptr()),
-        intermediateTensor.stride(0) * sizeof(uint16_t),
-        oSizeROI,
-        aTwist,
-        nppStreamCtx);
-
-    TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
-
-    // The output is in 16-bit, so we need to convert it to 8-bit.
-    // Ideally we'd just use `>> 8` but it's not supported by uint16
-    // torch tensors.
-    // Yes, that's losing precision. That's what our CPU implem does too.
-    dst = intermediateTensor.div(256).to(torch::kUInt8);
+    colorConvert10bitFrame(avFrame, dst, oSizeROI, nppCtx);
   } else {
     // For now we only support AV_PIX_FMT_NV12 and AV_PIX_FMT_P010LE formats.
     // But there is also AV_PIX_FMT_P010BE, AV_PIX_FMT_P016LE,
@@ -396,6 +316,89 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         ", but we expected AV_PIX_FMT_NV12 or AV_PIX_FMT_P010LE. "
         "If you're seeing this, please report this to the TorchCodec repo.");
   }
+}
+
+void CudaDeviceInterface::colorConvert8bitFrame(
+    UniqueAVFrame& avFrame,
+    torch::Tensor& dst,
+    const NppiSize& oSizeROI,
+    const NppStreamContext& nppCtx) {
+  // For 8-bit videos
+  Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
+  NppStatus status;
+
+  if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+    status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
+        input,
+        avFrame->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI,
+        nppCtx);
+  } else {
+    status = nppiNV12ToRGB_8u_P2C3R_Ctx(
+        input,
+        avFrame->linesize[0],
+        static_cast<Npp8u*>(dst.data_ptr()),
+        dst.stride(0),
+        oSizeROI,
+        nppCtx);
+  }
+  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
+}
+
+void CudaDeviceInterface::colorConvert10bitFrame(
+    UniqueAVFrame& avFrame,
+    torch::Tensor& dst,
+    const NppiSize& oSizeROI,
+    const NppStreamContext& nppCtx) {
+  // AV_PIX_FMT_P010LE is like NV12, but with 10 bits per component instead
+  // of 8. The data is actually stored in 16 bits. With Npp, the only way to
+  // convert 16-bit YUV data to RGB is to use
+  // nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx
+  // The 'ColorTwist' part is the color-conversion matrix, which defines how
+  // to numerically convert YUV values to RGB values.
+  const Npp16u* input[2] = {
+      reinterpret_cast<const Npp16u*>(avFrame->data[0]),
+      reinterpret_cast<const Npp16u*>(avFrame->data[1])};
+
+  // Choose color matrix based on colorspace
+  const Npp32f(*aTwist)[4];
+
+  // TODO tune matrix
+  static const Npp32f bt601Matrix[3][4] = {
+      {1.0f, 0.0f, 1.596f, 0.0f},
+      {1.0f, -0.392f, -0.813f, -32768.0f},
+      {1.0f, 2.017f, 0.0f, -32768.0f}};
+
+  if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+    TORCH_CHECK(false, "TODO: 10bit BT.709 colorspace support");
+  } else {
+    aTwist = bt601Matrix;
+  }
+
+  int aSrcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
+
+  torch::Tensor intermediateTensor = torch::empty(
+      {dst.size(0), dst.size(1), 3},
+      torch::TensorOptions().dtype(torch::kUInt16).device(device_));
+
+  NppStatus status = nppiNV12ToRGB_16u_ColorTwist32f_P2C3R_Ctx(
+      input,
+      aSrcStep,
+      reinterpret_cast<Npp16u*>(intermediateTensor.data_ptr()),
+      intermediateTensor.stride(0) * sizeof(uint16_t),
+      oSizeROI,
+      aTwist,
+      nppCtx);
+
+  TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert frame.");
+
+  // The output is in 16-bit, so we need to convert it to 8-bit.
+  // Ideally we'd just use `>> 8` but it's not supported by uint16
+  // torch tensors.
+  // Yes, that's losing precision. That's what our CPU implem does too.
+  dst = intermediateTensor.div(256).to(torch::kUInt8);
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9
