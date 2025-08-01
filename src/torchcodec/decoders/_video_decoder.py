@@ -81,7 +81,7 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate", "custom_frame_mappings"] = "exact",
-        custom_frame_mappings: Union[bytes, bytearray, str] = None,
+        custom_frame_mappings: Optional[Union[bytes, bytearray, str]] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
         allowed_seek_modes = ("exact", "approximate")
