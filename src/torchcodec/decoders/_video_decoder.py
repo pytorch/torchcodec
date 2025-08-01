@@ -118,7 +118,7 @@ class VideoDecoder:
 
         if isinstance(device, torch_device):
             device = str(device)
-            
+
         core.add_video_stream(
             self._decoder,
             stream_index=stream_index,
