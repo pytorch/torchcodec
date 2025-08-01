@@ -260,8 +260,19 @@ void _add_video_stream(
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
+  std::string deviceVariant = "default";
   if (device.has_value()) {
-    videoStreamOptions.device = createTorchDevice(std::string(device.value()));
+    std::string deviceStr = std::string(device.value());
+    videoStreamOptions.device = createTorchDevice(deviceStr);
+    
+    // Extract variant from device string (format: "device_type:index:variant")
+    size_t firstColon = deviceStr.find(':');
+    if (firstColon != std::string::npos) {
+      size_t secondColon = deviceStr.find(':', firstColon + 1);
+      if (secondColon != std::string::npos) {
+        deviceVariant = deviceStr.substr(secondColon + 1);
+      }
+    }
   }
   std::optional<SingleStreamDecoder::FrameMappings> converted_mappings =
       custom_frame_mappings.has_value()
@@ -269,7 +280,7 @@ void _add_video_stream(
       : std::nullopt;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions, converted_mappings);
+      stream_index.value_or(-1), videoStreamOptions, converted_mappings, deviceVariant);
 }
 
 // Add a new video stream at `stream_index` using the provided options.

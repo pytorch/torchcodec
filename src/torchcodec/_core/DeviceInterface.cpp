@@ -59,21 +59,58 @@ bool registerDeviceInterface(
 
 torch::Device createTorchDevice(const std::string device) {
   std::scoped_lock lock(g_interface_mutex);
-  std::string deviceType = getDeviceType(device);
+  
+  // Parse device string: "device_type:index:variant" or "device_type:index" or "device_type"
+  std::string deviceType;
+  std::string variant = "default";
+  std::string torchDeviceString = device; // What we'll pass to torch::Device constructor
+  
+  size_t firstColon = device.find(':');
+  if (firstColon == std::string::npos) {
+    // Just device type (e.g., "cpu")
+    deviceType = device;
+  } else {
+    deviceType = device.substr(0, firstColon);
+    
+    // Check for second colon (variant)
+    size_t secondColon = device.find(':', firstColon + 1);
+    if (secondColon != std::string::npos) {
+      // Format: "device_type:index:variant"
+      variant = device.substr(secondColon + 1);
+      torchDeviceString = device.substr(0, secondColon); // Remove variant part
+    }
+    // else: Format: "device_type:index" (no variant)
+  }
+  
   DeviceInterfaceMap& deviceMap = getDeviceMap();
 
+  // Find device interface that matches device type and variant
+  torch::DeviceType deviceTypeEnum = torch::Device(deviceType).type();
+  
   auto deviceInterface = std::find_if(
       deviceMap.begin(),
       deviceMap.end(),
       [&](const std::pair<DeviceInterfaceKey, CreateDeviceInterfaceFn>& arg) {
-        return device.rfind(
-                   torch::DeviceTypeName(arg.first.deviceType, /*lcase*/ true),
-                   0) == 0;
+        return arg.first.deviceType == deviceTypeEnum && arg.first.variant == variant;
       });
+      
+  // If variant-specific interface not found, try default variant
+  if (deviceInterface == deviceMap.end() && variant != "default") {
+    deviceInterface = std::find_if(
+        deviceMap.begin(),
+        deviceMap.end(),
+        [&](const std::pair<DeviceInterfaceKey, CreateDeviceInterfaceFn>& arg) {
+          return arg.first.deviceType == deviceTypeEnum && arg.first.variant == "default";
+        });
+  }
+  
   TORCH_CHECK(
-      deviceInterface != deviceMap.end(), "Unsupported device: ", device);
+      deviceInterface != deviceMap.end(), 
+      "Unsupported device: ", device, 
+      " (device type: ", deviceType, ", variant: ", variant, ")");
 
-  return torch::Device(device);
+  // Return torch::Device with just device type and index (no variant)
+  return torch::Device(torchDeviceString);
 }
 
 // Creation function with variant support (default = "default" for backward

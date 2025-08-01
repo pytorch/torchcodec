@@ -237,6 +237,7 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId) {
     return;
   }
 
+  printf("Initializing NVDEC video parser for codec\n");
   // Set up video parser parameters
   CUVIDPARSERPARAMS parserParams = {};
   parserParams.CodecType = videoFormat_.codec;

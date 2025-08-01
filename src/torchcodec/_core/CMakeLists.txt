@@ -94,6 +94,7 @@ function(make_torchcodec_libraries
         find_library(CUDA_NVCUVID_LIBRARY
             NAMES nvcuvid
             PATHS
+                /home/nicolashug/Downloads/Video_Codec_SDK_12.2.72/Lib/linux/stubs/x86_64
                 /usr/local/cuda/lib64
                 /usr/local/cuda/lib
                 ${CUDA_TOOLKIT_ROOT_DIR}/lib64
@@ -107,6 +108,7 @@ function(make_torchcodec_libraries
                 /usr/lib64
                 /usr/lib
         )
+        set(CUDA_NVCUVID_LIBRARY "/home/nicolashug/Downloads/Video_Codec_SDK_12.2.72/Lib/linux/stubs/x86_64/libnvcuvid.so")
 
         # Find NVIDIA Video Codec SDK headers
         find_path(NVCODEC_INCLUDE_DIR
@@ -134,8 +136,32 @@ function(make_torchcodec_libraries
         message(STATUS "Found NVIDIA Video Codec SDK library: ${CUDA_NVCUVID_LIBRARY}")
         message(STATUS "Found NVIDIA Video Codec SDK headers: ${NVCODEC_INCLUDE_DIR}")
 
-        # Add nvcuvid library to dependencies
-        list(APPEND core_library_dependencies ${CUDA_NVCUVID_LIBRARY})
+        # Add CUDA Driver API library (needed for cuCtxGetCurrent, etc.)
+        find_library(CUDA_DRIVER_LIBRARY
+            NAMES cuda
+            PATHS
+                /usr/local/cuda/lib64
+                /usr/local/cuda/lib
+                ${CUDA_TOOLKIT_ROOT_DIR}/lib64
+                ${CUDA_TOOLKIT_ROOT_DIR}/lib
+                /opt/cuda/lib64
+                /opt/cuda/lib
+                $ENV{CUDA_PATH}/lib64
+                $ENV{CUDA_PATH}/lib
+                $ENV{CUDA_HOME}/lib64
+                $ENV{CUDA_HOME}/lib
+                /usr/lib64
+                /usr/lib
+        )
+        
+        if(NOT CUDA_DRIVER_LIBRARY)
+            message(FATAL_ERROR "Cannot find CUDA Driver API library (libcuda.so)")
+        endif()
+        
+        message(STATUS "Found CUDA Driver API library: ${CUDA_DRIVER_LIBRARY}")
+
+        # Add nvcuvid and cuda driver libraries to dependencies
+        list(APPEND core_library_dependencies ${CUDA_NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
     endif()
 
     make_torchcodec_sublibrary(

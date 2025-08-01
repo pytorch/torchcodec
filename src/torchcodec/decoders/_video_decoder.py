@@ -53,6 +53,9 @@ class VideoDecoder:
             Passing 0 lets FFmpeg decide on the number of threads.
             Default: 1.
         device (str or torch.device, optional): The device to use for decoding. Default: "cpu".
+        device_variant (str, optional): The device interface variant to use. For CUDA devices,
+            specify "custom_nvdec" to use the custom NVDEC implementation instead of the default
+            FFmpeg NVDEC decoder. Default: None (uses default device interface).
         seek_mode (str, optional): Determines if frame access will be "exact" or
             "approximate". Exact guarantees that requesting frame i will always
             return frame i, but doing so requires an initial :term:`scan` of the
@@ -78,6 +81,7 @@ class VideoDecoder:
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
+        device_variant: Optional[str] = None,
         seek_mode: Literal["exact", "approximate"] = "exact",
     ):
         allowed_seek_modes = ("exact", "approximate")
@@ -101,6 +105,15 @@ class VideoDecoder:
 
         if isinstance(device, torch_device):
             device = str(device)
+        
+        # Handle device variant by extending device string
+        if device_variant is not None:
+            if device == "cpu":
+                # For CPU, variant format is "cpu:variant"
+                device = f"cpu:{device_variant}"
+            else:
+                # For other devices (e.g., "cuda:0"), append variant
+                device = f"{device}:{device_variant}"
 
         core.add_video_stream(
             self._decoder,
