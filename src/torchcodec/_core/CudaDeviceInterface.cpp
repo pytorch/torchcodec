@@ -198,12 +198,23 @@ NppStreamContext* getNppStreamContextFromCache(const torch::Device& device) {
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
   std::scoped_lock lock(g_cached_npp_stream_mutexes[deviceIndex]);
   if (g_cached_npp_stream_ctxs[deviceIndex].size() > 0) {
-    NppStreamContext* hw_device_ctx =
+    NppStreamContext* npp_stream_ctx =
         g_cached_npp_stream_ctxs[deviceIndex].back();
     g_cached_npp_stream_ctxs[deviceIndex].pop_back();
-    return hw_device_ctx;
+    return npp_stream_ctx;
   } else {
     return nullptr;
+  }
+}
+
+void addNppStreamContextToCache(
+    const torch::Device& device,
+    NppStreamContext* ctx) {
+  torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
+  std::scoped_lock lock(g_cached_npp_stream_mutexes[deviceIndex]);
+  // Add to cache if cache has capacity
+  if (g_cached_npp_stream_ctxs[deviceIndex].size() < MAX_CUDA_GPUS) {
+    g_cached_npp_stream_ctxs[deviceIndex].push_back(ctx);
   }
 }
 
@@ -213,16 +224,10 @@ NppStreamContext* getNppStreamContext(const torch::Device& device) {
   if (cached_npp_ctx_ptr != nullptr) {
     return cached_npp_ctx_ptr;
   }
+  // Create new NppStreamContext, and cache it
   NppStreamContext* npp_ctx_ptr = createNppStreamContext(
       static_cast<int>(getFFMPEGCompatibleDeviceIndex(device)));
-
-  torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
-  std::scoped_lock lock(g_cached_npp_stream_mutexes[deviceIndex]);
-  // Add to cache if cache has capacity
-  if (g_cached_npp_stream_ctxs[deviceIndex].size() < MAX_CUDA_GPUS) {
-    g_cached_npp_stream_ctxs[deviceIndex].push_back(npp_ctx_ptr);
-  }
-  // Error to user when full?
+  addNppStreamContextToCache(device, npp_ctx_ptr);
   return npp_ctx_ptr;
 }
 
@@ -330,9 +335,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // TODO cache the NppStreamContext! It currently gets re-recated for every
-  // single frame. The cache should be per-device, similar to the existing
-  // hw_device_ctx cache.
   NppStreamContext nppCtx = *getNppStreamContext(device_);
 
   torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device_);
