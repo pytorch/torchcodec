@@ -30,6 +30,22 @@ static bool g_cuda_custom_nvdec = registerDeviceInterface(
       return new CustomNvdecDeviceInterface(device);
     });
 
+// NVDEC callback functions
+static int CUDAAPI HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
+  CustomNvdecDeviceInterface* decoder = static_cast<CustomNvdecDeviceInterface*>(pUserData);
+  return decoder->handleVideoSequence(pVideoFormat);
+}
+
+static int CUDAAPI HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
+  CustomNvdecDeviceInterface* decoder = static_cast<CustomNvdecDeviceInterface*>(pUserData);
+  return decoder->handlePictureDecode(pPicParams);
+}
+
+static int CUDAAPI HandlePictureDisplay(void* pUserData, CUVIDPARSERDISPINFO* pDispInfo) {
+  CustomNvdecDeviceInterface* decoder = static_cast<CustomNvdecDeviceInterface*>(pUserData);
+  return decoder->handlePictureDisplay(pDispInfo);
+}
+
 } // namespace
 
 CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
@@ -42,6 +58,21 @@ CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
 }
 
 CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
+  // Clean up any remaining frames in the queue
+  {
+    std::lock_guard<std::mutex> lock(frameQueueMutex_);
+    while (!frameQueue_.empty()) {
+      auto framePair = frameQueue_.front();
+      frameQueue_.pop();
+      CUdeviceptr framePtr = framePair.first;
+      
+      // Unmap the frame if it's still mapped
+      if (videoDecoder_ && framePtr != 0) {
+        cuvidUnmapVideoFrame(videoDecoder_, framePtr);
+      }
+    }
+  }
+
   // Clean up NVDEC resources
   if (videoDecoder_) {
     cuvidDestroyDecoder(videoDecoder_);
@@ -54,6 +85,7 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
   }
 
   isInitialized_ = false;
+  parserInitialized_ = false;
 }
 
 std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
@@ -73,12 +105,18 @@ void CustomNvdecDeviceInterface::initializeContext(
 
   // Initialize our custom NVDEC decoder
   initializeNvdecDecoder(codecContext->codec_id);
+  
+  // Initialize video parser with the codec ID
+  initializeVideoParser(codecContext->codec_id);
 }
 
 void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   if (isInitialized_) {
     return; // Already initialized
   }
+  
+  // Store the codec ID for later use
+  currentCodecId_ = codecId;
 
   // Convert AVCodecID to NVDEC codec type
   cudaVideoCodec nvCodec;
@@ -128,6 +166,96 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   (void)0; // No-op to avoid unused variable warnings
 }
 
+void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId) {
+  if (parserInitialized_) {
+    return;
+  }
+
+  // Set up video parser parameters
+  CUVIDPARSERPARAMS parserParams = {};
+  parserParams.CodecType = videoFormat_.codec;
+  parserParams.ulMaxNumDecodeSurfaces = 1;
+  parserParams.ulClockRate = 0;
+  parserParams.ulErrorThreshold = 0;
+  parserParams.ulMaxDisplayDelay = 1;
+  parserParams.pUserData = this;
+  parserParams.pfnSequenceCallback = HandleVideoSequence;
+  parserParams.pfnDecodePicture = HandlePictureDecode;
+  parserParams.pfnDisplayPicture = HandlePictureDisplay;
+
+  CUresult result = cuvidCreateVideoParser(&videoParser_, &parserParams);
+  TORCH_CHECK(
+      result == CUDA_SUCCESS,
+      "Failed to create video parser: ",
+      result);
+
+  parserInitialized_ = true;
+}
+
+int CustomNvdecDeviceInterface::handleVideoSequence(CUVIDEOFORMAT* pVideoFormat) {
+  TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
+  
+  // Store video format
+  videoFormat_ = *pVideoFormat;
+  
+  // Create decoder if not already created
+  if (videoDecoder_ == nullptr) {
+    CUVIDDECODECREATEINFO createInfo = {};
+    createInfo.CodecType = pVideoFormat->codec;
+    createInfo.ulWidth = pVideoFormat->coded_width;
+    createInfo.ulHeight = pVideoFormat->coded_height;
+    createInfo.ulNumDecodeSurfaces = 4;
+    createInfo.ChromaFormat = pVideoFormat->chroma_format;
+    createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
+    createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
+    createInfo.ulTargetWidth = pVideoFormat->coded_width;
+    createInfo.ulTargetHeight = pVideoFormat->coded_height;
+    createInfo.ulNumOutputSurfaces = 2;
+    createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
+    createInfo.vidLock = nullptr;
+
+    CUresult result = cuvidCreateDecoder(&videoDecoder_, &createInfo);
+    if (result != CUDA_SUCCESS) {
+      return 0; // Failure
+    }
+  }
+  
+  return 1; // Success
+}
+
+int CustomNvdecDeviceInterface::handlePictureDecode(CUVIDPICPARAMS* pPicParams) {
+  TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
+  
+  if (videoDecoder_ == nullptr) {
+    return 0; // No decoder available
+  }
+  
+  CUresult result = cuvidDecodePicture(videoDecoder_, pPicParams);
+  return (result == CUDA_SUCCESS) ? 1 : 0;
+}
+
+int CustomNvdecDeviceInterface::handlePictureDisplay(CUVIDPARSERDISPINFO* pDispInfo) {
+  TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
+  
+  // Queue the frame for later retrieval
+  std::lock_guard<std::mutex> lock(frameQueueMutex_);
+  
+  // Map the decoded frame
+  CUdeviceptr framePtr = 0;
+  unsigned int pitch = 0;
+  CUVIDPROCPARAMS procParams = {};
+  procParams.progressive_frame = pDispInfo->progressive_frame;
+  procParams.top_field_first = pDispInfo->top_field_first;
+  procParams.unpaired_field = pDispInfo->repeat_first_field < 0;
+  
+  CUresult result = cuvidMapVideoFrame(videoDecoder_, pDispInfo->picture_index, &framePtr, &pitch, &procParams);
+  if (result == CUDA_SUCCESS) {
+    frameQueue_.push(std::make_pair(framePtr, *pDispInfo));
+  }
+  
+  return 1;
+}
+
 UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
     ReferenceAVPacket& packet) {
   TORCH_CHECK(isInitialized_, "NVDEC decoder not initialized");
@@ -139,32 +267,43 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
 
   TORCH_CHECK(compressedData != nullptr && size > 0, "Invalid packet data");
 
-  // For now, we need to create the decoder when we get the first frame with
-  // dimensions In a full implementation, you would:
-  // 1. Parse the compressed data to get video dimensions if not already known
-  // 2. Create the CUDA video decoder with proper dimensions
-  // 3. Submit the compressed data to the decoder
-  // 4. Get the decoded frame data
-  // 5. Convert to AVFrame format
+  // Video parser should already be initialized from initializeContext
+  TORCH_CHECK(parserInitialized_, "Video parser not initialized");
 
-  // This is a basic structure - the actual NVDEC API is more complex
-  if (videoDecoder_ == nullptr) {
-    // Would need to create decoder here with proper dimensions
-    // For now, return early to avoid the TORCH_CHECK below
-    // NVDEC decoder creation not yet implemented - need video dimensions
+  // Parse the packet data
+  CUVIDSOURCEDATAPACKET cudaPacket = {};
+  cudaPacket.payload = compressedData;
+  cudaPacket.payload_size = size;
+  cudaPacket.flags = CUVID_PKT_TIMESTAMP;
+  cudaPacket.timestamp = pts;
+
+  CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+  TORCH_CHECK(
+      result == CUDA_SUCCESS,
+      "Failed to parse video data: ",
+      result);
+
+  // Check if we have any decoded frames available
+  std::lock_guard<std::mutex> lock(frameQueueMutex_);
+  if (frameQueue_.empty()) {
+    // No frame ready yet (async decoding)
     return UniqueAVFrame(nullptr);
   }
 
-  // TODO: Implement actual NVDEC decoding pipeline
-  // This would involve:
-  // - cuvidDecodePicture() to submit compressed data
-  // - cuvidMapVideoFrame() to get decoded frame data
-  // - Converting the GPU frame data to AVFrame format
-  // - cuvidUnmapVideoFrame() to release the frame
+  // Get the first available frame
+  auto framePair = frameQueue_.front();
+  frameQueue_.pop();
+  
+  CUdeviceptr framePtr = framePair.first;
+  CUVIDPARSERDISPINFO dispInfo = framePair.second;
 
-  (void)pts; // Suppress unused parameter warning for now
-  TORCH_CHECK(false, "NVDEC decoding pipeline not yet fully implemented");
-  return UniqueAVFrame(nullptr);
+  // Convert the NVDEC frame to AVFrame
+  UniqueAVFrame avFrame = convertCudaFrameToAVFrame(framePtr, dispInfo);
+
+  // Unmap the frame
+  cuvidUnmapVideoFrame(videoDecoder_, framePtr);
+
+  return avFrame;
 }
 
 UniqueAVFrame CustomNvdecDeviceInterface::convertNvdecOutputToAVFrame(
@@ -201,6 +340,44 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertNvdecOutputToAVFrame(
   avFrame->linesize[3] = 0;
 
   // Successfully converted NVDEC frame to AVFrame
+
+  return avFrame;
+}
+
+UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
+    CUdeviceptr framePtr,
+    const CUVIDPARSERDISPINFO& dispInfo) {
+  TORCH_CHECK(framePtr != 0, "Invalid CUDA frame pointer");
+  
+  // Get frame dimensions from video format
+  int width = videoFormat_.coded_width;
+  int height = videoFormat_.coded_height;
+  
+  TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
+
+  // Allocate AVFrame
+  UniqueAVFrame avFrame(av_frame_alloc());
+  TORCH_CHECK(avFrame.get() != nullptr, "Failed to allocate AVFrame");
+
+  // Set frame properties
+  avFrame->width = width;
+  avFrame->height = height;
+  avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
+  avFrame->pts = dispInfo.timestamp;
+  avFrame->duration = 0; // Will be set by caller if needed
+
+  // For NVDEC output in NV12 format, we need to set up the data pointers
+  // The framePtr points to the beginning of the NV12 data
+  avFrame->data[0] = reinterpret_cast<uint8_t*>(framePtr); // Y plane
+  avFrame->data[1] = reinterpret_cast<uint8_t*>(framePtr + (width * height)); // UV plane
+  avFrame->data[2] = nullptr;
+  avFrame->data[3] = nullptr;
+
+  // Set line sizes for NV12 format
+  avFrame->linesize[0] = width; // Y plane stride
+  avFrame->linesize[1] = width; // UV plane stride (interleaved U and V)
+  avFrame->linesize[2] = 0;
+  avFrame->linesize[3] = 0;
 
   return avFrame;
 }

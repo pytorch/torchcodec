@@ -8,6 +8,9 @@
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 
+#include <queue>
+#include <mutex>
+
 // Include NVIDIA Video Codec SDK headers
 #include <cuviddec.h>
 #include <nvcuvid.h>
@@ -46,6 +49,12 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
     return decodePacketDirectly(packet);
   }
 
+ public:
+  // NVDEC callback functions (must be public for C callbacks)
+  int handleVideoSequence(CUVIDEOFORMAT* pVideoFormat);
+  int handlePictureDecode(CUVIDPICPARAMS* pPicParams);
+  int handlePictureDisplay(CUVIDPARSERDISPINFO* pDispInfo);
+
  private:
   // NVDEC decoder context and parser
   CUvideoparser videoParser_ = nullptr;
@@ -54,10 +63,19 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
 
   // Video format info
   CUVIDEOFORMAT videoFormat_;
+  AVCodecID currentCodecId_ = AV_CODEC_ID_NONE;
   bool isInitialized_ = false;
+  bool parserInitialized_ = false;
+
+  // Frame queue for async decoding
+  std::queue<std::pair<CUdeviceptr, CUVIDPARSERDISPINFO>> frameQueue_;
+  std::mutex frameQueueMutex_;
 
   // Custom context initialization for direct NVDEC usage
   void initializeNvdecDecoder(AVCodecID codecId);
+
+  // Initialize video parser
+  void initializeVideoParser(AVCodecID codecId);
 
   // Convert NVDEC output to AVFrame for compatibility with existing pipeline
   UniqueAVFrame convertNvdecOutputToAVFrame(
@@ -66,6 +84,11 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
       int height,
       int64_t pts,
       int64_t duration);
+
+  // Convert CUDA frame pointer to AVFrame
+  UniqueAVFrame convertCudaFrameToAVFrame(
+      CUdeviceptr framePtr,
+      const CUVIDPARSERDISPINFO& dispInfo);
 };
 
 } // namespace facebook::torchcodec
