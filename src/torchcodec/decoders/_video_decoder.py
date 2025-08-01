@@ -118,7 +118,7 @@ class VideoDecoder:
 
         if isinstance(device, torch_device):
             device = str(device)
-
+            
         core.add_video_stream(
             self._decoder,
             stream_index=stream_index,
@@ -408,7 +408,7 @@ def read_custom_frame_mappings(
     except json.JSONDecodeError:
         raise ValueError(
             "Invalid custom frame mappings. "
-            "It should be a valid JSON string or a path to a JSON file."
+            "It should be a valid JSON string or a JSON file object."
         )
     all_frames, is_key_frame, duration = zip(
         *[
