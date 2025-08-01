@@ -21,6 +21,82 @@ extern "C" {
 }
 
 namespace facebook::torchcodec {
+
+// Implementation of NvdecCache
+std::shared_ptr<CachedNvdecObjects> NvdecCache::getOrCreate(
+    const NvdecCacheKey& key,
+    const CUVIDEOFORMAT& videoFormat) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  
+  auto it = cache_.find(key);
+  if (it != cache_.end()) {
+    // Found existing cached object, increment reference count
+    it->second->refCount++;
+    return it->second;
+  }
+  
+  // Create new decoder and context
+  CUcontext context = nullptr;
+  CUresult cuResult = cuCtxGetCurrent(&context);
+  if (cuResult != CUDA_SUCCESS || context == nullptr) {
+    TORCH_CHECK(false, "Failed to get CUDA context for device ", key.deviceId);
+  }
+  
+  // Create decoder with the video format
+  CUVIDDECODECREATEINFO createInfo = {};
+  createInfo.CodecType = videoFormat.codec;
+  createInfo.ulWidth = videoFormat.coded_width;
+  createInfo.ulHeight = videoFormat.coded_height;
+  createInfo.ulNumDecodeSurfaces = 4;
+  createInfo.ChromaFormat = videoFormat.chroma_format;
+  createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
+  createInfo.bitDepthMinus8 = videoFormat.bit_depth_luma_minus8;
+  createInfo.ulTargetWidth = videoFormat.coded_width;
+  createInfo.ulTargetHeight = videoFormat.coded_height;
+  createInfo.ulNumOutputSurfaces = 2;
+  createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
+  createInfo.vidLock = nullptr;
+  
+  CUvideodecoder decoder = nullptr;
+  CUresult result = cuvidCreateDecoder(&decoder, &createInfo);
+  if (result != CUDA_SUCCESS) {
+    TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
+  }
+  
+  // Create cached object
+  auto cachedObj = std::make_shared<CachedNvdecObjects>(decoder, context);
+  cache_[key] = cachedObj;
+  
+  return cachedObj;
+}
+
+void NvdecCache::release(const NvdecCacheKey& key) {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  
+  auto it = cache_.find(key);
+  if (it != cache_.end()) {
+    it->second->refCount--;
+    if (it->second->refCount <= 0) {
+      // Clean up the decoder
+      if (it->second->decoder) {
+        cuvidDestroyDecoder(it->second->decoder);
+      }
+      cache_.erase(it);
+    }
+  }
+}
+
+void NvdecCache::cleanup() {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  
+  for (auto& pair : cache_) {
+    if (pair.second->decoder) {
+      cuvidDestroyDecoder(pair.second->decoder);
+    }
+  }
+  cache_.clear();
+}
+
 namespace {
 
 // Register the custom NVDEC device interface with 'custom_nvdec' variant
@@ -67,18 +143,19 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
       CUdeviceptr framePtr = framePair.first;
       
       // Unmap the frame if it's still mapped
-      if (videoDecoder_ && framePtr != 0) {
-        cuvidUnmapVideoFrame(videoDecoder_, framePtr);
+      if (cachedObjects_ && cachedObjects_->decoder && framePtr != 0) {
+        cuvidUnmapVideoFrame(cachedObjects_->decoder, framePtr);
       }
     }
   }
 
-  // Clean up NVDEC resources
-  if (videoDecoder_) {
-    cuvidDestroyDecoder(videoDecoder_);
-    videoDecoder_ = nullptr;
+  // Release cached objects (decrements reference count)
+  if (cachedObjects_) {
+    NvdecCache::getInstance().release(cacheKey_);
+    cachedObjects_ = nullptr;
   }
 
+  // Clean up video parser (not cached)
   if (videoParser_) {
     cuvidDestroyVideoParser(videoParser_);
     videoParser_ = nullptr;
@@ -143,15 +220,7 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
           avcodec_get_name(codecId));
   }
 
-  // Get current CUDA context
-  CUresult cuResult = cuCtxGetCurrent(&cudaContext_);
-  TORCH_CHECK(
-      cuResult == CUDA_SUCCESS,
-      "Failed to get current CUDA context: ",
-      cuResult);
-  TORCH_CHECK(cudaContext_ != nullptr, "No CUDA context available");
-
-  // Initialize video format structure
+  // Initialize video format structure (decoder will be created in handleVideoSequence)
   memset(&videoFormat_, 0, sizeof(videoFormat_));
   videoFormat_.codec = nvCodec;
   videoFormat_.coded_width = 0; // Will be set when we get the first frame
@@ -161,9 +230,6 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   videoFormat_.bit_depth_chroma_minus8 = 0;
 
   isInitialized_ = true;
-
-  // NVDEC decoder basic initialization complete
-  (void)0; // No-op to avoid unused variable warnings
 }
 
 void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId) {
@@ -198,39 +264,32 @@ int CustomNvdecDeviceInterface::handleVideoSequence(CUVIDEOFORMAT* pVideoFormat)
   // Store video format
   videoFormat_ = *pVideoFormat;
   
-  // Create decoder if not already created
-  if (videoDecoder_ == nullptr) {
-    CUVIDDECODECREATEINFO createInfo = {};
-    createInfo.CodecType = pVideoFormat->codec;
-    createInfo.ulWidth = pVideoFormat->coded_width;
-    createInfo.ulHeight = pVideoFormat->coded_height;
-    createInfo.ulNumDecodeSurfaces = 4;
-    createInfo.ChromaFormat = pVideoFormat->chroma_format;
-    createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
-    createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
-    createInfo.ulTargetWidth = pVideoFormat->coded_width;
-    createInfo.ulTargetHeight = pVideoFormat->coded_height;
-    createInfo.ulNumOutputSurfaces = 2;
-    createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
-    createInfo.vidLock = nullptr;
-
-    CUresult result = cuvidCreateDecoder(&videoDecoder_, &createInfo);
-    if (result != CUDA_SUCCESS) {
-      return 0; // Failure
-    }
-  }
+  // Create cache key based on video characteristics
+  cacheKey_.deviceId = device_.index();
+  cacheKey_.codec = pVideoFormat->codec;
+  cacheKey_.width = pVideoFormat->coded_width;
+  cacheKey_.height = pVideoFormat->coded_height;
+  cacheKey_.chromaFormat = pVideoFormat->chroma_format;
+  cacheKey_.bitDepthLumaMinus8 = pVideoFormat->bit_depth_luma_minus8;
+  cacheKey_.bitDepthChromaMinus8 = pVideoFormat->bit_depth_chroma_minus8;
   
-  return 1; // Success
+  // Get or create cached decoder and context
+  try {
+    cachedObjects_ = NvdecCache::getInstance().getOrCreate(cacheKey_, *pVideoFormat);
+    return 1; // Success
+  } catch (const std::exception& e) {
+    return 0; // Failure
+  }
 }
 
 int CustomNvdecDeviceInterface::handlePictureDecode(CUVIDPICPARAMS* pPicParams) {
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
   
-  if (videoDecoder_ == nullptr) {
+  if (!cachedObjects_ || !cachedObjects_->decoder) {
     return 0; // No decoder available
   }
   
-  CUresult result = cuvidDecodePicture(videoDecoder_, pPicParams);
+  CUresult result = cuvidDecodePicture(cachedObjects_->decoder, pPicParams);
   return (result == CUDA_SUCCESS) ? 1 : 0;
 }
 
@@ -248,7 +307,7 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(CUVIDPARSERDISPINFO* pDispI
   procParams.top_field_first = pDispInfo->top_field_first;
   procParams.unpaired_field = pDispInfo->repeat_first_field < 0;
   
-  CUresult result = cuvidMapVideoFrame(videoDecoder_, pDispInfo->picture_index, &framePtr, &pitch, &procParams);
+  CUresult result = cuvidMapVideoFrame(cachedObjects_->decoder, pDispInfo->picture_index, &framePtr, &pitch, &procParams);
   if (result == CUDA_SUCCESS) {
     frameQueue_.push(std::make_pair(framePtr, *pDispInfo));
   }
@@ -301,7 +360,7 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   UniqueAVFrame avFrame = convertCudaFrameToAVFrame(framePtr, dispInfo);
 
   // Unmap the frame
-  cuvidUnmapVideoFrame(videoDecoder_, framePtr);
+  cuvidUnmapVideoFrame(cachedObjects_->decoder, framePtr);
 
   return avFrame;
 }
