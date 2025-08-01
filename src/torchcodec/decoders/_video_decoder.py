@@ -80,7 +80,7 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate", "custom_frame_mappings"] = "exact",
-        custom_frame_mappings: Optional[Union[Path, str]] = None,
+        custom_frame_mappings: Union[bytes, bytearray, str] = None,
     ):
         allowed_seek_modes = ("exact", "approximate")
         if seek_mode not in allowed_seek_modes:
