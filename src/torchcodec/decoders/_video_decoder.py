@@ -80,7 +80,7 @@ class VideoDecoder:
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
-        seek_mode: Literal["exact", "approximate"] = "exact",
+        seek_mode: Literal["exact", "approximate", "custom_frame_mappings"] = "exact",
         custom_frame_mappings: Optional[Union[Path, str]] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
@@ -91,9 +91,8 @@ class VideoDecoder:
                 f"Supported values are {', '.join(allowed_seek_modes)}."
             )
         if custom_frame_mappings:
-            if seek_mode != "exact":
+            if seek_mode not in ("exact", "custom_frame_mappings"):
                 raise ValueError(
-                    "Custom frame mappings are only supported in 'exact' seek mode. "
                     "While setting custom frame mappings, do not set `seek_mode`."
                 )
             # Set seek mode to avoid exact mode scan
@@ -398,7 +397,7 @@ def _get_and_validate_stream_metadata(
 
 
 def read_custom_frame_mappings(
-    custom_frame_mappings: Union[Path, str]
+    custom_frame_mappings: Union[bytes, bytearray, str]
 ) -> tuple[Tensor, Tensor, Tensor]:
     try:
         if hasattr(custom_frame_mappings, "read"):
