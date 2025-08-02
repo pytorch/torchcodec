@@ -80,14 +80,6 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // Initialize video parser
   void initializeVideoParser(AVCodecID codecId);
 
-  // Convert NVDEC output to AVFrame for compatibility with existing pipeline
-  UniqueAVFrame convertNvdecOutputToAVFrame(
-      uint8_t* decodedFrame,
-      int width,
-      int height,
-      int64_t pts,
-      int64_t duration);
-
   // Convert CUDA frame pointer to AVFrame
   UniqueAVFrame convertCudaFrameToAVFrame(
       CUdeviceptr framePtr,

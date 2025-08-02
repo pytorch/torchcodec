@@ -312,43 +312,6 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   return avFrame;
 }
 
-UniqueAVFrame CustomNvdecDeviceInterface::convertNvdecOutputToAVFrame(
-    uint8_t* decodedFrame,
-    int width,
-    int height,
-    int64_t pts,
-    int64_t duration) {
-  TORCH_CHECK(decodedFrame != nullptr, "Invalid decoded frame data");
-  TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
-
-  // Allocate AVFrame
-  UniqueAVFrame avFrame(av_frame_alloc());
-  TORCH_CHECK(avFrame.get() != nullptr, "Failed to allocate AVFrame");
-
-  // Set frame properties
-  avFrame->width = width;
-  avFrame->height = height;
-  avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
-  avFrame->pts = pts;
-  avFrame->duration = duration;
-
-  // For NVDEC output, we typically get NV12 format (YUV 4:2:0 with interleaved
-  // UV) Set up GPU data pointers for NV12 format
-  avFrame->data[0] = decodedFrame; // Y plane
-  avFrame->data[1] = decodedFrame + (width * height); // UV plane for NV12
-  avFrame->data[2] = nullptr;
-  avFrame->data[3] = nullptr;
-
-  // Set line sizes
-  avFrame->linesize[0] = width; // Y plane stride
-  avFrame->linesize[1] = width; // UV plane stride (interleaved U and V)
-  avFrame->linesize[2] = 0;
-  avFrame->linesize[3] = 0;
-
-  // Successfully converted NVDEC frame to AVFrame
-
-  return avFrame;
-}
 
 UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
     CUdeviceptr framePtr,
@@ -402,33 +365,6 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected CUDA format frame from custom NVDEC decoder");
 
-  // TODO: Implement custom GPU-based color conversion
-  /*
-  Example implementation using CUDA kernels or NPP:
-
-  auto frameDims = getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions,
-  avFrame); int height = frameDims.height; int width = frameDims.width;
-
-  torch::Tensor& dst = frameOutput.data;
-  if (preAllocatedOutputTensor.has_value()) {
-    dst = preAllocatedOutputTensor.value();
-  } else {
-    dst = allocateEmptyHWCTensor(height, width, device_);
-  }
-
-  // Convert NV12 to RGB using custom CUDA kernel or NPP
-  convertNV12ToRGB_Custom(
-      avFrame->data[0],  // Y plane
-      avFrame->data[1],  // UV plane
-      avFrame->linesize[0],
-      static_cast<uint8_t*>(dst.data_ptr()),
-      dst.stride(0),
-      width,
-      height
-  );
-  */
-
-  // For now, fall back to CPU conversion as placeholder
   auto cpuDevice = torch::Device(torch::kCPU);
   auto cpuInterface = createDeviceInterface(cpuDevice);
 
