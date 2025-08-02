@@ -6,6 +6,7 @@
 
 #include <torch/types.h>
 #include <mutex>
+#include <vector>
 
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "src/torchcodec/_core/DeviceInterface.h"
@@ -117,8 +118,8 @@ void CustomNvdecDeviceInterface::initializeContext(
   // Initialize our custom NVDEC decoder
   initializeNvdecDecoder(codecContext->codec_id);
 
-  // Initialize video parser with the codec ID
-  initializeVideoParser(codecContext->codec_id);
+  // Initialize video parser with the codec ID and extradata
+  initializeVideoParser(codecContext->codec_id, codecContext->extradata, codecContext->extradata_size);
 }
 
 void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
@@ -167,12 +168,13 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   isInitialized_ = true;
 }
 
-void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId) {
+void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_t* extradata, int extradata_size) {
   if (parserInitialized_) {
     return;
   }
 
   printf("Initializing NVDEC video parser for codec\n");
+  
   // Set up video parser parameters
   CUVIDPARSERPARAMS parserParams = {};
   parserParams.CodecType = videoFormat_.codec;
@@ -288,11 +290,12 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   // Video parser should already be initialized from initializeContext
   TORCH_CHECK(parserInitialized_, "Video parser not initialized");
 
-  // Parse the packet data
+  // Parse the packet data (now already in Annex B format from bitstream filter)
   printf("About to parse packet: size=%d, pts=%lld\n", size, pts);
   printf("First 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n", 
          compressedData[0], compressedData[1], compressedData[2], compressedData[3],
          compressedData[4], compressedData[5], compressedData[6], compressedData[7]);
+
   CUVIDSOURCEDATAPACKET cudaPacket = {0};  // Initialize all fields to 0
   cudaPacket.payload = compressedData;
   cudaPacket.payload_size = size;
@@ -302,13 +305,6 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
   printf("Parse result: %d\n", result);
   TORCH_CHECK(result == CUDA_SUCCESS, "Failed to parse video data: ", result);
-  
-  // Try to flush the parser to trigger callbacks
-  CUVIDSOURCEDATAPACKET flushPacket = {0};
-  flushPacket.flags = CUVID_PKT_ENDOFSTREAM;
-  printf("Sending flush packet\n");
-  CUresult flushResult = cuvidParseVideoData(videoParser_, &flushPacket);
-  printf("Flush result: %d\n", flushResult);
 
   // Check if we have any decoded frames available
   std::lock_guard<std::mutex> lock(frameQueueMutex_);
@@ -386,7 +382,7 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected CUDA format frame from custom NVDEC decoder");
 
-  auto cpuDevice = torch::Device(torch::kCPU);
+  auto cpuDevice = torch::Device(torch::kCUDA);
   auto cpuInterface = createDeviceInterface(cpuDevice);
 
   FrameOutput cpuFrameOutput;

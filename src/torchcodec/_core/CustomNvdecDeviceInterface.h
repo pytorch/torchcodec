@@ -78,7 +78,7 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   void initializeNvdecDecoder(AVCodecID codecId);
 
   // Initialize video parser
-  void initializeVideoParser(AVCodecID codecId);
+  void initializeVideoParser(AVCodecID codecId, uint8_t* extradata, int extradata_size);
 
   // Convert CUDA frame pointer to AVFrame
   UniqueAVFrame convertCudaFrameToAVFrame(
