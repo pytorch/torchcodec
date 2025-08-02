@@ -177,7 +177,7 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId) {
   CUVIDPARSERPARAMS parserParams = {};
   parserParams.CodecType = videoFormat_.codec;
   parserParams.ulMaxNumDecodeSurfaces = 1;
-  parserParams.ulClockRate = 0;
+  parserParams.ulClockRate = 1000;
   parserParams.ulErrorThreshold = 0;
   parserParams.ulMaxDisplayDelay = 1;
   parserParams.pUserData = this;
@@ -290,7 +290,10 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
 
   // Parse the packet data
   printf("About to parse packet: size=%d, pts=%lld\n", size, pts);
-  CUVIDSOURCEDATAPACKET cudaPacket = {};
+  printf("First 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n", 
+         compressedData[0], compressedData[1], compressedData[2], compressedData[3],
+         compressedData[4], compressedData[5], compressedData[6], compressedData[7]);
+  CUVIDSOURCEDATAPACKET cudaPacket = {0};  // Initialize all fields to 0
   cudaPacket.payload = compressedData;
   cudaPacket.payload_size = size;
   cudaPacket.flags = CUVID_PKT_TIMESTAMP;
@@ -299,6 +302,13 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
   printf("Parse result: %d\n", result);
   TORCH_CHECK(result == CUDA_SUCCESS, "Failed to parse video data: ", result);
+  
+  // Try to flush the parser to trigger callbacks
+  CUVIDSOURCEDATAPACKET flushPacket = {0};
+  flushPacket.flags = CUVID_PKT_ENDOFSTREAM;
+  printf("Sending flush packet\n");
+  CUresult flushResult = cuvidParseVideoData(videoParser_, &flushPacket);
+  printf("Flush result: %d\n", flushResult);
 
   // Check if we have any decoded frames available
   std::lock_guard<std::mutex> lock(frameQueueMutex_);
