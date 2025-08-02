@@ -264,7 +264,7 @@ void _add_video_stream(
   if (device.has_value()) {
     std::string deviceStr = std::string(device.value());
     videoStreamOptions.device = createTorchDevice(deviceStr);
-    
+
     // Extract variant from device string (format: "device_type:index:variant")
     size_t firstColon = deviceStr.find(':');
     if (firstColon != std::string::npos) {
@@ -280,7 +280,10 @@ void _add_video_stream(
       : std::nullopt;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions, converted_mappings, deviceVariant);
+      stream_index.value_or(-1),
+      videoStreamOptions,
+      converted_mappings,
+      deviceVariant);
 }
 
 // Add a new video stream at `stream_index` using the provided options.

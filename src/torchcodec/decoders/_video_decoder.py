@@ -105,7 +105,7 @@ class VideoDecoder:
 
         if isinstance(device, torch_device):
             device = str(device)
-        
+
         # Handle device variant by extending device string
         if device_variant is not None:
             if device == "cpu":

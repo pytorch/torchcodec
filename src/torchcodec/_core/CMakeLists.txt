@@ -153,11 +153,11 @@ function(make_torchcodec_libraries
                 /usr/lib64
                 /usr/lib
         )
-        
+
         if(NOT CUDA_DRIVER_LIBRARY)
             message(FATAL_ERROR "Cannot find CUDA Driver API library (libcuda.so)")
         endif()
-        
+
         message(STATUS "Found CUDA Driver API library: ${CUDA_DRIVER_LIBRARY}")
 
         # Add nvcuvid and cuda driver libraries to dependencies

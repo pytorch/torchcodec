@@ -8,10 +8,10 @@
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 
-#include <queue>
-#include <mutex>
-#include <unordered_map>
 #include <memory>
+#include <mutex>
+#include <queue>
+#include <unordered_map>
 
 // Include NVIDIA Video Codec SDK headers
 #include <cuviddec.h>
@@ -19,77 +19,6 @@
 
 namespace facebook::torchcodec {
 
-// Cache key for decoder and context reuse
-struct NvdecCacheKey {
-  int deviceId;
-  cudaVideoCodec codec;
-  int width;
-  int height;
-  cudaVideoChromaFormat chromaFormat;
-  int bitDepthLumaMinus8;
-  int bitDepthChromaMinus8;
-
-  bool operator==(const NvdecCacheKey& other) const {
-    return deviceId == other.deviceId &&
-           codec == other.codec &&
-           width == other.width &&
-           height == other.height &&
-           chromaFormat == other.chromaFormat &&
-           bitDepthLumaMinus8 == other.bitDepthLumaMinus8 &&
-           bitDepthChromaMinus8 == other.bitDepthChromaMinus8;
-  }
-};
-
-// Hash function for NvdecCacheKey
-struct NvdecCacheKeyHash {
-  std::size_t operator()(const NvdecCacheKey& key) const {
-    std::size_t h1 = std::hash<int>{}(key.deviceId);
-    std::size_t h2 = std::hash<int>{}(static_cast<int>(key.codec));
-    std::size_t h3 = std::hash<int>{}(key.width);
-    std::size_t h4 = std::hash<int>{}(key.height);
-    std::size_t h5 = std::hash<int>{}(static_cast<int>(key.chromaFormat));
-    std::size_t h6 = std::hash<int>{}(key.bitDepthLumaMinus8);
-    std::size_t h7 = std::hash<int>{}(key.bitDepthChromaMinus8);
-    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6);
-  }
-};
-
-// Cached decoder and context objects
-struct CachedNvdecObjects {
-  CUvideodecoder decoder;
-  CUcontext context;
-  int refCount;
-  
-  CachedNvdecObjects(CUvideodecoder dec, CUcontext ctx) 
-    : decoder(dec), context(ctx), refCount(1) {}
-};
-
-// Global cache for NVDEC decoders and contexts
-class NvdecCache {
-public:
-  static NvdecCache& getInstance() {
-    static NvdecCache instance;
-    return instance;
-  }
-
-  std::shared_ptr<CachedNvdecObjects> getOrCreate(
-      const NvdecCacheKey& key,
-      const CUVIDEOFORMAT& videoFormat);
-  
-  void release(const NvdecCacheKey& key);
-  void cleanup(); // For testing/cleanup
-
-private:
-  std::unordered_map<NvdecCacheKey, std::shared_ptr<CachedNvdecObjects>, NvdecCacheKeyHash> cache_;
-  std::mutex cacheMutex_;
-  
-  NvdecCache() = default;
-  ~NvdecCache() { cleanup(); }
-  
-  // Non-copyable
-  NvdecCache(const NvdecCache&) = delete;
-  NvdecCache& operator=(const NvdecCache&) = delete;
-};
 
 // Custom NVDEC device interface that provides direct control over NVDEC
 // while keeping FFmpeg for demuxing
@@ -132,8 +61,8 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
  private:
   // NVDEC decoder context and parser
   CUvideoparser videoParser_ = nullptr;
-  std::shared_ptr<CachedNvdecObjects> cachedObjects_ = nullptr;
-  NvdecCacheKey cacheKey_;
+  CUvideodecoder decoder_ = nullptr;
+  CUcontext context_ = nullptr;
 
   // Video format info
   CUVIDEOFORMAT videoFormat_;
