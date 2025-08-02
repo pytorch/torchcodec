@@ -73,13 +73,12 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
   {
     std::lock_guard<std::mutex> lock(frameQueueMutex_);
     while (!frameQueue_.empty()) {
-      auto framePair = frameQueue_.front();
+      FrameData frameData = frameQueue_.front();
       frameQueue_.pop();
-      CUdeviceptr framePtr = framePair.first;
 
       // Unmap the frame if it's still mapped
-      if (decoder_ && framePtr != 0) {
-        cuvidUnmapVideoFrame(decoder_, framePtr);
+      if (decoder_ && frameData.framePtr != 0) {
+        cuvidUnmapVideoFrame(decoder_, frameData.framePtr);
       }
     }
   }
@@ -270,7 +269,8 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
       &pitch,
       &procParams);
   if (result == CUDA_SUCCESS) {
-    frameQueue_.push(std::make_pair(framePtr, *pDispInfo));
+    FrameData frameData = {framePtr, pitch, *pDispInfo};
+    frameQueue_.push(frameData);
   }
 
   return 1;
@@ -314,17 +314,14 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   }
 
   // Get the first available frame
-  auto framePair = frameQueue_.front();
+  FrameData frameData = frameQueue_.front();
   frameQueue_.pop();
 
-  CUdeviceptr framePtr = framePair.first;
-  CUVIDPARSERDISPINFO dispInfo = framePair.second;
-
   // Convert the NVDEC frame to AVFrame
-  UniqueAVFrame avFrame = convertCudaFrameToAVFrame(framePtr, dispInfo);
+  UniqueAVFrame avFrame = convertCudaFrameToAVFrame(frameData.framePtr, frameData.pitch, frameData.dispInfo);
 
   // Unmap the frame
-  cuvidUnmapVideoFrame(decoder_, framePtr);
+  cuvidUnmapVideoFrame(decoder_, frameData.framePtr);
 
   return avFrame;
 }
@@ -332,6 +329,7 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
 
 UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
     CUdeviceptr framePtr,
+    unsigned int pitch,
     const CUVIDPARSERDISPINFO& dispInfo) {
   TORCH_CHECK(framePtr != 0, "Invalid CUDA frame pointer");
 
@@ -340,6 +338,9 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   int height = videoFormat_.coded_height;
 
   TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
+  TORCH_CHECK(pitch >= width, "Pitch must be >= width");
+
+  printf("Frame conversion: width=%d, height=%d, pitch=%u\n", width, height, pitch);
 
   // Allocate AVFrame
   UniqueAVFrame avFrame(av_frame_alloc());
@@ -355,14 +356,13 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   // For NVDEC output in NV12 format, we need to set up the data pointers
   // The framePtr points to the beginning of the NV12 data
   avFrame->data[0] = reinterpret_cast<uint8_t*>(framePtr); // Y plane
-  avFrame->data[1] =
-      reinterpret_cast<uint8_t*>(framePtr + (width * height)); // UV plane
+  avFrame->data[1] = reinterpret_cast<uint8_t*>(framePtr + (pitch * height)); // UV plane (using pitch, not width)
   avFrame->data[2] = nullptr;
   avFrame->data[3] = nullptr;
 
-  // Set line sizes for NV12 format
-  avFrame->linesize[0] = width; // Y plane stride
-  avFrame->linesize[1] = width; // UV plane stride (interleaved U and V)
+  // Set line sizes for NV12 format using the actual NVDEC pitch
+  avFrame->linesize[0] = pitch; // Y plane stride (use actual pitch from NVDEC)
+  avFrame->linesize[1] = pitch; // UV plane stride (use actual pitch from NVDEC)
   avFrame->linesize[2] = 0;
   avFrame->linesize[3] = 0;
 
