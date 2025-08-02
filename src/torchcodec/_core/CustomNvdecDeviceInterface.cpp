@@ -35,7 +35,7 @@ static bool g_cuda_custom_nvdec = registerDeviceInterface(
 // NVDEC callback functions
 static int CUDAAPI
 HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
-  printf("Static HandleVideoSequence called\n");
+  // printf("Static HandleVideoSequence called\n");
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handleVideoSequence(pVideoFormat);
@@ -43,7 +43,7 @@ HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
 
 static int CUDAAPI
 HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
-  printf("Static HandlePictureDecode called\n");
+  // printf("Static HandlePictureDecode called\n");
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handlePictureDecode(pPicParams);
@@ -51,7 +51,7 @@ HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
 
 static int CUDAAPI
 HandlePictureDisplay(void* pUserData, CUVIDPARSERDISPINFO* pDispInfo) {
-  printf("Static HandlePictureDisplay called\n");
+  // printf("Static HandlePictureDisplay called\n");
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handlePictureDisplay(pDispInfo);
@@ -172,7 +172,7 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_
     return;
   }
 
-  printf("Initializing NVDEC video parser for codec\n");
+  // printf("Initializing NVDEC video parser for codec\n");
   
   // Set up video parser parameters
   CUVIDPARSERPARAMS parserParams = {};
@@ -186,9 +186,9 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_
   parserParams.pfnDecodePicture = HandlePictureDecode;
   parserParams.pfnDisplayPicture = HandlePictureDisplay;
   
-  printf("Parser params: pUserData=%p, pfnSequenceCallback=%p, pfnDecodePicture=%p, pfnDisplayPicture=%p\n", 
-         parserParams.pUserData, (void*)parserParams.pfnSequenceCallback, 
-         (void*)parserParams.pfnDecodePicture, (void*)parserParams.pfnDisplayPicture);
+  // printf("Parser params: pUserData=%p, pfnSequenceCallback=%p, pfnDecodePicture=%p, pfnDisplayPicture=%p\n", 
+  //        parserParams.pUserData, (void*)parserParams.pfnSequenceCallback, 
+  //        (void*)parserParams.pfnDecodePicture, (void*)parserParams.pfnDisplayPicture);
 
   CUresult result = cuvidCreateVideoParser(&videoParser_, &parserParams);
   TORCH_CHECK(
@@ -199,7 +199,7 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_
 
 int CustomNvdecDeviceInterface::handleVideoSequence(
     CUVIDEOFORMAT* pVideoFormat) {
-      printf("In CustomNvdecDeviceInterface::handleVideoSequence\n");
+      // printf("In CustomNvdecDeviceInterface::handleVideoSequence\n");
   TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
 
   // Store video format
@@ -237,7 +237,7 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
 int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
-  printf("In CustomNvdecDeviceInterface::handlePictureDecode\n");
+  // printf("In CustomNvdecDeviceInterface::handlePictureDecode\n");
 
   if (!decoder_) {
     return 0; // No decoder available
@@ -291,10 +291,10 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   TORCH_CHECK(parserInitialized_, "Video parser not initialized");
 
   // Parse the packet data (now already in Annex B format from bitstream filter)
-  printf("About to parse packet: size=%d, pts=%lld\n", size, pts);
-  printf("First 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n", 
-         compressedData[0], compressedData[1], compressedData[2], compressedData[3],
-         compressedData[4], compressedData[5], compressedData[6], compressedData[7]);
+  // printf("About to parse packet: size=%d, pts=%lld\n", size, pts);
+  // printf("First 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n", 
+  //        compressedData[0], compressedData[1], compressedData[2], compressedData[3],
+  //        compressedData[4], compressedData[5], compressedData[6], compressedData[7]);
 
   CUVIDSOURCEDATAPACKET cudaPacket = {0};  // Initialize all fields to 0
   cudaPacket.payload = compressedData;
@@ -303,7 +303,7 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   cudaPacket.timestamp = pts;
 
   CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
-  printf("Parse result: %d\n", result);
+  // printf("Parse result: %d\n", result);
   TORCH_CHECK(result == CUDA_SUCCESS, "Failed to parse video data: ", result);
 
   // Check if we have any decoded frames available
@@ -340,7 +340,7 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
   TORCH_CHECK(pitch >= width, "Pitch must be >= width");
 
-  printf("Frame conversion: width=%d, height=%d, pitch=%u\n", width, height, pitch);
+  // printf("Frame conversion: width=%d, height=%d, pitch=%u\n", width, height, pitch);
 
   // Allocate AVFrame
   UniqueAVFrame avFrame(av_frame_alloc());

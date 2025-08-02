@@ -474,7 +474,7 @@ void SingleStreamDecoder::addStream(
                           strcmp(formatName, "Matroska / WebM") == 0);
     
     if (isMP4Container) {
-      printf("Initializing H.264 MP4 to Annex B bitstream filter for %s container\n", formatName);
+      // printf("Initializing H.264 MP4 to Annex B bitstream filter for %s container\n", formatName);
       
       const AVBitStreamFilter* bsf = av_bsf_get_by_name("h264_mp4toannexb");
       TORCH_CHECK(bsf != nullptr, "Failed to find h264_mp4toannexb bitstream filter");
@@ -496,7 +496,7 @@ void SingleStreamDecoder::addStream(
                   getFFMPEGErrorStringFromErrorCode(retVal));
       
       streamInfo.needsBitstreamFiltering = true;
-      printf("Successfully initialized bitstream filter\n");
+      // printf("Successfully initialized bitstream filter\n");
     }
   }
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
@@ -1249,7 +1249,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       
       // Apply bitstream filtering if needed
       if (streamInfo.needsBitstreamFiltering && streamInfo.bitstreamFilter) {
-        printf("Applying bitstream filter to packet\n");
+        // printf("Applying bitstream filter to packet\n");
         
         // Send packet to bitstream filter
         int retVal = av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
@@ -1262,8 +1262,8 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
                     getFFMPEGErrorStringFromErrorCode(retVal));
         
         packetToSend = &filteredPacket;
-        printf("Bitstream filtering complete: original size=%d, filtered size=%d\n", 
-               packet->size, filteredPacket->size);
+        // printf("Bitstream filtering complete: original size=%d, filtered size=%d\n", 
+              //  packet->size, filteredPacket->size);
       }
       
       // Use custom packet decoding (e.g., direct NVDEC)
