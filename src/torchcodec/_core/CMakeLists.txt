@@ -14,7 +14,7 @@ else()
     set(TORCHCODEC_WERROR_OPTION "-Werror")
 endif()
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+if (WIN32)
   # Avoid warnings about non-ASCII characters in source files.
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4819")
   # Important for when we add Windows CUDA: exporting all symbols is aparently
@@ -46,7 +46,7 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
-    if(WIN32)  # TODO unify WIN detection
+    if(WIN32)
         # On Windows, the built artifacts are put in Release/Debug
         # subdirectories by default. We want to avoid that, otherwise our
         # install() step would not know where to find those.
@@ -66,11 +66,6 @@ function(make_torchcodec_sublibrary
         ${library_dependencies}
     )
     
-    # Debug output for Windows builds
-    if(WIN32)
-        message(STATUS "Created library: ${library_name}")
-        message(STATUS "Library dependencies: ${library_dependencies}")
-    endif()
 endfunction()
 
 function(make_torchcodec_libraries
@@ -176,7 +171,7 @@ function(make_torchcodec_libraries
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    if(NOT WIN32)  # TODO unify WIN detection
+    if(NOT WIN32)
         target_compile_options(
             ${pybind_ops_library_name}
             PUBLIC
