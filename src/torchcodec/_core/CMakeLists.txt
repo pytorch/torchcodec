@@ -17,8 +17,8 @@ endif()
 if (WIN32)
   # Avoid warnings about non-ASCII characters in source files.
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4819")
-  # Important for when we add Windows CUDA: exporting all symbols is aparently
-  # limited to 65535 symbols, which (aparently) will not work for CUDA.
+  # Important for when we add Windows CUDA: exporting all symbols is limited to
+  # 65535 symbols, which (apparently) will not work for CUDA.
   # https://github.com/pytorch/pytorch/pull/3650
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
@@ -178,16 +178,6 @@ function(make_torchcodec_libraries
             "-fvisibility=hidden"
         )
     endif()
-    if(APPLE)  # TODO unify APPLE detection
-        # If we don't make sure this flag is set, we run into segfauls at import
-        # time on Mac. See:
-        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
-        target_link_options(
-            ${pybind_ops_library_name}
-            PUBLIC
-            "LINKER:-undefined,dynamic_lookup"
-        )
-    endif()
 
     # The value we use here must match the value we return from
     # _get_pybind_ops_module_name() on the Python side. If the values do not
@@ -198,6 +188,17 @@ function(make_torchcodec_libraries
         PRIVATE
         PYBIND_OPS_MODULE_NAME=core_pybind_ops
     )
+
+    if(APPLE)  # TODO unify APPLE detection
+        # If we don't make sure this flag is set, we run into segfauls at import
+        # time on Mac. See:
+        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+        target_link_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "LINKER:-undefined,dynamic_lookup"
+        )
+    endif()
 
     # Install all libraries.
     set(
