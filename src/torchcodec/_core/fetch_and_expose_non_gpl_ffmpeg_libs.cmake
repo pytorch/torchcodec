@@ -17,6 +17,8 @@ set(
 )
 
 if (LINUX)
+    set(lib_dir "lib")
+
     set(
         platform_url
         ${base_url}/linux_x86_64
@@ -38,93 +40,6 @@ if (LINUX)
         f7_sha256
         1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
     )
-elseif (APPLE)
-    set(
-        platform_url
-        ${base_url}/macos_arm64
-    )
-    set(
-        f4_sha256
-        f0335434529d9e19359eae0fe912dd9e747667534a1c92e662f5219a55dfad8c
-    )
-    set(
-        f5_sha256
-        cfc3449c9af6863731a431ce89e32c08c5f8ece94b306fb6b695828502a76166
-    )
-    set(
-        f6_sha256
-        ec47b4783c342038e720e33b2fdfa55a9a490afb1cf37a26467733983688647e
-    )
-    set(
-        f7_sha256
-        48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
-    )
-
-elseif (WIN32)
-    set(
-        platform_url
-        ${base_url}/windows_x86_64
-    )
-    set(
-        f4_sha256
-        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
-    )
-    set(
-        f5_sha256
-        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
-    )
-    set(
-        f6_sha256
-        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
-    )
-    set(
-        f7_sha256
-        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
-    )
-else()
-    message(
-        FATAL_ERROR
-        "Unsupported operating system: ${CMAKE_SYSTEM_NAME}"
-    )
-endif()
-
-FetchContent_Declare(
-    f4
-    URL ${platform_url}/4.4.4.tar.gz
-    URL_HASH
-    SHA256=${f4_sha256}
-)
-FetchContent_Declare(
-    f5
-    URL ${platform_url}/5.1.4.tar.gz
-    URL_HASH
-    SHA256=${f5_sha256}
-)
-FetchContent_Declare(
-    f6
-    URL ${platform_url}/6.1.1.tar.gz
-    URL_HASH
-    SHA256=${f6_sha256}
-)
-FetchContent_Declare(
-    f7
-    URL ${platform_url}/7.0.1.tar.gz
-    URL_HASH
-    SHA256=${f7_sha256}
-)
-
-FetchContent_MakeAvailable(f4 f5 f6 f7)
-
-add_library(ffmpeg4 INTERFACE)
-add_library(ffmpeg5 INTERFACE)
-add_library(ffmpeg6 INTERFACE)
-add_library(ffmpeg7 INTERFACE)
-
-# Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
-
-# Set platform-specific library directory and file naming
-if (LINUX)
-    set(lib_dir "lib")
     set(
         f4_library_file_names
         libavutil.so.56
@@ -168,6 +83,27 @@ if (LINUX)
 elseif (APPLE)
     set(lib_dir "lib")
     set(
+        platform_url
+        ${base_url}/macos_arm64
+    )
+    set(
+        f4_sha256
+        f0335434529d9e19359eae0fe912dd9e747667534a1c92e662f5219a55dfad8c
+    )
+    set(
+        f5_sha256
+        cfc3449c9af6863731a431ce89e32c08c5f8ece94b306fb6b695828502a76166
+    )
+    set(
+        f6_sha256
+        ec47b4783c342038e720e33b2fdfa55a9a490afb1cf37a26467733983688647e
+    )
+    set(
+        f7_sha256
+        48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
+    )
+
+    set(
         f4_library_file_names
         libavutil.56.dylib
         libavcodec.58.dylib
@@ -207,8 +143,30 @@ elseif (APPLE)
         libswscale.8.dylib
         libswresample.5.dylib
     )
+
 elseif (WIN32)
     set(lib_dir "bin")
+    set(
+        platform_url
+        ${base_url}/windows_x86_64
+    )
+    set(
+        f4_sha256
+        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
+    )
+    set(
+        f5_sha256
+        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
+    )
+    set(
+        f6_sha256
+        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
+    )
+    set(
+        f7_sha256
+        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
+    )
+
     set(
         f4_library_file_names
         avutil.lib
@@ -249,7 +207,51 @@ elseif (WIN32)
         swscale.lib
         swresample.lib
     )
+else()
+    message(
+        FATAL_ERROR
+        "Unsupported operating system: ${CMAKE_SYSTEM_NAME}"
+    )
 endif()
+
+FetchContent_Declare(
+    f4
+    URL ${platform_url}/4.4.4.tar.gz
+    URL_HASH
+    SHA256=${f4_sha256}
+)
+FetchContent_Declare(
+    f5
+    URL ${platform_url}/5.1.4.tar.gz
+    URL_HASH
+    SHA256=${f5_sha256}
+)
+FetchContent_Declare(
+    f6
+    URL ${platform_url}/6.1.1.tar.gz
+    URL_HASH
+    SHA256=${f6_sha256}
+)
+FetchContent_Declare(
+    f7
+    URL ${platform_url}/7.0.1.tar.gz
+    URL_HASH
+    SHA256=${f7_sha256}
+)
+
+FetchContent_MakeAvailable(f4 f5 f6 f7)
+
+add_library(ffmpeg4 INTERFACE)
+add_library(ffmpeg5 INTERFACE)
+add_library(ffmpeg6 INTERFACE)
+add_library(ffmpeg7 INTERFACE)
+
+# Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
+target_include_directories(ffmpeg4 INTERFACE ${f4_SOURCE_DIR}/include)
+target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
+target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
+target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
+
 
 # Generate full library paths using list transform
 list(
@@ -272,10 +274,6 @@ list(
     PREPEND ${f7_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f7_library_paths
 )
-target_include_directories(ffmpeg4 INTERFACE ${f4_SOURCE_DIR}/include)
-target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
-target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
-target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
 
 
 target_link_libraries(
