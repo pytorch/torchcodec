@@ -126,12 +126,17 @@ class CMakeBuild(build_ext):
             f"-DTORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR={torchcodec_disable_compile_warning_as_error}",
         ]
 
+        self.build_temp = os.getenv("TORCHCODEC_CMAKE_BUILD_DIR", self.build_temp)
+        print(f"Using {self.build_temp = }", flush=True)
         Path(self.build_temp).mkdir(parents=True, exist_ok=True)
 
+        print("Calling cmake (configure)", flush=True)
         subprocess.check_call(
             ["cmake", str(_ROOT_DIR)] + cmake_args, cwd=self.build_temp
         )
+        print("Calling cmake --build", flush=True)
         subprocess.check_call(["cmake", "--build", "."], cwd=self.build_temp)
+        print("Calling cmake --install", flush=True)
         subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
 
     def copy_extensions_to_source(self):

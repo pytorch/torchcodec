@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <npp.h>
 #include "src/torchcodec/_core/DeviceInterface.h"
 
 namespace facebook::torchcodec {

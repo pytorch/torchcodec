@@ -1,3 +1,4 @@
+:: Taken from torchaudio
 @echo on
 
 set VC_VERSION_LOWER=17

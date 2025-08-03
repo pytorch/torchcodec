@@ -18,6 +18,7 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
+  // To perform the multiplication before the division, av_q2d is not used
   return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
@@ -129,11 +130,11 @@ void SingleStreamDecoder::initializeDecoder() {
 
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
       streamMetadata.durationSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->duration;
+          ptsToSeconds(avStream->duration, avStream->time_base);
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
       streamMetadata.beginStreamSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->start_time;
+          ptsToSeconds(avStream->start_time, avStream->time_base);
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -197,6 +198,45 @@ int SingleStreamDecoder::getBestStreamIndex(AVMediaType mediaType) {
 // --------------------------------------------------------------------------
 // VIDEO METADATA QUERY API
 // --------------------------------------------------------------------------
+
+void SingleStreamDecoder::sortAllFrames() {
+  // Sort the allFrames and keyFrames vecs in each stream, and also sets
+  // additional fields of the FrameInfo entries like nextPts and frameIndex
+  // This is called at the end of a scan, or when setting a user-defined frame
+  // mapping.
+  for (auto& [streamIndex, streamInfo] : streamInfos_) {
+    std::sort(
+        streamInfo.keyFrames.begin(),
+        streamInfo.keyFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+    std::sort(
+        streamInfo.allFrames.begin(),
+        streamInfo.allFrames.end(),
+        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
+          return frameInfo1.pts < frameInfo2.pts;
+        });
+
+    size_t keyFrameIndex = 0;
+    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
+      streamInfo.allFrames[i].frameIndex = i;
+      if (streamInfo.allFrames[i].isKeyFrame) {
+        TORCH_CHECK(
+            keyFrameIndex < streamInfo.keyFrames.size(),
+            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
+        ++keyFrameIndex;
+      }
+      if (i + 1 < streamInfo.allFrames.size()) {
+        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
+      }
+    }
+    TORCH_CHECK(
+        keyFrameIndex == streamInfo.keyFrames.size(),
+        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
+  }
+}
 
 void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
   if (scannedAllStreams_) {
@@ -265,13 +305,12 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
         streamInfos_[streamIndex].allFrames.size();
 
     if (streamMetadata.beginStreamPtsFromContent.has_value()) {
-      streamMetadata.beginStreamPtsSecondsFromContent =
-          *streamMetadata.beginStreamPtsFromContent *
-          av_q2d(avStream->time_base);
+      streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
     }
     if (streamMetadata.endStreamPtsFromContent.has_value()) {
-      streamMetadata.endStreamPtsSecondsFromContent =
-          *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+      streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.endStreamPtsFromContent, avStream->time_base);
     }
   }
 
@@ -283,40 +322,46 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
       getFFMPEGErrorStringFromErrorCode(status));
 
   // Sort all frames by their pts.
-  for (auto& [streamIndex, streamInfo] : streamInfos_) {
-    std::sort(
-        streamInfo.keyFrames.begin(),
-        streamInfo.keyFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-    std::sort(
-        streamInfo.allFrames.begin(),
-        streamInfo.allFrames.end(),
-        [](const FrameInfo& frameInfo1, const FrameInfo& frameInfo2) {
-          return frameInfo1.pts < frameInfo2.pts;
-        });
-
-    size_t keyFrameIndex = 0;
-    for (size_t i = 0; i < streamInfo.allFrames.size(); ++i) {
-      streamInfo.allFrames[i].frameIndex = i;
-      if (streamInfo.allFrames[i].isKeyFrame) {
-        TORCH_CHECK(
-            keyFrameIndex < streamInfo.keyFrames.size(),
-            "The allFrames vec claims it has MORE keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-        streamInfo.keyFrames[keyFrameIndex].frameIndex = i;
-        ++keyFrameIndex;
-      }
-      if (i + 1 < streamInfo.allFrames.size()) {
-        streamInfo.allFrames[i].nextPts = streamInfo.allFrames[i + 1].pts;
-      }
-    }
-    TORCH_CHECK(
-        keyFrameIndex == streamInfo.keyFrames.size(),
-        "The allFrames vec claims it has LESS keyFrames than the keyFrames vec. There's a bug in torchcodec.");
-  }
-
+  sortAllFrames();
   scannedAllStreams_ = true;
+}
+
+void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
+    int streamIndex,
+    FrameMappings customFrameMappings) {
+  auto& all_frames = customFrameMappings.all_frames;
+  auto& is_key_frame = customFrameMappings.is_key_frame;
+  auto& duration = customFrameMappings.duration;
+  TORCH_CHECK(
+      all_frames.size(0) == is_key_frame.size(0) &&
+          is_key_frame.size(0) == duration.size(0),
+      "all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.");
+
+  auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
+
+  streamMetadata.beginStreamPtsFromContent = all_frames[0].item<int64_t>();
+  streamMetadata.endStreamPtsFromContent =
+      all_frames[-1].item<int64_t>() + duration[-1].item<int64_t>();
+
+  auto avStream = formatContext_->streams[streamIndex];
+  streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
+
+  streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.endStreamPtsFromContent, avStream->time_base);
+
+  streamMetadata.numFramesFromContent = all_frames.size(0);
+  for (int64_t i = 0; i < all_frames.size(0); ++i) {
+    FrameInfo frameInfo;
+    frameInfo.pts = all_frames[i].item<int64_t>();
+    frameInfo.isKeyFrame = is_key_frame[i].item<bool>();
+    streamInfos_[streamIndex].allFrames.push_back(frameInfo);
+    if (frameInfo.isKeyFrame) {
+      streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
+    }
+  }
+  // Sort all frames by their pts
+  sortAllFrames();
 }
 
 ContainerMetadata SingleStreamDecoder::getContainerMetadata() const {
@@ -431,7 +476,8 @@ void SingleStreamDecoder::addStream(
 
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
-    const VideoStreamOptions& videoStreamOptions) {
+    const VideoStreamOptions& videoStreamOptions,
+    std::optional<FrameMappings> customFrameMappings) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
@@ -456,6 +502,14 @@ void SingleStreamDecoder::addVideoStream(
   streamMetadata.height = streamInfo.codecContext->height;
   streamMetadata.sampleAspectRatio =
       streamInfo.codecContext->sample_aspect_ratio;
+
+  if (seekMode_ == SeekMode::custom_frame_mappings) {
+    TORCH_CHECK(
+        customFrameMappings.has_value(),
+        "Please provide frame mappings when using custom_frame_mappings seek mode.");
+    readCustomFrameMappingsUpdateMetadataAndIndex(
+        streamIndex, customFrameMappings.value());
+  }
 }
 
 void SingleStreamDecoder::addAudioStream(
@@ -526,6 +580,12 @@ FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
+
+  std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
+  if (numFrames.has_value()) {
+    // If the frameIndex is negative, we convert it to a positive index
+    frameIndex = frameIndex >= 0 ? frameIndex : frameIndex + numFrames.value();
+  }
   validateFrameIndex(streamMetadata, frameIndex);
 
   int64_t pts = getPts(frameIndex);
@@ -567,8 +627,6 @@ FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
   for (size_t f = 0; f < frameIndices.size(); ++f) {
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
-
-    validateFrameIndex(streamMetadata, indexInVideo);
 
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
@@ -1407,6 +1465,7 @@ int SingleStreamDecoder::getKeyFrameIndexForPtsUsingScannedIndex(
 int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact: {
       auto frame = std::lower_bound(
           streamInfo.allFrames.begin(),
@@ -1434,6 +1493,7 @@ int64_t SingleStreamDecoder::secondsToIndexLowerBound(double seconds) {
 int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact: {
       auto frame = std::upper_bound(
           streamInfo.allFrames.begin(),
@@ -1461,6 +1521,7 @@ int64_t SingleStreamDecoder::secondsToIndexUpperBound(double seconds) {
 int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamInfo.allFrames[frameIndex].pts;
     case SeekMode::approximate: {
@@ -1485,6 +1546,7 @@ int64_t SingleStreamDecoder::getPts(int64_t frameIndex) {
 std::optional<int64_t> SingleStreamDecoder::getNumFrames(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.numFramesFromContent.value();
     case SeekMode::approximate: {
@@ -1498,6 +1560,7 @@ std::optional<int64_t> SingleStreamDecoder::getNumFrames(
 double SingleStreamDecoder::getMinSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.beginStreamPtsSecondsFromContent.value();
     case SeekMode::approximate:
@@ -1510,6 +1573,7 @@ double SingleStreamDecoder::getMinSeconds(
 std::optional<double> SingleStreamDecoder::getMaxSeconds(
     const StreamMetadata& streamMetadata) {
   switch (seekMode_) {
+    case SeekMode::custom_frame_mappings:
     case SeekMode::exact:
       return streamMetadata.endStreamPtsSecondsFromContent.value();
     case SeekMode::approximate: {
@@ -1559,21 +1623,24 @@ void SingleStreamDecoder::validateScannedAllStreams(const std::string& msg) {
 void SingleStreamDecoder::validateFrameIndex(
     const StreamMetadata& streamMetadata,
     int64_t frameIndex) {
-  TORCH_CHECK(
-      frameIndex >= 0,
-      "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-          "; must be greater than or equal to 0");
+  if (frameIndex < 0) {
+    throw std::out_of_range(
+        "Invalid frame index=" + std::to_string(frameIndex) +
+        " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+        "; negative indices must have an absolute value less than the number of frames, "
+        "and the number of frames must be known.");
+  }
 
   // Note that if we do not have the number of frames available in our metadata,
   // then we assume that the frameIndex is valid.
   std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
   if (numFrames.has_value()) {
-    TORCH_CHECK(
-        frameIndex < numFrames.value(),
-        "Invalid frame index=" + std::to_string(frameIndex) +
-            " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-            "; must be less than " + std::to_string(numFrames.value()));
+    if (frameIndex >= numFrames.value()) {
+      throw std::out_of_range(
+          "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+          "; must be less than " + std::to_string(numFrames.value()));
+    }
   }
 }
 
@@ -1645,6 +1712,8 @@ SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
     return SingleStreamDecoder::SeekMode::exact;
   } else if (seekMode == "approximate") {
     return SingleStreamDecoder::SeekMode::approximate;
+  } else if (seekMode == "custom_frame_mappings") {
+    return SingleStreamDecoder::SeekMode::custom_frame_mappings;
   } else {
     TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
   }
