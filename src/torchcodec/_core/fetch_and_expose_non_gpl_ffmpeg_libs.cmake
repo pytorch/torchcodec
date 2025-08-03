@@ -9,7 +9,6 @@ endif()
 
 include(FetchContent)
 
-# Define platform variables for cleaner conditionals
 set(LINUX ${UNIX} AND NOT ${APPLE})
 
 set(
@@ -17,8 +16,7 @@ set(
     https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2025-03-14
 )
 
-
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if (LINUX)
     set(
         platform_url
         ${base_url}/linux_x86_64
@@ -125,7 +123,7 @@ add_library(ffmpeg7 INTERFACE)
 # Note: the f?_SOURCE_DIR variables were set by FetchContent_MakeAvailable
 
 # Set platform-specific library directory and file naming
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if (LINUX)
     set(lib_dir "lib")
     set(
         f4_library_file_names
