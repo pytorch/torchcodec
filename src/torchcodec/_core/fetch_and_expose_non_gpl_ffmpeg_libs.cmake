@@ -9,6 +9,9 @@ endif()
 
 include(FetchContent)
 
+# Define platform variables for cleaner conditionals
+set(LINUX ${UNIX} AND NOT ${APPLE})
+
 set(
     base_url
     https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2025-03-14
@@ -37,7 +40,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         f7_sha256
         1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
     )
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+elseif (APPLE)
     set(
         platform_url
         ${base_url}/macos_arm64
@@ -59,7 +62,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
     )
 
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+elseif (WIN32)
     set(
         platform_url
         ${base_url}/windows_x86_64
@@ -164,7 +167,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         libswscale.so.8
         libswresample.so.5
     )
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+elseif (APPLE)
     set(lib_dir "lib")
     set(
         f4_library_file_names
@@ -206,7 +209,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         libswscale.8.dylib
         libswresample.5.dylib
     )
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+elseif (WIN32)
     set(lib_dir "bin")
     set(
         f4_library_file_names
