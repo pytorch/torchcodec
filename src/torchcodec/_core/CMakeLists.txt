@@ -189,7 +189,7 @@ function(make_torchcodec_libraries
         PYBIND_OPS_MODULE_NAME=core_pybind_ops
     )
 
-    if(APPLE)  # TODO unify APPLE detection
+    if(APPLE)
         # If we don't make sure this flag is set, we run into segfauls at import
         # time on Mac. See:
         # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
