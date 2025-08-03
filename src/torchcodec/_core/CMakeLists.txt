@@ -65,7 +65,7 @@ function(make_torchcodec_sublibrary
         PUBLIC
         ${library_dependencies}
     )
-    
+
 endfunction()
 
 function(make_torchcodec_libraries

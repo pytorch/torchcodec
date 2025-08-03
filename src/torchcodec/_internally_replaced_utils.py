@@ -21,9 +21,7 @@ def _get_extension_path(lib_name: str) -> str:
     elif sys.platform in ("win32", "cygwin"):
         extension_suffixes = importlib.machinery.EXTENSION_SUFFIXES + [".dll"]
     else:
-        raise NotImplementedError(
-            f"{sys.platform = } is not not supported"
-        )
+        raise NotImplementedError(f"{sys.platform = } is not not supported")
     loader_details = (
         importlib.machinery.ExtensionFileLoader,
         extension_suffixes,

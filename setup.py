@@ -158,9 +158,7 @@ class CMakeBuild(build_ext):
         elif sys.platform in ("win32", "cygwin"):
             extensions = ["dll"]
         else:
-            raise NotImplementedError(
-                f"Platform {sys.platform} is not supported"
-            )
+            raise NotImplementedError(f"Platform {sys.platform} is not supported")
 
         for ext in extensions:
             for lib_file in self._install_prefix.glob(f"*.{ext}"):

@@ -41,44 +41,44 @@ if (LINUX)
         1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
     )
     set(
-        f4_library_file_names
-        libavutil.so.56
-        libavcodec.so.58
-        libavformat.so.58
-        libavdevice.so.58
-        libavfilter.so.7
-        libswscale.so.5
-        libswresample.so.3
+       f4_library_file_names
+       libavutil.so.56
+       libavcodec.so.58
+       libavformat.so.58
+       libavdevice.so.58
+       libavfilter.so.7
+       libswscale.so.5
+       libswresample.so.3
     )
     set(
-        f5_library_file_names
-        libavutil.so.57
-        libavcodec.so.59
-        libavformat.so.59
-        libavdevice.so.59
-        libavfilter.so.8
-        libswscale.so.6
-        libswresample.so.4
+       f5_library_file_names
+       libavutil.so.57
+       libavcodec.so.59
+       libavformat.so.59
+       libavdevice.so.59
+       libavfilter.so.8
+       libswscale.so.6
+       libswresample.so.4
     )
     set(
-        f6_library_file_names
-        libavutil.so.58
-        libavcodec.so.60
-        libavformat.so.60
-        libavdevice.so.60
-        libavfilter.so.9
-        libswscale.so.7
-        libswresample.so.4
+       f6_library_file_names
+       libavutil.so.58
+       libavcodec.so.60
+       libavformat.so.60
+       libavdevice.so.60
+       libavfilter.so.9
+       libswscale.so.7
+       libswresample.so.4
     )
     set(
-        f7_library_file_names
-        libavutil.so.59
-        libavcodec.so.61
-        libavformat.so.61
-        libavdevice.so.61
-        libavfilter.so.10
-        libswscale.so.8
-        libswresample.so.5
+       f7_library_file_names
+       libavutil.so.59
+       libavcodec.so.61
+       libavformat.so.61
+       libavdevice.so.61
+       libavfilter.so.10
+       libswscale.so.8
+       libswresample.so.5
     )
 elseif (APPLE)
     set(lib_dir "lib")
@@ -104,44 +104,44 @@ elseif (APPLE)
     )
 
     set(
-        f4_library_file_names
-        libavutil.56.dylib
-        libavcodec.58.dylib
-        libavformat.58.dylib
-        libavdevice.58.dylib
-        libavfilter.7.dylib
-        libswscale.5.dylib
-        libswresample.3.dylib
+       f4_library_file_names
+       libavutil.56.dylib
+       libavcodec.58.dylib
+       libavformat.58.dylib
+       libavdevice.58.dylib
+       libavfilter.7.dylib
+       libswscale.5.dylib
+       libswresample.3.dylib
     )
     set(
-        f5_library_file_names
-        libavutil.57.dylib
-        libavcodec.59.dylib
-        libavformat.59.dylib
-        libavdevice.59.dylib
-        libavfilter.8.dylib
-        libswscale.6.dylib
-        libswresample.4.dylib
+       f5_library_file_names
+       libavutil.57.dylib
+       libavcodec.59.dylib
+       libavformat.59.dylib
+       libavdevice.59.dylib
+       libavfilter.8.dylib
+       libswscale.6.dylib
+       libswresample.4.dylib
     )
     set(
-        f6_library_file_names
-        libavutil.58.dylib
-        libavcodec.60.dylib
-        libavformat.60.dylib
-        libavdevice.60.dylib
-        libavfilter.9.dylib
-        libswscale.7.dylib
-        libswresample.4.dylib
+       f6_library_file_names
+       libavutil.58.dylib
+       libavcodec.60.dylib
+       libavformat.60.dylib
+       libavdevice.60.dylib
+       libavfilter.9.dylib
+       libswscale.7.dylib
+       libswresample.4.dylib
     )
     set(
-        f7_library_file_names
-        libavutil.59.dylib
-        libavcodec.61.dylib
-        libavformat.61.dylib
-        libavdevice.61.dylib
-        libavfilter.10.dylib
-        libswscale.8.dylib
-        libswresample.5.dylib
+       f7_library_file_names
+       libavutil.59.dylib
+       libavcodec.61.dylib
+       libavformat.61.dylib
+       libavdevice.61.dylib
+       libavfilter.10.dylib
+       libswscale.8.dylib
+       libswresample.5.dylib
     )
 
 elseif (WIN32)
@@ -253,7 +253,6 @@ target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
 target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
 
 
-# Generate full library paths using list transform
 list(
     TRANSFORM f4_library_file_names
     PREPEND ${f4_SOURCE_DIR}/${lib_dir}/
@@ -274,7 +273,6 @@ list(
     PREPEND ${f7_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f7_library_paths
 )
-
 
 target_link_libraries(
     ffmpeg4
