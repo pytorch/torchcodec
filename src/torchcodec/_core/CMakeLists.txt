@@ -11,7 +11,12 @@ find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 if(DEFINED TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR AND TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR)
     set(TORCHCODEC_WERROR_OPTION "")
 else()
-    set(TORCHCODEC_WERROR_OPTION "-Werror")
+    if (WIN32)
+        # TODO set warnings as errors on Windows as well.
+        # set(TORCHCODEC_WERROR_OPTION "/WX")
+    else()
+        set(TORCHCODEC_WERROR_OPTION "-Werror")
+    endif()
 endif()
 
 if (WIN32)
@@ -23,9 +28,11 @@ if (WIN32)
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
-# TODO put back previous line and set proper flags for windows. e.g. Wall is W4.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+if (WIN32)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+endif()
 
 
 function(make_torchcodec_sublibrary
