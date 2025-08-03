@@ -9,7 +9,11 @@ endif()
 
 include(FetchContent)
 
-set(LINUX ${UNIX} AND NOT ${APPLE})
+if (UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+else()
+    set(LINUX FALSE)
+endif()
 
 set(
     base_url
