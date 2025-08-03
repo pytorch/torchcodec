@@ -222,45 +222,7 @@ function(make_torchcodec_libraries
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
         RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
     )
-    # stray initialization of py::objects. The rest of the object code must
-    # match. See:
-    #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    if(NOT WIN32)  # TODO unify WIN detection
-        target_compile_options(
-            ${pybind_ops_library_name}
-            PUBLIC
-            "-fvisibility=hidden"
-        )
-    endif()
-    if(APPLE)  # TODO unify APPLE detection
-        # If we don't make sure this flag is set, we run into segfauls at import
-        # time on Mac. See:
-        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
-        target_link_options(
-            ${pybind_ops_library_name}
-            PUBLIC
-            "LINKER:-undefined,dynamic_lookup"
-        )
-    endif()
 
-    # Install all libraries.
-    set(
-        all_libraries
-        ${decoder_library_name}
-        ${custom_ops_library_name}
-        ${pybind_ops_library_name}
-    )
-
-    # The install step is invoked within CMakeBuild.build_library() in
-    # setup.py and just copies the built files from the temp
-    # cmake/setuptools build folder into the CMAKE_INSTALL_PREFIX folder. We
-    # still need to manually pass "DESTINATION ..." for cmake to copy those
-    # files in CMAKE_INSTALL_PREFIX instead of CMAKE_INSTALL_PREFIX/lib.
-    install(
-        TARGETS ${all_libraries}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
-    )
 endfunction()
 
 if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
@@ -298,21 +260,6 @@ else()
         libswresample
         libswscale
     )
-
-    # On Windows, explicitly add the conda library directory to the linker search path
-    if(WIN32 AND DEFINED ENV{CONDA_PREFIX})
-        link_directories("$ENV{CONDA_PREFIX}/Library/lib")
-        message(STATUS "Added conda library directory to linker search path: $ENV{CONDA_PREFIX}/Library/lib")
-        
-        # Also add the library path to CMAKE_PREFIX_PATH for better library finding
-        list(APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}/Library")
-        message(STATUS "Added conda prefix to CMAKE_PREFIX_PATH: $ENV{CONDA_PREFIX}/Library")
-        
-        # Debug: Show what LIBAV variables are set
-        message(STATUS "LIBAV_INCLUDE_DIRS: ${LIBAV_INCLUDE_DIRS}")
-        message(STATUS "LIBAV_LIBRARY_DIRS: ${LIBAV_LIBRARY_DIRS}")
-        message(STATUS "LIBAV_LIBRARIES: ${LIBAV_LIBRARIES}")
-    endif()
 
     # Split libavcodec's version string by '.' and convert it to a list
     string(REPLACE "." ";" libavcodec_version_list ${LIBAV_libavcodec_VERSION})
