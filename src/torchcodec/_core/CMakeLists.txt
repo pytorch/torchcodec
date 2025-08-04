@@ -66,7 +66,6 @@ function(make_torchcodec_libraries
     set(core_sources
         AVIOContextHolder.cpp
         AVIOTensorContext.cpp
-        AVIOFileLikeContext.cpp
         FFMPEGCommon.cpp
         Frame.cpp
         DeviceInterface.cpp

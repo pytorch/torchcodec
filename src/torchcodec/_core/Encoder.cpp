@@ -106,7 +106,7 @@ void AudioEncoder::close_avio() {
   if (avFormatContext_ && avFormatContext_->pb) {
     avio_flush(avFormatContext_->pb);
 
-    if (!avioToTensorContext_ && !avioFileLikeContext_) {
+    if (!avioContextHolder_) {
       avio_close(avFormatContext_->pb);
       // avoids closing again in destructor, which would segfault.
       avFormatContext_->pb = nullptr;
@@ -149,11 +149,11 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
-    std::unique_ptr<AVIOToTensorContext> avioToTensorContext,
+    std::unique_ptr<AVIOContextHolder> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
       inSampleRate_(sampleRate),
-      avioToTensorContext_(std::move(avioToTensorContext)) {
+      avioContextHolder_(std::move(avioContextHolder)) {
   setFFmpegLogLevel();
   AVFormatContext* avFormatContext = nullptr;
   int status = avformat_alloc_output_context2(
@@ -168,35 +168,7 @@ AudioEncoder::AudioEncoder(
       getFFMPEGErrorStringFromErrorCode(status));
   avFormatContext_.reset(avFormatContext);
 
-  avFormatContext_->pb = avioToTensorContext_->getAVIOContext();
-
-  initializeEncoder(audioStreamOptions);
-}
-
-AudioEncoder::AudioEncoder(
-    const torch::Tensor& samples,
-    int sampleRate,
-    std::string_view formatName,
-    std::unique_ptr<AVIOFileLikeContext> avioFileLikeContext,
-    const AudioStreamOptions& audioStreamOptions)
-    : samples_(validateSamples(samples)),
-      inSampleRate_(sampleRate),
-      avioFileLikeContext_(std::move(avioFileLikeContext)) {
-  setFFmpegLogLevel();
-  AVFormatContext* avFormatContext = nullptr;
-  int status = avformat_alloc_output_context2(
-      &avFormatContext, nullptr, formatName.data(), nullptr);
-
-  TORCH_CHECK(
-      avFormatContext != nullptr,
-      "Couldn't allocate AVFormatContext for file-like object. ",
-      "Check the desired format? Got format=",
-      formatName,
-      ". ",
-      getFFMPEGErrorStringFromErrorCode(status));
-  avFormatContext_.reset(avFormatContext);
-
-  avFormatContext_->pb = avioFileLikeContext_->getAVIOContext();
+  avFormatContext_->pb = avioContextHolder_->getAVIOContext();
 
   initializeEncoder(audioStreamOptions);
 }
@@ -275,10 +247,11 @@ void AudioEncoder::initializeEncoder(
 
 torch::Tensor AudioEncoder::encodeToTensor() {
   TORCH_CHECK(
-      avioToTensorContext_ != nullptr,
+      avioContextHolder_ != nullptr,
       "Cannot encode to tensor, avio tensor context doesn't exist.");
   encode();
-  return avioToTensorContext_->getOutputTensor();
+  return dynamic_cast<AVIOToTensorContext*>(avioContextHolder_.get())
+      ->getOutputTensor();
 }
 
 void AudioEncoder::encode() {
