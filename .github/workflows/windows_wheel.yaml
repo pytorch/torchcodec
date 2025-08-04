@@ -42,8 +42,7 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload Windows wheel
-    # TODO: use @main
-    uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
+    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
     with:
       repository: pytorch/torchcodec
       ref: ""
