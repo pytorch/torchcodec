@@ -44,6 +44,7 @@ from torchcodec._core import (
 from .utils import (
     assert_frames_equal,
     cpu_and_cuda,
+    get_ffmpeg_major_version,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
@@ -125,6 +126,10 @@ class TestVideoDecoderOps:
             INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame6, reference_frame6.to(device))
+        # Negative indices are supported
+        frame389 = get_frame_at_index(decoder, frame_index=-1)
+        reference_frame389 = NASA_VIDEO.get_frame_data_by_index(389)
+        assert_frames_equal(frame389[0], reference_frame389.to(device))
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frame_with_info_at_index(self, device):
@@ -176,6 +181,32 @@ class TestVideoDecoderOps:
         frames[0] += 20
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices_negative_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
+        frames389and387and1, *_ = get_frames_at_indices(
+            decoder, frame_indices=[-1, -3, -389]
+        )
+        reference_frame389 = NASA_VIDEO.get_frame_data_by_index(389)
+        reference_frame387 = NASA_VIDEO.get_frame_data_by_index(387)
+        reference_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
+        assert_frames_equal(frames389and387and1[0], reference_frame389.to(device))
+        assert_frames_equal(frames389and387and1[1], reference_frame387.to(device))
+        assert_frames_equal(frames389and387and1[2], reference_frame1.to(device))
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_get_frames_at_indices_fail_on_invalid_negative_indices(self, device):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device=device)
+        with pytest.raises(
+            IndexError,
+            match="negative indices must have an absolute value less than the number of frames",
+        ):
+            invalid_frames, *_ = get_frames_at_indices(
+                decoder, frame_indices=[-10000, -3000]
+            )
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     def test_get_frames_by_pts(self, device):
@@ -447,6 +478,73 @@ class TestVideoDecoderOps:
                 decoder, frame_index=i, pts_seconds_to_test=pts.item()
             )
             assert pts_is_equal
+
+    def test_seek_mode_custom_frame_mappings_fails(self):
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
+        with pytest.raises(
+            RuntimeError,
+            match="Please provide frame mappings when using custom_frame_mappings seek mode.",
+        ):
+            add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
+
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
+        different_lengths = (
+            torch.tensor([1, 2, 3]),
+            torch.tensor([1, 2]),
+            torch.tensor([1, 2, 3]),
+        )
+        with pytest.raises(
+            RuntimeError,
+            match="all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.",
+        ):
+            add_video_stream(
+                decoder, stream_index=0, custom_frame_mappings=different_lengths
+            )
+
+    @pytest.mark.skipif(
+        get_ffmpeg_major_version() in (4, 5),
+        reason="ffprobe isn't accurate on ffmpeg 4 and 5",
+    )
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    def test_seek_mode_custom_frame_mappings(self, device):
+        stream_index = 3  # custom_frame_index seek mode requires a stream index
+        decoder = create_from_file(
+            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+        )
+        add_video_stream(
+            decoder,
+            device=device,
+            stream_index=stream_index,
+            custom_frame_mappings=NASA_VIDEO.get_custom_frame_mappings(
+                stream_index=stream_index
+            ),
+        )
+
+        frame0, _, _ = get_next_frame(decoder)
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(
+            0, stream_index=stream_index
+        )
+        assert_frames_equal(frame0, reference_frame0.to(device))
+
+        frame6, _, _ = get_frame_at_pts(decoder, 6.006)
+        reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS, stream_index=stream_index
+        )
+        assert_frames_equal(frame6, reference_frame6.to(device))
+
+        frame6, _, _ = get_frame_at_index(decoder, frame_index=180)
+        reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
+            INDEX_OF_FRAME_AT_6_SECONDS, stream_index=stream_index
+        )
+        assert_frames_equal(frame6, reference_frame6.to(device))
+
+        ref_frames0_9 = NASA_VIDEO.get_frame_data_by_range(0, 9)
+        bulk_frames0_9, *_ = get_frames_in_range(decoder, start=0, stop=9)
+        assert_frames_equal(bulk_frames0_9, ref_frames0_9.to(device))
 
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
     def test_color_conversion_library(self, color_conversion_library):

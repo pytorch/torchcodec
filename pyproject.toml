@@ -3,7 +3,7 @@ name = "torchcodec"
 description = "A video decoder for PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {file = "LICENSE"}
+license-files = ["LICENSE"]
 authors = [
     { name = "PyTorch Team", email = "packages@pytorch.org" },
 ]
@@ -39,3 +39,15 @@ target-version = ["py38"]
 excludes = [
     "examples",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    # defines a 'slow' mark to mark slow tests with `@pytest.mark.slow`
+    "slow: mark test as slow"
+]
+
+# We don't want to run the slow tests by default. These options are ignored in
+# the CI, where we definitely want the 'slow' tests to run.
+addopts = "-v -m 'not slow'"
+
+testpaths = ["test"]

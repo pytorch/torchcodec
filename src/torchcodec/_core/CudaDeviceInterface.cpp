@@ -161,6 +161,44 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
       device, nonNegativeDeviceIndex, type);
 #endif
 }
+
+NppStreamContext createNppStreamContext(int deviceIndex) {
+  // From 12.9, NPP recommends using a user-created NppStreamContext and using
+  // the `_Ctx()` calls:
+  // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
+  // And the nppGetStreamContext() helper is deprecated. We are explicitly
+  // supposed to create the NppStreamContext manually from the CUDA device
+  // properties:
+  // https://github.com/NVIDIA/CUDALibrarySamples/blob/d97803a40fab83c058bb3d68b6c38bd6eebfff43/NPP/README.md?plain=1#L54-L72
+
+  NppStreamContext nppCtx{};
+  cudaDeviceProp prop{};
+  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaGetDeviceProperties failed: ",
+      cudaGetErrorString(err));
+
+  nppCtx.nCudaDeviceId = deviceIndex;
+  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
+
+  // TODO when implementing the cache logic, move these out. See other TODO
+  // below.
+  nppCtx.hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
+  err = cudaStreamGetFlags(nppCtx.hStream, &nppCtx.nStreamFlags);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaStreamGetFlags failed: ",
+      cudaGetErrorString(err));
+
+  return nppCtx;
+}
+
 } // namespace
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
@@ -196,10 +234,54 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
+    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
+    // gives us if it wasn't able to decode a frame, for whatever reason.
+    // Typically that happens if the video's encoder isn't supported by NVDEC.
+    // Below, we choose to convert the frame's color-space using the CPU
+    // codepath, and send it back to the GPU at the very end.
+    // TODO: A possibly better solution would be to send the frame to the GPU
+    // first, and do the color conversion there.
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
+
+    FrameOutput cpuFrameOutput;
+    cpuInterface->convertAVFrameToFrameOutput(
+        videoStreamOptions,
+        timeBase,
+        avFrame,
+        cpuFrameOutput,
+        preAllocatedOutputTensor);
+
+    frameOutput.data = cpuFrameOutput.data.to(device_);
+    return;
+  }
+
+  // Above we checked that the AVFrame was on GPU, but that's not enough, we
+  // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
+  // because this is what the NPP color conversion routines expect.
+  // TODO: we should investigate how to can perform color conversion for
+  // non-8bit videos. This is supported on CPU.
   TORCH_CHECK(
-      avFrame->format == AV_PIX_FMT_CUDA,
-      "Expected format to be AV_PIX_FMT_CUDA, got " +
-          std::string(av_get_pix_fmt_name((AVPixelFormat)avFrame->format)));
+      avFrame->hw_frames_ctx != nullptr,
+      "The AVFrame does not have a hw_frames_ctx. "
+      "That's unexpected, please report this to the TorchCodec repo.");
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+  TORCH_CHECK(
+      actualFormat == AV_PIX_FMT_NV12,
+      "The AVFrame is ",
+      (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+                                         : "unknown"),
+      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
+      "the video isn't 8bit, which is not supported on CUDA at the moment. "
+      "Try using the CPU device instead. "
+      "If the video is 10bit, we are tracking 10bit support in "
+      "https://github.com/pytorch/torchcodec/issues/776");
+
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
   int height = frameDims.height;
@@ -221,44 +303,37 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // Use the user-requested GPU for running the NPP kernel.
-  c10::cuda::CUDAGuard deviceGuard(device_);
+  // TODO cache the NppStreamContext! It currently gets re-recated for every
+  // single frame. The cache should be per-device, similar to the existing
+  // hw_device_ctx cache. When implementing the cache logic, the
+  // NppStreamContext hStream and nStreamFlags should not be part of the cache
+  // because they may change across calls.
+  NppStreamContext nppCtx = createNppStreamContext(
+      static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
 
-  auto start = std::chrono::high_resolution_clock::now();
   NppStatus status;
+
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
-    status = nppiNV12ToRGB_709CSC_8u_P2C3R(
+    status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
         input,
         avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
-        oSizeROI);
+        oSizeROI,
+        nppCtx);
   } else {
-    status = nppiNV12ToRGB_8u_P2C3R(
+    status = nppiNV12ToRGB_8u_P2C3R_Ctx(
         input,
         avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
-        oSizeROI);
+        oSizeROI,
+        nppCtx);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
-
-  // Make the pytorch stream wait for the npp kernel to finish before using the
-  // output.
-  at::cuda::CUDAEvent nppDoneEvent;
-  at::cuda::CUDAStream nppStreamWrapper =
-      c10::cuda::getStreamFromExternal(nppGetStream(), device_.index());
-  nppDoneEvent.record(nppStreamWrapper);
-  nppDoneEvent.block(at::cuda::getCurrentCUDAStream());
-
-  auto end = std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<double, std::micro> duration = end - start;
-  VLOG(9) << "NPP Conversion of frame height=" << height << " width=" << width
-          << " took: " << duration.count() << "us" << std::endl;
 }
 
 // inspired by https://github.com/FFmpeg/FFmpeg/commit/ad67ea9

@@ -42,6 +42,10 @@ git clone git@github.com:pytorch/torchcodec.git
 # Or, using https instead of ssh: git clone https://github.com/pytorch/torchcodec.git
 cd torchcodec
 
+# Optional, but recommended: define a persistent build directory which speeds-up
+# subsequent builds.
+export TORCHCODEC_CMAKE_BUILD_DIR="${PWD}/build"
+
 pip install -e ".[dev]" --no-build-isolation -vv
 # Or, for cuda support: ENABLE_CUDA=1 pip install -e ".[dev]" --no-build-isolation -vv
 ```
@@ -51,10 +55,11 @@ pip install -e ".[dev]" --no-build-isolation -vv
 To run python tests run:
 
 ```bash
-pytest test -vvv
+pytest
 ```
 
-Tip: use the `-k "not slow"` flag to skip slow tests.
+Some tests are marked as 'slow' and aren't run by default. You can use `pytest
+-m slow` to run those, or `pytest -m ""` to run all tests, slow or not.
 
 To run the C++ tests run:
 

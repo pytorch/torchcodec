@@ -3,6 +3,8 @@ import json
 import os
 import re
 import subprocess
+import sys
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ from torchcodec.decoders import AudioDecoder
 from torchcodec.encoders import AudioEncoder
 
 from .utils import (
+    assert_tensor_close_on_at_least,
     get_ffmpeg_major_version,
     in_fbcode,
     NASA_AUDIO_MP3,
@@ -154,6 +157,10 @@ class TestAudioEncoder:
         decoder = AudioEncoder(
             self.decode(NASA_AUDIO_MP3).data, sample_rate=NASA_AUDIO_MP3.sample_rate
         )
+        with pytest.raises(RuntimeError, match="invalid sample rate=10"):
+            getattr(decoder, method)(sample_rate=10, **valid_params)
+        with pytest.raises(RuntimeError, match="invalid sample rate=99999999"):
+            getattr(decoder, method)(sample_rate=99999999, **valid_params)
         with pytest.raises(RuntimeError, match="bit_rate=-1 must be >= 0"):
             getattr(decoder, method)(**valid_params, bit_rate=-1)
 
@@ -213,6 +220,7 @@ class TestAudioEncoder:
     @pytest.mark.parametrize("asset", (NASA_AUDIO_MP3, SINE_MONO_S32))
     @pytest.mark.parametrize("bit_rate", (None, 0, 44_100, 999_999_999))
     @pytest.mark.parametrize("num_channels", (None, 1, 2))
+    @pytest.mark.parametrize("sample_rate", (8_000, 32_000))
     @pytest.mark.parametrize("format", ("mp3", "wav", "flac"))
     @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
     def test_against_cli(
@@ -220,6 +228,7 @@ class TestAudioEncoder:
         asset,
         bit_rate,
         num_channels,
+        sample_rate,
         format,
         method,
         tmp_path,
@@ -237,6 +246,7 @@ class TestAudioEncoder:
             ["ffmpeg", "-i", str(asset.path)]
             + (["-b:a", f"{bit_rate}"] if bit_rate is not None else [])
             + (["-ac", f"{num_channels}"] if num_channels is not None else [])
+            + ["-ar", f"{sample_rate}"]
             + [
                 str(encoded_by_ffmpeg),
             ],
@@ -245,8 +255,9 @@ class TestAudioEncoder:
         )
 
         encoder = AudioEncoder(self.decode(asset).data, sample_rate=asset.sample_rate)
-
-        params = dict(bit_rate=bit_rate, num_channels=num_channels)
+        params = dict(
+            bit_rate=bit_rate, num_channels=num_channels, sample_rate=sample_rate
+        )
         if method == "to_file":
             encoded_by_us = tmp_path / f"output.{format}"
             encoder.to_file(dest=str(encoded_by_us), **params)
@@ -269,7 +280,12 @@ class TestAudioEncoder:
         if format in ("flac", "mp3"):
             assert "Application provided invalid" not in captured.err
 
-        if format == "wav":
+        assert_close = torch.testing.assert_close
+        if sample_rate != asset.sample_rate:
+            rtol, atol = 0, 1e-3
+            if sys.platform == "darwin":
+                assert_close = partial(assert_tensor_close_on_at_least, percentage=99)
+        elif format == "wav":
             rtol, atol = 0, 1e-4
         elif format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
             # Not sure why, this one needs slightly higher tol. With default
@@ -281,7 +297,7 @@ class TestAudioEncoder:
             rtol, atol = None, None
         samples_by_us = self.decode(encoded_by_us)
         samples_by_ffmpeg = self.decode(encoded_by_ffmpeg)
-        torch.testing.assert_close(
+        assert_close(
             samples_by_us.data,
             samples_by_ffmpeg.data,
             rtol=rtol,
