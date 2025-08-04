@@ -158,6 +158,7 @@ def encode_audio_to_file_like(
     file_like: Union[io.RawIOBase, io.BufferedIOBase],
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
 ) -> None:
     """Encode audio samples to a file-like object.
 
@@ -168,6 +169,7 @@ def encode_audio_to_file_like(
         file_like: File-like object that supports write() and seek() methods
         bit_rate: Optional bit rate for encoding
         num_channels: Optional number of output channels
+        desired_sample_rate: Optional desired sample rate for the output.
     """
     assert _pybind_ops is not None
 
@@ -197,6 +199,7 @@ def encode_audio_to_file_like(
         file_like,
         bit_rate,
         num_channels,
+        desired_sample_rate,
     )
 
     # This check is useless but it's critical to keep it to ensures that samples

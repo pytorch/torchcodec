@@ -106,7 +106,7 @@ void AudioEncoder::close_avio() {
   if (avFormatContext_ && avFormatContext_->pb) {
     avio_flush(avFormatContext_->pb);
 
-    if (!avioToTensorContext_) { // TODO is this the right one??
+    if (!avioToTensorContext_ && !avioFileLikeContext_) {
       avio_close(avFormatContext_->pb);
       // avoids closing again in destructor, which would segfault.
       avFormatContext_->pb = nullptr;
@@ -529,6 +529,7 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
 void AudioEncoder::flushBuffers() {
   AutoAVPacket autoAVPacket;
   maybeFlushSwrBuffers(autoAVPacket);
+
   encodeFrame(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec

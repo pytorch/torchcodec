@@ -116,6 +116,7 @@ class AudioEncoder:
         *,
         bit_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
+        sample_rate: Optional[int] = None,
     ) -> None:
         """Encode samples into a file-like object.
 
@@ -134,6 +135,8 @@ class AudioEncoder:
             num_channels (int, optional): The number of channels of the encoded
                 output samples. By default, the number of channels of the input
                 ``samples`` is used.
+            sample_rate (int, optional): The sample rate of the encoded output.
+                By default, the sample rate of the input ``samples`` is used.
         """
         _core.encode_audio_to_file_like(
             samples=self._samples,
@@ -142,4 +145,5 @@ class AudioEncoder:
             file_like=file_like,
             bit_rate=bit_rate,
             num_channels=num_channels,
+            desired_sample_rate=sample_rate,
         )

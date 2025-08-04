@@ -48,7 +48,8 @@ void encode_audio_to_file_like(
     std::string_view format,
     py::object file_like,
     std::optional<int64_t> bit_rate = std::nullopt,
-    std::optional<int64_t> num_channels = std::nullopt) {
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
   // We assume float32 *and* contiguity, this must be enforced by the caller.
   auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
   auto samples = torch::from_blob(
@@ -60,6 +61,7 @@ void encode_audio_to_file_like(
   AudioStreamOptions audioStreamOptions;
   audioStreamOptions.bitRate = bit_rate;
   audioStreamOptions.numChannels = num_channels;
+  audioStreamOptions.sampleRate = desired_sample_rate;
 
   auto avioContextHolder =
       std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/true);
@@ -88,7 +90,8 @@ PYBIND11_MODULE(PYBIND_OPS_MODULE_NAME, m) {
       "format",
       "file_like",
       "bit_rate",
-      "num_channels");
+      "num_channels",
+      "desired_sample_rate");
 }
 
 } // namespace facebook::torchcodec
