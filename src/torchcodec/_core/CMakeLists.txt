@@ -148,6 +148,15 @@ function(make_torchcodec_libraries
         "${custom_ops_dependencies}"
     )
 
+    if(WIN32)
+      # On Windows, ensure DLLs can find their dependencies in the same directory
+      set_target_properties(${custom_ops_library_name} PROPERTIES
+          INSTALL_RPATH "$ORIGIN"
+          BUILD_WITH_INSTALL_RPATH TRUE
+      )
+    endif()
+
+
     # 3. Create libtorchcodec_pybind_opsN.so.
     set(pybind_ops_library_name "libtorchcodec_pybind_ops${ffmpeg_major_version}")
     set(pybind_ops_sources
