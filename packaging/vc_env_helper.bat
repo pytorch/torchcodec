@@ -24,6 +24,7 @@ if "%VSDEVCMD_ARGS%" == "" (
 if "%CU_VERSION%" == "xpu" call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 
 set DISTUTILS_USE_SDK=1
+set BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1
 
 set args=%1
 shift

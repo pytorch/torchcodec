@@ -1,0 +1,62 @@
+name: Build and test Windows wheel
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+    tags:
+        - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: write
+
+defaults:
+  run:
+    shell: bash -l -eo pipefail {0}
+
+jobs:
+
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-xpu: disable
+      with-rocm: disable
+      with-cuda: disable
+      build-python-only: "disable"
+
+  build:
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+    name: Build and Upload Windows wheel
+    # TODO: use @main
+    uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
+    with:
+      repository: pytorch/torchcodec
+      ref: ""
+      test-infra-repository: nicolashug/test-infra
+      test-infra-ref: build-platform-windows
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script.sh
+      # post-script: packaging/post_build_script.sh  TODO: consider enabling post-build checks for Windows
+      env-script: packaging/vc_env_helper.bat
+      smoke-test-script: packaging/fake_smoke_test.py
+      package-name: torchcodec
+      trigger-event: ${{ github.event_name }}
+      build-platform: "python-build-package"
+      # The BUILD_AGAINST_ALL_FFMPEG_FROM_S3 var, needed to build the wheel, is
+      # set in vc_env_helper.bat Couldn't find a way to set it from here.
+      build-command: "python -m build --wheel -vvv --no-isolation"
