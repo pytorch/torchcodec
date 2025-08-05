@@ -6,6 +6,8 @@
 
 import io
 import json
+import os
+import sys
 import warnings
 from types import ModuleType
 from typing import List, Optional, Tuple, Union
@@ -57,9 +59,42 @@ def load_torchcodec_shared_libraries():
             )
             return
         except Exception as e:
-            # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
-            # but we should probably handle that via a proper logging mechanism.
-            exceptions.append((ffmpeg_major_version, e))
+            # Enhanced error reporting with Windows-specific details
+            error_msg = str(e)
+            
+            # On Windows, try to get more detailed DLL loading error information
+            if sys.platform == "win32":
+                try:
+                    import ctypes
+                    # Get the last Windows error code
+                    win_error = ctypes.get_last_error()
+                    if win_error != 0:
+                        win_error_msg = ctypes.FormatError(win_error)
+                        error_msg += f" [Windows Error {win_error}: {win_error_msg}]"
+                except Exception:
+                    pass
+                
+                # Check if the files actually exist
+                try:
+                    core_path = _get_extension_path(decoder_library_name)
+                    custom_ops_path = _get_extension_path(custom_ops_library_name)
+                    pybind_ops_path = _get_extension_path(pybind_ops_library_name)
+                    
+                    paths_info = []
+                    for name, path in [
+                        ("core", core_path), 
+                        ("custom_ops", custom_ops_path), 
+                        ("pybind_ops", pybind_ops_path)
+                    ]:
+                        exists = os.path.exists(path)
+                        size = os.path.getsize(path) if exists else 0
+                        paths_info.append(f"{name}: {path} (exists: {exists}, size: {size})")
+                    
+                    error_msg += f" [Library paths: {'; '.join(paths_info)}]"
+                except Exception as path_e:
+                    error_msg += f" [Could not check library paths: {path_e}]"
+            
+            exceptions.append((ffmpeg_major_version, error_msg))
 
     traceback = (
         "\n[start of libtorchcodec loading traceback]\n"
