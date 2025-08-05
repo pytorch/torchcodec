@@ -150,26 +150,55 @@ elseif (APPLE)
 
 elseif (WIN32)
     set(lib_dir "bin")
-    set(
-        platform_url
-        ${base_url}/windows_x86_64
-    )
-    set(
-        f4_sha256
-        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
-    )
-    set(
-        f5_sha256
-        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
-    )
-    set(
-        f6_sha256
-        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
-    )
-    set(
-        f7_sha256
-        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
-    )
+    
+    # Option to use MSVC-compatible FFmpeg libraries on Windows
+    option(USE_MSVC_FFMPEG "Use MSVC-compatible FFmpeg libraries on Windows" ON)
+    
+    if(USE_MSVC_FFMPEG)
+        message(STATUS "Using MSVC-compatible FFmpeg libraries for Windows")
+        set(
+            platform_url
+            ${base_url}/windows_x86_64_msvc
+        )
+        set(
+            f4_sha256
+            407c0f4dea134050261b3e29ec75ca146afc50c5c1fbdd63b48507c70ccce6d4
+        )
+        set(
+            f5_sha256
+            fa3850be150d64efb7fa3f91da4e488621ee03cd8041623b727e5ea3281a1574
+        )
+        set(
+            f6_sha256
+            3d65fca9597b9be7d9e3e11e1a4f4a9aa87c622c18e47abca752700a6ac92e8c
+        )
+        set(
+            f7_sha256
+            c1888939320b2c7de1d3ea687147f5b18aec42dd4797f59a818c840c5a4e5ee2
+        )
+    else()
+        message(STATUS "Using MinGW-compatible FFmpeg libraries for Windows")
+        set(
+            platform_url
+            ${base_url}/windows_x86_64
+        )
+        set(
+            f4_sha256
+            270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
+        )
+        set(
+            f5_sha256
+            b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
+        )
+        set(
+            f6_sha256
+            5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
+        )
+        set(
+            f7_sha256
+            ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
+        )
+    endif()
 
     set(
         f4_library_file_names
