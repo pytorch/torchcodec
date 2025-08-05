@@ -49,20 +49,32 @@ def load_torchcodec_shared_libraries():
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
-            print("Loading {decoder_library_name}", flush=True)
-            torch.ops.load_library(_get_extension_path(decoder_library_name))
-            print("successfully loaded {decoder_library_name}", flush=True)
-            print("Loading {custom_ops_library_name}", flush=True)
+            print(f"Loading {decoder_library_name}", flush=True)
+            core_path = _get_extension_path(decoder_library_name)
+            torch.ops.load_library(core_path)
+            print(f"successfully loaded {decoder_library_name}", flush=True)
+            
+            # On Windows, try to preload the core DLL to help resolve dependencies
+            if sys.platform == "win32":
+                try:
+                    import ctypes
+                    # Preload the core library so it's available for dependency resolution
+                    ctypes.CDLL(core_path)
+                    print(f"Preloaded core library via ctypes", flush=True)
+                except Exception as preload_e:
+                    print(f"Could not preload core library: {preload_e}", flush=True)
+            
+            print(f"Loading {custom_ops_library_name}", flush=True)
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
-            print("successfully loaded {custom_ops_library_name}", flush=True)
+            print(f"successfully loaded {custom_ops_library_name}", flush=True)
 
-            print("Loading {pybind_ops_library_name}", flush=True)
+            print(f"Loading {pybind_ops_library_name}", flush=True)
             pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
             global _pybind_ops
             _pybind_ops = _load_pybind11_module(
                 pybind_ops_module_name, pybind_ops_library_path
             )
-            print("successfully loaded {pybind_ops_library_name}", flush=True)
+            print(f"successfully loaded {pybind_ops_library_name}", flush=True)
             return
         except Exception as e:
             # Enhanced error reporting with Windows-specific details
