@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
+
+if (WIN32)
+    set(Python3_FIND_ABI "ANY" "ANY" "ANY" "ANY")
+endif()
 find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 
 if(DEFINED TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR AND TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR)
@@ -141,6 +145,9 @@ function(make_torchcodec_libraries
         ${core_library_name}
         ${Python3_LIBRARIES}
     )
+    if (WIN32)
+        list(APPEND custom_ops_dependencies Python3::Python)
+    endif()
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
         SHARED
