@@ -156,7 +156,7 @@ class CMakeBuild(build_ext):
             #   https://stackoverflow.com/a/2339910
             extensions = ["dylib", "so"]
         elif sys.platform in ("win32", "cygwin"):
-            extensions = ["dll"]
+            extensions = ["dll", "pyd"]
         else:
             raise NotImplementedError(f"Platform {sys.platform} is not supported")
 
