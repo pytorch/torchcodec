@@ -13,6 +13,29 @@ from types import ModuleType
 from typing import List, Optional, Tuple, Union
 
 import torch
+
+
+def _init_dll_path():
+    """Initialize DLL search paths for Windows
+    
+    On Windows Python-3.8+ has `os.add_dll_directory` call,
+    which is called to configure dll search path.
+    To find FFmpeg and other dependent dlls we need to make sure the
+    conda environment/bin path and other system paths are configured.
+    """
+    if os.name == "nt":
+        for path in os.environ.get("PATH", "").split(";"):
+            if os.path.exists(path):
+                try:
+                    os.add_dll_directory(path)
+                except Exception:
+                    # Ignore paths that can't be added
+                    pass
+
+
+# Initialize DLL paths on Windows before attempting to load libraries
+if os.name == "nt":
+    _init_dll_path()
 from torch.library import get_ctx, register_fake
 
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
