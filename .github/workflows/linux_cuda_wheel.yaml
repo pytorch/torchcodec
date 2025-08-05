@@ -1,7 +1,7 @@
 name: Build and test Linux CUDA wheels
 
 on:
-  pull_request:
+  # pull_request:
   push:
     branches:
       - nightly
