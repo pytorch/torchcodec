@@ -191,7 +191,8 @@ jobs:
         conda create \
           --name ci \
           --quiet --yes \
-          python="${PYTHON_VERSION}" pip \
+          python="${PYTHON_VERSION}" pip
+
         conda activate ci
 
         # Download and install wheel
