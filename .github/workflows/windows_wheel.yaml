@@ -183,6 +183,7 @@ jobs:
         export GPU_ARCH_TYPE=${{ matrix.gpu-arch-type }}
         export GPU_ARCH_VERSION=${{ matrix.gpu-arch-version }}
         export FFMPEG_VERSION_FOR_TESTS=${{ matrix.ffmpeg-version-for-tests }}
+        export BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1
 
         # Prepare conda
         set +x && eval "$($(which conda) shell.bash hook)" && set -x
@@ -213,8 +214,32 @@ jobs:
         # Install torchcodec from source in development mode
         pip install -e ".[dev]" --no-build-isolation -vv
         
-        # Test torchcodec import
-        python -c "import torchcodec; print('TorchCodec import successful!')"
+        # Add torchcodec source directory to DLL search path for Windows
+        torchcodec_dll_path="$(pwd)/src/torchcodec"
+        echo "Adding torchcodec DLL path: $torchcodec_dll_path"
+        export PATH="$torchcodec_dll_path:$PATH"
+        
+        # Test torchcodec import with detailed error reporting
+        python -c "
+import torch
+print(f'PyTorch version: {torch.__version__}')
+
+try:
+    import torchcodec
+    print('TorchCodec import successful!')
+except Exception as e:
+    print(f'TorchCodec import failed: {e}')
+    import traceback
+    traceback.print_exc()
+    
+    # Try to get more specific error info
+    try:
+        from torchcodec._core import ops
+        print('Core ops import successful')
+    except Exception as ops_e:
+        print(f'Core ops import failed: {ops_e}')
+        traceback.print_exc()
+"
         
         # Run tests
         pytest test -vvv

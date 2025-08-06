@@ -58,6 +58,16 @@ def load_torchcodec_shared_libraries():
             if sys.platform == "win32":
                 try:
                     import ctypes
+                    
+                    # Add the DLL directory to help with dependency resolution
+                    dll_dir = os.path.dirname(core_path)
+                    if hasattr(os, 'add_dll_directory'):
+                        try:
+                            os.add_dll_directory(dll_dir)
+                            print(f"Added DLL directory: {dll_dir}", flush=True)
+                        except Exception as add_dir_e:
+                            print(f"Could not add DLL directory: {add_dir_e}", flush=True)
+                    
                     # Preload the core library so it's available for dependency resolution
                     ctypes.CDLL(core_path)
                     print(f"Preloaded core library via ctypes", flush=True)
