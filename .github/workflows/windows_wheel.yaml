@@ -161,8 +161,7 @@ jobs:
         #     gpu-arch-type: cuda
         #     gpu-arch-version: "11.8"
       fail-fast: false
-    # needs: build
-    needs: generate-matrix  # TODO REMOVE
+    needs: build
     uses: pytorch/test-infra/.github/workflows/windows_job.yml@main
     permissions:
       id-token: write
