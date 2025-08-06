@@ -220,26 +220,7 @@ jobs:
         export PATH="$torchcodec_dll_path:$PATH"
         
         # Test torchcodec import with detailed error reporting
-        python -c "
-import torch
-print(f'PyTorch version: {torch.__version__}')
-
-try:
-    import torchcodec
-    print('TorchCodec import successful!')
-except Exception as e:
-    print(f'TorchCodec import failed: {e}')
-    import traceback
-    traceback.print_exc()
-    
-    # Try to get more specific error info
-    try:
-        from torchcodec._core import ops
-        print('Core ops import successful')
-    except Exception as ops_e:
-        print(f'Core ops import failed: {ops_e}')
-        traceback.print_exc()
-"
+        python -c "import torch; import torchcodec"
         
         # Run tests
         pytest test -vvv
