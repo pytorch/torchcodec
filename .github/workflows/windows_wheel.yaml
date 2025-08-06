@@ -37,29 +37,29 @@ jobs:
       with-cuda: disable
       build-python-only: "disable"
 
-  build:
-    needs: generate-matrix
-    strategy:
-      fail-fast: false
-    name: Build and Upload Windows wheel
-    # TODO: use @main
-    uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
-    with:
-      repository: pytorch/torchcodec
-      ref: ""
-      test-infra-repository: nicolashug/test-infra
-      test-infra-ref: build-platform-windows
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script.sh
-      # post-script: packaging/post_build_script.sh  TODO: consider enabling post-build checks for Windows
-      env-script: packaging/vc_env_helper.bat
-      smoke-test-script: packaging/fake_smoke_test.py
-      package-name: torchcodec
-      trigger-event: ${{ github.event_name }}
-      build-platform: "python-build-package"
-      # The BUILD_AGAINST_ALL_FFMPEG_FROM_S3 var, needed to build the wheel, is
-      # set in vc_env_helper.bat Couldn't find a way to set it from here.
-      build-command: "python -m build --wheel -vvv --no-isolation"
+  # build:
+  #   needs: generate-matrix
+  #   strategy:
+  #     fail-fast: false
+  #   name: Build and Upload Windows wheel
+  #   # TODO: use @main
+  #   uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
+  #   with:
+  #     repository: pytorch/torchcodec
+  #     ref: ""
+  #     test-infra-repository: nicolashug/test-infra
+  #     test-infra-ref: build-platform-windows
+  #     build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+  #     pre-script: packaging/pre_build_script.sh
+  #     # post-script: packaging/post_build_script.sh  TODO: consider enabling post-build checks for Windows
+  #     env-script: packaging/vc_env_helper.bat
+  #     smoke-test-script: packaging/fake_smoke_test.py
+  #     package-name: torchcodec
+  #     trigger-event: ${{ github.event_name }}
+  #     build-platform: "python-build-package"
+  #     # The BUILD_AGAINST_ALL_FFMPEG_FROM_S3 var, needed to build the wheel, is
+  #     # set in vc_env_helper.bat Couldn't find a way to set it from here.
+  #     build-command: "python -m build --wheel -vvv --no-isolation"
 
   # install-and-test:
   #   runs-on: windows-latest
@@ -161,7 +161,8 @@ jobs:
         #     gpu-arch-type: cuda
         #     gpu-arch-version: "11.8"
       fail-fast: false
-    needs: build
+    # needs: build
+    needs: generate-matrix ## TODO REMOVE
     uses: pytorch/test-infra/.github/workflows/windows_job.yml@main
     permissions:
       id-token: write
@@ -194,26 +195,26 @@ jobs:
 
         conda activate ci
 
-        # Download and install wheel
+        # Install PyTorch
         python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
-        wheel_path=$(find pytorch/torchcodec/dist -type f -name "*${{ matrix.python-version }}*.whl" | head -1)
-        echo "Installing $wheel_path"
-        python -m pip install "$wheel_path" -vvv
-
-        # Install FFmpeg and test dependencies
-        conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-        conda_env_path=$(conda info --base)/envs/test
+        
+        # Install build dependencies
+        conda install cmake pkg-config pybind11 "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
+        
+        # Ensure FFmpeg DLLs are in PATH for Windows
+        conda_env_path=$(conda info --base)/envs/ci
         library_bin_path="$conda_env_path/Library/bin"
+        echo "Adding conda Library/bin to PATH: $library_bin_path"
         echo "$library_bin_path" >> $GITHUB_PATH
         
-        # Install test dependencies
-        python -m pip install numpy pytest pillow
-
+        # Verify FFmpeg is available
+        ffmpeg -version
+        
+        # Install torchcodec from source in development mode
+        pip install -e ".[dev]" --no-build-isolation -vv
+        
         # Test torchcodec import
         python -c "import torchcodec; print('TorchCodec import successful!')"
-
-        # Remove source to ensure testing against wheel
-        rm -rf src/
-
+        
         # Run tests
         pytest test -vvv
