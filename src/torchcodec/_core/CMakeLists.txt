@@ -71,21 +71,11 @@ function(make_torchcodec_sublibrary
         )
     endif()
 
-    # For the core library, use PRIVATE to prevent FFmpeg dependencies from leaking
-    # For other libraries, use PUBLIC so they can properly link to their dependencies
-    if(${library_name} MATCHES ".*_core[0-9]+$")
-        target_link_libraries(
-            ${library_name}
-            PRIVATE
-            ${library_dependencies}
-        )
-    else()
-        target_link_libraries(
-            ${library_name}
-            PUBLIC
-            ${library_dependencies}
-        )
-    endif()
+    target_link_libraries(
+        ${library_name}
+        PUBLIC
+        ${library_dependencies}
+    )
 
 endfunction()
 
