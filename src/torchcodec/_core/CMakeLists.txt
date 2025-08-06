@@ -71,23 +71,14 @@ function(make_torchcodec_sublibrary
         )
     endif()
 
-    # For the core library, make dependencies PRIVATE to prevent transitive linking issues
-    # but still expose include directories
+    # For the core library, use PRIVATE to prevent FFmpeg dependencies from leaking
+    # For other libraries, use PUBLIC so they can properly link to their dependencies
     if(${library_name} MATCHES ".*_core[0-9]+$")
         target_link_libraries(
             ${library_name}
             PRIVATE
             ${library_dependencies}
         )
-        # Manually expose FFmpeg include directories as PUBLIC for compilation
-        foreach(dep ${library_dependencies})
-            if(TARGET ${dep})
-                get_target_property(dep_include_dirs ${dep} INTERFACE_INCLUDE_DIRECTORIES)
-                if(dep_include_dirs)
-                    target_include_directories(${library_name} PUBLIC ${dep_include_dirs})
-                endif()
-            endif()
-        endforeach()
     else()
         target_link_libraries(
             ${library_name}
