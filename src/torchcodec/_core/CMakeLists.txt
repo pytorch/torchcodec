@@ -71,11 +71,30 @@ function(make_torchcodec_sublibrary
         )
     endif()
 
-    target_link_libraries(
-        ${library_name}
-        PUBLIC
-        ${library_dependencies}
-    )
+    # For the core library, make dependencies PRIVATE to prevent transitive linking issues
+    # but still expose include directories
+    if(${library_name} MATCHES ".*_core[0-9]+$")
+        target_link_libraries(
+            ${library_name}
+            PRIVATE
+            ${library_dependencies}
+        )
+        # Manually expose FFmpeg include directories as PUBLIC for compilation
+        foreach(dep ${library_dependencies})
+            if(TARGET ${dep})
+                get_target_property(dep_include_dirs ${dep} INTERFACE_INCLUDE_DIRECTORIES)
+                if(dep_include_dirs)
+                    target_include_directories(${library_name} PUBLIC ${dep_include_dirs})
+                endif()
+            endif()
+        endforeach()
+    else()
+        target_link_libraries(
+            ${library_name}
+            PUBLIC
+            ${library_dependencies}
+        )
+    endif()
 
 endfunction()
 
@@ -141,20 +160,12 @@ function(make_torchcodec_libraries
         AVIOTensorContext.cpp
         custom_ops.cpp
     )
-    # On Windows, custom_ops should not transitively link to FFmpeg to avoid DLL issues
-    if(WIN32)
-        set(custom_ops_dependencies
-            ${Python3_LIBRARIES}
-            Python3::Python
-        )
-        # Link to core library but without transitive dependencies
-        set(custom_ops_core_dependency ${core_library_name})
-    else()
-        set(custom_ops_dependencies
-            ${core_library_name}
-            ${Python3_LIBRARIES}
-        )
-        set(custom_ops_core_dependency "")
+    set(custom_ops_dependencies
+        ${core_library_name}
+        ${Python3_LIBRARIES}
+    )
+    if (WIN32)
+        list(APPEND custom_ops_dependencies Python3::Python)
     endif()
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
@@ -162,11 +173,6 @@ function(make_torchcodec_libraries
         "${custom_ops_sources}"
         "${custom_ops_dependencies}"
     )
-    
-    # On Windows, link to core library privately to avoid transitive FFmpeg dependencies
-    if(WIN32 AND custom_ops_core_dependency)
-        target_link_libraries(${custom_ops_library_name} PRIVATE ${custom_ops_core_dependency})
-    endif()
 
 
     # 3. Create libtorchcodec_pybind_opsN.so.
