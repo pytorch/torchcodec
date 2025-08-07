@@ -506,7 +506,7 @@ void SingleStreamDecoder::addVideoStream(
   if (seekMode_ == SeekMode::custom_frame_mappings) {
     TORCH_CHECK(
         customFrameMappings.has_value(),
-        "Please provide frame mappings when using custom_frame_mappings seek mode.");
+        "Missing frame mappings when custom_frame_mappings seek mode is set.");
     readCustomFrameMappingsUpdateMetadataAndIndex(
         streamIndex, customFrameMappings.value());
   }
