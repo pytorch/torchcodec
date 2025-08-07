@@ -1,0 +1,44 @@
+
+
+.. _sphx_glr_generated_examples_encoding:
+
+Encoding
+--------
+
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+.. thumbnail-parent-div-open
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to encode audio samples to a file or to raw bytes using the AudioEncoder class.">
+
+.. only:: html
+
+  .. image:: /generated_examples/encoding/images/thumb/sphx_glr_audio_encoding_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_generated_examples_encoding_audio_encoding.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Encoding audio samples with AudioEncoder</div>
+    </div>
+
+
+.. thumbnail-parent-div-close
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /generated_examples/encoding/audio_encoding
+
