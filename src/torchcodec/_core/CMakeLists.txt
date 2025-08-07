@@ -144,16 +144,22 @@ function(make_torchcodec_libraries
     set(custom_ops_dependencies
         ${core_library_name}
         ${Python3_LIBRARIES}
+        ${TORCH_LIBRARIES}  # Add PyTorch libraries for custom ops registration
     )
     if (WIN32)
         list(APPEND custom_ops_dependencies Python3::Python)
     endif()
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
-        SHARED
+        MODULE  # Use MODULE like pybind_ops instead of SHARED
         "${custom_ops_sources}"
         "${custom_ops_dependencies}"
     )
+
+    # Apply same Windows handling as pybind_ops
+    if(WIN32)
+      set_target_properties(${custom_ops_library_name} PROPERTIES SUFFIX ".pyd")
+    endif()
 
 
     # 3. Create libtorchcodec_pybind_opsN.so.
