@@ -465,7 +465,7 @@ class TestAudioEncoder:
         encoder = AudioEncoder(source_samples, sample_rate=asset.sample_rate)
 
         file_like = CustomFileObject()
-        encoder.to_file_like(file_like, format="wav")
+        encoder.to_file_like(file_like, format="flac")
 
         decoded_samples = self.decode(file_like.get_encoded_data())
 
@@ -485,7 +485,7 @@ class TestAudioEncoder:
         file_path = tmp_path / "test_file_like.wav"
 
         with open(file_path, "wb") as file_like:
-            encoder.to_file_like(file_like, format="wav")
+            encoder.to_file_like(file_like, format="flac")
 
         decoded_samples = self.decode(str(file_path))
         torch.testing.assert_close(
