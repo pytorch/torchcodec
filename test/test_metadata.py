@@ -78,9 +78,7 @@ def test_get_metadata(metadata_getter):
     with pytest.raises(NotImplementedError, match="Decide on logic"):
         metadata.bit_rate
 
-    ffmpeg_major_version = int(
-        get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0]
-    )
+    ffmpeg_major_version = get_ffmpeg_major_version()
     if ffmpeg_major_version <= 5:
         expected_duration_seconds_from_header = 16.57
         expected_bit_rate_from_header = 324915

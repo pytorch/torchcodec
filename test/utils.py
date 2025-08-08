@@ -28,7 +28,10 @@ def cpu_and_cuda():
 
 
 def get_ffmpeg_major_version():
-    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+    ffmpeg_version = get_ffmpeg_library_versions()["ffmpeg_version"]
+    if ffmpeg_version.startswith("n"):
+        ffmpeg_version = ffmpeg_version.removeprefix("n")
+    return int(ffmpeg_version.split(".")[0])
 
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
