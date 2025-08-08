@@ -81,17 +81,7 @@ void encode_audio_to_file_like(
 
 PYBIND11_MODULE(PYBIND_OPS_MODULE_NAME, m) {
   m.def("create_from_file_like", &create_from_file_like);
-  m.def(
-      "encode_audio_to_file_like",
-      &encode_audio_to_file_like,
-      "data_ptr",
-      "shape",
-      "sample_rate",
-      "format",
-      "file_like",
-      "bit_rate",
-      "num_channels",
-      "desired_sample_rate");
+  m.def("encode_audio_to_file_like", &encode_audio_to_file_like);
 }
 
 } // namespace facebook::torchcodec
