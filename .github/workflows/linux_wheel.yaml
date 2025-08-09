@@ -1,7 +1,7 @@
 name: Build and test Linux wheel
 
 on:
-  pull_request:
+  # pull_request:
   push:
     branches:
       - nightly
