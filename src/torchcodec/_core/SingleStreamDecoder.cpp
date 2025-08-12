@@ -1056,7 +1056,7 @@ bool SingleStreamDecoder::canWeAvoidSeeking() const {
   if (lastDecodedAvFramePts == cursor_) {
     // We are seeking to the exact same frame as we are currently at. Without
     // caching we have to rewind back and decode the frame again.
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // TODO: https://github.com/meta-pytorch/torchcodec/issues/84 we could
     // implement caching.
     return false;
   }
