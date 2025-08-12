@@ -15,7 +15,6 @@ from torchcodec._core import (
     create_from_file,
     get_container_metadata,
     get_container_metadata_from_header,
-    get_ffmpeg_library_versions,
     VideoStreamMetadata,
 )
 from torchcodec.decoders import AudioDecoder, VideoDecoder
