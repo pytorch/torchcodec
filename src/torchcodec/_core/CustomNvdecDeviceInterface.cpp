@@ -5,9 +5,12 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <torch/types.h>
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAFunctions.h>
 #include <mutex>
 #include <vector>
 #include <chrono>
+#include <cstdlib>
 
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "src/torchcodec/_core/DeviceInterface.h"
@@ -25,6 +28,12 @@ extern "C" {
 namespace facebook::torchcodec {
 
 namespace {
+
+// Check if caching is disabled via environment variable
+bool isCacheDisabled() {
+  const char* envVar = std::getenv("TORCHCODEC_DISABLE_NVDEC_CACHE");
+  return envVar && std::string(envVar) == "1";
+}
 
 // Simple decoder cache for reusing CUvideodecoder objects
 struct CachedDecoder {
@@ -45,6 +54,18 @@ class DecoderCache {
       const CUVIDDECODECREATEINFO& requestedCreateInfo) {
     std::lock_guard<std::mutex> lock(mutex_);
     
+    if (isCacheDisabled()) {
+      // If caching is disabled, clear any existing cache and return null
+      for (auto& entry : cached_) {
+        if (entry.decoder) {
+          cuvidDestroyDecoder(entry.decoder);
+          entry.decoder = nullptr;
+        }
+      }
+      cached_.clear();
+      return nullptr;
+    }
+    
     // Find matching decoder
     for (auto& entry : cached_) {
       if (entry.decoder && 
@@ -63,6 +84,12 @@ class DecoderCache {
       CUvideodecoder decoder,
       CUcontext context,
       const CUVIDDECODECREATEINFO& createInfo) {
+    if (isCacheDisabled()) {
+      // If caching is disabled, destroy the decoder immediately
+      cuvidDestroyDecoder(decoder);
+      return;
+    }
+    
     std::lock_guard<std::mutex> lock(mutex_);
     
     // Find empty slot or oldest entry
@@ -317,10 +344,18 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   // Store video format
   videoFormat_ = *pVideoFormat;
 
-  // Get current CUDA context
+  // Ensure we have a CUDA context - create a tensor to force PyTorch to set it up
+  torch::Tensor contextTensor = torch::empty(
+      {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
+  
+  // Force CUDA operations to establish context properly
+  contextTensor = contextTensor + 1;  // TODO ugh? Same with tensor creation above.
+  c10::cuda::device_synchronize();  // TODO is this needed? multi-threading was buggy without it
+  
+  // Now get the current CUDA context
   CUresult cuResult = cuCtxGetCurrent(&context_);
   if (cuResult != CUDA_SUCCESS || context_ == nullptr) {
-    TORCH_CHECK(false, "Failed to get CUDA context for device ", device_.index());
+    TORCH_CHECK(false, "Failed to get CUDA context after tensor operation");
   }
 
   // Create decoder with the video format
