@@ -68,6 +68,7 @@ class DecoderCache {
     
     // Find matching decoder
     for (auto& entry : cached_) {
+      // TODO probably need additional or different cache key checks
       if (entry.decoder && 
           entry.context == currentContext &&
           isCreateInfoCompatible(entry.createInfo, requestedCreateInfo)) {
