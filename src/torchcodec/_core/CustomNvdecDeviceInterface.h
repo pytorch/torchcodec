@@ -66,6 +66,7 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
 
   // Video format info
   CUVIDEOFORMAT videoFormat_;
+  CUVIDDECODECREATEINFO createInfo_;
   AVCodecID currentCodecId_ = AV_CODEC_ID_NONE;
   bool isInitialized_ = false;
   bool parserInitialized_ = false;

@@ -7,6 +7,7 @@
 #include <torch/types.h>
 #include <mutex>
 #include <vector>
+#include <chrono>
 
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "src/torchcodec/_core/DeviceInterface.h"
@@ -24,6 +25,117 @@ extern "C" {
 namespace facebook::torchcodec {
 
 namespace {
+
+// Simple decoder cache for reusing CUvideodecoder objects
+struct CachedDecoder {
+  CUvideodecoder decoder = nullptr;
+  CUcontext context = nullptr;
+  CUVIDDECODECREATEINFO createInfo = {};
+  
+  // For LRU eviction
+  std::chrono::steady_clock::time_point lastUsed;
+};
+
+class DecoderCache {
+ public:
+  static constexpr size_t MAX_CACHE_SIZE = 10;
+  
+  static CUvideodecoder tryGetCachedDecoder(
+      CUcontext currentContext, 
+      const CUVIDDECODECREATEINFO& requestedCreateInfo) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Find matching decoder
+    for (auto& entry : cached_) {
+      if (entry.decoder && 
+          entry.context == currentContext &&
+          isCreateInfoCompatible(entry.createInfo, requestedCreateInfo)) {
+        auto decoder = entry.decoder;
+        entry.decoder = nullptr; // Remove from cache
+        entry.lastUsed = std::chrono::steady_clock::now();
+        return decoder;
+      }
+    }
+    return nullptr;
+  }
+  
+  static void cacheDecoder(
+      CUvideodecoder decoder,
+      CUcontext context,
+      const CUVIDDECODECREATEINFO& createInfo) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Find empty slot or oldest entry
+    auto now = std::chrono::steady_clock::now();
+    size_t targetIndex = 0;
+    bool foundEmpty = false;
+    
+    for (size_t i = 0; i < cached_.size(); ++i) {
+      if (!cached_[i].decoder) {
+        targetIndex = i;
+        foundEmpty = true;
+        break;
+      }
+      if (cached_[i].lastUsed < cached_[targetIndex].lastUsed) {
+        targetIndex = i;
+      }
+    }
+    
+    // If cache is full and no empty slot, destroy the oldest
+    if (!foundEmpty && targetIndex < cached_.size()) {
+      if (cached_[targetIndex].decoder) {
+        cuvidDestroyDecoder(cached_[targetIndex].decoder);
+      }
+    }
+    
+    // Add to cache (ensure we don't exceed MAX_CACHE_SIZE)
+    if (cached_.size() < MAX_CACHE_SIZE && targetIndex >= cached_.size()) {
+      cached_.resize(targetIndex + 1);
+    } else if (cached_.size() >= MAX_CACHE_SIZE && targetIndex >= MAX_CACHE_SIZE) {
+      targetIndex = 0; // Use first slot if we somehow got here
+    }
+    
+    cached_[targetIndex] = {decoder, context, createInfo, now};
+  }
+  
+  // Clean up cache on program exit
+  static void clearCache() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& entry : cached_) {
+      if (entry.decoder) {
+        cuvidDestroyDecoder(entry.decoder);
+        entry.decoder = nullptr;
+      }
+    }
+    cached_.clear();
+  }
+  
+ private:
+  static bool isCreateInfoCompatible(
+      const CUVIDDECODECREATEINFO& cached,
+      const CUVIDDECODECREATEINFO& requested) {
+    return cached.CodecType == requested.CodecType &&
+           cached.ulWidth == requested.ulWidth &&
+           cached.ulHeight == requested.ulHeight &&
+           cached.ChromaFormat == requested.ChromaFormat &&
+           cached.OutputFormat == requested.OutputFormat &&
+           cached.bitDepthMinus8 == requested.bitDepthMinus8;
+  }
+  
+  static std::mutex mutex_;
+  static std::vector<CachedDecoder> cached_;
+};
+
+std::mutex DecoderCache::mutex_;
+std::vector<CachedDecoder> DecoderCache::cached_;
+
+// Global cleanup helper
+struct CacheCleanup {
+  ~CacheCleanup() {
+    DecoderCache::clearCache();
+  }
+};
+static CacheCleanup g_cache_cleanup;
 
 // Register the custom NVDEC device interface with 'custom_nvdec' variant
 static bool g_cuda_custom_nvdec = registerDeviceInterface(
@@ -83,9 +195,9 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
     }
   }
 
-  // Clean up decoder
-  if (decoder_) {
-    cuvidDestroyDecoder(decoder_);
+  // Cache decoder instead of destroying it
+  if (decoder_ && context_) {
+    DecoderCache::cacheDecoder(decoder_, context_, createInfo_);
     decoder_ = nullptr;
   }
 
@@ -212,23 +324,29 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   }
 
   // Create decoder with the video format
-  CUVIDDECODECREATEINFO createInfo = {};
-  createInfo.CodecType = pVideoFormat->codec;
-  createInfo.ulWidth = pVideoFormat->coded_width;
-  createInfo.ulHeight = pVideoFormat->coded_height;
-  createInfo.ulNumDecodeSurfaces = 4;
-  createInfo.ChromaFormat = pVideoFormat->chroma_format;
-  createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
-  createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
-  createInfo.ulTargetWidth = pVideoFormat->coded_width;
-  createInfo.ulTargetHeight = pVideoFormat->coded_height;
-  createInfo.ulNumOutputSurfaces = 2;
-  createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
-  createInfo.vidLock = nullptr;
+  createInfo_ = {};
+  createInfo_.CodecType = pVideoFormat->codec;
+  createInfo_.ulWidth = pVideoFormat->coded_width;
+  createInfo_.ulHeight = pVideoFormat->coded_height;
+  createInfo_.ulNumDecodeSurfaces = 4;
+  createInfo_.ChromaFormat = pVideoFormat->chroma_format;
+  createInfo_.OutputFormat = cudaVideoSurfaceFormat_NV12;
+  createInfo_.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
+  createInfo_.ulTargetWidth = pVideoFormat->coded_width;
+  createInfo_.ulTargetHeight = pVideoFormat->coded_height;
+  createInfo_.ulNumOutputSurfaces = 2;
+  createInfo_.ulCreationFlags = cudaVideoCreate_PreferCUVID;
+  createInfo_.vidLock = nullptr;
 
-  CUresult result = cuvidCreateDecoder(&decoder_, &createInfo);
-  if (result != CUDA_SUCCESS) {
-    TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
+  // Try to get a cached decoder first
+  decoder_ = DecoderCache::tryGetCachedDecoder(context_, createInfo_);
+  
+  if (!decoder_) {
+    // No suitable cached decoder found, create a new one
+    CUresult result = cuvidCreateDecoder(&decoder_, &createInfo_);
+    if (result != CUDA_SUCCESS) {
+      TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
+    }
   }
 
   return 1; // Success
