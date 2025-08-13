@@ -30,7 +30,7 @@ class CudaDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
  private:
-  AVBufferRef* ctx_ = nullptr;
+  UniqueAVBufferRef ctx_;
 };
 
 } // namespace facebook::torchcodec
