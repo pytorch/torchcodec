@@ -18,10 +18,10 @@ def _get_extension_path(lib_name: str) -> str:
         extension_suffixes = importlib.machinery.EXTENSION_SUFFIXES
     elif sys.platform == "darwin":
         extension_suffixes = importlib.machinery.EXTENSION_SUFFIXES + [".dylib"]
+    elif sys.platform in ("win32", "cygwin"):
+        extension_suffixes = importlib.machinery.EXTENSION_SUFFIXES + [".dll"]
     else:
-        raise NotImplementedError(
-            "Platforms other than linux/darwin are not supported yet"
-        )
+        raise NotImplementedError(f"{sys.platform = } is not not supported")
     loader_details = (
         importlib.machinery.ExtensionFileLoader,
         extension_suffixes,

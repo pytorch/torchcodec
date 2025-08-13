@@ -19,7 +19,8 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
-  return static_cast<double>(pts) * av_q2d(timeBase);
+  // To perform the multiplication before the division, av_q2d is not used
+  return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
 int64_t secondsToClosestPts(double seconds, const AVRational& timeBase) {
@@ -1097,7 +1098,7 @@ bool SingleStreamDecoder::canWeAvoidSeeking() const {
   if (lastDecodedAvFramePts == cursor_) {
     // We are seeking to the exact same frame as we are currently at. Without
     // caching we have to rewind back and decode the frame again.
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // TODO: https://github.com/pytorch/torchcodec/issues/84 we could
     // implement caching.
     return false;
   }

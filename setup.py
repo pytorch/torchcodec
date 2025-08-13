@@ -155,10 +155,10 @@ class CMakeBuild(build_ext):
             # dynamically loaded module. For more, see:
             #   https://stackoverflow.com/a/2339910
             extensions = ["dylib", "so"]
+        elif sys.platform in ("win32", "cygwin"):
+            extensions = ["dll"]
         else:
-            raise NotImplementedError(
-                "Platforms other than linux/darwin are not supported yet"
-            )
+            raise NotImplementedError(f"Platform {sys.platform} is not supported")
 
         for ext in extensions:
             for lib_file in self._install_prefix.glob(f"*.{ext}"):

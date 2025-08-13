@@ -9,12 +9,20 @@ endif()
 
 include(FetchContent)
 
+if (UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+else()
+    set(LINUX FALSE)
+endif()
+
 set(
     base_url
     https://pytorch.s3.amazonaws.com/torchcodec/ffmpeg/2025-03-14
 )
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if (LINUX)
+    set(lib_dir "lib")
+
     set(
         platform_url
         ${base_url}/linux_x86_64
@@ -36,7 +44,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         f7_sha256
         1cb946d8b7c6393c2c3ebe1f900b8de7a2885fe614c45d4ec32c9833084f2f26
     )
-
     set(
        f4_library_file_names
        libavutil.so.56
@@ -77,7 +84,8 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
        libswscale.so.8
        libswresample.so.5
     )
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+elseif (APPLE)
+    set(lib_dir "lib")
     set(
         platform_url
         ${base_url}/macos_arm64
@@ -98,6 +106,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         f7_sha256
         48a4fc8ce098305cfd4a58f40889249c523ca3c285f66ba704b5bad0e3ada53a
     )
+
     set(
        f4_library_file_names
        libavutil.56.dylib
@@ -137,6 +146,70 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
        libavfilter.10.dylib
        libswscale.8.dylib
        libswresample.5.dylib
+    )
+
+elseif (WIN32)
+    set(lib_dir "bin")
+    set(
+        platform_url
+        ${base_url}/windows_x86_64
+    )
+    set(
+        f4_sha256
+        270a1aa8892225267e68a7eb87c417931da30dccbf08ee2bde8833e659cab5cb
+    )
+    set(
+        f5_sha256
+        b8b2a349a847e56a6da875b066dff1cae53cb8ee7cf5ba9321ec1243dea0cde0
+    )
+    set(
+        f6_sha256
+        5d9f8c76dc55f790fa31d825985e9270bf9e498b8bfec21a0ad3a1feb1fa053a
+    )
+    set(
+        f7_sha256
+        ae391ace382330e912793b70b68529ee7c91026d2869b4df7e7c3e7d3656bdd5
+    )
+
+    set(
+        f4_library_file_names
+        avutil.lib
+        avcodec.lib
+        avformat.lib
+        avdevice.lib
+        avfilter.lib
+        swscale.lib
+        swresample.lib
+    )
+    set(
+        f5_library_file_names
+        avutil.lib
+        avcodec.lib
+        avformat.lib
+        avdevice.lib
+        avfilter.lib
+        swscale.lib
+        swresample.lib
+    )
+    set(
+        f6_library_file_names
+        avutil.lib
+        avcodec.lib
+        avformat.lib
+        avdevice.lib
+        avfilter.lib
+        swscale.lib
+        swresample.lib
+    )
+    set(
+        f7_library_file_names
+        avutil.lib
+        avcodec.lib
+        avformat.lib
+        avdevice.lib
+        avfilter.lib
+        swscale.lib
+        swresample.lib
     )
 else()
     message(
@@ -183,24 +256,25 @@ target_include_directories(ffmpeg5 INTERFACE ${f5_SOURCE_DIR}/include)
 target_include_directories(ffmpeg6 INTERFACE ${f6_SOURCE_DIR}/include)
 target_include_directories(ffmpeg7 INTERFACE ${f7_SOURCE_DIR}/include)
 
+
 list(
     TRANSFORM f4_library_file_names
-    PREPEND ${f4_SOURCE_DIR}/lib/
+    PREPEND ${f4_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f4_library_paths
 )
 list(
     TRANSFORM f5_library_file_names
-    PREPEND ${f5_SOURCE_DIR}/lib/
+    PREPEND ${f5_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f5_library_paths
 )
 list(
     TRANSFORM f6_library_file_names
-    PREPEND ${f6_SOURCE_DIR}/lib/
+    PREPEND ${f6_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f6_library_paths
 )
 list(
     TRANSFORM f7_library_file_names
-    PREPEND ${f7_SOURCE_DIR}/lib/
+    PREPEND ${f7_SOURCE_DIR}/${lib_dir}/
     OUTPUT_VARIABLE f7_library_paths
 )
 

@@ -11,11 +11,29 @@ find_package(Python3 ${PYTHON_VERSION} EXACT COMPONENTS Development)
 if(DEFINED TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR AND TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR)
     set(TORCHCODEC_WERROR_OPTION "")
 else()
-    set(TORCHCODEC_WERROR_OPTION "-Werror")
+    if (WIN32)
+        # TODO set warnings as errors on Windows as well.
+        # set(TORCHCODEC_WERROR_OPTION "/WX")
+    else()
+        set(TORCHCODEC_WERROR_OPTION "-Werror")
+    endif()
 endif()
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+if (WIN32)
+  # Avoid warnings about non-ASCII characters in source files.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4819")
+  # Important for when we add Windows CUDA: exporting all symbols is limited to
+  # 65535 symbols, which (apparently) will not work for CUDA.
+  # https://github.com/pytorch/pytorch/pull/3650
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+if (WIN32)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+else()
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+endif()
 
 function(make_torchcodec_sublibrary
     library_name
@@ -35,11 +53,26 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
+    if(WIN32)
+        # On Windows, the built artifacts are put in Release/Debug
+        # subdirectories by default. We want to avoid that, otherwise our
+        # install() step would not know where to find those.
+        set_target_properties(${library_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
+        )
+    endif()
+
     target_link_libraries(
         ${library_name}
         PUBLIC
         ${library_dependencies}
     )
+
 endfunction()
 
 function(make_torchcodec_libraries
@@ -227,11 +260,14 @@ function(make_torchcodec_libraries
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-      "-fvisibility=hidden"
-    )
+    if(NOT WIN32)
+        target_compile_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "-fvisibility=hidden"
+        )
+    endif()
+
     # The value we use here must match the value we return from
     # _get_pybind_ops_module_name() on the Python side. If the values do not
     # match, then we will be unable to import the C++ shared library as a
@@ -241,14 +277,17 @@ function(make_torchcodec_libraries
         PRIVATE
         PYBIND_OPS_MODULE_NAME=core_pybind_ops
     )
-    # If we don't make sure this flag is set, we run into segfauls at import
-    # time on Mac. See:
-    #    https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
-    target_link_options(
-        ${pybind_ops_library_name}
-        PUBLIC
-        "LINKER:-undefined,dynamic_lookup"
-    )
+
+    if(APPLE)
+        # If we don't make sure this flag is set, we run into segfauls at import
+        # time on Mac. See:
+        # https://github.com/pybind/pybind11/issues/3907#issuecomment-1170412764
+        target_link_options(
+            ${pybind_ops_library_name}
+            PUBLIC
+            "LINKER:-undefined,dynamic_lookup"
+        )
+    endif()
 
     # Install all libraries.
     set(
@@ -266,7 +305,9 @@ function(make_torchcodec_libraries
     install(
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
     )
+
 endfunction()
 
 if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})

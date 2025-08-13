@@ -422,6 +422,7 @@ class TestVideoDecoder:
             elif i == 389:
                 assert_frames_equal(ref_frame_last, frame)
 
+    @pytest.mark.slow
     def test_iteration_slow(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
