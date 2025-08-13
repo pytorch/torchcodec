@@ -250,8 +250,10 @@ torch::Tensor AudioEncoder::encodeToTensor() {
       avioContextHolder_ != nullptr,
       "Cannot encode to tensor, avio tensor context doesn't exist.");
   encode();
-  return dynamic_cast<AVIOToTensorContext*>(avioContextHolder_.get())
-      ->getOutputTensor();
+  auto avioToTensorContext =
+      dynamic_cast<AVIOToTensorContext*>(avioContextHolder_.get());
+  TORCH_CHECK(avioToTensorContext != nullptr, "Invalid AVIO context holder.");
+  return avioToTensorContext->getOutputTensor();
 }
 
 void AudioEncoder::encode() {
