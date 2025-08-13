@@ -31,6 +31,7 @@ class CudaDeviceInterface : public DeviceInterface {
 
  private:
   UniqueAVBufferRef ctx_;
+  std::unique_ptr<NppStreamContext> nppCtx_;
 };
 
 } // namespace facebook::torchcodec

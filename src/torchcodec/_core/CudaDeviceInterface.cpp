@@ -41,6 +41,9 @@ const int MAX_CONTEXTS_PER_GPU_IN_CACHE = -1;
 PerGpuCache<UniqueAVBufferRef> g_cached_hw_device_ctxs(
     MAX_CUDA_GPUS,
     MAX_CONTEXTS_PER_GPU_IN_CACHE);
+PerGpuCache<std::unique_ptr<NppStreamContext>> g_cached_npp_ctxs(
+    MAX_CUDA_GPUS,
+    MAX_CONTEXTS_PER_GPU_IN_CACHE);
 
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
 
@@ -122,7 +125,15 @@ UniqueAVBufferRef getCudaContext(const torch::Device& device) {
 #endif
 }
 
-NppStreamContext createNppStreamContext(int deviceIndex) {
+std::unique_ptr<NppStreamContext> getNppStreamContext(
+    const torch::Device& device) {
+  torch::DeviceIndex nonNegativeDeviceIndex = getNonNegativeDeviceIndex(device);
+
+  std::unique_ptr<NppStreamContext> nppCtx = g_cached_npp_ctxs.get(device);
+  if (nppCtx) {
+    return nppCtx;
+  }
+
   // From 12.9, NPP recommends using a user-created NppStreamContext and using
   // the `_Ctx()` calls:
   // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
@@ -131,30 +142,21 @@ NppStreamContext createNppStreamContext(int deviceIndex) {
   // properties:
   // https://github.com/NVIDIA/CUDALibrarySamples/blob/d97803a40fab83c058bb3d68b6c38bd6eebfff43/NPP/README.md?plain=1#L54-L72
 
-  NppStreamContext nppCtx{};
+  nppCtx = std::make_unique<NppStreamContext>();
   cudaDeviceProp prop{};
-  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  cudaError_t err = cudaGetDeviceProperties(&prop, nonNegativeDeviceIndex);
   TORCH_CHECK(
       err == cudaSuccess,
       "cudaGetDeviceProperties failed: ",
       cudaGetErrorString(err));
 
-  nppCtx.nCudaDeviceId = deviceIndex;
-  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
-  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
-  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
-  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
-  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
-  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
-
-  // TODO when implementing the cache logic, move these out. See other TODO
-  // below.
-  nppCtx.hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
-  err = cudaStreamGetFlags(nppCtx.hStream, &nppCtx.nStreamFlags);
-  TORCH_CHECK(
-      err == cudaSuccess,
-      "cudaStreamGetFlags failed: ",
-      cudaGetErrorString(err));
+  nppCtx->nCudaDeviceId = nonNegativeDeviceIndex;
+  nppCtx->nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx->nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx->nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx->nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx->nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx->nCudaDevAttrComputeCapabilityMinor = prop.minor;
 
   return nppCtx;
 }
@@ -172,6 +174,9 @@ CudaDeviceInterface::~CudaDeviceInterface() {
   if (ctx_) {
     g_cached_hw_device_ctxs.addIfCacheHasCapacity(device_, std::move(ctx_));
   }
+  if (nppCtx_) {
+    g_cached_npp_ctxs.addIfCacheHasCapacity(device_, std::move(nppCtx_));
+  }
 }
 
 void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
@@ -183,6 +188,7 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
   ctx_ = getCudaContext(device_);
+  nppCtx_ = getNppStreamContext(device_);
   codecContext->hw_device_ctx = av_buffer_ref(ctx_.get());
   return;
 }
@@ -262,13 +268,14 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // TODO cache the NppStreamContext! It currently gets re-recated for every
-  // single frame. The cache should be per-device, similar to the existing
-  // hw_device_ctx cache. When implementing the cache logic, the
-  // NppStreamContext hStream and nStreamFlags should not be part of the cache
-  // because they may change across calls.
-  NppStreamContext nppCtx = createNppStreamContext(
-      static_cast<int>(getNonNegativeDeviceIndex(device_)));
+  torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
+  nppCtx_->hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
+  cudaError_t err =
+      cudaStreamGetFlags(nppCtx_->hStream, &nppCtx_->nStreamFlags);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaStreamGetFlags failed: ",
+      cudaGetErrorString(err));
 
   NppiSize oSizeROI = {width, height};
   Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
@@ -282,7 +289,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx);
+        *nppCtx_);
   } else {
     status = nppiNV12ToRGB_8u_P2C3R_Ctx(
         input,
@@ -290,7 +297,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx);
+        *nppCtx_);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 }
