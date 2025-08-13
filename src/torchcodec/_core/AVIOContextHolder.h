@@ -51,6 +51,7 @@ class AVIOContextHolder {
       AVIOWriteFunction write,
       AVIOSeekFunction seek,
       void* heldData,
+      bool isForWriting,
       int bufferSize = defaultBufferSize);
 
  private:
