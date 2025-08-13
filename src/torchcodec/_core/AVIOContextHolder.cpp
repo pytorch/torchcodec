@@ -14,6 +14,7 @@ void AVIOContextHolder::createAVIOContext(
     AVIOWriteFunction write,
     AVIOSeekFunction seek,
     void* heldData,
+    bool isForWriting,
     int bufferSize) {
   TORCH_CHECK(
       bufferSize > 0,
@@ -23,14 +24,18 @@ void AVIOContextHolder::createAVIOContext(
       buffer != nullptr,
       "Failed to allocate buffer of size " + std::to_string(bufferSize));
 
-  TORCH_CHECK(
-      (seek != nullptr) && ((write != nullptr) ^ (read != nullptr)),
-      "seek method must be defined, and either write or read must be defined. "
-      "But not both!")
+  TORCH_CHECK(seek != nullptr, "seek method must be defined");
+
+  if (isForWriting) {
+    TORCH_CHECK(write != nullptr, "write method must be defined for writing");
+  } else {
+    TORCH_CHECK(read != nullptr, "read method must be defined for reading");
+  }
+
   avioContext_.reset(avioAllocContext(
       buffer,
       bufferSize,
-      /*write_flag=*/write != nullptr,
+      /*write_flag=*/isForWriting,
       heldData,
       read,
       write,
