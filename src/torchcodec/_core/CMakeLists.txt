@@ -127,6 +127,10 @@ function(make_torchcodec_libraries
         find_library(CUDA_NVCUVID_LIBRARY
             NAMES nvcuvid
             PATHS
+                $ENV{NVCODEC_SDK_ROOT}/Lib/linux/stubs/x86_64
+                $ENV{NVCODEC_SDK_ROOT}/Lib/linux/x86_64
+                $ENV{NVCODEC_SDK_ROOT}/lib64
+                $ENV{NVCODEC_SDK_ROOT}/lib
                 /home/nicolashug/Downloads/Video_Codec_SDK_12.2.72/Lib/linux/stubs/x86_64
                 /usr/local/cuda/lib64
                 /usr/local/cuda/lib
@@ -147,6 +151,8 @@ function(make_torchcodec_libraries
         find_path(NVCODEC_INCLUDE_DIR
             NAMES cuviddec.h nvcuvid.h
             PATHS
+                $ENV{NVCODEC_SDK_ROOT}/Interface
+                $ENV{NVCODEC_SDK_ROOT}/include
                 $ENV{HOME}/Downloads/Video_Codec_SDK_12.2.72/Interface
                 /usr/local/cuda/include
                 ${CUDA_TOOLKIT_ROOT_DIR}/include
@@ -154,6 +160,7 @@ function(make_torchcodec_libraries
                 $ENV{CUDA_HOME}/include
                 /opt/cuda/include
             PATH_SUFFIXES
+                Interface
                 Video_Codec_SDK_12.2.72/Interface
                 Video_Codec_SDK/Interface
         )
