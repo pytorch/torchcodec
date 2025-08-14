@@ -23,7 +23,7 @@ def needs_cuda(test_item):
     return pytest.mark.needs_cuda(test_item)
 
 
-def cpu_and_cuda():
+def all_supported_devices():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
