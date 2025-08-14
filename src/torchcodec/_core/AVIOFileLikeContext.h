@@ -19,7 +19,7 @@ namespace facebook::torchcodec {
 // and seek calls back up to the methods on the Python object.
 class AVIOFileLikeContext : public AVIOContextHolder {
  public:
-  explicit AVIOFileLikeContext(py::object fileLike, bool isForWriting);
+  explicit AVIOFileLikeContext(const py::object& fileLike, bool isForWriting);
 
  private:
   static int read(void* opaque, uint8_t* buf, int buf_size);
