@@ -3,7 +3,7 @@ name = "torchcodec"
 description = "A video decoder for PyTorch"
 readme = "README.md"
 requires-python = ">=3.8"
-license-files = ["LICENSE"]
+license = {file = "LICENSE"}
 authors = [
     { name = "PyTorch Team", email = "packages@pytorch.org" },
 ]
