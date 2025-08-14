@@ -28,7 +28,13 @@ def cpu_and_cuda():
 
 
 def get_ffmpeg_major_version():
-    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+    ffmpeg_version = get_ffmpeg_library_versions()["ffmpeg_version"]
+    # When building FFmpeg from source there can be a `n` prefix in the version
+    # string.  This is quite brittle as we're using av_version_info(), which has
+    # no stable format. See https://github.com/pytorch/torchcodec/issues/100
+    if ffmpeg_version.startswith("n"):
+        ffmpeg_version = ffmpeg_version.removeprefix("n")
+    return int(ffmpeg_version.split(".")[0])
 
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
@@ -365,6 +371,28 @@ NASA_VIDEO = TestVideo(
         3: TestVideoStreamInfo(width=480, height=270, num_color_channels=3),
     },
     frames={},  # Automatically loaded from json file
+)
+
+# Video generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=200x200:rate=30 -c:v libx265 -pix_fmt yuv420p10le -preset fast -crf 23 h265_10bits.mp4
+H265_10BITS = TestVideo(
+    filename="h265_10bits.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=200, height=200, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
+)
+
+# Video generated with:
+# peg -f lavfi -i testsrc2=duration=1:size=200x200:rate=30 -c:v libx264 -pix_fmt yuv420p10le -preset fast -crf 23 h264_10bits.mp4
+H264_10BITS = TestVideo(
+    filename="h264_10bits.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=200, height=200, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
 )
 
 

@@ -18,6 +18,7 @@ namespace facebook::torchcodec {
 namespace {
 
 double ptsToSeconds(int64_t pts, const AVRational& timeBase) {
+  // To perform the multiplication before the division, av_q2d is not used
   return static_cast<double>(pts) * timeBase.num / timeBase.den;
 }
 
@@ -129,11 +130,11 @@ void SingleStreamDecoder::initializeDecoder() {
 
     if (avStream->duration > 0 && avStream->time_base.den > 0) {
       streamMetadata.durationSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->duration;
+          ptsToSeconds(avStream->duration, avStream->time_base);
     }
     if (avStream->start_time != AV_NOPTS_VALUE) {
       streamMetadata.beginStreamSecondsFromHeader =
-          av_q2d(avStream->time_base) * avStream->start_time;
+          ptsToSeconds(avStream->start_time, avStream->time_base);
     }
 
     if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -304,13 +305,12 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
         streamInfos_[streamIndex].allFrames.size();
 
     if (streamMetadata.beginStreamPtsFromContent.has_value()) {
-      streamMetadata.beginStreamPtsSecondsFromContent =
-          *streamMetadata.beginStreamPtsFromContent *
-          av_q2d(avStream->time_base);
+      streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
     }
     if (streamMetadata.endStreamPtsFromContent.has_value()) {
-      streamMetadata.endStreamPtsSecondsFromContent =
-          *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+      streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+          *streamMetadata.endStreamPtsFromContent, avStream->time_base);
     }
   }
 
@@ -344,11 +344,11 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
       all_frames[-1].item<int64_t>() + duration[-1].item<int64_t>();
 
   auto avStream = formatContext_->streams[streamIndex];
-  streamMetadata.beginStreamPtsSecondsFromContent =
-      *streamMetadata.beginStreamPtsFromContent * av_q2d(avStream->time_base);
+  streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.beginStreamPtsFromContent, avStream->time_base);
 
-  streamMetadata.endStreamPtsSecondsFromContent =
-      *streamMetadata.endStreamPtsFromContent * av_q2d(avStream->time_base);
+  streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
+      *streamMetadata.endStreamPtsFromContent, avStream->time_base);
 
   streamMetadata.numFramesFromContent = all_frames.size(0);
   for (int64_t i = 0; i < all_frames.size(0); ++i) {
@@ -580,6 +580,12 @@ FrameOutput SingleStreamDecoder::getFrameAtIndexInternal(
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
+
+  std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
+  if (numFrames.has_value()) {
+    // If the frameIndex is negative, we convert it to a positive index
+    frameIndex = frameIndex >= 0 ? frameIndex : frameIndex + numFrames.value();
+  }
   validateFrameIndex(streamMetadata, frameIndex);
 
   int64_t pts = getPts(frameIndex);
@@ -621,8 +627,6 @@ FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
   for (size_t f = 0; f < frameIndices.size(); ++f) {
     auto indexInOutput = indicesAreSorted ? f : argsort[f];
     auto indexInVideo = frameIndices[indexInOutput];
-
-    validateFrameIndex(streamMetadata, indexInVideo);
 
     if ((f > 0) && (indexInVideo == previousIndexInVideo)) {
       // Avoid decoding the same frame twice
@@ -1052,7 +1056,7 @@ bool SingleStreamDecoder::canWeAvoidSeeking() const {
   if (lastDecodedAvFramePts == cursor_) {
     // We are seeking to the exact same frame as we are currently at. Without
     // caching we have to rewind back and decode the frame again.
-    // TODO: https://github.com/pytorch-labs/torchcodec/issues/84 we could
+    // TODO: https://github.com/pytorch/torchcodec/issues/84 we could
     // implement caching.
     return false;
   }
@@ -1619,21 +1623,24 @@ void SingleStreamDecoder::validateScannedAllStreams(const std::string& msg) {
 void SingleStreamDecoder::validateFrameIndex(
     const StreamMetadata& streamMetadata,
     int64_t frameIndex) {
-  TORCH_CHECK(
-      frameIndex >= 0,
-      "Invalid frame index=" + std::to_string(frameIndex) +
-          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-          "; must be greater than or equal to 0");
+  if (frameIndex < 0) {
+    throw std::out_of_range(
+        "Invalid frame index=" + std::to_string(frameIndex) +
+        " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+        "; negative indices must have an absolute value less than the number of frames, "
+        "and the number of frames must be known.");
+  }
 
   // Note that if we do not have the number of frames available in our metadata,
   // then we assume that the frameIndex is valid.
   std::optional<int64_t> numFrames = getNumFrames(streamMetadata);
   if (numFrames.has_value()) {
-    TORCH_CHECK(
-        frameIndex < numFrames.value(),
-        "Invalid frame index=" + std::to_string(frameIndex) +
-            " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
-            "; must be less than " + std::to_string(numFrames.value()));
+    if (frameIndex >= numFrames.value()) {
+      throw std::out_of_range(
+          "Invalid frame index=" + std::to_string(frameIndex) +
+          " for streamIndex=" + std::to_string(streamMetadata.streamIndex) +
+          "; must be less than " + std::to_string(numFrames.value()));
+    }
   }
 }
 

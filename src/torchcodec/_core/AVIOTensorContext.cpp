@@ -105,12 +105,14 @@ AVIOFromTensorContext::AVIOFromTensorContext(torch::Tensor data)
   TORCH_CHECK(data.numel() > 0, "data must not be empty");
   TORCH_CHECK(data.is_contiguous(), "data must be contiguous");
   TORCH_CHECK(data.scalar_type() == torch::kUInt8, "data must be kUInt8");
-  createAVIOContext(&read, nullptr, &seek, &tensorContext_);
+  createAVIOContext(
+      &read, nullptr, &seek, &tensorContext_, /*isForWriting=*/false);
 }
 
 AVIOToTensorContext::AVIOToTensorContext()
     : tensorContext_{torch::empty({INITIAL_TENSOR_SIZE}, {torch::kUInt8}), 0} {
-  createAVIOContext(nullptr, &write, &seek, &tensorContext_);
+  createAVIOContext(
+      nullptr, &write, &seek, &tensorContext_, /*isForWriting=*/true);
 }
 
 torch::Tensor AVIOToTensorContext::getOutputTensor() {

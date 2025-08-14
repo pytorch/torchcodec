@@ -9,21 +9,31 @@
 
 namespace facebook::torchcodec {
 
-AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike)
+AVIOFileLikeContext::AVIOFileLikeContext(
+    const py::object& fileLike,
+    bool isForWriting)
     : fileLike_{UniquePyObject(new py::object(fileLike))} {
   {
     // TODO: Is it necessary to acquire the GIL here? Is it maybe even
     // harmful? At the moment, this is only called from within a pybind
     // function, and pybind guarantees we have the GIL.
     py::gil_scoped_acquire gil;
-    TORCH_CHECK(
-        py::hasattr(fileLike, "read"),
-        "File like object must implement a read method.");
+
+    if (isForWriting) {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "write"),
+          "File like object must implement a write method for writing.");
+    } else {
+      TORCH_CHECK(
+          py::hasattr(fileLike, "read"),
+          "File like object must implement a read method for reading.");
+    }
+
     TORCH_CHECK(
         py::hasattr(fileLike, "seek"),
         "File like object must implement a seek method.");
   }
-  createAVIOContext(&read, nullptr, &seek, &fileLike_);
+  createAVIOContext(&read, &write, &seek, &fileLike_, isForWriting);
 }
 
 int AVIOFileLikeContext::read(void* opaque, uint8_t* buf, int buf_size) {
@@ -75,6 +85,14 @@ int64_t AVIOFileLikeContext::seek(void* opaque, int64_t offset, int whence) {
   auto fileLike = static_cast<UniquePyObject*>(opaque);
   py::gil_scoped_acquire gil;
   return py::cast<int64_t>((*fileLike)->attr("seek")(offset, whence));
+}
+
+int AVIOFileLikeContext::write(void* opaque, const uint8_t* buf, int buf_size) {
+  auto fileLike = static_cast<UniquePyObject*>(opaque);
+  py::gil_scoped_acquire gil;
+  py::bytes bytes_obj(reinterpret_cast<const char*>(buf), buf_size);
+
+  return py::cast<int>((*fileLike)->attr("write")(bytes_obj));
 }
 
 } // namespace facebook::torchcodec

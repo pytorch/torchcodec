@@ -27,6 +27,8 @@ from .utils import (
     cpu_and_cuda,
     FULL_COLOR_RANGE,
     get_ffmpeg_major_version,
+    H264_10BITS,
+    H265_10BITS,
     H265_VIDEO,
     in_fbcode,
     NASA_AUDIO,
@@ -377,10 +379,10 @@ class TestVideoDecoder:
     def test_getitem_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(IndexError, match="Invalid frame index"):
             frame = decoder[1000]  # noqa
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(IndexError, match="Invalid frame index"):
             frame = decoder[-1000]  # noqa
 
         with pytest.raises(TypeError, match="Unsupported key type"):
@@ -421,6 +423,7 @@ class TestVideoDecoder:
             elif i == 389:
                 assert_frames_equal(ref_frame_last, frame)
 
+    @pytest.mark.slow
     def test_iteration_slow(self):
         decoder = VideoDecoder(NASA_VIDEO.path)
         ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
@@ -489,10 +492,13 @@ class TestVideoDecoder:
     def test_get_frame_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(
+            IndexError,
+            match="negative indices must have an absolute value less than the number of frames",
+        ):
             frame = decoder.get_frame_at(-10000)  # noqa
 
-        with pytest.raises(IndexError, match="out of bounds"):
+        with pytest.raises(IndexError, match="must be less than"):
             frame = decoder.get_frame_at(10000)  # noqa
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
@@ -551,13 +557,13 @@ class TestVideoDecoder:
     def test_get_frames_at_fails(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
-        expected_converted_index = -10000 + len(decoder)
         with pytest.raises(
-            RuntimeError, match=f"Invalid frame index={expected_converted_index}"
+            IndexError,
+            match="negative indices must have an absolute value less than the number of frames",
         ):
             decoder.get_frames_at([-10000])
 
-        with pytest.raises(RuntimeError, match="Invalid frame index=390"):
+        with pytest.raises(IndexError, match="Invalid frame index=390"):
             decoder.get_frames_at([390])
 
         with pytest.raises(RuntimeError, match="Expected a value of type"):
@@ -773,6 +779,58 @@ class TestVideoDecoder:
         torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range_slice_indices_syntax(self, device, seek_mode):
+        decoder = VideoDecoder(
+            NASA_VIDEO.path,
+            stream_index=3,
+            device=device,
+            seek_mode=seek_mode,
+        )
+
+        # high range ends get capped to num_frames
+        frames387_389 = decoder.get_frames_in_range(start=387, stop=1000)
+        assert frames387_389.data.shape == torch.Size(
+            [
+                3,
+                NASA_VIDEO.get_num_color_channels(stream_index=3),
+                NASA_VIDEO.get_height(stream_index=3),
+                NASA_VIDEO.get_width(stream_index=3),
+            ]
+        )
+        ref_frame387_389 = NASA_VIDEO.get_frame_data_by_range(
+            start=387, stop=390, stream_index=3
+        ).to(device)
+        assert_frames_equal(frames387_389.data, ref_frame387_389)
+
+        # negative indices are converted
+        frames387_389 = decoder.get_frames_in_range(start=-3, stop=1000)
+        assert frames387_389.data.shape == torch.Size(
+            [
+                3,
+                NASA_VIDEO.get_num_color_channels(stream_index=3),
+                NASA_VIDEO.get_height(stream_index=3),
+                NASA_VIDEO.get_width(stream_index=3),
+            ]
+        )
+        assert_frames_equal(frames387_389.data, ref_frame387_389)
+
+        # "None" as stop is treated as end of the video
+        frames387_None = decoder.get_frames_in_range(start=-3, stop=None)
+        assert frames387_None.data.shape == torch.Size(
+            [
+                3,
+                NASA_VIDEO.get_num_color_channels(stream_index=3),
+                NASA_VIDEO.get_height(stream_index=3),
+                NASA_VIDEO.get_width(stream_index=3),
+            ]
+        )
+        reference_frame387_389 = NASA_VIDEO.get_frame_data_by_range(
+            start=387, stop=390, stream_index=3
+        ).to(device)
+        assert_frames_equal(frames387_None.data, reference_frame387_389)
 
     @pytest.mark.parametrize("device", cpu_and_cuda())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
@@ -1141,15 +1199,70 @@ class TestVideoDecoder:
             torch.testing.assert_close(decoder[0], decoder[10])
 
     @needs_cuda
-    def test_full_range_bt709_video(self):
-        decoder_gpu = VideoDecoder(FULL_COLOR_RANGE.path, device="cuda")
-        decoder_cpu = VideoDecoder(FULL_COLOR_RANGE.path, device="cpu")
+    @pytest.mark.parametrize("asset", (FULL_COLOR_RANGE, NASA_VIDEO))
+    def test_full_range_bt709_video(self, asset):
+        decoder_gpu = VideoDecoder(asset.path, device="cuda")
+        decoder_cpu = VideoDecoder(asset.path, device="cpu")
 
         a, b = decoder_gpu[0].data.cpu(), decoder_cpu[0].data
         for frame_index in (0, 10, 20, 5):
             gpu_frame = decoder_gpu.get_frame_at(frame_index).data.cpu()
             cpu_frame = decoder_cpu.get_frame_at(frame_index).data
             torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
+
+    def test_10bit_videos_cuda(self):
+        # Assert that we raise proper error on different kinds of 10bit videos.
+
+        # TODO we should investigate how to support 10bit videos on GPU.
+        # See https://github.com/pytorch/torchcodec/issues/776
+
+        asset = H265_10BITS
+
+        decoder = VideoDecoder(asset.path, device="cuda")
+        with pytest.raises(
+            RuntimeError,
+            match="The AVFrame is p010le, but we expected AV_PIX_FMT_NV12.",
+        ):
+            decoder.get_frame_at(0)
+
+    @needs_cuda
+    def test_10bit_gpu_fallsback_to_cpu(self):
+        # Test for 10-bit videos that aren't supported by NVDEC: we decode and
+        # do the color conversion on the CPU.
+        # Here we just assert that the GPU results are the same as the CPU
+        # results.
+        # TODO see other TODO below in test_10bit_videos_cpu: we should validate
+        # the frames against a reference.
+
+        # We know from previous tests that the H264_10BITS video isn't supported
+        # by NVDEC, so NVDEC decodes it on the CPU.
+        asset = H264_10BITS
+
+        decoder_gpu = VideoDecoder(asset.path, device="cuda")
+        decoder_cpu = VideoDecoder(asset.path)
+
+        frame_indices = [0, 10, 20, 5]
+        for frame_index in frame_indices:
+            frame_gpu = decoder_gpu.get_frame_at(frame_index).data
+            assert frame_gpu.device.type == "cuda"
+            frame_cpu = decoder_cpu.get_frame_at(frame_index).data
+            assert_frames_equal(frame_gpu.cpu(), frame_cpu)
+
+        # We also check a batch API just to be on the safe side, making sure the
+        # pre-allocated tensor is passed down correctly to the CPU
+        # implementation.
+        frames_gpu = decoder_gpu.get_frames_at(frame_indices).data
+        assert frames_gpu.device.type == "cuda"
+        frames_cpu = decoder_cpu.get_frames_at(frame_indices).data
+        assert_frames_equal(frames_gpu.cpu(), frames_cpu)
+
+    @pytest.mark.parametrize("asset", (H264_10BITS, H265_10BITS))
+    def test_10bit_videos_cpu(self, asset):
+        # This just validates that we can decode 10-bit videos on CPU.
+        # TODO validate against the ref that the decoded frames are correct
+
+        decoder = VideoDecoder(asset.path)
+        decoder.get_frame_at(10)
 
 
 class TestAudioDecoder:

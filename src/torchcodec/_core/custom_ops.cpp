@@ -656,6 +656,10 @@ std::string get_stream_json_metadata(
 
 // Returns version information about the various FFMPEG libraries that are
 // loaded in the program's address space.
+// TODO: ideally we'd have a more robust way of getting the ffmpeg version,
+// we're using av_version_info() which is not standardized and shouldn't be
+// parsed by code (which we do!). See
+// https://github.com/pytorch/torchcodec/issues/100
 std::string _get_json_ffmpeg_library_versions() {
   std::stringstream ss;
   ss << "{\n";
