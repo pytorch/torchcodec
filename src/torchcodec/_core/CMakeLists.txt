@@ -101,6 +101,7 @@ function(make_torchcodec_libraries
         AVIOContextHolder.cpp
         AVIOTensorContext.cpp
         FFMPEGCommon.cpp
+        FilterGraph.cpp
         Frame.cpp
         DeviceInterface.cpp
         CpuDeviceInterface.cpp
