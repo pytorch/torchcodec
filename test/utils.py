@@ -638,8 +638,20 @@ AV1_VIDEO = TestVideo(
     },
 )
 
-FULL_COLOR_RANGE = TestVideo(
-    filename="full_range_709.mp4",
+
+# This is a BT.709 full range video, generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=1920x720:rate=30 \
+# -c:v libx264 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 \
+# -colorspace bt709 -color_range pc bt709_full_range.mp4
+#
+# We can confirm the color space and color range with:
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=color_space,color_transfer,color_primaries,color_range -of default=noprint_wrappers=1 test/resources/bt709_full_range.mp4 
+# color_range=pc
+# color_space=bt709
+# color_transfer=bt709
+# color_primaries=bt709
+BT709_FULL_RANGE = TestVideo(
+    filename="bt709_full_range.mp4",
     default_stream_index=0,
     stream_infos={
         0: TestVideoStreamInfo(width=1280, height=720, num_color_channels=3),

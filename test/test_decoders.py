@@ -24,8 +24,8 @@ from torchcodec.decoders import (
 from .utils import (
     assert_frames_equal,
     AV1_VIDEO,
+    BT709_FULL_RANGE,
     cpu_and_cuda,
-    FULL_COLOR_RANGE,
     get_ffmpeg_major_version,
     H264_10BITS,
     H265_10BITS,
@@ -1199,15 +1199,24 @@ class TestVideoDecoder:
             torch.testing.assert_close(decoder[0], decoder[10])
 
     @needs_cuda
-    @pytest.mark.parametrize("asset", (FULL_COLOR_RANGE, NASA_VIDEO))
-    def test_full_range_bt709_video(self, asset):
+    @pytest.mark.parametrize("asset", (BT709_FULL_RANGE, NASA_VIDEO))
+    def test_full_and_studio_range_bt709_video(self, asset):
+        # Test ensuring result consistency between CPU and GPU decoder on BT709
+        # videos, one with full color range, one with studio range.
+        # This is a non-regression test for times when we used to not support
+        # full range on GPU.
+        #
+        # NASA_VIDEO is a BT709 studio range video, as can be confirmed with
+        # ffprobe -v quiet -select_streams v:0 -show_entries
+        # stream=color_space,color_transfer,color_primaries,color_range -of
+        # default=noprint_wrappers=1 test/resources/nasa_13013.mp4
         decoder_gpu = VideoDecoder(asset.path, device="cuda")
         decoder_cpu = VideoDecoder(asset.path, device="cpu")
 
-        a, b = decoder_gpu[0].data.cpu(), decoder_cpu[0].data
         for frame_index in (0, 10, 20, 5):
             gpu_frame = decoder_gpu.get_frame_at(frame_index).data.cpu()
             cpu_frame = decoder_cpu.get_frame_at(frame_index).data
+            
             torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
 
     def test_10bit_videos_cuda(self):

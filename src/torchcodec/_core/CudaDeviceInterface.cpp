@@ -312,79 +312,58 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
 
   NppiSize oSizeROI = {width, height};
-  Npp8u* input[2] = {avFrame->data[0], avFrame->data[1]};
-
-  // Conversion matrix taken from https://mymusing.co/bt-709-yuv-to-rgb-conversion-color/
-  // The -128 offset is needed to first center the U and V channels around 0
-  static const Npp32f bt709ColorTwist[3][4] = {
-    {1.0f, 0.0f, 1.5748f, 0.0f},     
-    {1.0f, -0.187324, -0.468124, -128.0f},  
-    {1.0f, 1.8556, 0.0f, -128.0f}         
-  };
+  Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;
 
+  // For background, see
+  // Note [YUV -> RGB Color Conversion, color space and color range]
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
     if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
-      // BT.709 full range using custom ColorTwist to match libswscale
-      // Create NPP stream context for the _Ctx function
-      printf("it's a BT.709 full range frame\n");
-      NppStreamContext nppStreamCtx;
-      nppGetStreamContext(&nppStreamCtx);
-      
-      // ColorTwist function expects step arrays for planar input format
+      // NPP provides a pre-defined color conversion function for BT.709 full
+      // range: nppiNV12ToRGB_709HDTV_8u_P2C3R_Ctx. But it's not closely
+      // matching the results we have on CPU. So we're using a custom color
+      // conversion matrix, which provides more accurate results. See the note
+      // mentioned above for details, and headaches.
+      static const Npp32f bt709FullRangeColorTwist[3][4] = {
+          {1.0f, 0.0f, 1.5748f, 0.0f},
+          {1.0f, -0.187324273, -0.468124273, -128.0f},
+          {1.0f, 1.8556, 0.0f, -128.0f}};
+
       int srcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
-      
+
       status = nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx(
-          input,
+          yuvData,
           srcStep,
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
           oSizeROI,
-          bt709ColorTwist,
-          nppStreamCtx);
+          bt709FullRangeColorTwist,
+          nppCtx);
     } else {
-      printf("it's a BT.709 studio range frame\n");
-            NppStreamContext nppStreamCtx;
-      nppGetStreamContext(&nppStreamCtx);
-
-    static const Npp32f mat[3][4] = {
-      // {1.16438356f, 0.0f, 1.79274107f, -16.0f},
-      // {1.16438356f, -0.213248614f, -0.5329093290f, -128.0f},
-      // {1.16438356f, 2.11240179f, 0.0f, -128.0f}
-      {1.16438356f, 0.0f, 1.79274107f, -16.0f},
-      {1.16438356f, -0.213248614f, -0.5329093290f, -128.0f},
-      {1.16438356f, 2.11240179f, 0.0f, -128.0f}
-    };
-    // [[ 1.16438  0.00000  1.79274]
-    // [ 1.16438 -0.21325 -0.53291]
-    // [ 1.16438  2.11240  0.00000]]
-
-
-      
-      // ColorTwist function expects step arrays for planar input format
-      int srcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
-      
-      status = nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx(
-          input,
-          srcStep,
+      // If not full range, we assume studio limited range.
+      // The color conversion matrix for BT.709 limited range should be:
+      // static const Npp32f bt709LimitedRangeColorTwist[3][4] = {
+      //   {1.16438356f, 0.0f, 1.79274107f, -16.0f},
+      //   {1.16438356f, -0.213248614f, -0.5329093290f, -128.0f},
+      //   {1.16438356f, 2.11240179f, 0.0f, -128.0f}
+      // };
+      // We get very close results to CPU with that, but using the pre-defined
+      // nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx seems to be even more accurate.
+      status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
+          yuvData,
+          avFrame->linesize[0],
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
           oSizeROI,
-          mat,
-          nppStreamCtx);
-
-    // status = nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx(
-    //     input,
-    //     avFrame->linesize[0],
-    //     static_cast<Npp8u*>(dst.data_ptr()),
-    //     dst.stride(0),
-    //     oSizeROI,
-    //     nppCtx);
+          nppCtx);
     }
   } else {
+    // TODO we're assuming BT.601 color space (and probably limited range) by
+    // calling nppiNV12ToRGB_8u_P2C3R_Ctx. We should handle BT.601 full range,
+    // and other color-spaces like 2020.
     status = nppiNV12ToRGB_8u_P2C3R_Ctx(
-        input,
+        yuvData,
         avFrame->linesize[0],
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
@@ -421,7 +400,6 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 
 } // namespace facebook::torchcodec
 
-
 /* clang-format off */
 // Note: [YUV -> RGB Color Conversion, color space and color range]
 //
@@ -430,14 +408,16 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 // process. There may be some inaccuracies and approximations that experts will
 // notice, but our goal is only to provide a good enough understanding of the
 // process for torchcodec developers to implement and maintain it.
+// On CPU, filtergraph and swscale handle everything for us. With CUDA, we have
+// to do a lot of the heavy lifting ourselves.
 //
 // Color space and color range
 // ---------------------------
 // Two main characteristics of a frame will affect the conversion process:
-// 1. Color space: This mainly defines what YUV values correspond to which
-//    physical waveform. No need to go into details here,the point is that
+// 1. Color space: This basically defines what YUV values correspond to which
+//    physical wavelength. No need to go into details here,the point is that
 //    videos can come in different color spaces, the most common ones being
-//    BT.601 and BT.709.
+//    BT.601 and BT.709, but there are others.
 //    In FFmpeg this is represented with AVColorSpace:
 //    https://ffmpeg.org/doxygen/4.0/pixfmt_8h.html#aff71a069509a1ad3ff54d53a1c894c85
 // 2. Color range: This defines the range of YUV values. There is:
@@ -450,7 +430,7 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 //
 // In the first version of this note we'll focus on the full color range. It
 // will later be updated to account for the limited range.
-// 
+//
 // Color conversion matrix
 // -----------------------
 // YUV -> RGB conversion is defined as the reverse process of the RGB -> YUV,
@@ -476,7 +456,7 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 // [U]     [-kr/u_scale      -kg/u_scale   (1-kb)/u_scale]  [G]
 // [V]     [(1-kr)/v_scale   -kg/v_scale   -kb)/v_scale  ]  [B]
 //
-// 
+//
 // Now, to convert YUV to RGB, we just need to invert this matrix:
 // ```py
 // import torch
@@ -503,14 +483,9 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 //
 // Color conversion in NPP
 // -----------------------
-// NPP provides different ways to convert YUV to RGB:
 // https://docs.nvidia.com/cuda/npp/image_color_conversion.html.
 //
-// As an aside, as I'm writing this note, I am trying very hard not to use foul
-// language to describe the NPP documentation. NVidia, if you're reading this,
-// please, PLEASE improve your docs. Everywhere.
-//
-// Back to NPP and the color conversion functions. There are:
+// NPP provides different ways to convert YUV to RGB:
 // - pre-defined color conversion functions like
 //   nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx and nppiNV12ToRGB_709HDTV_8u_P2C3R_Ctx
 //   which are for BT.709 limited and full range, respectively.
@@ -531,7 +506,8 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 // Y is in [0, 1], and [U, V] in [-0.5, 0.5]. We're in luck, that's how we
 // defined ours above. HOWEVER, the function itself expects Y to be in [0, 255]
 // and U,V to be in [-128, 127]. So U and V need to be offset by -128 to center
-// them around 0. The offsets can be applied by adding a 4th column to the matrix:
+// them around 0. The offsets can be applied by adding a 4th column to the
+// matrix:
 //
 // Previous matrix with new offset column:
 // tensor([[ 1.0000e+00, -3.3142e-09,  1.5748e+00,     0]
