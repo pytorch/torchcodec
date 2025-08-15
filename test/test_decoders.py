@@ -25,6 +25,8 @@ from .utils import (
     all_supported_devices,
     assert_frames_equal,
     AV1_VIDEO,
+    BT709_FULL_RANGE,
+    cuda_version_used_for_building_torch,
     get_ffmpeg_major_version,
     H264_10BITS,
     H265_10BITS,
@@ -35,6 +37,7 @@ from .utils import (
     NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
     needs_cuda,
+    psnr,
     SINE_MONO_S16,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
@@ -1196,6 +1199,30 @@ class TestVideoDecoder:
         decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
+
+    @needs_cuda
+    @pytest.mark.parametrize("asset", (BT709_FULL_RANGE, NASA_VIDEO))
+    def test_full_and_studio_range_bt709_video(self, asset):
+        # Test ensuring result consistency between CPU and GPU decoder on BT709
+        # videos, one with full color range, one with studio range.
+        # This is a non-regression test for times when we used to not support
+        # full range on GPU.
+        #
+        # NASA_VIDEO is a BT709 studio range video, as can be confirmed with
+        # ffprobe -v quiet -select_streams v:0 -show_entries
+        # stream=color_space,color_transfer,color_primaries,color_range -of
+        # default=noprint_wrappers=1 test/resources/nasa_13013.mp4
+        decoder_gpu = VideoDecoder(asset.path, device="cuda")
+        decoder_cpu = VideoDecoder(asset.path, device="cpu")
+
+        for frame_index in (0, 10, 20, 5):
+            gpu_frame = decoder_gpu.get_frame_at(frame_index).data.cpu()
+            cpu_frame = decoder_cpu.get_frame_at(frame_index).data
+
+            if cuda_version_used_for_building_torch() >= (12, 9):
+                torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
+            elif cuda_version_used_for_building_torch() == (12, 8):
+                assert psnr(gpu_frame, cpu_frame) > 20
 
     @needs_cuda
     def test_10bit_videos_cuda(self):
