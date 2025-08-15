@@ -20,6 +20,13 @@ static bool g_cuda =
       return new CudaDeviceInterface(device);
     });
 
+// BT.709 full range color conversion matrix for YUV to RGB conversion.
+// See Note [YUV -> RGB Color Conversion, color space and color range] below.
+constexpr Npp32f bt709FullRangeColorTwist[3][4] = {
+    {1.0f, 0.0f, 1.5748f, 0.0f},
+    {1.0f, -0.187324273f, -0.468124273f, -128.0f},
+    {1.0f, 1.8556f, 0.0f, -128.0f}};
+
 // We reuse cuda contexts across VideoDeoder instances. This is because
 // creating a cuda context is expensive. The cache mechanism is as follows:
 // 1. There is a cache of size MAX_CONTEXTS_PER_GPU_IN_CACHE cuda contexts for
@@ -325,10 +332,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       // matching the results we have on CPU. So we're using a custom color
       // conversion matrix, which provides more accurate results. See the note
       // mentioned above for details, and headaches.
-      static const Npp32f bt709FullRangeColorTwist[3][4] = {
-          {1.0f, 0.0f, 1.5748f, 0.0f},
-          {1.0f, -0.187324273, -0.468124273, -128.0f},
-          {1.0f, 1.8556, 0.0f, -128.0f}};
 
       int srcStep[2] = {avFrame->linesize[0], avFrame->linesize[1]};
 
