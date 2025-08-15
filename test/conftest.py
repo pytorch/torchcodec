@@ -23,7 +23,7 @@ def pytest_collection_modifyitems(items):
         # with the @needs_cuda decorator. It will also exist if it was
         # parametrized with a parameter that has the mark: for example if a test
         # is parametrized with
-        # @pytest.mark.parametrize('device', cpu_and_cuda())
+        # @pytest.mark.parametrize('device', all_supported_devices())
         # the "instances" of the tests where device == 'cuda' will have the
         # 'needs_cuda' mark, and the ones with device == 'cpu' won't have the
         # mark.

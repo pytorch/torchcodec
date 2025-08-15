@@ -23,7 +23,7 @@ def needs_cuda(test_item):
     return pytest.mark.needs_cuda(test_item)
 
 
-def cpu_and_cuda():
+def all_supported_devices():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
@@ -645,7 +645,7 @@ AV1_VIDEO = TestVideo(
 # -colorspace bt709 -color_range pc bt709_full_range.mp4
 #
 # We can confirm the color space and color range with:
-# ffprobe -v quiet -select_streams v:0 -show_entries stream=color_space,color_transfer,color_primaries,color_range -of default=noprint_wrappers=1 test/resources/bt709_full_range.mp4 
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=color_space,color_transfer,color_primaries,color_range -of default=noprint_wrappers=1 test/resources/bt709_full_range.mp4
 # color_range=pc
 # color_space=bt709
 # color_transfer=bt709
