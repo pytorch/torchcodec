@@ -1219,6 +1219,7 @@ class TestVideoDecoder:
 
             torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
 
+    @needs_cuda
     def test_10bit_videos_cuda(self):
         # Assert that we raise proper error on different kinds of 10bit videos.
 
