@@ -349,10 +349,17 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       nppGetStreamContext(&nppStreamCtx);
 
     static const Npp32f mat[3][4] = {
-      {1.16438f, 0.0f, 1.79274, -16.0f},     
-      {1.16438f, -0.21325, -0.53291, -128.0f},  
-      {1.16438f, 2.11240, 0.0f, -128.0f}         
+      // {1.16438356f, 0.0f, 1.79274107f, -16.0f},
+      // {1.16438356f, -0.213248614f, -0.5329093290f, -128.0f},
+      // {1.16438356f, 2.11240179f, 0.0f, -128.0f}
+      {1.16438356f, 0.0f, 1.79274107f, -16.0f},
+      {1.16438356f, -0.213248614f, -0.5329093290f, -128.0f},
+      {1.16438356f, 2.11240179f, 0.0f, -128.0f}
     };
+    // [[ 1.16438  0.00000  1.79274]
+    // [ 1.16438 -0.21325 -0.53291]
+    // [ 1.16438  2.11240  0.00000]]
+
 
       
       // ColorTwist function expects step arrays for planar input format
@@ -413,3 +420,123 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 }
 
 } // namespace facebook::torchcodec
+
+
+/* clang-format off */
+// Note: [YUV -> RGB Color Conversion, color space and color range]
+//
+// The frames we get from the decoder (FFmpeg decoder, or NVCUVID) are in YUV
+// format. We need to convert them to RGB. This note attempts to describe this
+// process. There may be some inaccuracies and approximations that experts will
+// notice, but our goal is only to provide a good enough understanding of the
+// process for torchcodec developers to implement and maintain it.
+//
+// Color space and color range
+// ---------------------------
+// Two main characteristics of a frame will affect the conversion process:
+// 1. Color space: This mainly defines what YUV values correspond to which
+//    physical waveform. No need to go into details here,the point is that
+//    videos can come in different color spaces, the most common ones being
+//    BT.601 and BT.709.
+//    In FFmpeg this is represented with AVColorSpace:
+//    https://ffmpeg.org/doxygen/4.0/pixfmt_8h.html#aff71a069509a1ad3ff54d53a1c894c85
+// 2. Color range: This defines the range of YUV values. There is:
+//    - full range, also called PC range: AVCOL_RANGE_JPEG
+//    - and the "limited" range, also called studio or TV range: AVCOL_RANGE_MPEG
+//    https://ffmpeg.org/doxygen/4.0/pixfmt_8h.html#a3da0bf691418bc22c4bcbe6583ad589a
+//
+// Color space and color range are independent concepts, so we can have a BT.709
+// with full range, and another one with limited range. Same for BT.601.
+//
+// In the first version of this note we'll focus on the full color range. It
+// will later be updated to account for the limited range.
+// 
+// Color conversion matrix
+// -----------------------
+// YUV -> RGB conversion is defined as the reverse process of the RGB -> YUV,
+// So this is where we'll start.
+// At the core of a RGB -> YUV conversion are the "luma coefficients", which are
+// specific to a given color space and defined by the color space standard. In
+// FFmpeg they can be found here:
+// https://github.com/FFmpeg/FFmpeg/blob/7d606ef0ccf2946a4a21ab1ec23486cadc21864b/libavutil/csp.c#L46-L56
+//
+// For example, the BT.709 coefficients are: kr=0.2126, kg=0.7152, kb=0.0722
+// Coefficients must sum to 1.
+//
+// Conventionally Y is in [0, 1] range, and U and V are in [-0.5, 0.5] range
+// (that's mathematically, in practice they are represented in integer range).
+// The conversion is defined as:
+// https://en.wikipedia.org/wiki/YCbCr#R'G'B'_to_Y%E2%80%B2PbPr
+// Y = kr*R + kg*G + kb*B
+// U = (B - Y) * 0.5 / (1 - kb) = (B - Y) / u_scale where u_scale = 2 * (1 - kb)
+// V = (R - Y) * 0.5 / (1 - kr) = (R - Y) / v_scale where v_scale = 2 * (1 - kr)
+//
+// Putting all this into matrix form, we get:
+// [Y]   = [kr               kg            kb            ]  [R]
+// [U]     [-kr/u_scale      -kg/u_scale   (1-kb)/u_scale]  [G]
+// [V]     [(1-kr)/v_scale   -kg/v_scale   -kb)/v_scale  ]  [B]
+//
+// 
+// Now, to convert YUV to RGB, we just need to invert this matrix:
+// ```py
+// import torch
+// kr, kg, kb = 0.2126, 0.7152, 0.0722  # BT.709  luma coefficients
+// u_scale = 2 * (1 - kb)
+// v_scale = 2 * (1 - kr)
+//
+// rgb_to_yuv = torch.tensor([
+//     [kr, kg, kb],
+//     [-kr/u_scale, -kg/u_scale, (1-kb)/u_scale],
+//     [(1-kr)/v_scale, -kg/v_scale, -kb/v_scale]
+// ])
+//
+// yuv_to_rgb_full = torch.linalg.inv(rgb_to_yuv)
+// print("YUV->RGB matrix (Full Range):")
+// print(yuv_to_rgb_full)
+// ```
+// And we get:
+// tensor([[ 1.0000e+00, -3.3142e-09,  1.5748e+00],
+//         [ 1.0000e+00, -1.8732e-01, -4.6812e-01],
+//         [ 1.0000e+00,  1.8556e+00,  4.6231e-09]])
+//
+// Which matches https://en.wikipedia.org/wiki/YCbCr#ITU-R_BT.709_conversion
+//
+// Color conversion in NPP
+// -----------------------
+// NPP provides different ways to convert YUV to RGB:
+// https://docs.nvidia.com/cuda/npp/image_color_conversion.html.
+//
+// As an aside, as I'm writing this note, I am trying very hard not to use foul
+// language to describe the NPP documentation. NVidia, if you're reading this,
+// please, PLEASE improve your docs. Everywhere.
+//
+// Back to NPP and the color conversion functions. There are:
+// - pre-defined color conversion functions like
+//   nppiNV12ToRGB_709CSC_8u_P2C3R_Ctx and nppiNV12ToRGB_709HDTV_8u_P2C3R_Ctx
+//   which are for BT.709 limited and full range, respectively.
+// - generic color conversion functions that accept a custom color conversion
+//   matrix, called ColorTwist, like nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx
+//
+// We use the pre-defined functions or the color twist functions depending on
+// which one we find to be closer to the CPU results.
+//
+// The color twist functionality is described in a section that you'll have to
+// search for with "YUVToRGBColorTwist". I can't provide a link, because it's a
+// well known fact that developers enjoy scrolling through endless API ref pages
+// to find what they need, and NVidia knows to respect that. But don't worry if
+// you can't find it: it's completely useless (and wrong) anyway.
+//
+// So, what the doc do not tell you, which you ABSOLUTELY need to know to make
+// anything work, is that they expect the matrix coefficient to assume the input
+// Y is in [0, 1], and [U, V] in [-0.5, 0.5]. We're in luck, that's how we
+// defined ours above. HOWEVER, the function itself expects Y to be in [0, 255]
+// and U,V to be in [-128, 127]. So U and V need to be offset by -128 to center
+// them around 0. The offsets can be applied by adding a 4th column to the matrix:
+//
+// Previous matrix with new offset column:
+// tensor([[ 1.0000e+00, -3.3142e-09,  1.5748e+00,     0]
+//         [ 1.0000e+00, -1.8732e-01, -4.6812e-01,     -128]
+//         [ 1.0000e+00,  1.8556e+00,  4.6231e-09 ,    -128]])
+//
+// And that's what we need to pass for BT701, full range.
+/* clang-format on */
