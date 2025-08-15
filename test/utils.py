@@ -37,6 +37,31 @@ def get_ffmpeg_major_version():
     return int(ffmpeg_version.split(".")[0])
 
 
+def cuda_version_used_for_building_torch() -> Optional[tuple[int, int]]:
+    # Return the CUDA version that was used to build PyTorch. That's not always
+    # the same as the CUDA version that is currently installed on the running
+    # machine, which is what we actually want. On the CI though, these are the
+    # same.
+    if torch.version.cuda is None:
+        return None
+    else:
+        return tuple(int(x) for x in torch.version.cuda.split("."))
+
+
+def psnr(a, b, max_val=255) -> float:
+    # Return Peak Signal-to-Noise Ratio (PSNR) between two tensors a and b. The
+    # higher, the better.
+    # According to https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio,
+    # typical values for the PSNR in lossy image and video compression are
+    # between 30 and 50 dB.
+    # Acceptable values for wireless transmission quality loss are considered to
+    # be about 20 dB to 25 dB
+    mse = torch.mean((a.float() - b.float()) ** 2)
+    if mse == 0:
+        return float("inf")
+    return 20 * torch.log10(max_val / torch.sqrt(mse)).item()
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does

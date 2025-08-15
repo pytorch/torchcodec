@@ -26,6 +26,7 @@ from .utils import (
     assert_frames_equal,
     AV1_VIDEO,
     BT709_FULL_RANGE,
+    cuda_version_used_for_building_torch,
     get_ffmpeg_major_version,
     H264_10BITS,
     H265_10BITS,
@@ -36,6 +37,7 @@ from .utils import (
     NASA_AUDIO_MP3_44100,
     NASA_VIDEO,
     needs_cuda,
+    psnr,
     SINE_MONO_S16,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
@@ -1213,19 +1215,13 @@ class TestVideoDecoder:
         decoder_gpu = VideoDecoder(asset.path, device="cuda")
         decoder_cpu = VideoDecoder(asset.path, device="cpu")
 
-        def psnr(a, b, max_val=255):
-            mse = torch.mean((a.float() - b.float()) ** 2)
-            if mse == 0:
-                return float("inf")
-            return 20 * torch.log10(max_val / torch.sqrt(mse))
-
         for frame_index in (0, 10, 20, 5):
             gpu_frame = decoder_gpu.get_frame_at(frame_index).data.cpu()
             cpu_frame = decoder_cpu.get_frame_at(frame_index).data
 
-            if torch.version.cuda == "12.9":
+            if cuda_version_used_for_building_torch() >= (12, 9):
                 torch.testing.assert_close(gpu_frame, cpu_frame, rtol=0, atol=2)
-            else:
+            elif cuda_version_used_for_building_torch() == (12, 8):
                 assert psnr(gpu_frame, cpu_frame) > 20
 
     @needs_cuda
