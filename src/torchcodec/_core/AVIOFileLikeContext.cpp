@@ -9,7 +9,9 @@
 
 namespace facebook::torchcodec {
 
-AVIOFileLikeContext::AVIOFileLikeContext(py::object fileLike, bool isForWriting)
+AVIOFileLikeContext::AVIOFileLikeContext(
+    const py::object& fileLike,
+    bool isForWriting)
     : fileLike_{UniquePyObject(new py::object(fileLike))} {
   {
     // TODO: Is it necessary to acquire the GIL here? Is it maybe even
@@ -90,7 +92,7 @@ int AVIOFileLikeContext::write(void* opaque, const uint8_t* buf, int buf_size) {
   py::gil_scoped_acquire gil;
   py::bytes bytes_obj(reinterpret_cast<const char*>(buf), buf_size);
 
-  return py::cast<int64_t>((*fileLike)->attr("write")(bytes_obj));
+  return py::cast<int>((*fileLike)->attr("write")(bytes_obj));
 }
 
 } // namespace facebook::torchcodec
