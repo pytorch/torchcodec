@@ -196,6 +196,7 @@ def clips_at_random_indices(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     # See docstring below
+    torch._C._log_api_usage_once("torchcodec.samplers.clips_at_random_indices")
     return _generic_index_based_sampler(
         kind="random",
         decoder=decoder,
@@ -219,6 +220,7 @@ def clips_at_regular_indices(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     # See docstring below
+    torch._C._log_api_usage_once("torchcodec.samplers.clips_at_regular_indices")
     return _generic_index_based_sampler(
         kind="regular",
         decoder=decoder,

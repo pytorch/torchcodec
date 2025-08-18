@@ -21,6 +21,7 @@ class AudioEncoder:
     """
 
     def __init__(self, samples: Tensor, *, sample_rate: int):
+        torch._C._log_api_usage_once("torchcodec.encoders.AudioEncoder")
         # Some of these checks are also done in C++: it's OK, they're cheap, and
         # doing them here allows to surface them when the AudioEncoder is
         # instantiated, rather than later when the encoding methods are called.

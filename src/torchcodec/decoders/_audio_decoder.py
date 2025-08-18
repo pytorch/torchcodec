@@ -8,6 +8,7 @@ import io
 from pathlib import Path
 from typing import Optional, Union
 
+import torch
 from torch import Tensor
 
 from torchcodec import _core as core, AudioSamples
@@ -59,6 +60,7 @@ class AudioDecoder:
         sample_rate: Optional[int] = None,
         num_channels: Optional[int] = None,
     ):
+        torch._C._log_api_usage_once("torchcodec.decoders.AudioDecoder")
         self._decoder = create_decoder(source=source, seek_mode="approximate")
 
         core.add_audio_stream(
