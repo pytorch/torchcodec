@@ -38,10 +38,9 @@ const int MAX_CUDA_GPUS = 128;
 // Set to -1 to have an infinitely sized cache. Set it to 0 to disable caching.
 // Set to a positive number to have a cache of that size.
 const int MAX_CONTEXTS_PER_GPU_IN_CACHE = -1;
-PerGpuCache<UniqueAVBufferRef> g_cached_hw_device_ctxs(
-    MAX_CUDA_GPUS,
-    MAX_CONTEXTS_PER_GPU_IN_CACHE);
-PerGpuCache<std::unique_ptr<NppStreamContext>> g_cached_npp_ctxs(
+PerGpuCache<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>
+    g_cached_hw_device_ctxs(MAX_CUDA_GPUS, MAX_CONTEXTS_PER_GPU_IN_CACHE);
+PerGpuCache<NppStreamContext> g_cached_npp_ctxs(
     MAX_CUDA_GPUS,
     MAX_CONTEXTS_PER_GPU_IN_CACHE);
 

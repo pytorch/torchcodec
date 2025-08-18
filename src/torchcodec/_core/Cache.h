@@ -22,27 +22,29 @@ namespace facebook::torchcodec {
 //    must be first queried from the cache. If the cache is empty then new
 //    object must be created.
 
-template <typename T>
+template <typename T, typename D = std::default_delete<T>>
 class Cache {
  public:
+  using element_type = std::unique_ptr<T, D>;
+
   Cache(int capacity) : capacity_(capacity) {}
 
   // Adds an object to the cache if the cache has capacity. Returns true
   // if object was added and false otherwise.
-  bool addIfCacheHasCapacity(T&& obj);
+  bool addIfCacheHasCapacity(element_type&& obj);
 
   // Returns an object from the cache. Cache does not hold a reference
   // to the object after this call.
-  T get();
+  element_type get();
 
  private:
   int capacity_;
   std::mutex mutex_;
-  std::vector<T> cache_;
+  std::vector<element_type> cache_;
 };
 
-template <typename T>
-bool Cache<T>::addIfCacheHasCapacity(T&& obj) {
+template <typename T, typename D>
+bool Cache<T, D>::addIfCacheHasCapacity(element_type&& obj) {
   std::scoped_lock lock(mutex_);
   if (capacity_ >= 0 && cache_.size() >= static_cast<size_t>(capacity_)) {
     return false;
@@ -51,41 +53,43 @@ bool Cache<T>::addIfCacheHasCapacity(T&& obj) {
   return true;
 }
 
-template <typename T>
-T Cache<T>::get() {
+template <typename T, typename D>
+typename Cache<T, D>::element_type Cache<T, D>::get() {
   std::scoped_lock lock(mutex_);
-  if (!cache_.size())
-    return {};
+  if (cache_.empty())
+    return nullptr;
 
-  T obj = std::move(cache_.back());
+  element_type obj = std::move(cache_.back());
   cache_.pop_back();
   return obj;
 }
 
-template <typename T>
+template <typename T, typename D = std::default_delete<T>>
 class PerGpuCache {
  public:
+  using element_type = typename Cache<T, D>::element_type;
+
   // Initializes 'maxGpus' number of caches. Each cache can hold no
   // more than 'capacity' items. If 'capacity' <0 cache size is unlimited.
   PerGpuCache(int maxGpus, int capacity) {
     TORCH_CHECK(maxGpus > 0, "maxGpus for PerGpuCache must be >0");
     for (int i = 0; i < maxGpus; ++i) {
-      cache_.emplace_back(std::make_unique<Cache<T>>(capacity));
+      cache_.emplace_back(std::make_unique<Cache<T, D>>(capacity));
     }
   }
 
   // Adds an object to the specified device cache if the cache has
   // capacity. Returns true if object was added and false otherwise.
-  bool addIfCacheHasCapacity(const torch::Device& device, T&& obj);
+  bool addIfCacheHasCapacity(const torch::Device& device, element_type&& obj);
 
   // Returns an object from the cache of the specified device. Cache
   // does not hold a reference to the object after this call.
-  T get(const torch::Device& device);
+  element_type get(const torch::Device& device);
 
  private:
   // 'Cache' class implementation contains mutex which makes it non-movable
   // and non-copyable, so we need to wrap it in std::unique_ptr.
-  std::vector<std::unique_ptr<Cache<T>>> cache_;
+  std::vector<std::unique_ptr<Cache<T, D>>> cache_;
 };
 
 torch::DeviceIndex getNonNegativeDeviceIndex(const torch::Device& device) {
@@ -99,23 +103,24 @@ torch::DeviceIndex getNonNegativeDeviceIndex(const torch::Device& device) {
   return deviceIndex;
 }
 
-template <typename T>
-bool PerGpuCache<T>::addIfCacheHasCapacity(
+template <typename T, typename D>
+bool PerGpuCache<T, D>::addIfCacheHasCapacity(
     const torch::Device& device,
-    T&& obj) {
+    element_type&& obj) {
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device);
-  if (static_cast<size_t>(deviceIndex) >= cache_.size()) {
-    return false;
-  }
+  TORCH_CHECK(
+      static_cast<size_t>(deviceIndex) < cache_.size(),
+      "Device index out of range");
   return cache_[deviceIndex]->addIfCacheHasCapacity(std::move(obj));
 }
 
-template <typename T>
-T PerGpuCache<T>::get(const torch::Device& device) {
+template <typename T, typename D>
+typename PerGpuCache<T, D>::element_type PerGpuCache<T, D>::get(
+    const torch::Device& device) {
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device);
-  if (static_cast<size_t>(deviceIndex) >= cache_.size()) {
-    return {};
-  }
+  TORCH_CHECK(
+      static_cast<size_t>(deviceIndex) < cache_.size(),
+      "Device index out of range");
   return cache_[deviceIndex]->get();
 }
 
