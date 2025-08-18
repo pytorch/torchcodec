@@ -231,6 +231,7 @@ def clips_at_random_timestamps(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     # See docstring below
+    torch._C._log_api_usage_once("torchcodec.samplers.clips_at_random_timestamps")
     return _generic_time_based_sampler(
         kind="random",
         decoder=decoder,
@@ -256,6 +257,7 @@ def clips_at_regular_timestamps(
     policy: Literal["repeat_last", "wrap", "error"] = "repeat_last",
 ) -> FrameBatch:
     # See docstring below
+    torch._C._log_api_usage_once("torchcodec.samplers.clips_at_regular_timestamps")
     return _generic_time_based_sampler(
         kind="regular",
         decoder=decoder,

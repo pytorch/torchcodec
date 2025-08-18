@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
 from torch import device as torch_device, Tensor
+from torch._C import _log_api_usage_once
 
 from torchcodec import _core as core, Frame, FrameBatch
 from torchcodec.decoders._decoder_utils import (
@@ -80,6 +81,7 @@ class VideoDecoder:
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
     ):
+        _log_api_usage_once("torchcodec.decoders.VideoDecoder")
         allowed_seek_modes = ("exact", "approximate")
         if seek_mode not in allowed_seek_modes:
             raise ValueError(
