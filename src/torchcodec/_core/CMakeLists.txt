@@ -144,7 +144,6 @@ function(make_torchcodec_libraries
     set(custom_ops_dependencies
         ${core_library_name}
         ${Python3_LIBRARIES}
-        ${TORCH_LIBRARIES}  # Add PyTorch libraries for custom ops registration
     )
     if (WIN32)
         list(APPEND custom_ops_dependencies Python3::Python)
