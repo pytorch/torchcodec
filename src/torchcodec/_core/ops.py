@@ -158,6 +158,62 @@ def create_from_file_like(
     return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
 
 
+def encode_audio_to_file_like(
+    samples: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    file_like: Union[io.RawIOBase, io.BufferedIOBase],
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
+) -> None:
+    """Encode audio samples to a file-like object.
+
+    Args:
+        samples: Audio samples tensor
+        sample_rate: Sample rate in Hz
+        format: Audio format (e.g., "wav", "mp3", "flac")
+        file_like: File-like object that supports write() and seek() methods
+        bit_rate: Optional bit rate for encoding
+        num_channels: Optional number of output channels
+        desired_sample_rate: Optional desired sample rate for the output.
+    """
+    assert _pybind_ops is not None
+
+    if samples.dtype != torch.float32:
+        raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
+
+    # We're having the same problem as with the decoder's create_from_file_like:
+    # We should be able to pass a tensor directly, but this leads to a pybind
+    # error. In order to work around this, we pass the pointer to the tensor's
+    # data, and its shape, in order to re-construct it in C++. For this to work:
+    # - the tensor must be float32
+    # - the tensor  must be contiguous, which is why we call contiguous().
+    #   In theory we could avoid this restriction by also passing the strides?
+    # - IMPORTANT: the input samples tensor and its underlying data must be
+    #   alive during the call.
+    #
+    # A more elegant solution would be to cast the tensor into a py::object, but
+    # casting the py::object backk to a tensor in C++ seems to lead to the same
+    # pybing error.
+
+    samples = samples.contiguous()
+    _pybind_ops.encode_audio_to_file_like(
+        samples.data_ptr(),
+        list(samples.shape),
+        sample_rate,
+        format,
+        file_like,
+        bit_rate,
+        num_channels,
+        desired_sample_rate,
+    )
+
+    # This check is useless but it's critical to keep it to ensures that samples
+    # is still alive during the call to encode_audio_to_file_like.
+    assert samples.is_contiguous()
+
+
 # ==============================
 # Abstract impl for the operators. Needed by torch.compile.
 # ==============================
