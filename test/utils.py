@@ -37,6 +37,31 @@ def get_ffmpeg_major_version():
     return int(ffmpeg_version.split(".")[0])
 
 
+def cuda_version_used_for_building_torch() -> Optional[tuple[int, int]]:
+    # Return the CUDA version that was used to build PyTorch. That's not always
+    # the same as the CUDA version that is currently installed on the running
+    # machine, which is what we actually want. On the CI though, these are the
+    # same.
+    if torch.version.cuda is None:
+        return None
+    else:
+        return tuple(int(x) for x in torch.version.cuda.split("."))
+
+
+def psnr(a, b, max_val=255) -> float:
+    # Return Peak Signal-to-Noise Ratio (PSNR) between two tensors a and b. The
+    # higher, the better.
+    # According to https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio,
+    # typical values for the PSNR in lossy image and video compression are
+    # between 30 and 50 dB.
+    # Acceptable values for wireless transmission quality loss are considered to
+    # be about 20 dB to 25 dB
+    mse = torch.mean((a.float() - b.float()) ** 2)
+    if mse == 0:
+        return float("inf")
+    return 20 * torch.log10(max_val / torch.sqrt(mse)).item()
+
+
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
 # On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
@@ -636,4 +661,25 @@ AV1_VIDEO = TestVideo(
             10: TestFrameInfo(pts_seconds=0.400000, duration_seconds=0.040000),
         },
     },
+)
+
+
+# This is a BT.709 full range video, generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=1920x720:rate=30 \
+# -c:v libx264 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 \
+# -colorspace bt709 -color_range pc bt709_full_range.mp4
+#
+# We can confirm the color space and color range with:
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=color_space,color_transfer,color_primaries,color_range -of default=noprint_wrappers=1 test/resources/bt709_full_range.mp4
+# color_range=pc
+# color_space=bt709
+# color_transfer=bt709
+# color_primaries=bt709
+BT709_FULL_RANGE = TestVideo(
+    filename="bt709_full_range.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=1280, height=720, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
 )
