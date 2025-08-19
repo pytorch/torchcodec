@@ -188,10 +188,6 @@ function(make_torchcodec_libraries
         "${pybind_ops_dependencies}"
     )
 
-    if(WIN32)
-      set_target_properties(${pybind_ops_library_name} PROPERTIES SUFFIX ".pyd")
-    endif()
-
     # pybind11 limits the visibility of symbols in the shared library to prevent
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
