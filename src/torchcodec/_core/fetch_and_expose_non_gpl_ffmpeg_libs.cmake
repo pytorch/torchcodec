@@ -150,7 +150,6 @@ elseif (APPLE)
 
 elseif (WIN32)
     set(lib_dir "bin")
-    message(STATUS "Using MinGW-compatible FFmpeg libraries for Windows")
     set(
         platform_url
         ${base_url}/windows_x86_64
