@@ -135,9 +135,9 @@ class CMakeBuild(build_ext):
             ["cmake", str(_ROOT_DIR)] + cmake_args, cwd=self.build_temp
         )
         print("Calling cmake --build", flush=True)
-        subprocess.check_call(["cmake", "--build", "."], cwd=self.build_temp)
+        subprocess.check_call(["cmake", "--build", ".","--config",cmake_build_type], cwd=self.build_temp)
         print("Calling cmake --install", flush=True)
-        subprocess.check_call(["cmake", "--install", "."], cwd=self.build_temp)
+        subprocess.check_call(["cmake", "--install", ".","--config",cmake_build_type], cwd=self.build_temp)
 
     def copy_extensions_to_source(self):
         """Copy built extensions from temporary folder back into source tree.
