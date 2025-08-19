@@ -43,13 +43,8 @@ class CpuDeviceInterface : public DeviceInterface {
       const UniqueAVFrame& avFrame);
 
   void createSwsContext(
-      const DecodedFrameContext& frameContext,
+      const FiltersContext& filtersContext,
       const enum AVColorSpace colorspace);
-
-  void createFilterGraph(
-      const DecodedFrameContext& frameContext,
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase);
 
   // color-conversion fields. Only one of FilterGraphContext and
   // UniqueSwsContext should be non-null.
@@ -58,7 +53,7 @@ class CpuDeviceInterface : public DeviceInterface {
 
   // Used to know whether a new FilterGraphContext or UniqueSwsContext should
   // be created before decoding a new frame.
-  DecodedFrameContext prevFrameContext_;
+  FiltersContext prevFiltersContext_;
 };
 
 } // namespace facebook::torchcodec

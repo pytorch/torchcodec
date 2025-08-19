@@ -13,22 +13,26 @@ extern "C" {
 
 namespace facebook::torchcodec {
 
-bool DecodedFrameContext::operator==(const DecodedFrameContext& other) {
-  return decodedWidth == other.decodedWidth &&
-      decodedHeight == other.decodedHeight &&
-      decodedFormat == other.decodedFormat &&
-      expectedWidth == other.expectedWidth &&
-      expectedHeight == other.expectedHeight;
+bool operator==(const AVRational& lhs, const AVRational& rhs) {
+  return lhs.num == rhs.num && lhs.den == rhs.den;
 }
 
-bool DecodedFrameContext::operator!=(const DecodedFrameContext& other) {
+bool FiltersContext::operator==(const FiltersContext& other) {
+  return inputWidth == other.inputWidth && inputHeight == other.inputHeight &&
+      inputFormat == other.inputFormat && outputWidth == other.outputWidth &&
+      outputHeight == other.outputHeight &&
+      outputFormat == other.outputFormat && filters == other.filters &&
+      timeBase == other.timeBase &&
+      hwFramesCtx.get() == other.hwFramesCtx.get();
+}
+
+bool FiltersContext::operator!=(const FiltersContext& other) {
   return !(*this == other);
 }
 
 FilterGraph::FilterGraph(
-    const DecodedFrameContext& frameContext,
-    const VideoStreamOptions& videoStreamOptions,
-    const AVRational& timeBase) {
+    const FiltersContext& filtersContext,
+    const VideoStreamOptions& videoStreamOptions) {
   filterGraph_.reset(avfilter_graph_alloc());
   TORCH_CHECK(filterGraph_.get() != nullptr);
 
@@ -39,26 +43,40 @@ FilterGraph::FilterGraph(
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
   const AVFilter* buffersink = avfilter_get_by_name("buffersink");
 
-  std::stringstream filterArgs;
-  filterArgs << "video_size=" << frameContext.decodedWidth << "x"
-             << frameContext.decodedHeight;
-  filterArgs << ":pix_fmt=" << frameContext.decodedFormat;
-  filterArgs << ":time_base=" << timeBase.num << "/" << timeBase.den;
-  filterArgs << ":pixel_aspect=" << frameContext.decodedAspectRatio.num << "/"
-             << frameContext.decodedAspectRatio.den;
+  auto deleter = [](AVBufferSrcParameters* p) {
+    if (p) {
+      av_freep(&p);
+    }
+  };
+  std::unique_ptr<AVBufferSrcParameters, decltype(deleter)> srcParams(
+      nullptr, deleter);
 
-  int status = avfilter_graph_create_filter(
-      &sourceContext_,
-      buffersrc,
-      "in",
-      filterArgs.str().c_str(),
-      nullptr,
-      filterGraph_.get());
+  srcParams.reset(av_buffersrc_parameters_alloc());
+  TORCH_CHECK(srcParams, "Failed to allocate buffersrc params");
+
+  srcParams->format = filtersContext.inputFormat;
+  srcParams->width = filtersContext.inputWidth;
+  srcParams->height = filtersContext.inputHeight;
+  srcParams->sample_aspect_ratio = filtersContext.inputAspectRatio;
+  srcParams->time_base = filtersContext.timeBase;
+  if (filtersContext.hwFramesCtx) {
+    srcParams->hw_frames_ctx = av_buffer_ref(filtersContext.hwFramesCtx.get());
+  }
+
+  sourceContext_ =
+      avfilter_graph_alloc_filter(filterGraph_.get(), buffersrc, "in");
+  TORCH_CHECK(sourceContext_, "Failed to allocate filter graph");
+
+  int status = av_buffersrc_parameters_set(sourceContext_, srcParams.get());
   TORCH_CHECK(
       status >= 0,
       "Failed to create filter graph: ",
-      filterArgs.str(),
-      ": ",
+      getFFMPEGErrorStringFromErrorCode(status));
+
+  status = avfilter_init_str(sourceContext_, nullptr);
+  TORCH_CHECK(
+      status >= 0,
+      "Failed to create filter graph : ",
       getFFMPEGErrorStringFromErrorCode(status));
 
   status = avfilter_graph_create_filter(
@@ -68,7 +86,8 @@ FilterGraph::FilterGraph(
       "Failed to create filter graph: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24, AV_PIX_FMT_NONE};
+  enum AVPixelFormat pix_fmts[] = {
+      filtersContext.outputFormat, AV_PIX_FMT_NONE};
 
   status = av_opt_set_int_list(
       sinkContext_,
@@ -93,16 +112,11 @@ FilterGraph::FilterGraph(
   inputs->pad_idx = 0;
   inputs->next = nullptr;
 
-  std::stringstream description;
-  description << "scale=" << frameContext.expectedWidth << ":"
-              << frameContext.expectedHeight;
-  description << ":sws_flags=bilinear";
-
   AVFilterInOut* outputsTmp = outputs.release();
   AVFilterInOut* inputsTmp = inputs.release();
   status = avfilter_graph_parse_ptr(
       filterGraph_.get(),
-      description.str().c_str(),
+      filtersContext.filters.c_str(),
       &inputsTmp,
       &outputsTmp,
       nullptr);
@@ -128,8 +142,7 @@ UniqueAVFrame FilterGraph::convert(const UniqueAVFrame& avFrame) {
   UniqueAVFrame filteredAVFrame(av_frame_alloc());
   status = av_buffersink_get_frame(sinkContext_, filteredAVFrame.get());
   TORCH_CHECK(
-      status >= AVSUCCESS, "Failed to fet frame from buffer sink context");
-  TORCH_CHECK_EQ(filteredAVFrame->format, AV_PIX_FMT_RGB24);
+      status >= AVSUCCESS, "Failed to get frame from buffer sink context");
 
   return filteredAVFrame;
 }
