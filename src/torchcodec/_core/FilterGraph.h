@@ -11,24 +11,28 @@
 
 namespace facebook::torchcodec {
 
-struct DecodedFrameContext {
-  int decodedWidth;
-  int decodedHeight;
-  AVPixelFormat decodedFormat;
-  AVRational decodedAspectRatio;
-  int expectedWidth;
-  int expectedHeight;
+struct FiltersContext {
+  int inputWidth = 0;
+  int inputHeight = 0;
+  AVPixelFormat inputFormat = AV_PIX_FMT_NONE;
+  AVRational inputAspectRatio = {0, 0};
+  int outputWidth = 0;
+  int outputHeight = 0;
+  AVPixelFormat outputFormat = AV_PIX_FMT_NONE;
 
-  bool operator==(const DecodedFrameContext&);
-  bool operator!=(const DecodedFrameContext&);
+  std::string filters;
+  AVRational timeBase = {0, 0};
+  UniqueAVBufferRef hwFramesCtx;
+
+  bool operator==(const FiltersContext&);
+  bool operator!=(const FiltersContext&);
 };
 
 class FilterGraph {
  public:
   FilterGraph(
-      const DecodedFrameContext& frameContext,
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase);
+      const FiltersContext& filtersContext,
+      const VideoStreamOptions& videoStreamOptions);
 
   UniqueAVFrame convert(const UniqueAVFrame& avFrame);
 
