@@ -498,21 +498,24 @@ std::optional<const AVCodec*> CudaDeviceInterface::findCodec(
 // We use the pre-defined functions or the color twist functions depending on
 // which one we find to be closer to the CPU results.
 //
-// The color twist functionality is described in a section that you'll have to
-// search for with "YUVToRGBColorTwist". I can't provide a link, because it's a
-// well known fact that developers enjoy scrolling through endless API ref pages
-// to find what they need, and NVidia knows to respect that. But don't worry if
-// you can't find it: it's completely useless (and wrong) anyway.
+// The color twist functionality is *partially* described in a section named
+// "YUVToRGBColorTwist". Importantly:
 //
-// So, what the doc do not tell you, which you ABSOLUTELY need to know to make
-// anything work, is that they expect the matrix coefficient to assume the input
-// Y is in [0, 1], and [U, V] in [-0.5, 0.5]. We're in luck, that's how we
-// defined ours above. HOWEVER, the function itself expects Y to be in [0, 255]
-// and U,V to be in [-128, 127]. So U and V need to be offset by -128 to center
-// them around 0. The offsets can be applied by adding a 4th column to the
-// matrix:
+// - The `nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx` function takes the YUV data
+//   and the color-conversion matrix as input. The function itself and the
+//   matrix assume different ranges for YUV values:
+// - The **matrix coefficient** must assume that Y is in [0, 1] and U,V are in
+//   [-0.5, 0.5]. That's how we defined our matrix above.
+// - The function `nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx` however expects all
+//   of the input Y, U, V to be in [0, 255]. That's how the data comes out of
+//   the decoder.
+// - But *internally*, `nppiNV12ToRGB_8u_ColorTwist32f_P2C3R_Ctx` needs U and V to
+//   be centered around 0, i.e. in [-128, 127]. So we need to apply a -128
+//   offset to U and V. Y doesn't need to be offset. The offset can be applied
+//   by adding a 4th column to the matrix.
 //
-// Previous matrix with new offset column:
+//
+// So our conversion matrix becomes the following, with new offset column:
 // tensor([[ 1.0000e+00, -3.3142e-09,  1.5748e+00,     0]
 //         [ 1.0000e+00, -1.8732e-01, -4.6812e-01,     -128]
 //         [ 1.0000e+00,  1.8556e+00,  4.6231e-09 ,    -128]])
