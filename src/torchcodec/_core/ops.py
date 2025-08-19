@@ -66,6 +66,8 @@ def load_torchcodec_shared_libraries():
             print(f"successfully loaded {pybind_ops_library_name}", flush=True)
             return
         except Exception as e:
+            # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
+            # but we should probably handle that via a proper logging mechanism.
             exceptions.append((ffmpeg_major_version, e))
     
     traceback = (
