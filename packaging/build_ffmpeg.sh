@@ -20,10 +20,6 @@
 set -eux
 
 prefix="${FFMPEG_ROOT}"
-args=""
-if [[ "$OSTYPE" == "msys" ]]; then
-   args="--toolchain=msvc"
-fi
 archive="https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${FFMPEG_VERSION}.tar.gz"
 
 build_dir=$(mktemp -d -t ffmpeg-build.XXXXXXXXXX)
@@ -66,7 +62,7 @@ tar -xf ffmpeg.tar.gz --strip-components 1
     --enable-avformat \
     --enable-avutil \
     --enable-swscale \
-    --enable-swresample ${args}
+    --enable-swresample
 
 make -j install
 ls ${prefix}/*
