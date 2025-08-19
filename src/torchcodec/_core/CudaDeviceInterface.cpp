@@ -4,6 +4,7 @@
 #include <torch/types.h>
 #include <mutex>
 
+#include "src/torchcodec/_core/Cache.h"
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
@@ -44,49 +45,11 @@ const int MAX_CUDA_GPUS = 128;
 // Set to -1 to have an infinitely sized cache. Set it to 0 to disable caching.
 // Set to a positive number to have a cache of that size.
 const int MAX_CONTEXTS_PER_GPU_IN_CACHE = -1;
-std::vector<AVBufferRef*> g_cached_hw_device_ctxs[MAX_CUDA_GPUS];
-std::mutex g_cached_hw_device_mutexes[MAX_CUDA_GPUS];
-
-torch::DeviceIndex getFFMPEGCompatibleDeviceIndex(const torch::Device& device) {
-  torch::DeviceIndex deviceIndex = device.index();
-  deviceIndex = std::max<at::DeviceIndex>(deviceIndex, 0);
-  TORCH_CHECK(deviceIndex >= 0, "Device index out of range");
-  // FFMPEG cannot handle negative device indices.
-  // For single GPU- machines libtorch returns -1 for the device index. So for
-  // that case we set the device index to 0.
-  // TODO: Double check if this works for multi-GPU machines correctly.
-  return deviceIndex;
-}
-
-void addToCacheIfCacheHasCapacity(
-    const torch::Device& device,
-    AVBufferRef* hwContext) {
-  torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
-  if (static_cast<int>(deviceIndex) >= MAX_CUDA_GPUS) {
-    return;
-  }
-  std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
-  if (MAX_CONTEXTS_PER_GPU_IN_CACHE >= 0 &&
-      g_cached_hw_device_ctxs[deviceIndex].size() >=
-          MAX_CONTEXTS_PER_GPU_IN_CACHE) {
-    return;
-  }
-  g_cached_hw_device_ctxs[deviceIndex].push_back(av_buffer_ref(hwContext));
-}
-
-AVBufferRef* getFromCache(const torch::Device& device) {
-  torch::DeviceIndex deviceIndex = getFFMPEGCompatibleDeviceIndex(device);
-  if (static_cast<int>(deviceIndex) >= MAX_CUDA_GPUS) {
-    return nullptr;
-  }
-  std::scoped_lock lock(g_cached_hw_device_mutexes[deviceIndex]);
-  if (g_cached_hw_device_ctxs[deviceIndex].size() > 0) {
-    AVBufferRef* hw_device_ctx = g_cached_hw_device_ctxs[deviceIndex].back();
-    g_cached_hw_device_ctxs[deviceIndex].pop_back();
-    return hw_device_ctx;
-  }
-  return nullptr;
-}
+PerGpuCache<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>
+    g_cached_hw_device_ctxs(MAX_CUDA_GPUS, MAX_CONTEXTS_PER_GPU_IN_CACHE);
+PerGpuCache<NppStreamContext> g_cached_npp_ctxs(
+    MAX_CUDA_GPUS,
+    MAX_CONTEXTS_PER_GPU_IN_CACHE);
 
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
 
@@ -143,14 +106,13 @@ AVBufferRef* getFFMPEGContextFromNewCudaContext(
 
 #endif
 
-AVBufferRef* getCudaContext(const torch::Device& device) {
+UniqueAVBufferRef getCudaContext(const torch::Device& device) {
   enum AVHWDeviceType type = av_hwdevice_find_type_by_name("cuda");
   TORCH_CHECK(type != AV_HWDEVICE_TYPE_NONE, "Failed to find cuda device");
-  torch::DeviceIndex nonNegativeDeviceIndex =
-      getFFMPEGCompatibleDeviceIndex(device);
+  torch::DeviceIndex nonNegativeDeviceIndex = getNonNegativeDeviceIndex(device);
 
-  AVBufferRef* hw_device_ctx = getFromCache(device);
-  if (hw_device_ctx != nullptr) {
+  UniqueAVBufferRef hw_device_ctx = g_cached_hw_device_ctxs.get(device);
+  if (hw_device_ctx) {
     return hw_device_ctx;
   }
 
@@ -161,15 +123,23 @@ AVBufferRef* getCudaContext(const torch::Device& device) {
   // 58.26.100 of avutil.
   // https://github.com/FFmpeg/FFmpeg/blob/4acb9b7d1046944345ae506165fb55883d04d8a6/doc/APIchanges#L265
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 26, 100)
-  return getFFMPEGContextFromExistingCudaContext(
-      device, nonNegativeDeviceIndex, type);
+  return UniqueAVBufferRef(getFFMPEGContextFromExistingCudaContext(
+      device, nonNegativeDeviceIndex, type));
 #else
-  return getFFMPEGContextFromNewCudaContext(
-      device, nonNegativeDeviceIndex, type);
+  return UniqueAVBufferRef(
+      getFFMPEGContextFromNewCudaContext(device, nonNegativeDeviceIndex, type));
 #endif
 }
 
-NppStreamContext createNppStreamContext(int deviceIndex) {
+std::unique_ptr<NppStreamContext> getNppStreamContext(
+    const torch::Device& device) {
+  torch::DeviceIndex nonNegativeDeviceIndex = getNonNegativeDeviceIndex(device);
+
+  std::unique_ptr<NppStreamContext> nppCtx = g_cached_npp_ctxs.get(device);
+  if (nppCtx) {
+    return nppCtx;
+  }
+
   // From 12.9, NPP recommends using a user-created NppStreamContext and using
   // the `_Ctx()` calls:
   // https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#npp-release-12-9-update-1
@@ -178,30 +148,21 @@ NppStreamContext createNppStreamContext(int deviceIndex) {
   // properties:
   // https://github.com/NVIDIA/CUDALibrarySamples/blob/d97803a40fab83c058bb3d68b6c38bd6eebfff43/NPP/README.md?plain=1#L54-L72
 
-  NppStreamContext nppCtx{};
+  nppCtx = std::make_unique<NppStreamContext>();
   cudaDeviceProp prop{};
-  cudaError_t err = cudaGetDeviceProperties(&prop, deviceIndex);
+  cudaError_t err = cudaGetDeviceProperties(&prop, nonNegativeDeviceIndex);
   TORCH_CHECK(
       err == cudaSuccess,
       "cudaGetDeviceProperties failed: ",
       cudaGetErrorString(err));
 
-  nppCtx.nCudaDeviceId = deviceIndex;
-  nppCtx.nMultiProcessorCount = prop.multiProcessorCount;
-  nppCtx.nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
-  nppCtx.nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
-  nppCtx.nSharedMemPerBlock = prop.sharedMemPerBlock;
-  nppCtx.nCudaDevAttrComputeCapabilityMajor = prop.major;
-  nppCtx.nCudaDevAttrComputeCapabilityMinor = prop.minor;
-
-  // TODO when implementing the cache logic, move these out. See other TODO
-  // below.
-  nppCtx.hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
-  err = cudaStreamGetFlags(nppCtx.hStream, &nppCtx.nStreamFlags);
-  TORCH_CHECK(
-      err == cudaSuccess,
-      "cudaStreamGetFlags failed: ",
-      cudaGetErrorString(err));
+  nppCtx->nCudaDeviceId = nonNegativeDeviceIndex;
+  nppCtx->nMultiProcessorCount = prop.multiProcessorCount;
+  nppCtx->nMaxThreadsPerMultiProcessor = prop.maxThreadsPerMultiProcessor;
+  nppCtx->nMaxThreadsPerBlock = prop.maxThreadsPerBlock;
+  nppCtx->nSharedMemPerBlock = prop.sharedMemPerBlock;
+  nppCtx->nCudaDevAttrComputeCapabilityMajor = prop.major;
+  nppCtx->nCudaDevAttrComputeCapabilityMinor = prop.minor;
 
   return nppCtx;
 }
@@ -217,8 +178,10 @@ CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
 
 CudaDeviceInterface::~CudaDeviceInterface() {
   if (ctx_) {
-    addToCacheIfCacheHasCapacity(device_, ctx_);
-    av_buffer_unref(&ctx_);
+    g_cached_hw_device_ctxs.addIfCacheHasCapacity(device_, std::move(ctx_));
+  }
+  if (nppCtx_) {
+    g_cached_npp_ctxs.addIfCacheHasCapacity(device_, std::move(nppCtx_));
   }
 }
 
@@ -231,7 +194,8 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   torch::Tensor dummyTensorForCudaInitialization = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
   ctx_ = getCudaContext(device_);
-  codecContext->hw_device_ctx = av_buffer_ref(ctx_);
+  nppCtx_ = getNppStreamContext(device_);
+  codecContext->hw_device_ctx = av_buffer_ref(ctx_.get());
   return;
 }
 
@@ -310,13 +274,14 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  // TODO cache the NppStreamContext! It currently gets re-recated for every
-  // single frame. The cache should be per-device, similar to the existing
-  // hw_device_ctx cache. When implementing the cache logic, the
-  // NppStreamContext hStream and nStreamFlags should not be part of the cache
-  // because they may change across calls.
-  NppStreamContext nppCtx = createNppStreamContext(
-      static_cast<int>(getFFMPEGCompatibleDeviceIndex(device_)));
+  torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
+  nppCtx_->hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
+  cudaError_t err =
+      cudaStreamGetFlags(nppCtx_->hStream, &nppCtx_->nStreamFlags);
+  TORCH_CHECK(
+      err == cudaSuccess,
+      "cudaStreamGetFlags failed: ",
+      cudaGetErrorString(err));
 
   NppiSize oSizeROI = {width, height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
@@ -342,7 +307,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
           dst.stride(0),
           oSizeROI,
           bt709FullRangeColorTwist,
-          nppCtx);
+          *nppCtx_);
     } else {
       // If not full range, we assume studio limited range.
       // The color conversion matrix for BT.709 limited range should be:
@@ -359,7 +324,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
           static_cast<Npp8u*>(dst.data_ptr()),
           dst.stride(0),
           oSizeROI,
-          nppCtx);
+          *nppCtx_);
     }
   } else {
     // TODO we're assuming BT.601 color space (and probably limited range) by
@@ -371,7 +336,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         static_cast<Npp8u*>(dst.data_ptr()),
         dst.stride(0),
         oSizeROI,
-        nppCtx);
+        *nppCtx_);
   }
   TORCH_CHECK(status == NPP_SUCCESS, "Failed to convert NV12 frame.");
 }
