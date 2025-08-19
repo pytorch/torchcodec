@@ -151,7 +151,7 @@ function(make_torchcodec_libraries
     endif()
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
-        MODULE  # Use MODULE like pybind_ops instead of SHARED
+        SHARED
         "${custom_ops_sources}"
         "${custom_ops_dependencies}"
     )
