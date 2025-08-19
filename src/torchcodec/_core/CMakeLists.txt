@@ -145,9 +145,6 @@ function(make_torchcodec_libraries
         ${core_library_name}
         ${Python3_LIBRARIES}
     )
-    if (WIN32)
-        list(APPEND custom_ops_dependencies Python3::Python)
-    endif()
     make_torchcodec_sublibrary(
         "${custom_ops_library_name}"
         SHARED
