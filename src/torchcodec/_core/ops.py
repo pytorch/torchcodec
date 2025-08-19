@@ -50,29 +50,8 @@ def load_torchcodec_shared_libraries():
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
             print(f"Loading {decoder_library_name}", flush=True)
-            core_path = _get_extension_path(decoder_library_name)
-            torch.ops.load_library(core_path)
+            torch.ops.load_library(_get_extension_path(decoder_library_name))
             print(f"successfully loaded {decoder_library_name}", flush=True)
-            
-            # On Windows, try to preload the core DLL to help resolve dependencies
-            if sys.platform == "win32":
-                try:
-                    import ctypes
-                    
-                    # Add the DLL directory to help with dependency resolution
-                    dll_dir = os.path.dirname(core_path)
-                    if hasattr(os, 'add_dll_directory'):
-                        try:
-                            os.add_dll_directory(dll_dir)
-                            print(f"Added DLL directory: {dll_dir}", flush=True)
-                        except Exception as add_dir_e:
-                            print(f"Could not add DLL directory: {add_dir_e}", flush=True)
-                    
-                    # Preload the core library so it's available for dependency resolution
-                    ctypes.CDLL(core_path)
-                    print(f"Preloaded core library via ctypes", flush=True)
-                except Exception as preload_e:
-                    print(f"Could not preload core library: {preload_e}", flush=True)
             
             print(f"Loading {custom_ops_library_name}", flush=True)
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
@@ -87,43 +66,8 @@ def load_torchcodec_shared_libraries():
             print(f"successfully loaded {pybind_ops_library_name}", flush=True)
             return
         except Exception as e:
-            # Enhanced error reporting with Windows-specific details
-            error_msg = str(e)
-            
-            # On Windows, try to get more detailed DLL loading error information
-            if sys.platform == "win32":
-                try:
-                    import ctypes
-                    # Get the last Windows error code
-                    win_error = ctypes.get_last_error()
-                    if win_error != 0:
-                        win_error_msg = ctypes.FormatError(win_error)
-                        error_msg += f" [Windows Error {win_error}: {win_error_msg}]"
-                except Exception:
-                    pass
-                
-                # Check if the files actually exist
-                try:
-                    core_path = _get_extension_path(decoder_library_name)
-                    custom_ops_path = _get_extension_path(custom_ops_library_name)
-                    pybind_ops_path = _get_extension_path(pybind_ops_library_name)
-                    
-                    paths_info = []
-                    for name, path in [
-                        ("core", core_path), 
-                        ("custom_ops", custom_ops_path), 
-                        ("pybind_ops", pybind_ops_path)
-                    ]:
-                        exists = os.path.exists(path)
-                        size = os.path.getsize(path) if exists else 0
-                        paths_info.append(f"{name}: {path} (exists: {exists}, size: {size})")
-                    
-                    error_msg += f" [Library paths: {'; '.join(paths_info)}]"
-                except Exception as path_e:
-                    error_msg += f" [Could not check library paths: {path_e}]"
-            
-            exceptions.append((ffmpeg_major_version, error_msg))
-
+            exceptions.append((ffmpeg_major_version, e))
+    
     traceback = (
         "\n[start of libtorchcodec loading traceback]\n"
         + "\n".join(f"FFmpeg version {v}: {str(e)}" for v, e in exceptions)
