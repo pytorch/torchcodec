@@ -152,7 +152,7 @@ elseif (WIN32)
     set(lib_dir "bin")
     
     # Option to use MSVC-compatible FFmpeg libraries on Windows
-    option(USE_MSVC_FFMPEG "Use MSVC-compatible FFmpeg libraries on Windows" ON)
+    option(USE_MSVC_FFMPEG "Use MSVC-compatible FFmpeg libraries on Windows" OFF)
     
     if(USE_MSVC_FFMPEG)
         message(STATUS "Using MSVC-compatible FFmpeg libraries for Windows")
