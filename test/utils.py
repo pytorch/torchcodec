@@ -290,10 +290,15 @@ class TestContainerFile:
 
     def create_custom_frame_mappings(self, stream_index: int) -> None:
         result = json.loads(self.generate_custom_frame_mappings(stream_index))
-        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
+        # These keys are prefixed with "pkt_" in ffmpeg 4 and ffmpeg 5
+        pts_key = "pkt_pts" if "pts" not in result["frames"][0] else "pts"
+        duration_key = (
+            "pkt_duration" if "duration" not in result["frames"][0] else "duration"
+        )
+        all_frames = torch.tensor([float(frame[pts_key]) for frame in result["frames"]])
         is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
         duration = torch.tensor(
-            [float(frame["duration"]) for frame in result["frames"]]
+            [float(frame[duration_key]) for frame in result["frames"]]
         )
         assert (
             len(all_frames) == len(is_key_frame) == len(duration)
