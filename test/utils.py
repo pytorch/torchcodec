@@ -15,6 +15,7 @@ import torch
 
 from torchcodec._core import get_ffmpeg_library_versions
 
+IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
 # effectively marked to be skipped in pytest_collection_modifyitems() of
