@@ -188,7 +188,7 @@ jobs:
 
         # Prepare conda
         set +x && eval "$($(which conda) shell.bash hook)" && set -x
-        
+
         echo '::group::Create build environment'
         conda create \
           --name ci \
@@ -199,29 +199,29 @@ jobs:
 
         # Install PyTorch
         python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cpu
-        
+
         # Install build dependencies
         conda install cmake pkg-config pybind11 "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
-        
+
         # Ensure FFmpeg DLLs are in PATH for Windows
         conda_env_path=$(conda info --base)/envs/ci
         library_bin_path="$conda_env_path/Library/bin"
         echo "Adding conda Library/bin to PATH: $library_bin_path"
         echo "$library_bin_path" >> $GITHUB_PATH
-        
+
         # Verify FFmpeg is available
         ffmpeg -version
-        
+
         # Install torchcodec from source in development mode
         pip install -e ".[dev]" --no-build-isolation -vv
-        
+
         # Add torchcodec source directory to DLL search path for Windows
         torchcodec_dll_path="$(pwd)/src/torchcodec"
         echo "Adding torchcodec DLL path: $torchcodec_dll_path"
         export PATH="$torchcodec_dll_path:$PATH"
-        
+
         # Test torchcodec import with detailed error reporting
         python -c "import torch; import torchcodec"
-        
+
         # Run tests
         pytest test -vvv

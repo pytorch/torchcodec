@@ -6,8 +6,6 @@
 
 import io
 import json
-import os
-import sys
 import warnings
 from types import ModuleType
 from typing import List, Optional, Tuple, Union
@@ -49,27 +47,20 @@ def load_torchcodec_shared_libraries():
         custom_ops_library_name = f"libtorchcodec_custom_ops{ffmpeg_major_version}"
         pybind_ops_library_name = f"libtorchcodec_pybind_ops{ffmpeg_major_version}"
         try:
-            print(f"Loading {decoder_library_name}", flush=True)
             torch.ops.load_library(_get_extension_path(decoder_library_name))
-            print(f"successfully loaded {decoder_library_name}", flush=True)
-            
-            print(f"Loading {custom_ops_library_name}", flush=True)
             torch.ops.load_library(_get_extension_path(custom_ops_library_name))
-            print(f"successfully loaded {custom_ops_library_name}", flush=True)
 
-            print(f"Loading {pybind_ops_library_name}", flush=True)
             pybind_ops_library_path = _get_extension_path(pybind_ops_library_name)
             global _pybind_ops
             _pybind_ops = _load_pybind11_module(
                 pybind_ops_module_name, pybind_ops_library_path
             )
-            print(f"successfully loaded {pybind_ops_library_name}", flush=True)
             return
         except Exception as e:
             # TODO: recording and reporting exceptions this way is OK for now as  it's just for debugging,
             # but we should probably handle that via a proper logging mechanism.
             exceptions.append((ffmpeg_major_version, e))
-    
+
     traceback = (
         "\n[start of libtorchcodec loading traceback]\n"
         + "\n".join(f"FFmpeg version {v}: {str(e)}" for v, e in exceptions)
