@@ -88,16 +88,17 @@ function(make_torchcodec_libraries
     #
     # 1. libtorchcodec_coreN.{ext}: Base library which contains the
     #    implementation of VideoDecoder and everything VideoDecoder needs. On
-    #    Linux, {ext} is so. On Mac, it is dylib.
+    #    Linux, {ext} is so. On Mac, it is dylib. On Windows it's dll.
     #
     # 2. libtorchcodec_custom_opsN.{ext}: Implementation of the PyTorch custom
     #    ops. Depends on libtorchcodec_coreN.{ext}. On Linux, {ext} is so.
-    #    On Mac, it is dylib.
+    #    On Mac, it is dylib. On Windows it's dll.
     #
     # 3. libtorchcodec_pybind_opsN.{ext}: Implementation of the pybind11 ops. We
     #    keep these separate from the PyTorch custom ops because we have to
     #    load these libraries separately on the Python side. Depends on
-    #    libtorchcodec_coreN.{ext}. On BOTH Linux and Mac {ext} is so.
+    #    libtorchcodec_coreN.{ext}. On BOTH Linux and Mac {ext} is so. On
+    #    Windows, it's pyd.
 
     # 1. Create libtorchcodec_coreN.{ext}.
     set(core_library_name "libtorchcodec_core${ffmpeg_major_version}")
@@ -180,6 +181,9 @@ function(make_torchcodec_libraries
     )
 
     if(WIN32)
+      # On Windows, we need to set the suffix to .pyd so that Python can
+      # import the shared library as a module. Just setting the MODULE type
+      # isn't enough.
       set_target_properties(${pybind_ops_library_name} PROPERTIES SUFFIX ".pyd")
     endif()
 
@@ -232,7 +236,7 @@ function(make_torchcodec_libraries
     install(
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows
     )
 
 endfunction()
