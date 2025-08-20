@@ -1292,7 +1292,7 @@ class TestVideoDecoder:
             # Return the custom frame mappings as a JSON string
             return custom_frame_mappings
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("stream_index", [0, 3])
     @pytest.mark.parametrize(
         "method",
@@ -1348,7 +1348,7 @@ class TestVideoDecoder:
             ref_frame6 = H265_VIDEO.get_frame_data_by_index(5)
             assert_frames_equal(ref_frame6, decoder.get_frame_played_at(0.5).data)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_custom_frame_mappings_init_fails(self, device):
         # Init fails if "approximate" seek mode is used with custom frame mappings
         with pytest.raises(ValueError, match="seek_mode"):

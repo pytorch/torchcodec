@@ -409,9 +409,12 @@ def read_custom_frame_mappings(
             "Invalid custom frame mappings. "
             "It should be a valid JSON string or a JSON file object."
         )
+    # These keys are prefixed with "pkt_" in ffmpeg 4 and ffmpeg 5
+    pts_key = "pkt_pts" if "pts" not in input_data["frames"][0] else "pts"
+    duration_key = "pkt_duration" if "duration" not in input_data["frames"][0] else "duration"
     all_frames, is_key_frame, duration = zip(
         *[
-            (float(frame["pts"]), frame["key_frame"], float(frame["duration"]))
+            (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
             for frame in input_data["frames"]
         ]
     )
