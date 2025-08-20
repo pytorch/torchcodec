@@ -35,7 +35,7 @@ def main():
             cmd = f"""ffmpeg -y -i {VIDEO_PATH} -map 0:{stream} -vf select=eq(n\\,{frame}) -vsync vfr -q:v 2 {VIDEO_PATH}.stream{stream}.frame{frame_name}.bmp"""
             subprocess.run(cmd.split(), check=True)
 
-    # 12 is the last frame of this video. ??
+    # Extract individual frames at specific timestamps, including the last frame of the video.
     seek_ts = [6.0, 6.1, 10.0, 12.979633]
     ts_name = [f"{seek_ts:06f}" for seek_ts in seek_ts]
     print(ts_name)
