@@ -411,7 +411,9 @@ def read_custom_frame_mappings(
         )
     # These keys are prefixed with "pkt_" in ffmpeg 4 and ffmpeg 5
     pts_key = "pkt_pts" if "pts" not in input_data["frames"][0] else "pts"
-    duration_key = "pkt_duration" if "duration" not in input_data["frames"][0] else "duration"
+    duration_key = (
+        "pkt_duration" if "duration" not in input_data["frames"][0] else "duration"
+    )
     all_frames, is_key_frame, duration = zip(
         *[
             (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
