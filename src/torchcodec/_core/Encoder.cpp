@@ -104,10 +104,14 @@ AudioEncoder::~AudioEncoder() {
 
 void AudioEncoder::close_avio() {
   if (avFormatContext_ && avFormatContext_->pb) {
-    avio_flush(avFormatContext_->pb);
+    if (avFormatContext_->pb->error == 0) {
+      avio_flush(avFormatContext_->pb);
+    }
 
     if (!avioContextHolder_) {
-      avio_close(avFormatContext_->pb);
+      if (avFormatContext_->pb->error == 0) {
+        avio_close(avFormatContext_->pb);
+      }
       // avoids closing again in destructor, which would segfault.
       avFormatContext_->pb = nullptr;
     }
