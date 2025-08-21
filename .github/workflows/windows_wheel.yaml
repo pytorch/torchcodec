@@ -70,8 +70,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        # ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-        ffmpeg-version-for-tests: ['6.1.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        # ffmpeg-version-for-tests: ['6.1.1']
     needs: build
     steps:
       - uses: actions/download-artifact@v4
@@ -107,19 +107,6 @@ jobs:
           assert_ffmpeg_not_installed
           conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" -c conda-forge
           ffmpeg -version
-          # On Windows, ensure the conda Library/bin directory is in PATH
-          # This is needed for Windows DLL loading to find FFmpeg DLLs
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            conda_env_path=$(conda info --base)/envs/test
-            library_bin_path="$conda_env_path/Library/bin"
-            echo "Adding conda Library/bin to PATH: $library_bin_path"
-            echo "$library_bin_path" >> $GITHUB_PATH
-            # Verify FFmpeg DLLs are accessible
-            echo "Checking if FFmpeg DLLs are in PATH:"
-            where avutil.dll || echo "avutil.dll not found in PATH"
-            where avcodec.dll || echo "avcodec.dll not found in PATH"
-            where avformat.dll || echo "avformat.dll not found in PATH"
-          fi
       - name: Test torchcodec import after FFmpeg installation
         run: |
           echo "Testing torchcodec import after FFmpeg is installed and PATH is updated..."
@@ -156,17 +143,9 @@ jobs:
           # - "3.12"
         runner: ["windows.4xlarge"]
         gpu-arch-type: ["cpu"]
-        ffmpeg-version-for-tests: ['6.1.1']
-        # ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
-        # TODO: put GPU testing back
-        # include:
-        #   - python-version: "3.9"
-        #     runner: windows.g5.4xlarge.nvidia.gpu
-        #     gpu-arch-type: cuda
-        #     gpu-arch-version: "11.8"
+        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
       fail-fast: false
-    # needs: build
-    needs: generate-matrix ## TODO REMOVE
+    needs: generate-matrix
     uses: pytorch/test-infra/.github/workflows/windows_job.yml@main
     permissions:
       id-token: write
