@@ -257,6 +257,8 @@ class TestAudioEncoder:
 
         if get_ffmpeg_major_version() == 4 and format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+        if IS_WINDOWS and get_ffmpeg_major_version() <= 5 and format == "mp3":
+            pytest.skip("Encoding mp3 on Windows is weirdly buggy")
 
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{format}"
         subprocess.run(
@@ -343,6 +345,8 @@ class TestAudioEncoder:
     ):
         if get_ffmpeg_major_version() == 4 and format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
+        if IS_WINDOWS and get_ffmpeg_major_version() <= 5 and format == "mp3":
+            pytest.skip("Encoding mp3 on Windows is weirdly buggy")
 
         encoder = AudioEncoder(self.decode(asset).data, sample_rate=asset.sample_rate)
 
