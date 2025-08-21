@@ -38,7 +38,7 @@ jobs:
       build-python-only: "disable"
       # Explicitly avoid 3.13 because 3.13t builds don't work.
       # TODO remove eventually.
-      python-versions: ["3.9", "3.10", "3.11", "3.12"]
+      python-versions: '["3.9", "3.10", "3.11", "3.12"]'
 
   build:
     needs: generate-matrix
