@@ -421,35 +421,53 @@ def _get_and_validate_stream_metadata(
 def read_custom_frame_mappings(
     custom_frame_mappings: Union[bytes, bytearray, str]
 ) -> tuple[Tensor, Tensor, Tensor]:
+    """Parse custom frame mappings from JSON data and extract frame metadata.
+
+    Args:
+        custom_frame_mappings: JSON data containing frame metadata, provided as:
+            - A JSON string (str, bytes, or bytearray)
+            - A file-like object with a read() method
+
+    Returns:
+        A tuple of three tensors:
+        - all_frames (Tensor): Presentation timestamps (PTS) for each frame
+        - is_key_frame (Tensor): Boolean tensor indicating which frames are key frames
+        - duration (Tensor): Duration of each frame
+    """
     try:
-        if hasattr(custom_frame_mappings, "read"):
-            input_data = json.load(custom_frame_mappings)
-        else:
-            input_data = json.loads(custom_frame_mappings)
-    except json.JSONDecodeError:
-        raise ValueError(
-            "Invalid custom frame mappings. "
-            "It should be a valid JSON string or a JSON file object."
+        input_data = (
+            json.load(custom_frame_mappings)
+            if hasattr(custom_frame_mappings, "read")
+            else json.loads(custom_frame_mappings)
         )
-    # These keys are prefixed with "pkt_" in ffmpeg 4 and ffmpeg 5
-    pts_key = "pkt_pts" if "pts" not in input_data["frames"][0] else "pts"
-    duration_key = (
-        "pkt_duration" if "duration" not in input_data["frames"][0] else "duration"
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Invalid custom frame mappings: {e}. It should be a valid JSON string or a file-like object."
+        ) from e
+
+    if not input_data or "frames" not in input_data:
+        raise ValueError(
+            "Invalid custom frame mappings. The input is empty or missing the required 'frames' key."
+        )
+
+    first_frame = input_data["frames"][0]
+    pts_key = next((key for key in ("pts", "pkt_pts") if key in first_frame), None)
+    duration_key = next(
+        (key for key in ("duration", "pkt_duration") if key in first_frame), None
     )
-    all_frames, is_key_frame, duration = zip(
-        *[
-            (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
-            for frame in input_data["frames"]
-        ]
-    )
-    all_frames = Tensor(all_frames)
-    is_key_frame = Tensor(is_key_frame)
-    duration = Tensor(duration)
+    key_frame_present = "key_frame" in first_frame
+
+    if not pts_key or not duration_key or not key_frame_present:
+        raise ValueError(
+            "Invalid custom frame mappings. The 'pts', 'duration', and 'key_frame' keys are required in the frame metadata."
+        )
+
+    frame_data = [
+        (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
+        for frame in input_data["frames"]
+    ]
+    all_frames, is_key_frame, duration = map(Tensor, zip(*frame_data))
     assert (
         len(all_frames) == len(is_key_frame) == len(duration)
     ), "Mismatched lengths in frame index data"
-    return (
-        all_frames,
-        is_key_frame,
-        duration,
-    )
+    return all_frames, is_key_frame, duration
