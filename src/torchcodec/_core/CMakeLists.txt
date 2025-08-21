@@ -57,20 +57,6 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
-    if(WIN32)
-        # On Windows, the built artifacts are put in Release/Debug
-        # subdirectories by default. We want to avoid that, otherwise our
-        # install() step would not know where to find those.
-        set_target_properties(${library_name} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-            ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-        )
-    endif()
-
     target_link_libraries(
         ${library_name}
         PUBLIC
