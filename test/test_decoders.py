@@ -1343,45 +1343,56 @@ class TestVideoDecoder:
             )
 
     @pytest.mark.parametrize("device", all_supported_devices())
-    def test_custom_frame_mappings_init_fails(self, tmp_path, device):
-        # Init fails if "approximate" seek mode is used with custom frame mappings
-        with pytest.raises(ValueError, match="seek_mode"):
+    @pytest.mark.parametrize(
+        "custom_frame_mappings,expected_match",
+        [
+            (NASA_VIDEO.generate_custom_frame_mappings(0), "seek_mode"),
+            ("{}", "The input is empty or missing the required 'frames' key."),
+            (
+                '{"valid": "json"}',
+                "The input is empty or missing the required 'frames' key.",
+            ),
+            (
+                '{"frames": [{"missing": "keys"}]}',
+                "The 'pts', 'duration', and 'key_frame' keys are required in the frame metadata.",
+            ),
+        ],
+    )
+    def test_custom_frame_mappings_init_fails(
+        self, device, custom_frame_mappings, expected_match
+    ):
+        with pytest.raises(ValueError, match=expected_match):
             VideoDecoder(
                 NASA_VIDEO.path,
                 stream_index=0,
                 device=device,
-                seek_mode="approximate",
-                custom_frame_mappings=NASA_VIDEO.generate_custom_frame_mappings(3),
+                custom_frame_mappings=custom_frame_mappings,
+                seek_mode=(
+                    "approximate"
+                    if expected_match == "seek_mode"
+                    else "custom_frame_mappings"
+                ),
             )
-        # Write an invalid JSON file for testing
+
+    @pytest.mark.parametrize("device", all_supported_devices())
+    def test_custom_frame_mappings_init_fails_invalid_json(self, tmp_path, device):
         invalid_json_path = tmp_path / "invalid_json"
         with open(invalid_json_path, "w+") as f:
             f.write("""'{"invalid": "json"'""")
-        # Init fails if invalid JSON bytes are passed in as custom frame mappings
-        with pytest.raises(
-            ValueError,
-            match="Invalid custom frame mappings. It should be a valid JSON string or a JSON file object.",
-        ):
-            with open(invalid_json_path, "r") as f:
-                VideoDecoder(
-                    NASA_VIDEO.path,
-                    stream_index=0,
-                    device=device,
-                    custom_frame_mappings=f,
-                )
-        # Init fails if invalid JSON string is passed in as custom frame mappings
-        invalid_json_path = tmp_path / "invalid_json"
-        with pytest.raises(
-            ValueError,
-            match="Invalid custom frame mappings. It should be a valid JSON string or a JSON file object.",
-        ):
-            with open(invalid_json_path, "r") as f:
-                VideoDecoder(
-                    NASA_VIDEO.path,
-                    stream_index=0,
-                    device=device,
-                    custom_frame_mappings=f.read(),
-                )
+
+        # Test both file object and string
+        with open(invalid_json_path, "r") as file_obj:
+            for custom_frame_mappings in [
+                file_obj,
+                file_obj.read(),
+            ]:
+                with pytest.raises(ValueError, match="Invalid custom frame mappings"):
+                    VideoDecoder(
+                        NASA_VIDEO.path,
+                        stream_index=0,
+                        device=device,
+                        custom_frame_mappings=custom_frame_mappings,
+                    )
 
 
 class TestAudioDecoder:
