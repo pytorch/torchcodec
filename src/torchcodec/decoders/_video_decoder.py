@@ -63,7 +63,24 @@ class VideoDecoder:
             probably is. Default: "exact".
             Read more about this parameter in:
             :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
+        custom_frame_mappings (str, bytes, or file-like object, optional):
+            Mapping of frames to their metadata, typically generated via ffprobe.
+            This enables accurate frame seeking without requiring a full video scan
+            as in `exact` mode. Expected JSON format:
 
+            .. code-block:: json
+
+                {
+                    "frames": [
+                        {
+                            "pts": 0,
+                            "duration": 1001,
+                            "key_frame": 1
+                            ...  # Other metadata fields can be included
+                        },
+                        ...
+                    ]
+                }
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.
@@ -81,27 +98,32 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate", "custom_frame_mappings"] = "exact",
-        custom_frame_mappings: Optional[Union[bytes, bytearray, str]] = None,
+        custom_frame_mappings: Optional[
+            Union[str, bytes, io.RawIOBase, io.BufferedReader]
+        ] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
-        allowed_seek_modes = ("exact", "approximate")
+        allowed_seek_modes = ("exact", "approximate", "custom_frame_mappings")
         if seek_mode not in allowed_seek_modes:
             raise ValueError(
                 f"Invalid seek mode ({seek_mode}). "
                 f"Supported values are {', '.join(allowed_seek_modes)}."
             )
-        if custom_frame_mappings:
-            if seek_mode not in ("exact", "custom_frame_mappings"):
-                raise ValueError(
-                    "While setting custom frame mappings, do not set `seek_mode`."
-                )
-            # Set seek mode to avoid exact mode scan
+
+        # Validate seek_mode and custom_frame_mappings are not mismatched
+        if custom_frame_mappings is not None and seek_mode == "approximate":
+            raise ValueError(
+                "custom_frame_mappings is incompatible with seek_mode='approximate'. "
+                "Use seek_mode='custom_frame_mappings' or leave it unspecified to automatically use custom frame mappings."
+            )
+
+        # Auto-select custom_frame_mappings seek_mode and process data when mappings are provided
+        custom_frame_mappings_data = None
+        if custom_frame_mappings is not None:
             seek_mode = "custom_frame_mappings"
-        custom_frame_mappings_data = (
-            read_custom_frame_mappings(custom_frame_mappings)
-            if custom_frame_mappings is not None
-            else None
-        )
+            custom_frame_mappings_data = read_custom_frame_mappings(
+                custom_frame_mappings
+            )
 
         self._decoder = create_decoder(source=source, seek_mode=seek_mode)
 
