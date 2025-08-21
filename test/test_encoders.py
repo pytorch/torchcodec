@@ -439,7 +439,7 @@ class TestAudioEncoder:
 
         sample_rate = 16_000
         source_samples = torch.rand(num_channels_input, 1_000)
-        format = "mp3"
+        format = "flac"
 
         encoder = AudioEncoder(source_samples, sample_rate=sample_rate)
         params = dict(num_channels=num_channels_output)
