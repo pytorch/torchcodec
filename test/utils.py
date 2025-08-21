@@ -14,6 +14,7 @@ import pytest
 import torch
 
 from torchcodec._core import get_ffmpeg_library_versions
+from torchcodec.decoders._video_decoder import read_custom_frame_mappings
 
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
@@ -267,7 +268,9 @@ class TestContainerFile:
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
-            self.create_custom_frame_mappings(stream_index)
+            self._custom_frame_mappings_data[stream_index] = read_custom_frame_mappings(
+                self.generate_custom_frame_mappings(stream_index)
+            )
         return self._custom_frame_mappings_data[stream_index]
 
     def generate_custom_frame_mappings(self, stream_index: int) -> str:
@@ -287,27 +290,6 @@ class TestContainerFile:
             text=True,
         ).stdout
         return result
-
-    def create_custom_frame_mappings(self, stream_index: int) -> None:
-        result = json.loads(self.generate_custom_frame_mappings(stream_index))
-        # These keys are prefixed with "pkt_" in ffmpeg 4 and ffmpeg 5
-        pts_key = "pkt_pts" if "pts" not in result["frames"][0] else "pts"
-        duration_key = (
-            "pkt_duration" if "duration" not in result["frames"][0] else "duration"
-        )
-        all_frames = torch.tensor([float(frame[pts_key]) for frame in result["frames"]])
-        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
-        duration = torch.tensor(
-            [float(frame[duration_key]) for frame in result["frames"]]
-        )
-        assert (
-            len(all_frames) == len(is_key_frame) == len(duration)
-        ), "Mismatched lengths in frame index data"
-        self._custom_frame_mappings_data[stream_index] = (
-            all_frames,
-            is_key_frame,
-            duration,
-        )
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
