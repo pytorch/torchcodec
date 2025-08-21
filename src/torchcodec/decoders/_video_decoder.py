@@ -419,13 +419,13 @@ def _get_and_validate_stream_metadata(
 
 
 def read_custom_frame_mappings(
-    custom_frame_mappings: Union[bytes, bytearray, str]
+    custom_frame_mappings: Union[str, bytes, io.RawIOBase, io.BufferedReader]
 ) -> tuple[Tensor, Tensor, Tensor]:
     """Parse custom frame mappings from JSON data and extract frame metadata.
 
     Args:
         custom_frame_mappings: JSON data containing frame metadata, provided as:
-            - A JSON string (str, bytes, or bytearray)
+            - A JSON string (str, bytes)
             - A file-like object with a read() method
 
     Returns:
