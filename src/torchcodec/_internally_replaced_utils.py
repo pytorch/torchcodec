@@ -45,12 +45,15 @@ def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
         module_name,
         library_path,
     )
-    if spec is None:
+    if spec is None or spec.loader is None:
         raise ImportError(
-            f"Unable to load spec for module {module_name} from path {library_path}"
+            f"Unable to load spec or spec.loader for module {module_name} from path {library_path}"
         )
 
-    return importlib.util.module_from_spec(spec)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    return mod
 
 
 # Note that the return value from this function must match the value used as
