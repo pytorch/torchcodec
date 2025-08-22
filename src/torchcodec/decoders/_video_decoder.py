@@ -120,7 +120,7 @@ class VideoDecoder:
         # Auto-select custom_frame_mappings seek_mode and process data when mappings are provided
         custom_frame_mappings_data = None
         if custom_frame_mappings is not None:
-            seek_mode = "custom_frame_mappings"
+            seek_mode = "custom_frame_mappings"  # type: ignore[assignment]
             custom_frame_mappings_data = _read_custom_frame_mappings(
                 custom_frame_mappings
             )
