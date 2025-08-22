@@ -52,7 +52,7 @@ def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
 
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    
+
     return mod
 
 
