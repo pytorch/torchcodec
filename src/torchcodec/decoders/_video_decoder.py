@@ -76,8 +76,7 @@ class VideoDecoder:
                             "pts": 0,
                             "duration": 1001,
                             "key_frame": 1
-                        },
-                        ...
+                        }
                     ]
                 }
 
