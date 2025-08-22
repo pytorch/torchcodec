@@ -70,7 +70,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        # ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.0.1', '6.1.1', '7.0.1']
         # ffmpeg-version-for-tests: ['6.1.1']
     needs: build
     steps:
@@ -143,7 +144,8 @@ jobs:
           # - "3.12"
         runner: ["windows.4xlarge"]
         gpu-arch-type: ["cpu"]
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        # ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.0.1', '6.1.1', '7.0.1']
       fail-fast: false
     needs: generate-matrix
     uses: pytorch/test-infra/.github/workflows/windows_job.yml@main
