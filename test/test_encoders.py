@@ -258,6 +258,7 @@ class TestAudioEncoder:
         if get_ffmpeg_major_version() == 4 and format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
         if IS_WINDOWS and get_ffmpeg_major_version() <= 5 and format == "mp3":
+            # TODO: https://github.com/pytorch/torchcodec/issues/837
             pytest.skip("Encoding mp3 on Windows is weirdly buggy")
 
         encoded_by_ffmpeg = tmp_path / f"ffmpeg_output.{format}"
@@ -317,6 +318,7 @@ class TestAudioEncoder:
 
         if IS_WINDOWS and format == "mp3":
             # We're getting a "Could not open input file" on Windows mp3 files when decoding.
+            # TODO: https://github.com/pytorch/torchcodec/issues/837
             return
 
         samples_by_us = self.decode(encoded_by_us)
@@ -346,6 +348,7 @@ class TestAudioEncoder:
         if get_ffmpeg_major_version() == 4 and format == "wav":
             pytest.skip("Swresample with FFmpeg 4 doesn't work on wav files")
         if IS_WINDOWS and get_ffmpeg_major_version() <= 5 and format == "mp3":
+            # TODO: https://github.com/pytorch/torchcodec/issues/837
             pytest.skip("Encoding mp3 on Windows is weirdly buggy")
 
         encoder = AudioEncoder(self.decode(asset).data, sample_rate=asset.sample_rate)
@@ -369,6 +372,7 @@ class TestAudioEncoder:
 
         if not (IS_WINDOWS and format == "mp3"):
             # We're getting a "Could not open input file" on Windows mp3 files when decoding.
+            # TODO: https://github.com/pytorch/torchcodec/issues/837
             torch.testing.assert_close(
                 self.decode(encoded_file).data, self.decode(encoded_output).data
             )
