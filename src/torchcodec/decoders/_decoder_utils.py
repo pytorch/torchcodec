@@ -48,5 +48,5 @@ def create_decoder(
         f"Unknown source type: {type(source)}. "
         "Supported types are str, Path, bytes, Tensor and file-like objects with "
         "read(self, size: int) -> bytes and "
-        "seek(self, offset: int, whence: int) -> bytes methods."
+        "seek(self, offset: int, whence: int) -> int methods."
     )
