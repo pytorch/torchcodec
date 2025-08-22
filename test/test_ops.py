@@ -1038,7 +1038,7 @@ class TestAudioDecoderOps:
                 self.num_reads += 1
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 self.num_seeks += 1
                 return self._file.seek(offset, whence)
 
@@ -1086,8 +1086,8 @@ class TestAudioDecoderOps:
 
     def test_file_like_method_check_fails(self):
         class ReadMethodMissing:
-            def seek(self, offset: int, whence: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int, whence: int) -> int:
+                return 0
 
         with pytest.raises(RuntimeError, match="must implement a read method"):
             create_from_file_like(ReadMethodMissing(), "approximate")
@@ -1107,7 +1107,7 @@ class TestAudioDecoderOps:
             def read(self) -> bytes:
                 return bytes()
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seeK(offset, whence)
 
         with pytest.raises(
@@ -1126,8 +1126,8 @@ class TestAudioDecoderOps:
                 return self._file.read(size)
 
             # io.RawIOBase says we should accept two ints; wrong signature on purpose
-            def seek(self, offset: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int) -> int:
+                return 0
 
         with pytest.raises(
             TypeError, match="takes 2 positional arguments but 3 were given"
@@ -1147,7 +1147,7 @@ class TestAudioDecoderOps:
                 # We intentionally read more than requested.
                 return self._file.read(size + 10)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         with pytest.raises(RuntimeError, match="does not conform to read protocol"):
@@ -1174,7 +1174,7 @@ class TestAudioDecoderOps:
 
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         decoder_file_like = create_from_file_like(

@@ -30,7 +30,7 @@ class VideoDecoder:
             - If ``bytes`` object or ``torch.Tensor``: the raw encoded video data.
             - If file-like object: we read video data from the object on demand. The object must
               expose the methods `read(self, size: int) -> bytes` and
-              `seek(self, offset: int, whence: int) -> bytes`. Read more in:
+              `seek(self, offset: int, whence: int) -> int`. Read more in:
               :ref:`sphx_glr_generated_examples_decoding_file_like.py`.
         stream_index (int, optional): Specifies which stream in the video to decode frames from.
             Note that this index is absolute across all media types. If left unspecified, then
