@@ -97,13 +97,13 @@ class VideoDecoder:
         dimension_order: Literal["NCHW", "NHWC"] = "NCHW",
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
-        seek_mode: Literal["exact", "approximate", "custom_frame_mappings"] = "exact",
+        seek_mode: Literal["exact", "approximate"] = "exact",
         custom_frame_mappings: Optional[
             Union[str, bytes, io.RawIOBase, io.BufferedReader]
         ] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
-        allowed_seek_modes = ("exact", "approximate", "custom_frame_mappings")
+        allowed_seek_modes = ("exact", "approximate")
         if seek_mode not in allowed_seek_modes:
             raise ValueError(
                 f"Invalid seek mode ({seek_mode}). "
@@ -121,7 +121,7 @@ class VideoDecoder:
         custom_frame_mappings_data = None
         if custom_frame_mappings is not None:
             seek_mode = "custom_frame_mappings"
-            custom_frame_mappings_data = read_custom_frame_mappings(
+            custom_frame_mappings_data = _read_custom_frame_mappings(
                 custom_frame_mappings
             )
 
@@ -418,7 +418,7 @@ def _get_and_validate_stream_metadata(
     )
 
 
-def read_custom_frame_mappings(
+def _read_custom_frame_mappings(
     custom_frame_mappings: Union[str, bytes, io.RawIOBase, io.BufferedReader]
 ) -> tuple[Tensor, Tensor, Tensor]:
     """Parse custom frame mappings from JSON data and extract frame metadata.
@@ -459,15 +459,14 @@ def read_custom_frame_mappings(
 
     if not pts_key or not duration_key or not key_frame_present:
         raise ValueError(
-            "Invalid custom frame mappings. The 'pts', 'duration', and 'key_frame' keys are required in the frame metadata."
+            "Invalid custom frame mappings. The 'pts'/'pkt_pts', 'duration'/'pkt_duration', and 'key_frame' keys are required in the frame metadata."
         )
 
     frame_data = [
         (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
         for frame in input_data["frames"]
     ]
-    all_frames, is_key_frame, duration = map(Tensor, zip(*frame_data))
-    assert (
-        len(all_frames) == len(is_key_frame) == len(duration)
-    ), "Mismatched lengths in frame index data"
+    all_frames, is_key_frame, duration = map(torch.tensor, zip(*frame_data))
+    if not (len(all_frames) == len(is_key_frame) == len(duration)):
+        raise ValueError("Mismatched lengths in frame index data")
     return all_frames, is_key_frame, duration

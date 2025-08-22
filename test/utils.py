@@ -14,7 +14,7 @@ import pytest
 import torch
 
 from torchcodec._core import get_ffmpeg_library_versions
-from torchcodec.decoders._video_decoder import read_custom_frame_mappings
+from torchcodec.decoders._video_decoder import _read_custom_frame_mappings
 
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
@@ -268,8 +268,10 @@ class TestContainerFile:
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
-            self._custom_frame_mappings_data[stream_index] = read_custom_frame_mappings(
-                self.generate_custom_frame_mappings(stream_index)
+            self._custom_frame_mappings_data[stream_index] = (
+                _read_custom_frame_mappings(
+                    self.generate_custom_frame_mappings(stream_index)
+                )
             )
         return self._custom_frame_mappings_data[stream_index]
 

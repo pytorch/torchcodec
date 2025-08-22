@@ -1280,7 +1280,7 @@ class TestVideoDecoder:
         decoder = VideoDecoder(asset.path)
         decoder.get_frame_at(10)
 
-    def setup_frame_mappings(tmp_path: str, file: bool, stream_index: int):
+    def setup_frame_mappings(tmp_path, file, stream_index):
         json_path = tmp_path / "custom_frame_mappings.json"
         custom_frame_mappings = NASA_VIDEO.generate_custom_frame_mappings(stream_index)
         if file:
@@ -1318,29 +1318,25 @@ class TestVideoDecoder:
                 device=device,
                 custom_frame_mappings=custom_frame_mappings,
             )
-            frame_0 = decoder.get_frame_at(0)
-            frame_5 = decoder.get_frame_at(5)
-            assert_frames_equal(
-                frame_0.data,
-                NASA_VIDEO.get_frame_data_by_index(0, stream_index=stream_index).to(
-                    device
-                ),
-            )
-            assert_frames_equal(
-                frame_5.data,
-                NASA_VIDEO.get_frame_data_by_index(5, stream_index=stream_index).to(
-                    device
-                ),
-            )
-            frames0_5 = decoder.get_frames_played_in_range(
-                frame_0.pts_seconds, frame_5.pts_seconds
-            )
-            assert_frames_equal(
-                frames0_5.data,
-                NASA_VIDEO.get_frame_data_by_range(0, 5, stream_index=stream_index).to(
-                    device
-                ),
-            )
+        frame_0 = decoder.get_frame_at(0)
+        frame_5 = decoder.get_frame_at(5)
+        assert_frames_equal(
+            frame_0.data,
+            NASA_VIDEO.get_frame_data_by_index(0, stream_index=stream_index).to(device),
+        )
+        assert_frames_equal(
+            frame_5.data,
+            NASA_VIDEO.get_frame_data_by_index(5, stream_index=stream_index).to(device),
+        )
+        frames0_5 = decoder.get_frames_played_in_range(
+            frame_0.pts_seconds, frame_5.pts_seconds
+        )
+        assert_frames_equal(
+            frames0_5.data,
+            NASA_VIDEO.get_frame_data_by_range(0, 5, stream_index=stream_index).to(
+                device
+            ),
+        )
 
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize(
@@ -1354,7 +1350,7 @@ class TestVideoDecoder:
             ),
             (
                 '{"frames": [{"missing": "keys"}]}',
-                "The 'pts', 'duration', and 'key_frame' keys are required in the frame metadata.",
+                "keys are required in the frame metadata.",
             ),
         ],
     )
@@ -1367,18 +1363,14 @@ class TestVideoDecoder:
                 stream_index=0,
                 device=device,
                 custom_frame_mappings=custom_frame_mappings,
-                seek_mode=(
-                    "approximate"
-                    if expected_match == "seek_mode"
-                    else "custom_frame_mappings"
-                ),
+                seek_mode=("approximate" if expected_match == "seek_mode" else "exact"),
             )
 
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_custom_frame_mappings_init_fails_invalid_json(self, tmp_path, device):
         invalid_json_path = tmp_path / "invalid_json"
         with open(invalid_json_path, "w+") as f:
-            f.write("""'{"invalid": "json"'""")
+            f.write("invalid input")
 
         # Test both file object and string
         with open(invalid_json_path, "r") as file_obj:
