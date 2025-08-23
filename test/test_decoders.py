@@ -86,7 +86,7 @@ class TestDecoder:
                 def read(self, size: int) -> bytes:
                     return self._file.read(size)
 
-                def seek(self, offset: int, whence: int) -> bytes:
+                def seek(self, offset: int, whence: int) -> int:
                     return self._file.seek(offset, whence)
 
             source = CustomReader(open(asset.path, mode="rb", buffering=0))
