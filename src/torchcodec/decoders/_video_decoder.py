@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import io
+import json
 import numbers
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
@@ -62,7 +63,25 @@ class VideoDecoder:
             probably is. Default: "exact".
             Read more about this parameter in:
             :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
+        custom_frame_mappings (str, bytes, or file-like object, optional):
+            Mapping of frames to their metadata, typically generated via ffprobe.
+            This enables accurate frame seeking without requiring a full video scan.
+            Do not set seek_mode when custom_frame_mappings is provided.
+            Expected JSON format:
 
+            .. code-block:: json
+
+                {
+                    "frames": [
+                        {
+                            "pts": 0,
+                            "duration": 1001,
+                            "key_frame": 1
+                        }
+                    ]
+                }
+
+            Alternative field names "pkt_pts" and "pkt_duration" are also supported.
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.
@@ -80,6 +99,9 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
+        custom_frame_mappings: Optional[
+            Union[str, bytes, io.RawIOBase, io.BufferedReader]
+        ] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
         allowed_seek_modes = ("exact", "approximate")
@@ -87,6 +109,21 @@ class VideoDecoder:
             raise ValueError(
                 f"Invalid seek mode ({seek_mode}). "
                 f"Supported values are {', '.join(allowed_seek_modes)}."
+            )
+
+        # Validate seek_mode and custom_frame_mappings are not mismatched
+        if custom_frame_mappings is not None and seek_mode == "approximate":
+            raise ValueError(
+                "custom_frame_mappings is incompatible with seek_mode='approximate'. "
+                "Use seek_mode='custom_frame_mappings' or leave it unspecified to automatically use custom frame mappings."
+            )
+
+        # Auto-select custom_frame_mappings seek_mode and process data when mappings are provided
+        custom_frame_mappings_data = None
+        if custom_frame_mappings is not None:
+            seek_mode = "custom_frame_mappings"  # type: ignore[assignment]
+            custom_frame_mappings_data = _read_custom_frame_mappings(
+                custom_frame_mappings
             )
 
         self._decoder = create_decoder(source=source, seek_mode=seek_mode)
@@ -110,6 +147,7 @@ class VideoDecoder:
             dimension_order=dimension_order,
             num_threads=num_ffmpeg_threads,
             device=device,
+            custom_frame_mappings=custom_frame_mappings_data,
         )
 
         (
@@ -379,3 +417,57 @@ def _get_and_validate_stream_metadata(
         end_stream_seconds,
         num_frames,
     )
+
+
+def _read_custom_frame_mappings(
+    custom_frame_mappings: Union[str, bytes, io.RawIOBase, io.BufferedReader]
+) -> tuple[Tensor, Tensor, Tensor]:
+    """Parse custom frame mappings from JSON data and extract frame metadata.
+
+    Args:
+        custom_frame_mappings: JSON data containing frame metadata, provided as:
+            - A JSON string (str, bytes)
+            - A file-like object with a read() method
+
+    Returns:
+        A tuple of three tensors:
+        - all_frames (Tensor): Presentation timestamps (PTS) for each frame
+        - is_key_frame (Tensor): Boolean tensor indicating which frames are key frames
+        - duration (Tensor): Duration of each frame
+    """
+    try:
+        input_data = (
+            json.load(custom_frame_mappings)
+            if hasattr(custom_frame_mappings, "read")
+            else json.loads(custom_frame_mappings)
+        )
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Invalid custom frame mappings: {e}. It should be a valid JSON string or a file-like object."
+        ) from e
+
+    if not input_data or "frames" not in input_data:
+        raise ValueError(
+            "Invalid custom frame mappings. The input is empty or missing the required 'frames' key."
+        )
+
+    first_frame = input_data["frames"][0]
+    pts_key = next((key for key in ("pts", "pkt_pts") if key in first_frame), None)
+    duration_key = next(
+        (key for key in ("duration", "pkt_duration") if key in first_frame), None
+    )
+    key_frame_present = "key_frame" in first_frame
+
+    if not pts_key or not duration_key or not key_frame_present:
+        raise ValueError(
+            "Invalid custom frame mappings. The 'pts'/'pkt_pts', 'duration'/'pkt_duration', and 'key_frame' keys are required in the frame metadata."
+        )
+
+    frame_data = [
+        (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
+        for frame in input_data["frames"]
+    ]
+    all_frames, is_key_frame, duration = map(torch.tensor, zip(*frame_data))
+    if not (len(all_frames) == len(is_key_frame) == len(duration)):
+        raise ValueError("Mismatched lengths in frame index data")
+    return all_frames, is_key_frame, duration
