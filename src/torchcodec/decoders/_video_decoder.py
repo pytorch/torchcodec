@@ -65,8 +65,9 @@ class VideoDecoder:
             :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
         custom_frame_mappings (str, bytes, or file-like object, optional):
             Mapping of frames to their metadata, typically generated via ffprobe.
-            This enables accurate frame seeking without requiring a full video scan
-            as in `exact` mode. Expected JSON format:
+            This enables accurate frame seeking without requiring a full video scan.
+            Do not set seek_mode when custom_frame_mappings is provided.
+            Expected JSON format:
 
             .. code-block:: json
 
@@ -79,6 +80,8 @@ class VideoDecoder:
                         }
                     ]
                 }
+
+            Alternative field names "pkt_pts" and "pkt_duration" are also supported.
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.
