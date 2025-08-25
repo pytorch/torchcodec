@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - test/generate_reference_resources.sh
+      - test/generate_reference_resources.py
       - .github/workflows/reference_resources.yaml # self reference
   schedule:
     - cron: '0 0 * * 0'  # on sunday
@@ -38,7 +38,7 @@ jobs:
       - name: Update pip
         run: python -m pip install --upgrade pip
 
-      - name: Instal generation dependencies
+      - name: Install generation dependencies
         run: |
           # Note that we're installing stable - this is for running a script where we're a normal PyTorch
           # user, not for building TorhCodec.
@@ -50,4 +50,4 @@ jobs:
 
       - name: Run generation reference resources
         run: |
-          test/generate_reference_resources.sh
+          python test/generate_reference_resources.py
