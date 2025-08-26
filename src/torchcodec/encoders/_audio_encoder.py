@@ -69,7 +69,7 @@ class AudioEncoder:
         _core.encode_audio_to_file(
             samples=self._samples,
             sample_rate=self._sample_rate,
-            filename=dest,
+            filename=str(dest),
             bit_rate=bit_rate,
             num_channels=num_channels,
             desired_sample_rate=sample_rate,
