@@ -36,9 +36,6 @@ jobs:
       with-rocm: disable
       with-cuda: disable
       build-python-only: "disable"
-      # Explicitly avoid 3.13 because 3.13t builds don't work.
-      # TODO remove eventually.
-      python-versions: '["3.9", "3.10", "3.11", "3.12"]'
 
   build:
     needs: generate-matrix
@@ -69,7 +66,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9']
         # TODO: FFmpeg 5 on Windows segfaults in avcodec_open2() when passing
         # bad parameters.
         # See https://github.com/pytorch/torchcodec/pull/806
