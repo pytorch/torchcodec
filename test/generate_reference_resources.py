@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 import os
 import subprocess
 
@@ -6,12 +11,6 @@ import numpy as np
 
 import torch
 from PIL import Image
-
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
 
 # Run this script to update the resources used in unit tests. The resources are all derived
 # from source media already checked into the repo.
@@ -24,8 +23,6 @@ def convert_image_to_tensor(image_path):
     base_filename = os.path.splitext(image_path)[0]
     pil_image = Image.open(image_path)
     img_tensor = torch.from_numpy(np.asarray(pil_image))
-    print(img_tensor.shape)
-    print(img_tensor.dtype)
     # Save tensor to disk
     torch.save(img_tensor, base_filename + ".pt", _use_new_zipfile_serialization=True)
     os.remove(image_path)
