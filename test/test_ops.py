@@ -44,7 +44,6 @@ from torchcodec._core import (
 from .utils import (
     all_supported_devices,
     assert_frames_equal,
-    get_ffmpeg_major_version,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
@@ -485,7 +484,7 @@ class TestVideoDecoderOps:
         )
         with pytest.raises(
             RuntimeError,
-            match="Please provide frame mappings when using custom_frame_mappings seek mode.",
+            match="Missing frame mappings when custom_frame_mappings seek mode is set.",
         ):
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
@@ -505,10 +504,6 @@ class TestVideoDecoderOps:
                 decoder, stream_index=0, custom_frame_mappings=different_lengths
             )
 
-    @pytest.mark.skipif(
-        get_ffmpeg_major_version() in (4, 5),
-        reason="ffprobe isn't accurate on ffmpeg 4 and 5",
-    )
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # custom_frame_index seek mode requires a stream index
@@ -1038,7 +1033,7 @@ class TestAudioDecoderOps:
                 self.num_reads += 1
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 self.num_seeks += 1
                 return self._file.seek(offset, whence)
 
@@ -1086,8 +1081,8 @@ class TestAudioDecoderOps:
 
     def test_file_like_method_check_fails(self):
         class ReadMethodMissing:
-            def seek(self, offset: int, whence: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int, whence: int) -> int:
+                return 0
 
         with pytest.raises(RuntimeError, match="must implement a read method"):
             create_from_file_like(ReadMethodMissing(), "approximate")
@@ -1107,7 +1102,7 @@ class TestAudioDecoderOps:
             def read(self) -> bytes:
                 return bytes()
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seeK(offset, whence)
 
         with pytest.raises(
@@ -1126,8 +1121,8 @@ class TestAudioDecoderOps:
                 return self._file.read(size)
 
             # io.RawIOBase says we should accept two ints; wrong signature on purpose
-            def seek(self, offset: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int) -> int:
+                return 0
 
         with pytest.raises(
             TypeError, match="takes 2 positional arguments but 3 were given"
@@ -1147,7 +1142,7 @@ class TestAudioDecoderOps:
                 # We intentionally read more than requested.
                 return self._file.read(size + 10)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         with pytest.raises(RuntimeError, match="does not conform to read protocol"):
@@ -1174,7 +1169,7 @@ class TestAudioDecoderOps:
 
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         decoder_file_like = create_from_file_like(

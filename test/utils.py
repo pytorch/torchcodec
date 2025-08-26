@@ -14,6 +14,7 @@ import pytest
 import torch
 
 from torchcodec._core import get_ffmpeg_library_versions
+from torchcodec.decoders._video_decoder import _read_custom_frame_mappings
 
 IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
@@ -269,40 +270,30 @@ class TestContainerFile:
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
-            self.generate_custom_frame_mappings(stream_index)
+            self._custom_frame_mappings_data[stream_index] = (
+                _read_custom_frame_mappings(
+                    self.generate_custom_frame_mappings(stream_index)
+                )
+            )
         return self._custom_frame_mappings_data[stream_index]
 
-    def generate_custom_frame_mappings(self, stream_index: int) -> None:
-        result = json.loads(
-            subprocess.run(
-                [
-                    "ffprobe",
-                    "-i",
-                    f"{self.path}",
-                    "-select_streams",
-                    f"{stream_index}",
-                    "-show_frames",
-                    "-of",
-                    "json",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-        )
-        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
-        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
-        duration = torch.tensor(
-            [float(frame["duration"]) for frame in result["frames"]]
-        )
-        assert (
-            len(all_frames) == len(is_key_frame) == len(duration)
-        ), "Mismatched lengths in frame index data"
-        self._custom_frame_mappings_data[stream_index] = (
-            all_frames,
-            is_key_frame,
-            duration,
-        )
+    def generate_custom_frame_mappings(self, stream_index: int) -> str:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-i",
+                f"{self.path}",
+                "-select_streams",
+                f"{stream_index}",
+                "-show_frames",
+                "-of",
+                "json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return result
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
