@@ -199,6 +199,68 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   return;
 }
 
+std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
+    const VideoStreamOptions& videoStreamOptions,
+    const UniqueAVFrame& avFrame,
+    const AVRational& timeBase) {
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(avFrame->format);
+
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
+    return cpuInterface->initializeFiltersContext(
+        videoStreamOptions, avFrame, timeBase);
+  }
+
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
+  int height = frameDims.height;
+  int width = frameDims.width;
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+
+  if (actualFormat == AV_PIX_FMT_NV12) {
+    return nullptr;
+  }
+
+  std::unique_ptr<FiltersContext> filtersContext =
+      std::make_unique<FiltersContext>();
+
+  filtersContext->inputWidth = avFrame->width;
+  filtersContext->inputHeight = avFrame->height;
+  filtersContext->inputFormat = frameFormat;
+  filtersContext->inputAspectRatio = avFrame->sample_aspect_ratio;
+  filtersContext->timeBase = timeBase;
+  filtersContext->hwFramesCtx.reset(av_buffer_ref(avFrame->hw_frames_ctx));
+
+  std::stringstream filters;
+
+  unsigned version_int = avfilter_version();
+  if (version_int < AV_VERSION_INT(8, 0, 103)) {
+    // Color conversion support ('format=' option) was added to scale_cuda from
+    // n5.0. With the earlier version of ffmpeg we have no choice but use CPU
+    // filters. See:
+    // https://github.com/FFmpeg/FFmpeg/commit/62dc5df941f5e196164c151691e4274195523e95
+    filtersContext->outputFormat = AV_PIX_FMT_RGB24;
+
+    filters << "hwdownload,format=" << av_pix_fmt_desc_get(actualFormat)->name;
+    filters << ",scale=" << width << ":" << height;
+    filters << ":sws_flags=bilinear";
+  } else {
+    // Actual output color format will be set via filter options
+    filtersContext->outputFormat = AV_PIX_FMT_CUDA;
+
+    filters << "scale_cuda=" << width << ":" << height;
+    filters << ":format=nv12:interp_algo=bilinear";
+  }
+
+  filtersContext->filters = filters.str();
+  return filtersContext;
+}
+
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] const AVRational& timeBase,
