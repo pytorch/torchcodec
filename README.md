@@ -130,7 +130,7 @@ The following table indicates the compatibility between versions of
 
 | `torchcodec`       | `torch`            | Python              |
 | ------------------ | ------------------ | ------------------- |
-| `main` / `nightly` | `main` / `nightly` | `>=3.9`, `<=3.13`   |
+| `main` / `nightly` | `main` / `nightly` | `>=3.10`, `<=3.13`   |
 | `0.6`              | `2.8`              | `>=3.9`, `<=3.13`   |
 | `0.5`              | `2.7`              | `>=3.9`, `<=3.13`   |
 | `0.4`              | `2.7`              | `>=3.9`, `<=3.13`   |
