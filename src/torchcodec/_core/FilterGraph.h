@@ -35,7 +35,8 @@ struct FiltersContext {
       int outputHeight,
       AVPixelFormat outputFormat,
       const std::string& filtergraphStr,
-      AVRational timeBase);
+      AVRational timeBase,
+      AVBufferRef* hwFramesCtx = nullptr);
 
   bool operator==(const FiltersContext&) const;
   bool operator!=(const FiltersContext&) const;

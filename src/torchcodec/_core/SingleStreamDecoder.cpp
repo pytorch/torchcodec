@@ -1251,6 +1251,42 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
         deviceInterface_ != nullptr,
         "No device interface available for video decoding. This ",
         "shouldn't happen, please report.");
+
+    std::unique_ptr<FiltersContext> newFiltersContext =
+        deviceInterface_->initializeFiltersContext(
+            streamInfo.videoStreamOptions, avFrame, streamInfo.timeBase);
+    // Device interface might return nullptr for the filter context in which
+    // case device interface will handle conversion directly in
+    // convertAVFrameToFrameOutput().
+    if (newFiltersContext) {
+      // We need to compare the current filter context with our previous filter
+      // context. If they are different, then we need to re-create a filter
+      // graph. We create a filter graph late so that we don't have to depend
+      // on the unreliable metadata in the header. And we sometimes re-create
+      // it because it's possible for frame resolution to change mid-stream.
+      // Finally, we want to reuse the filter graph as much as possible for
+      // performance reasons.
+      if (!filterGraph_ || filtersContext_ != newFiltersContext) {
+        filterGraph_ = std::make_unique<FilterGraph>(
+            *newFiltersContext, streamInfo.videoStreamOptions);
+        filtersContext_ = std::move(newFiltersContext);
+      }
+      avFrame = filterGraph_->convert(avFrame);
+
+      // If this check fails it means the frame wasn't
+      // reshaped to its expected dimensions by filtergraph.
+      TORCH_CHECK(
+          (avFrame->width == filtersContext_->outputWidth) &&
+              (avFrame->height == filtersContext_->outputHeight),
+          "Expected frame from filter graph of ",
+          filtersContext_->outputWidth,
+          "x",
+          filtersContext_->outputHeight,
+          ", got ",
+          avFrame->width,
+          "x",
+          avFrame->height);
+    }
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         streamInfo.timeBase,
