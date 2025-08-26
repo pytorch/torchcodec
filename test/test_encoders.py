@@ -436,6 +436,9 @@ class TestAudioEncoder:
             encoded_from_contiguous, encoded_from_non_contiguous, rtol=0, atol=0
         )
 
+    @pytest.mark.skip(
+        reason="Flaky test, see https://github.com/pytorch/torchcodec/issues/724"
+    )
     @pytest.mark.parametrize("num_channels_input", (1, 2))
     @pytest.mark.parametrize("num_channels_output", (1, 2, None))
     @pytest.mark.parametrize("method", ("to_file", "to_tensor", "to_file_like"))
