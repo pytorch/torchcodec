@@ -22,7 +22,8 @@ FiltersContext::FiltersContext(
     int outputHeight,
     AVPixelFormat outputFormat,
     const std::string& filtergraphStr,
-    AVRational timeBase)
+    AVRational timeBase,
+    AVBufferRef* hwFramesCtx)
     : inputWidth(inputWidth),
       inputHeight(inputHeight),
       inputFormat(inputFormat),
@@ -31,7 +32,8 @@ FiltersContext::FiltersContext(
       outputHeight(outputHeight),
       outputFormat(outputFormat),
       filtergraphStr(filtergraphStr),
-      timeBase(timeBase) {}
+      timeBase(timeBase),
+      hwFramesCtx(hwFramesCtx) {}
 
 bool operator==(const AVRational& lhs, const AVRational& rhs) {
   return lhs.num == rhs.num && lhs.den == rhs.den;
