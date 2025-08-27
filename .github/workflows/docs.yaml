@@ -51,10 +51,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-          # 3.9 corresponds to the minimum python version for which we build
+          # 3.10 corresponds to the minimum python version for which we build
           # the wheel unless the label cliflow/binaries/all is present in the
           # PR.
-        python-version: ['3.9']
+        python-version: ['3.10']
         cuda-version: ['12.6']
         ffmpeg-version-for-tests: ['7']
     container:

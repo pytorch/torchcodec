@@ -84,7 +84,9 @@ at::Tensor wrapDecoderPointerToTensor(
 }
 
 SingleStreamDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
+  TORCH_CHECK(
+      tensor.is_contiguous(),
+      "fake decoder tensor must be contiguous! This is an internal error, please report on the torchcodec issue tracker.");
   void* buffer = tensor.mutable_data_ptr();
   SingleStreamDecoder* decoder = static_cast<SingleStreamDecoder*>(buffer);
   return decoder;
