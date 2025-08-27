@@ -1342,7 +1342,11 @@ class TestVideoDecoder:
     @pytest.mark.parametrize(
         "custom_frame_mappings,expected_match",
         [
-            (NASA_VIDEO.generate_custom_frame_mappings(0), "seek_mode"),
+            pytest.param(
+                NASA_VIDEO.generate_custom_frame_mappings(0),
+                "seek_mode",
+                id="valid_content_approximate",
+            ),
             ("{}", "The input is empty or missing the required 'frames' key."),
             (
                 '{"valid": "json"}',
