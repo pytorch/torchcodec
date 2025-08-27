@@ -355,7 +355,7 @@ class TestAudioEncoder:
 
         params = dict(bit_rate=bit_rate, num_channels=num_channels)
         encoded_file = tmp_path / f"output.{format}"
-        encoder.to_file(dest=str(encoded_file), **params)
+        encoder.to_file(dest=encoded_file, **params)
 
         if method == "to_tensor":
             encoded_output = encoder.to_tensor(
