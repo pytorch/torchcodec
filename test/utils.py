@@ -510,6 +510,8 @@ class TestAudio(TestContainerFile):
         return self.stream_infos[self.default_stream_index].sample_format
 
 
+# This file was generated with:
+# ffmpeg -y -i test/resources/nasa_13013.mp4 -b:a 192K -vn test/resources/nasa_13013.mp4.audio.mp3"
 NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
     default_stream_index=0,
