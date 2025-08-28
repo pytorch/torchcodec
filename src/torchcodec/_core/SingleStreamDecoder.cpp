@@ -1333,6 +1333,8 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
   } else if (deviceInterface_) {
+    printf("Calling device interface to convert AVFrame to FrameOutput\n");
+    fflush(stdout);
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         streamInfo.timeBase,

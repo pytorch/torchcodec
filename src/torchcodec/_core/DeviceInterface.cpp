@@ -97,16 +97,6 @@ torch::Device createTorchDevice(const std::string device) {
             arg.first.variant == variant;
       });
 
-  // If variant-specific interface not found, try default variant
-  if (deviceInterface == deviceMap.end() && variant != "default") {
-    deviceInterface = std::find_if(
-        deviceMap.begin(),
-        deviceMap.end(),
-        [&](const std::pair<DeviceInterfaceKey, CreateDeviceInterfaceFn>& arg) {
-          return arg.first.deviceType == deviceTypeEnum &&
-              arg.first.variant == "default";
-        });
-  }
 
   TORCH_CHECK(
       deviceInterface != deviceMap.end(),

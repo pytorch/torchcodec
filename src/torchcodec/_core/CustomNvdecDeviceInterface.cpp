@@ -62,6 +62,8 @@ HandlePictureDisplay(void* pUserData, CUVIDPARSERDISPINFO* pDispInfo) {
 CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
     const torch::Device& device)
     : DeviceInterface(device) {
+  printf("IN CustomNvdecDeviceInterface::CustomNvdecDeviceInterface\n");
+  fflush(stdout);
   TORCH_CHECK(
       g_cuda_custom_nvdec, "CustomNvdecDeviceInterface was not registered!");
   TORCH_CHECK(
@@ -279,6 +281,8 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
 UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
     ReferenceAVPacket& packet) {
   TORCH_CHECK(isInitialized_, "NVDEC decoder not initialized");
+  printf("IN CustomNvdecDeviceInterface::decodePacketDirectly\n");
+  fflush(stdout);
 
   // Extract compressed data from AVPacket
   uint8_t* compressedData = packet->data;
@@ -377,6 +381,8 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // For custom NVDEC, the frame should already be on GPU
   // We need to convert from NVDEC's output format (typically NV12) to RGB
+  printf("OKAY\n");
+  fflush(stdout);
 
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
