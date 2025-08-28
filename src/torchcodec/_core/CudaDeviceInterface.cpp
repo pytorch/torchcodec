@@ -260,6 +260,12 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     return;
   }
 
+  // TODONVDEC: We're currently calling this function from within the CNI
+  // (Custome NVDEC Interface). But the AVFrame's hw_frames_ctx doesn't exist,
+  // so we error. Not sure how to solve this: either set the field in a
+  // meaningful way, or allow to bypass the check, but then how do we know the
+  // pix format?
+
   // // Above we checked that the AVFrame was on GPU, but that's not enough, we
   // // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
   // // because this is what the NPP color conversion routines expect.
