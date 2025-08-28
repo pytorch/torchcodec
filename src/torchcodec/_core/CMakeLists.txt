@@ -12,8 +12,7 @@ if(DEFINED TORCHCODEC_DISABLE_COMPILE_WARNING_AS_ERROR AND TORCHCODEC_DISABLE_CO
     set(TORCHCODEC_WERROR_OPTION "")
 else()
     if (WIN32)
-        # TODO set warnings as errors on Windows as well.
-        # set(TORCHCODEC_WERROR_OPTION "/WX")
+        set(TORCHCODEC_WERROR_OPTION "/WX")
     else()
         set(TORCHCODEC_WERROR_OPTION "-Werror")
     endif()
