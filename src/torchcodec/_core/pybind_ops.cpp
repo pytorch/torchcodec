@@ -13,6 +13,7 @@
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
 #include "src/torchcodec/_core/StreamOptions.h"
+#include "src/torchcodec/_core/ValidationUtils.h"
 
 namespace py = pybind11;
 
@@ -55,20 +56,19 @@ void encode_audio_to_file_like(
   auto samples = torch::from_blob(
       reinterpret_cast<void*>(data_ptr), shape, tensor_options);
 
-  // TODO Fix implicit int conversion:
-  // https://github.com/pytorch/torchcodec/issues/679
-  // same for sample_rate parameter below
   AudioStreamOptions audioStreamOptions;
-  audioStreamOptions.bitRate = bit_rate;
-  audioStreamOptions.numChannels = num_channels;
-  audioStreamOptions.sampleRate = desired_sample_rate;
+  audioStreamOptions.bitRate = validateOptionalInt64ToInt(bit_rate, "bit_rate");
+  audioStreamOptions.numChannels =
+      validateOptionalInt64ToInt(num_channels, "num_channels");
+  audioStreamOptions.sampleRate =
+      validateOptionalInt64ToInt(desired_sample_rate, "desired_sample_rate");
 
   auto avioContextHolder =
       std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/true);
 
   AudioEncoder encoder(
       samples,
-      static_cast<int>(sample_rate),
+      validateInt64ToInt(sample_rate, "sample_rate"),
       format,
       std::move(avioContextHolder),
       audioStreamOptions);
