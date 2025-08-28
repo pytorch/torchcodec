@@ -1254,6 +1254,17 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
   } else if (deviceInterface_) {
+    std::unique_ptr<FiltersContext> filtersContext =
+        deviceInterface_->initializeFiltersContext(
+            streamInfo.videoStreamOptions, avFrame, streamInfo.timeBase);
+    if (filtersContext) {
+      if (!filterGraph_ || prevFiltersContext_ != filtersContext) {
+        filterGraph_ = std::make_unique<FilterGraph>(
+            *filtersContext, streamInfo.videoStreamOptions);
+        prevFiltersContext_ = std::move(filtersContext);
+      }
+      avFrame = filterGraph_->convert(avFrame);
+    }
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         streamInfo.timeBase,

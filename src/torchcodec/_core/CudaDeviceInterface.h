@@ -21,6 +21,11 @@ class CudaDeviceInterface : public DeviceInterface {
 
   void initializeContext(AVCodecContext* codecContext) override;
 
+  std::unique_ptr<FiltersContext> initializeFiltersContext(
+      const VideoStreamOptions& videoStreamOptions,
+      const UniqueAVFrame& avFrame,
+      const AVRational& timeBase) override;
+
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       const AVRational& timeBase,

@@ -8,6 +8,7 @@
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
+#include "src/torchcodec/_core/FilterGraph.h"
 
 namespace facebook::torchcodec {
 
@@ -25,6 +26,11 @@ class CpuDeviceInterface : public DeviceInterface {
   void initializeContext(
       [[maybe_unused]] AVCodecContext* codecContext) override {}
 
+  std::unique_ptr<FiltersContext> initializeFiltersContext(
+      const VideoStreamOptions& videoStreamOptions,
+      const UniqueAVFrame& avFrame,
+      const AVRational& timeBase) override;
+
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       const AVRational& timeBase,
@@ -38,43 +44,21 @@ class CpuDeviceInterface : public DeviceInterface {
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      const UniqueAVFrame& avFrame);
-
-  struct FilterGraphContext {
-    UniqueAVFilterGraph filterGraph;
-    AVFilterContext* sourceContext = nullptr;
-    AVFilterContext* sinkContext = nullptr;
-  };
-
-  struct DecodedFrameContext {
-    int decodedWidth;
-    int decodedHeight;
-    AVPixelFormat decodedFormat;
-    AVRational decodedAspectRatio;
-    int expectedWidth;
-    int expectedHeight;
-    bool operator==(const DecodedFrameContext&);
-    bool operator!=(const DecodedFrameContext&);
-  };
-
-  void createSwsContext(
-      const DecodedFrameContext& frameContext,
-      const enum AVColorSpace colorspace);
-
-  void createFilterGraph(
-      const DecodedFrameContext& frameContext,
+  std::unique_ptr<FiltersContext> initializeFiltersContextInternal(
       const VideoStreamOptions& videoStreamOptions,
+      const UniqueAVFrame& avFrame,
       const AVRational& timeBase);
 
-  // color-conversion fields. Only one of FilterGraphContext and
-  // UniqueSwsContext should be non-null.
-  FilterGraphContext filterGraphContext_;
+  void createSwsContext(
+      const FiltersContext& filtersContext,
+      const enum AVColorSpace colorspace);
+
+  // SWS color conversion context
   UniqueSwsContext swsContext_;
 
-  // Used to know whether a new FilterGraphContext or UniqueSwsContext should
+  // Used to know whether a new UniqueSwsContext should
   // be created before decoding a new frame.
-  DecodedFrameContext prevFrameContext_;
+  std::unique_ptr<FiltersContext> prevFiltersContext_;
 };
 
 } // namespace facebook::torchcodec
