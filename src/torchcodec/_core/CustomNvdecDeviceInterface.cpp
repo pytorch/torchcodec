@@ -12,9 +12,8 @@
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
-// Include NVIDIA Video Codec SDK headers
-#include <cuviddec.h>
-#include <nvcuvid.h>
+#include "src/torchcodec/_core/nvcuvid_include/cuviddec.h"
+#include "src/torchcodec/_core/nvcuvid_include/nvcuvid.h"
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>

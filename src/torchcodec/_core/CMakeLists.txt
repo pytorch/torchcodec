@@ -123,78 +123,14 @@ function(make_torchcodec_libraries
             ${CUDA_nppicc_LIBRARY}
         )
 
-        # Find NVIDIA Video Codec SDK library
-        find_library(CUDA_NVCUVID_LIBRARY
-            NAMES nvcuvid
-            PATHS
-                /home/nicolashug/Downloads/Video_Codec_SDK_12.2.72/Lib/linux/stubs/x86_64
-                /usr/local/cuda/lib64
-                /usr/local/cuda/lib
-                ${CUDA_TOOLKIT_ROOT_DIR}/lib64
-                ${CUDA_TOOLKIT_ROOT_DIR}/lib
-                /opt/cuda/lib64
-                /opt/cuda/lib
-                $ENV{CUDA_PATH}/lib64
-                $ENV{CUDA_PATH}/lib
-                $ENV{CUDA_HOME}/lib64
-                $ENV{CUDA_HOME}/lib
-                /usr/lib64
-                /usr/lib
-        )
-        set(CUDA_NVCUVID_LIBRARY "/home/nicolashug/Downloads/Video_Codec_SDK_12.2.72/Lib/linux/stubs/x86_64/libnvcuvid.so")
+        find_library(NVCUVID_LIBRARY NAMES nvcuvid REQUIRED)
+        message(STATUS "Found NVCUVID library: ${NVCUVID_LIBRARY}")
 
-        # Find NVIDIA Video Codec SDK headers
-        find_path(NVCODEC_INCLUDE_DIR
-            NAMES cuviddec.h nvcuvid.h
-            PATHS
-                $ENV{HOME}/Downloads/Video_Codec_SDK_12.2.72/Interface
-                /usr/local/cuda/include
-                ${CUDA_TOOLKIT_ROOT_DIR}/include
-                $ENV{CUDA_PATH}/include
-                $ENV{CUDA_HOME}/include
-                /opt/cuda/include
-            PATH_SUFFIXES
-                Video_Codec_SDK_12.2.72/Interface
-                Video_Codec_SDK/Interface
-        )
+        # Add CUDA Driver library (needed for cuCtxGetCurrent, etc.)
+        find_library(CUDA_DRIVER_LIBRARY NAMES cuda REQUIRED)
+        message(STATUS "Found CUDA Driver library: ${CUDA_DRIVER_LIBRARY}")
 
-        if(NOT CUDA_NVCUVID_LIBRARY)
-            message(FATAL_ERROR "Cannot find libnvcuvid, you may need to manually register and download at https://developer.nvidia.com/nvidia-video-codec-sdk. Then copy libnvcuvid to cuda_toolkit_root/lib64/")
-        endif()
-
-        if(NOT NVCODEC_INCLUDE_DIR)
-            message(FATAL_ERROR "Cannot find NVIDIA Video Codec SDK headers (cuviddec.h, nvcuvid.h). Please download the NVIDIA Video Codec SDK from https://developer.nvidia.com/nvidia-video-codec-sdk and copy the headers to your CUDA include directory.")
-        endif()
-
-        message(STATUS "Found NVIDIA Video Codec SDK library: ${CUDA_NVCUVID_LIBRARY}")
-        message(STATUS "Found NVIDIA Video Codec SDK headers: ${NVCODEC_INCLUDE_DIR}")
-
-        # Add CUDA Driver API library (needed for cuCtxGetCurrent, etc.)
-        find_library(CUDA_DRIVER_LIBRARY
-            NAMES cuda
-            PATHS
-                /usr/local/cuda/lib64
-                /usr/local/cuda/lib
-                ${CUDA_TOOLKIT_ROOT_DIR}/lib64
-                ${CUDA_TOOLKIT_ROOT_DIR}/lib
-                /opt/cuda/lib64
-                /opt/cuda/lib
-                $ENV{CUDA_PATH}/lib64
-                $ENV{CUDA_PATH}/lib
-                $ENV{CUDA_HOME}/lib64
-                $ENV{CUDA_HOME}/lib
-                /usr/lib64
-                /usr/lib
-        )
-
-        if(NOT CUDA_DRIVER_LIBRARY)
-            message(FATAL_ERROR "Cannot find CUDA Driver API library (libcuda.so)")
-        endif()
-
-        message(STATUS "Found CUDA Driver API library: ${CUDA_DRIVER_LIBRARY}")
-
-        # Add nvcuvid and cuda driver libraries to dependencies
-        list(APPEND core_library_dependencies ${CUDA_NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
+        list(APPEND core_library_dependencies ${NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
     endif()
 
     make_torchcodec_sublibrary(
@@ -203,15 +139,6 @@ function(make_torchcodec_libraries
         "${core_sources}"
         "${core_library_dependencies}"
     )
-
-    # Add NVDEC include directories after target creation
-    if(ENABLE_CUDA AND NVCODEC_INCLUDE_DIR)
-        target_include_directories(${core_library_name}
-            PRIVATE
-            ${NVCODEC_INCLUDE_DIR}
-        )
-    endif()
-
 
     # 2. Create libtorchcodec_custom_opsN.{ext}.
     set(custom_ops_library_name "libtorchcodec_custom_ops${ffmpeg_major_version}")
