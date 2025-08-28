@@ -381,25 +381,25 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   // For custom NVDEC, the frame should already be on GPU
   // We need to convert from NVDEC's output format (typically NV12) to RGB
-  printf("OKAY\n");
+  printf("In CNI convertAVFrameToFrameOutput\n");
   fflush(stdout);
 
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected CUDA format frame from custom NVDEC decoder");
 
-  auto cpuDevice = torch::Device(torch::kCUDA);
-  auto cpuInterface = createDeviceInterface(cpuDevice);
+  auto cudaDevice = torch::Device(torch::kCUDA);
+  auto cudaInterface = createDeviceInterface(cudaDevice);
 
-  FrameOutput cpuFrameOutput;
-  cpuInterface->convertAVFrameToFrameOutput(
+  FrameOutput cudaFrameOutput;
+  cudaInterface->convertAVFrameToFrameOutput(
       videoStreamOptions,
       timeBase,
       avFrame,
-      cpuFrameOutput,
+      cudaFrameOutput,
       preAllocatedOutputTensor);
 
-  frameOutput.data = cpuFrameOutput.data.to(device_);
+  frameOutput.data = cudaFrameOutput.data.to(device_);
 }
 
 } // namespace facebook::torchcodec
