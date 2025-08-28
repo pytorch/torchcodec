@@ -26,6 +26,11 @@ class CpuDeviceInterface : public DeviceInterface {
   void initializeContext(
       [[maybe_unused]] AVCodecContext* codecContext) override {}
 
+  std::unique_ptr<FiltersContext> initializeFiltersContext(
+      const VideoStreamOptions& videoStreamOptions,
+      const UniqueAVFrame& avFrame,
+      const AVRational& timeBase) override;
+
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       const AVRational& timeBase,
@@ -39,21 +44,21 @@ class CpuDeviceInterface : public DeviceInterface {
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      const UniqueAVFrame& avFrame);
+  std::unique_ptr<FiltersContext> initializeFiltersContextInternal(
+      const VideoStreamOptions& videoStreamOptions,
+      const UniqueAVFrame& avFrame,
+      const AVRational& timeBase);
 
   void createSwsContext(
       const FiltersContext& filtersContext,
       const enum AVColorSpace colorspace);
 
-  // color-conversion fields. Only one of FilterGraphContext and
-  // UniqueSwsContext should be non-null.
-  std::unique_ptr<FilterGraph> filterGraphContext_;
+  // SWS color conversion context
   UniqueSwsContext swsContext_;
 
-  // Used to know whether a new FilterGraphContext or UniqueSwsContext should
+  // Used to know whether a new UniqueSwsContext should
   // be created before decoding a new frame.
-  FiltersContext prevFiltersContext_;
+  std::unique_ptr<FiltersContext> prevFiltersContext_;
 };
 
 } // namespace facebook::torchcodec
