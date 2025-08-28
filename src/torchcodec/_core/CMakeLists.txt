@@ -93,6 +93,7 @@ function(make_torchcodec_libraries
         CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
         Encoder.cpp
+        ValidationUtils.cpp
     )
 
     if(ENABLE_CUDA)
@@ -123,7 +124,6 @@ function(make_torchcodec_libraries
     set(custom_ops_sources
         AVIOTensorContext.cpp
         custom_ops.cpp
-        ValidationUtils.cpp
     )
     set(custom_ops_dependencies
         ${core_library_name}
@@ -141,7 +141,6 @@ function(make_torchcodec_libraries
     set(pybind_ops_sources
         AVIOFileLikeContext.cpp
         pybind_ops.cpp
-        ValidationUtils.cpp
     )
     set(pybind_ops_dependencies
        ${core_library_name}
