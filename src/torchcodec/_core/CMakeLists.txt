@@ -93,6 +93,7 @@ function(make_torchcodec_libraries
         CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
         Encoder.cpp
+        ValidationUtils.cpp
     )
 
     if(ENABLE_CUDA)

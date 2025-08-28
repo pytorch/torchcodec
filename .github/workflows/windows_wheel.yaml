@@ -42,13 +42,12 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload Windows wheel
-    # TODO: use @main
-    uses: nicolashug/test-infra/.github/workflows/build_wheels_windows.yml@build-platform-windows
+    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
     with:
       repository: pytorch/torchcodec
       ref: ""
-      test-infra-repository: nicolashug/test-infra
-      test-infra-ref: build-platform-windows
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       # post-script: packaging/post_build_script.sh  TODO: consider enabling post-build checks for Windows
