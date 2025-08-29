@@ -378,8 +378,7 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  // For custom NVDEC, the frame should already be on GPU
-  // We need to convert from NVDEC's output format (typically NV12) to RGB
+
   printf("In CNI convertAVFrameToFrameOutput\n");
   fflush(stdout);
 
@@ -387,8 +386,15 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
       avFrame->format == AV_PIX_FMT_CUDA,
       "Expected CUDA format frame from custom NVDEC decoder");
 
+  // TODONVDEC: we use the 'default' cuda device interface for color conversion.
+  // That's a temporary hack to make things work. *IF* we keep both device
+  // interfaces then we should abstract the color conversion stuff separately.
+  // If we only keep this device interface, we can just integrate the color
+  // conversion code here.
   auto cudaDevice = torch::Device(torch::kCUDA);
   auto cudaInterface = createDeviceInterface(cudaDevice);
+  AVCodecContext dummyCodecContext = {};
+  cudaInterface->initializeContext(&dummyCodecContext);
 
   FrameOutput cudaFrameOutput;
   cudaInterface->convertAVFrameToFrameOutput(

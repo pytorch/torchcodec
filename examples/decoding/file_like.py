@@ -215,7 +215,7 @@ class FileOpCounter:
         self.num_reads += 1
         return self._file.read(size)
 
-    def seek(self, offset: int, whence: int) -> bytes:
+    def seek(self, offset: int, whence: int) -> int:
         self.num_seeks += 1
         return self._file.seek(offset, whence)
 

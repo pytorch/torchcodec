@@ -104,10 +104,14 @@ AudioEncoder::~AudioEncoder() {
 
 void AudioEncoder::close_avio() {
   if (avFormatContext_ && avFormatContext_->pb) {
-    avio_flush(avFormatContext_->pb);
+    if (avFormatContext_->pb->error == 0) {
+      avio_flush(avFormatContext_->pb);
+    }
 
     if (!avioContextHolder_) {
-      avio_close(avFormatContext_->pb);
+      if (avFormatContext_->pb->error == 0) {
+        avio_close(avFormatContext_->pb);
+      }
       // avoids closing again in destructor, which would segfault.
       avFormatContext_->pb = nullptr;
     }
@@ -149,7 +153,7 @@ AudioEncoder::AudioEncoder(
     const torch::Tensor& samples,
     int sampleRate,
     std::string_view formatName,
-    std::unique_ptr<AVIOToTensorContext> avioContextHolder,
+    std::unique_ptr<AVIOContextHolder> avioContextHolder,
     const AudioStreamOptions& audioStreamOptions)
     : samples_(validateSamples(samples)),
       inSampleRate_(sampleRate),
@@ -248,9 +252,12 @@ void AudioEncoder::initializeEncoder(
 torch::Tensor AudioEncoder::encodeToTensor() {
   TORCH_CHECK(
       avioContextHolder_ != nullptr,
-      "Cannot encode to tensor, avio context doesn't exist.");
+      "Cannot encode to tensor, avio tensor context doesn't exist.");
   encode();
-  return avioContextHolder_->getOutputTensor();
+  auto avioToTensorContext =
+      dynamic_cast<AVIOToTensorContext*>(avioContextHolder_.get());
+  TORCH_CHECK(avioToTensorContext != nullptr, "Invalid AVIO context holder.");
+  return avioToTensorContext->getOutputTensor();
 }
 
 void AudioEncoder::encode() {
@@ -501,6 +508,7 @@ void AudioEncoder::maybeFlushSwrBuffers(AutoAVPacket& autoAVPacket) {
 void AudioEncoder::flushBuffers() {
   AutoAVPacket autoAVPacket;
   maybeFlushSwrBuffers(autoAVPacket);
+
   encodeFrame(autoAVPacket, UniqueAVFrame(nullptr));
 }
 } // namespace facebook::torchcodec

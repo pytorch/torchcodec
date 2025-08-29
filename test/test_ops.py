@@ -42,9 +42,8 @@ from torchcodec._core import (
 )
 
 from .utils import (
+    all_supported_devices,
     assert_frames_equal,
-    cpu_and_cuda,
-    get_ffmpeg_major_version,
     NASA_AUDIO,
     NASA_AUDIO_MP3,
     NASA_VIDEO,
@@ -60,7 +59,7 @@ INDEX_OF_FRAME_AT_6_SECONDS = 180
 
 
 class TestVideoDecoderOps:
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -77,7 +76,7 @@ class TestVideoDecoderOps:
         )
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_seek_to_negative_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -89,7 +88,7 @@ class TestVideoDecoderOps:
         frame0, _, _ = get_next_frame(decoder)
         assert_frames_equal(frame0, reference_frame0.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frame_at_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -113,7 +112,7 @@ class TestVideoDecoderOps:
             with pytest.raises(AssertionError):
                 assert_frames_equal(next_frame, reference_frame6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -131,7 +130,7 @@ class TestVideoDecoderOps:
         reference_frame389 = NASA_VIDEO.get_frame_data_by_index(389)
         assert_frames_equal(frame389[0], reference_frame389.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -143,7 +142,7 @@ class TestVideoDecoderOps:
         assert pts.item() == pytest.approx(6.006, rel=1e-3)
         assert duration.item() == pytest.approx(0.03337, rel=1e-3)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_at_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -155,7 +154,7 @@ class TestVideoDecoderOps:
         assert_frames_equal(frames0and180[0], reference_frame0.to(device))
         assert_frames_equal(frames0and180[1], reference_frame180.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
@@ -182,7 +181,7 @@ class TestVideoDecoderOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_at_indices_negative_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -196,7 +195,7 @@ class TestVideoDecoderOps:
         assert_frames_equal(frames389and387and1[1], reference_frame387.to(device))
         assert_frames_equal(frames389and387and1[2], reference_frame1.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_at_indices_fail_on_invalid_negative_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -208,7 +207,7 @@ class TestVideoDecoderOps:
                 decoder, frame_indices=[-10000, -3000]
             )
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
@@ -236,7 +235,7 @@ class TestVideoDecoderOps:
         with pytest.raises(AssertionError):
             assert_frames_equal(frames[0], frames[-1])
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_pts_apis_against_index_ref(self, device):
         # Non-regression test for https://github.com/pytorch/torchcodec/pull/287
         # Get all frames in the video, then query all frames with all time-based
@@ -291,7 +290,7 @@ class TestVideoDecoderOps:
         )
         torch.testing.assert_close(pts_seconds, all_pts_seconds_ref, atol=0, rtol=0)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_in_range(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -331,7 +330,7 @@ class TestVideoDecoderOps:
         empty_frame, *_ = get_frames_in_range(decoder, start=5, stop=5)
         assert_frames_equal(empty_frame, NASA_VIDEO.empty_chw_tensor.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_throws_exception_at_eof(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -346,7 +345,7 @@ class TestVideoDecoderOps:
         with pytest.raises(IndexError, match="no more frames"):
             get_frame_at_pts(decoder, seconds=1000.0)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_throws_exception_if_seek_too_far(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
@@ -355,7 +354,7 @@ class TestVideoDecoderOps:
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_compile_seek_and_next(self, device):
         # TODO_OPEN_ISSUE Scott (T180277797): Get this to work with the inductor stack. Right now
         # compilation fails because it can't handle tensors of size unknown at
@@ -379,7 +378,7 @@ class TestVideoDecoderOps:
         assert_frames_equal(frame0, reference_frame0.to(device))
         assert_frames_equal(frame_time6, reference_frame_time6.to(device))
 
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize(
         "create_from",
         ("file", "tensor", "bytes", "file_like_rawio", "file_like_bufferedio"),
@@ -485,7 +484,7 @@ class TestVideoDecoderOps:
         )
         with pytest.raises(
             RuntimeError,
-            match="Please provide frame mappings when using custom_frame_mappings seek mode.",
+            match="Missing frame mappings when custom_frame_mappings seek mode is set.",
         ):
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
@@ -505,11 +504,7 @@ class TestVideoDecoderOps:
                 decoder, stream_index=0, custom_frame_mappings=different_lengths
             )
 
-    @pytest.mark.skipif(
-        get_ffmpeg_major_version() in (4, 5),
-        reason="ffprobe isn't accurate on ffmpeg 4 and 5",
-    )
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # custom_frame_index seek mode requires a stream index
         decoder = create_from_file(
@@ -1015,7 +1010,7 @@ class TestAudioDecoderOps:
         torch.testing.assert_close(frames_downsampled_to_8000, frames_8000_native)
 
     @pytest.mark.parametrize("buffering", (0, 1024))
-    @pytest.mark.parametrize("device", cpu_and_cuda())
+    @pytest.mark.parametrize("device", all_supported_devices())
     def test_file_like_decoding(self, buffering, device):
         # Test to ensure that seeks and reads are actually going through the
         # methods on the IO object.
@@ -1038,7 +1033,7 @@ class TestAudioDecoderOps:
                 self.num_reads += 1
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 self.num_seeks += 1
                 return self._file.seek(offset, whence)
 
@@ -1086,8 +1081,8 @@ class TestAudioDecoderOps:
 
     def test_file_like_method_check_fails(self):
         class ReadMethodMissing:
-            def seek(self, offset: int, whence: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int, whence: int) -> int:
+                return 0
 
         with pytest.raises(RuntimeError, match="must implement a read method"):
             create_from_file_like(ReadMethodMissing(), "approximate")
@@ -1107,7 +1102,7 @@ class TestAudioDecoderOps:
             def read(self) -> bytes:
                 return bytes()
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seeK(offset, whence)
 
         with pytest.raises(
@@ -1126,8 +1121,8 @@ class TestAudioDecoderOps:
                 return self._file.read(size)
 
             # io.RawIOBase says we should accept two ints; wrong signature on purpose
-            def seek(self, offset: int) -> bytes:
-                return bytes()
+            def seek(self, offset: int) -> int:
+                return 0
 
         with pytest.raises(
             TypeError, match="takes 2 positional arguments but 3 were given"
@@ -1147,7 +1142,7 @@ class TestAudioDecoderOps:
                 # We intentionally read more than requested.
                 return self._file.read(size + 10)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         with pytest.raises(RuntimeError, match="does not conform to read protocol"):
@@ -1174,7 +1169,7 @@ class TestAudioDecoderOps:
 
                 return self._file.read(size)
 
-            def seek(self, offset: int, whence: int) -> bytes:
+            def seek(self, offset: int, whence: int) -> int:
                 return self._file.seek(offset, whence)
 
         decoder_file_like = create_from_file_like(

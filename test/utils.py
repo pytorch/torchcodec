@@ -14,6 +14,9 @@ import pytest
 import torch
 
 from torchcodec._core import get_ffmpeg_library_versions
+from torchcodec.decoders._video_decoder import _read_custom_frame_mappings
+
+IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
 
 # Decorator for skipping CUDA tests when CUDA isn't available. The tests are
@@ -23,12 +26,43 @@ def needs_cuda(test_item):
     return pytest.mark.needs_cuda(test_item)
 
 
-def cpu_and_cuda():
+def all_supported_devices():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
 
 
 def get_ffmpeg_major_version():
-    return int(get_ffmpeg_library_versions()["ffmpeg_version"].split(".")[0])
+    ffmpeg_version = get_ffmpeg_library_versions()["ffmpeg_version"]
+    # When building FFmpeg from source there can be a `n` prefix in the version
+    # string.  This is quite brittle as we're using av_version_info(), which has
+    # no stable format. See https://github.com/pytorch/torchcodec/issues/100
+    if ffmpeg_version.startswith("n"):
+        ffmpeg_version = ffmpeg_version.removeprefix("n")
+    return int(ffmpeg_version.split(".")[0])
+
+
+def cuda_version_used_for_building_torch() -> Optional[tuple[int, int]]:
+    # Return the CUDA version that was used to build PyTorch. That's not always
+    # the same as the CUDA version that is currently installed on the running
+    # machine, which is what we actually want. On the CI though, these are the
+    # same.
+    if torch.version.cuda is None:
+        return None
+    else:
+        return tuple(int(x) for x in torch.version.cuda.split("."))
+
+
+def psnr(a, b, max_val=255) -> float:
+    # Return Peak Signal-to-Noise Ratio (PSNR) between two tensors a and b. The
+    # higher, the better.
+    # According to https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio,
+    # typical values for the PSNR in lossy image and video compression are
+    # between 30 and 50 dB.
+    # Acceptable values for wireless transmission quality loss are considered to
+    # be about 20 dB to 25 dB
+    mse = torch.mean((a.float() - b.float()) ** 2)
+    if mse == 0:
+        return float("inf")
+    return 20 * torch.log10(max_val / torch.sqrt(mse)).item()
 
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
@@ -236,40 +270,30 @@ class TestContainerFile:
         if stream_index is None:
             stream_index = self.default_stream_index
         if self._custom_frame_mappings_data.get(stream_index) is None:
-            self.generate_custom_frame_mappings(stream_index)
+            self._custom_frame_mappings_data[stream_index] = (
+                _read_custom_frame_mappings(
+                    self.generate_custom_frame_mappings(stream_index)
+                )
+            )
         return self._custom_frame_mappings_data[stream_index]
 
-    def generate_custom_frame_mappings(self, stream_index: int) -> None:
-        result = json.loads(
-            subprocess.run(
-                [
-                    "ffprobe",
-                    "-i",
-                    f"{self.path}",
-                    "-select_streams",
-                    f"{stream_index}",
-                    "-show_frames",
-                    "-of",
-                    "json",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-        )
-        all_frames = torch.tensor([float(frame["pts"]) for frame in result["frames"]])
-        is_key_frame = torch.tensor([frame["key_frame"] for frame in result["frames"]])
-        duration = torch.tensor(
-            [float(frame["duration"]) for frame in result["frames"]]
-        )
-        assert (
-            len(all_frames) == len(is_key_frame) == len(duration)
-        ), "Mismatched lengths in frame index data"
-        self._custom_frame_mappings_data[stream_index] = (
-            all_frames,
-            is_key_frame,
-            duration,
-        )
+    def generate_custom_frame_mappings(self, stream_index: int) -> str:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-i",
+                f"{self.path}",
+                "-select_streams",
+                f"{stream_index}",
+                "-show_frames",
+                "-of",
+                "json",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        return result
 
     @property
     def empty_pts_seconds(self) -> torch.Tensor:
@@ -486,6 +510,8 @@ class TestAudio(TestContainerFile):
         return self.stream_infos[self.default_stream_index].sample_format
 
 
+# This file was generated with:
+# ffmpeg -y -i test/resources/nasa_13013.mp4 -b:a 192K -vn test/resources/nasa_13013.mp4.audio.mp3"
 NASA_AUDIO_MP3 = TestAudio(
     filename="nasa_13013.mp4.audio.mp3",
     default_stream_index=0,
@@ -630,4 +656,25 @@ AV1_VIDEO = TestVideo(
             10: TestFrameInfo(pts_seconds=0.400000, duration_seconds=0.040000),
         },
     },
+)
+
+
+# This is a BT.709 full range video, generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=1920x720:rate=30 \
+# -c:v libx264 -pix_fmt yuv420p -color_primaries bt709 -color_trc bt709 \
+# -colorspace bt709 -color_range pc bt709_full_range.mp4
+#
+# We can confirm the color space and color range with:
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=color_space,color_transfer,color_primaries,color_range -of default=noprint_wrappers=1 test/resources/bt709_full_range.mp4
+# color_range=pc
+# color_space=bt709
+# color_transfer=bt709
+# color_primaries=bt709
+BT709_FULL_RANGE = TestVideo(
+    filename="bt709_full_range.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=1280, height=720, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
 )

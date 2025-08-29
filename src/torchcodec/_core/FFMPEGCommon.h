@@ -79,6 +79,8 @@ using UniqueAVAudioFifo = std::
     unique_ptr<AVAudioFifo, Deleter<AVAudioFifo, void, av_audio_fifo_free>>;
 using UniqueAVBSFContext = std::
     unique_ptr<AVBSFContext, Deleterp<AVBSFContext, void, av_bsf_free>>;
+using UniqueAVBufferRef =
+    std::unique_ptr<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:

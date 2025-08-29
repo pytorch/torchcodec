@@ -53,20 +53,6 @@ function(make_torchcodec_sublibrary
     # Avoid adding the "lib" prefix which we already add explicitly.
     set_target_properties(${library_name} PROPERTIES PREFIX "")
 
-    if(WIN32)
-        # On Windows, the built artifacts are put in Release/Debug
-        # subdirectories by default. We want to avoid that, otherwise our
-        # install() step would not know where to find those.
-        set_target_properties(${library_name} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-            LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-            ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
-            ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}
-        )
-    endif()
-
     target_link_libraries(
         ${library_name}
         PUBLIC
@@ -84,16 +70,17 @@ function(make_torchcodec_libraries
     #
     # 1. libtorchcodec_coreN.{ext}: Base library which contains the
     #    implementation of VideoDecoder and everything VideoDecoder needs. On
-    #    Linux, {ext} is so. On Mac, it is dylib.
+    #    Linux, {ext} is so. On Mac, it is dylib. On Windows it's dll.
     #
     # 2. libtorchcodec_custom_opsN.{ext}: Implementation of the PyTorch custom
     #    ops. Depends on libtorchcodec_coreN.{ext}. On Linux, {ext} is so.
-    #    On Mac, it is dylib.
+    #    On Mac, it is dylib. On Windows it's dll.
     #
     # 3. libtorchcodec_pybind_opsN.{ext}: Implementation of the pybind11 ops. We
     #    keep these separate from the PyTorch custom ops because we have to
     #    load these libraries separately on the Python side. Depends on
-    #    libtorchcodec_coreN.{ext}. On BOTH Linux and Mac {ext} is so.
+    #    libtorchcodec_coreN.{ext}. On BOTH Linux and Mac {ext} is so. On
+    #    Windows, it's pyd.
 
     # 1. Create libtorchcodec_coreN.{ext}.
     set(core_library_name "libtorchcodec_core${ffmpeg_major_version}")
@@ -106,6 +93,7 @@ function(make_torchcodec_libraries
         CpuDeviceInterface.cpp
         SingleStreamDecoder.cpp
         Encoder.cpp
+        ValidationUtils.cpp
     )
 
     if(ENABLE_CUDA)
@@ -183,6 +171,14 @@ function(make_torchcodec_libraries
         "${pybind_ops_sources}"
         "${pybind_ops_dependencies}"
     )
+
+    if(WIN32)
+      # On Windows, we need to set the suffix to .pyd so that Python can
+      # import the shared library as a module. Just setting the MODULE type
+      # isn't enough.
+      set_target_properties(${pybind_ops_library_name} PROPERTIES SUFFIX ".pyd")
+    endif()
+
     # pybind11 limits the visibility of symbols in the shared library to prevent
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
@@ -232,7 +228,7 @@ function(make_torchcodec_libraries
     install(
         TARGETS ${all_libraries}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows DLLs
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}  # For Windows
     )
 
 endfunction()

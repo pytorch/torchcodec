@@ -13,6 +13,7 @@
 #include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
+#include "src/torchcodec/_core/ValidationUtils.h"
 
 namespace facebook::torchcodec {
 
@@ -84,7 +85,9 @@ at::Tensor wrapDecoderPointerToTensor(
 }
 
 SingleStreamDecoder* unwrapTensorToGetDecoder(at::Tensor& tensor) {
-  TORCH_INTERNAL_ASSERT(tensor.is_contiguous());
+  TORCH_CHECK(
+      tensor.is_contiguous(),
+      "fake decoder tensor must be contiguous! This is an internal error, please report on the torchcodec issue tracker.");
   void* buffer = tensor.mutable_data_ptr();
   SingleStreamDecoder* decoder = static_cast<SingleStreamDecoder*>(buffer);
   return decoder;
@@ -160,16 +163,6 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   ss << "}";
 
   return ss.str();
-}
-
-int validateSampleRate(int64_t sampleRate) {
-  TORCH_CHECK(
-      sampleRate <= std::numeric_limits<int>::max(),
-      "sample_rate=",
-      sampleRate,
-      " is too large to be cast to an int.");
-
-  return static_cast<int>(sampleRate);
 }
 
 } // namespace
@@ -425,14 +418,17 @@ void encode_audio_to_file(
     std::optional<int64_t> bit_rate = std::nullopt,
     std::optional<int64_t> num_channels = std::nullopt,
     std::optional<int64_t> desired_sample_rate = std::nullopt) {
-  // TODO Fix implicit int conversion:
-  // https://github.com/pytorch/torchcodec/issues/679
   AudioStreamOptions audioStreamOptions;
-  audioStreamOptions.bitRate = bit_rate;
-  audioStreamOptions.numChannels = num_channels;
-  audioStreamOptions.sampleRate = desired_sample_rate;
+  audioStreamOptions.bitRate = validateOptionalInt64ToInt(bit_rate, "bit_rate");
+  audioStreamOptions.numChannels =
+      validateOptionalInt64ToInt(num_channels, "num_channels");
+  audioStreamOptions.sampleRate =
+      validateOptionalInt64ToInt(desired_sample_rate, "desired_sample_rate");
   AudioEncoder(
-      samples, validateSampleRate(sample_rate), file_name, audioStreamOptions)
+      samples,
+      validateInt64ToInt(sample_rate, "sample_rate"),
+      file_name,
+      audioStreamOptions)
       .encode();
 }
 
@@ -444,15 +440,15 @@ at::Tensor encode_audio_to_tensor(
     std::optional<int64_t> num_channels = std::nullopt,
     std::optional<int64_t> desired_sample_rate = std::nullopt) {
   auto avioContextHolder = std::make_unique<AVIOToTensorContext>();
-  // TODO Fix implicit int conversion:
-  // https://github.com/pytorch/torchcodec/issues/679
   AudioStreamOptions audioStreamOptions;
-  audioStreamOptions.bitRate = bit_rate;
-  audioStreamOptions.numChannels = num_channels;
-  audioStreamOptions.sampleRate = desired_sample_rate;
+  audioStreamOptions.bitRate = validateOptionalInt64ToInt(bit_rate, "bit_rate");
+  audioStreamOptions.numChannels =
+      validateOptionalInt64ToInt(num_channels, "num_channels");
+  audioStreamOptions.sampleRate =
+      validateOptionalInt64ToInt(desired_sample_rate, "desired_sample_rate");
   return AudioEncoder(
              samples,
-             validateSampleRate(sample_rate),
+             validateInt64ToInt(sample_rate, "sample_rate"),
              format,
              std::move(avioContextHolder),
              audioStreamOptions)
@@ -670,6 +666,10 @@ std::string get_stream_json_metadata(
 
 // Returns version information about the various FFMPEG libraries that are
 // loaded in the program's address space.
+// TODO: ideally we'd have a more robust way of getting the ffmpeg version,
+// we're using av_version_info() which is not standardized and shouldn't be
+// parsed by code (which we do!). See
+// https://github.com/pytorch/torchcodec/issues/100
 std::string _get_json_ffmpeg_library_versions() {
   std::stringstream ss;
   ss << "{\n";
