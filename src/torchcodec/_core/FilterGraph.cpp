@@ -43,15 +43,7 @@ FilterGraph::FilterGraph(
   const AVFilter* buffersrc = avfilter_get_by_name("buffer");
   const AVFilter* buffersink = avfilter_get_by_name("buffersink");
 
-  auto deleter = [](AVBufferSrcParameters* p) {
-    if (p) {
-      av_freep(&p);
-    }
-  };
-  std::unique_ptr<AVBufferSrcParameters, decltype(deleter)> srcParams(
-      nullptr, deleter);
-
-  srcParams.reset(av_buffersrc_parameters_alloc());
+  UniqueAVBufferSrcParameters srcParams(av_buffersrc_parameters_alloc());
   TORCH_CHECK(srcParams, "Failed to allocate buffersrc params");
 
   srcParams->format = filtersContext.inputFormat;
