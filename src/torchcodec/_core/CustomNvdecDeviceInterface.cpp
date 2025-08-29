@@ -34,8 +34,6 @@ static bool g_cuda_custom_nvdec = registerDeviceInterface(
 // NVDEC callback functions
 static int CUDAAPI
 HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
-  printf("  IN CNI::handleVideoSequence\n");
-  fflush(stdout);
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handleVideoSequence(pVideoFormat);
@@ -43,8 +41,6 @@ HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
 
 static int CUDAAPI
 HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
-  printf("  IN CNI::handlePictureDecode\n");
-  fflush(stdout);
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handlePictureDecode(pPicParams);
@@ -150,6 +146,7 @@ void CustomNvdecDeviceInterface::initializeContext(
   }
 
   // TODONVDEC figure out why this is needed and where videoFormat_ is actually used.
+  // Maybe this isn't needed at all since this gets overridden in handleVideoSequence?
   memset(&videoFormat_, 0, sizeof(videoFormat_));
   videoFormat_.codec = nvCodec;
   videoFormat_.coded_width = 0; // Will be set when we get the first frame
@@ -193,21 +190,18 @@ void CustomNvdecDeviceInterface::createVideoParser() {
   parserCreated_ = true;
 }
 
+// This callback is called by the parser within cuvidParseVideoData, either when
+// the parser encounters the start of the headers, or when "there is a change in
+// the sequence" - I don't know what that means. Maybe a resolution change?
 int CustomNvdecDeviceInterface::handleVideoSequence(
     CUVIDEOFORMAT* pVideoFormat) {
-
-  printf("  IN CNI::handleVideoSequence\n");
+  printf("    IN CNI::handleVideoSequence\n");
   fflush(stdout);
   TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
 
   // Store video format
   videoFormat_ = *pVideoFormat;
 
-  // Get current CUDA context
-  CUresult cuResult = cuCtxGetCurrent(&context_);
-  if (cuResult != CUDA_SUCCESS || context_ == nullptr) {
-    TORCH_CHECK(false, "Failed to get CUDA context for device ", device_.index());
-  }
 
   // Create decoder with the video format
   CUVIDDECODECREATEINFO createInfo = {};
@@ -234,8 +228,9 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
 
 int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
+  printf("    IN CNI::handlePictureDecode\n");
+  fflush(stdout);
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
-  // printf("In CustomNvdecDeviceInterface::handlePictureDecode\n");
 
   if (!decoder_) {
     return 0; // No decoder available
@@ -247,7 +242,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
 
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
-  printf("  IN CNI::handlePictureDisplay\n");
+  printf("    IN CNI::handlePictureDisplay\n");
   fflush(stdout);
   TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
 
@@ -297,7 +292,11 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   cudaPacket.flags = CUVID_PKT_TIMESTAMP;
   cudaPacket.timestamp = pts;
 
+  printf("  In CNI calling cuvidParseVideoData\n");
+  fflush(stdout);
   CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+  printf("  In CNI after cuvidParseVideoData\n");
+  fflush(stdout);
   TORCH_CHECK(result == CUDA_SUCCESS, "Failed to parse video data: ", result);
 
   std::lock_guard<std::mutex> lock(frameQueueMutex_);

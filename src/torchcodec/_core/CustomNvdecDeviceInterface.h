@@ -61,7 +61,6 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // NVDEC decoder context and parser
   CUvideoparser videoParser_ = nullptr;
   CUvideodecoder decoder_ = nullptr;
-  CUcontext context_ = nullptr;
 
   // Video format info
   CUVIDEOFORMAT videoFormat_;
