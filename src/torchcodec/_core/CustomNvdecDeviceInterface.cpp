@@ -34,7 +34,8 @@ static bool g_cuda_custom_nvdec = registerDeviceInterface(
 // NVDEC callback functions
 static int CUDAAPI
 HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
-  // printf("Static HandleVideoSequence called\n");
+  printf("  IN CNI::handleVideoSequence\n");
+  fflush(stdout);
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handleVideoSequence(pVideoFormat);
@@ -42,7 +43,8 @@ HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
 
 static int CUDAAPI
 HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
-  // printf("Static HandlePictureDecode called\n");
+  printf("  IN CNI::handlePictureDecode\n");
+  fflush(stdout);
   CustomNvdecDeviceInterface* decoder =
       static_cast<CustomNvdecDeviceInterface*>(pUserData);
   return decoder->handlePictureDecode(pPicParams);
@@ -61,7 +63,7 @@ HandlePictureDisplay(void* pUserData, CUVIDPARSERDISPINFO* pDispInfo) {
 CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
     const torch::Device& device)
     : DeviceInterface(device) {
-  printf("IN CustomNvdecDeviceInterface::CustomNvdecDeviceInterface\n");
+  printf("  IN CNI::CustomNvdecDeviceInterface\n");
   fflush(stdout);
   TORCH_CHECK(
       g_cuda_custom_nvdec, "CustomNvdecDeviceInterface was not registered!");
@@ -70,6 +72,8 @@ CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
 }
 
 CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
+  printf("  IN CNI::destructor\n");
+  fflush(stdout);
   // Clean up any remaining frames in the queue
   {
     std::lock_guard<std::mutex> lock(frameQueueMutex_);
@@ -96,12 +100,15 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
     videoParser_ = nullptr;
   }
 
-  isInitialized_ = false;
-  parserInitialized_ = false;
+  parserCreated_ = false;
 }
 
 std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
     const AVCodecID& codecId) {
+
+  // TODONVDEC uhh???
+  printf("  IN CNI::findCodec\n");
+  fflush(stdout);
   // For custom NVDEC, we bypass FFmpeg codec selection entirely
   // We'll handle the codec selection in our own NVDEC initialization
   (void)codecId; // Suppress unused parameter warning
@@ -110,29 +117,16 @@ std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
 
 void CustomNvdecDeviceInterface::initializeContext(
     AVCodecContext* codecContext) {
+  printf("  IN CNI::initializeContext\n");
+  fflush(stdout);
   // Don't set hw_device_ctx - we handle decoding directly with NVDEC SDK
   // Just ensure CUDA context exists for PyTorch tensors
   torch::Tensor dummyTensor = torch::empty(
       {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
 
-  // Initialize our custom NVDEC decoder
-  initializeNvdecDecoder(codecContext->codec_id);
-
-  // Initialize video parser with the codec ID and extradata
-  initializeVideoParser(codecContext->codec_id, codecContext->extradata, codecContext->extradata_size);
-}
-
-void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
-  if (isInitialized_) {
-    return; // Already initialized
-  }
-
-  // Store the codec ID for later use
-  currentCodecId_ = codecId;
-
-  // Convert AVCodecID to NVDEC codec type
+  // Convert FFmpeg codec ID to NVDEC codec enum
   cudaVideoCodec nvCodec;
-  switch (codecId) {
+  switch (codecContext->codec_id) {
     case AV_CODEC_ID_H264:
       nvCodec = cudaVideoCodec_H264;
       break;
@@ -152,11 +146,10 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
       TORCH_CHECK(
           false,
           "Unsupported codec for custom NVDEC: ",
-          avcodec_get_name(codecId));
+          avcodec_get_name(codecContext->codec_id));
   }
 
-  // Initialize video format structure (decoder will be created in
-  // handleVideoSequence)
+  // TODONVDEC figure out why this is needed and where videoFormat_ is actually used.
   memset(&videoFormat_, 0, sizeof(videoFormat_));
   videoFormat_.codec = nvCodec;
   videoFormat_.coded_width = 0; // Will be set when we get the first frame
@@ -165,15 +158,17 @@ void CustomNvdecDeviceInterface::initializeNvdecDecoder(AVCodecID codecId) {
   videoFormat_.bit_depth_luma_minus8 = 0;
   videoFormat_.bit_depth_chroma_minus8 = 0;
 
-  isInitialized_ = true;
+  createVideoParser();
 }
 
-void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_t* extradata, int extradata_size) {
-  if (parserInitialized_) {
+
+void CustomNvdecDeviceInterface::createVideoParser() {
+  printf("  IN CNI::createVideoParser\n");
+  fflush(stdout);
+  if (parserCreated_) {
+    // TODONVDEC - is this needed?
     return;
   }
-
-  // printf("Initializing NVDEC video parser for codec\n");
   
   // Set up video parser parameters
   CUVIDPARSERPARAMS parserParams = {};
@@ -186,21 +181,19 @@ void CustomNvdecDeviceInterface::initializeVideoParser(AVCodecID codecId, uint8_
   parserParams.pfnSequenceCallback = HandleVideoSequence;
   parserParams.pfnDecodePicture = HandlePictureDecode;
   parserParams.pfnDisplayPicture = HandlePictureDisplay;
-  
-  // printf("Parser params: pUserData=%p, pfnSequenceCallback=%p, pfnDecodePicture=%p, pfnDisplayPicture=%p\n", 
-  //        parserParams.pUserData, (void*)parserParams.pfnSequenceCallback, 
-  //        (void*)parserParams.pfnDecodePicture, (void*)parserParams.pfnDisplayPicture);
 
   CUresult result = cuvidCreateVideoParser(&videoParser_, &parserParams);
   TORCH_CHECK(
       result == CUDA_SUCCESS, "Failed to create video parser: ", result);
 
-  parserInitialized_ = true;
+  parserCreated_ = true;
 }
 
 int CustomNvdecDeviceInterface::handleVideoSequence(
     CUVIDEOFORMAT* pVideoFormat) {
-      // printf("In CustomNvdecDeviceInterface::handleVideoSequence\n");
+
+  printf("  IN CNI::handleVideoSequence\n");
+  fflush(stdout);
   TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
 
   // Store video format
@@ -250,6 +243,8 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
 
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
+  printf("  IN CNI::handlePictureDisplay\n");
+  fflush(stdout);
   TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
 
   // Queue the frame for later retrieval
@@ -279,8 +274,7 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
 
 UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
     ReferenceAVPacket& packet) {
-  TORCH_CHECK(isInitialized_, "NVDEC decoder not initialized");
-  printf("IN CustomNvdecDeviceInterface::decodePacketDirectly\n");
+  printf("  IN CNI::decodePacketDirectly\n");
   fflush(stdout);
 
   // Extract compressed data from AVPacket
@@ -291,7 +285,7 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   TORCH_CHECK(compressedData != nullptr && size > 0, "Invalid packet data");
 
   // Video parser should already be initialized from initializeContext
-  TORCH_CHECK(parserInitialized_, "Video parser not initialized");
+  TORCH_CHECK(parserCreated_, "Video parser not initialized");
 
   // Parse the packet data (now already in Annex B format from bitstream filter)
   // printf("About to parse packet: size=%d, pts=%lld\n", size, pts);
@@ -313,6 +307,8 @@ UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
   std::lock_guard<std::mutex> lock(frameQueueMutex_);
   if (frameQueue_.empty()) {
     // No frame ready yet (async decoding)
+    printf("  No frame ready after parsing\n");
+    fflush(stdout);
     return UniqueAVFrame(nullptr);
   }
 
@@ -379,7 +375,7 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
 
-  printf("In CNI convertAVFrameToFrameOutput\n");
+  printf("  In CNI convertAVFrameToFrameOutput\n");
   fflush(stdout);
 
   TORCH_CHECK(
