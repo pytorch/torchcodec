@@ -31,9 +31,9 @@ endif()
 if (WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 endif()
-
 
 function(make_torchcodec_sublibrary
     library_name
@@ -97,7 +97,7 @@ function(make_torchcodec_libraries
     )
 
     if(ENABLE_CUDA)
-	    list(APPEND core_sources CudaDeviceInterface.cpp)
+	    list(APPEND core_sources CudaDeviceInterface.cpp CustomNvdecDeviceInterface.cpp)
     endif()
 
     set(core_library_dependencies
@@ -110,6 +110,15 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
+
+        find_library(NVCUVID_LIBRARY NAMES nvcuvid REQUIRED)
+        message(STATUS "Found NVCUVID library: ${NVCUVID_LIBRARY}")
+
+        # Add CUDA Driver library (needed for cuCtxGetCurrent, etc.)
+        find_library(CUDA_DRIVER_LIBRARY NAMES cuda REQUIRED)
+        message(STATUS "Found CUDA Driver library: ${CUDA_DRIVER_LIBRARY}")
+
+        list(APPEND core_library_dependencies ${NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
     endif()
 
     make_torchcodec_sublibrary(
