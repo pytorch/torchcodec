@@ -253,6 +253,14 @@ void _add_video_stream(
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
+  // TODONVDEC:
+  // - All parsing logic of the the 'cuda:0:variant' string should probably
+  // happen in Python, and the core/C++ code should just accept a clean device
+  // string with a separate variant parameter.
+  // - the createTorchDevice function does 2 things: return a clean
+  // torch::Device, and also validate that a corresponding interface exists. We
+  // should separate both logics. Note that this pre-exists in main.
+  // - The variant should be part of the VideoStreamOptions struct when passed to the SingleStreamDecoder.
   std::string deviceVariant = "default";
   if (device.has_value()) {
     std::string deviceStr = std::string(device.value());
