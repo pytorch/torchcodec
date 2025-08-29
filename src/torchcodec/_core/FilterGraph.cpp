@@ -17,16 +17,16 @@ bool operator==(const AVRational& lhs, const AVRational& rhs) {
   return lhs.num == rhs.num && lhs.den == rhs.den;
 }
 
-bool FiltersContext::operator==(const FiltersContext& other) {
+bool FiltersContext::operator==(const FiltersContext& other) const {
   return inputWidth == other.inputWidth && inputHeight == other.inputHeight &&
       inputFormat == other.inputFormat && outputWidth == other.outputWidth &&
       outputHeight == other.outputHeight &&
-      outputFormat == other.outputFormat && filters == other.filters &&
-      timeBase == other.timeBase &&
+      outputFormat == other.outputFormat &&
+      filtergraphStr == other.filtergraphStr && timeBase == other.timeBase &&
       hwFramesCtx.get() == other.hwFramesCtx.get();
 }
 
-bool FiltersContext::operator!=(const FiltersContext& other) {
+bool FiltersContext::operator!=(const FiltersContext& other) const {
   return !(*this == other);
 }
 
@@ -108,7 +108,7 @@ FilterGraph::FilterGraph(
   AVFilterInOut* inputsTmp = inputs.release();
   status = avfilter_graph_parse_ptr(
       filterGraph_.get(),
-      filtersContext.filters.c_str(),
+      filtersContext.filtergraphStr.c_str(),
       &inputsTmp,
       &outputsTmp,
       nullptr);

@@ -15,6 +15,18 @@ static bool g_cpu = registerDeviceInterface(
 
 } // namespace
 
+bool CpuDeviceInterface::SwsFrameContext::operator==(
+    const CpuDeviceInterface::SwsFrameContext& other) const {
+  return inputWidth == other.inputWidth && inputHeight == other.inputHeight &&
+      inputFormat == other.inputFormat && outputWidth == other.outputWidth &&
+      outputHeight == other.outputHeight;
+}
+
+bool CpuDeviceInterface::SwsFrameContext::operator!=(
+    const CpuDeviceInterface::SwsFrameContext& other) const {
+  return !(*this == other);
+}
+
 CpuDeviceInterface::CpuDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
   TORCH_CHECK(g_cpu, "CpuDeviceInterface was not registered!");
@@ -56,31 +68,8 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
   }
 
   torch::Tensor outputTensor;
-  // We need to compare the current frame context with our previous frame
-  // context. If they are different, then we need to re-create our colorspace
-  // conversion objects. We create our colorspace conversion objects late so
-  // that we don't have to depend on the unreliable metadata in the header.
-  // And we sometimes re-create them because it's possible for frame
-  // resolution to change mid-stream. Finally, we want to reuse the colorspace
-  // conversion objects as much as possible for performance reasons.
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(avFrame->format);
-  FiltersContext filtersContext;
-
-  filtersContext.inputWidth = avFrame->width;
-  filtersContext.inputHeight = avFrame->height;
-  filtersContext.inputFormat = frameFormat;
-  filtersContext.inputAspectRatio = avFrame->sample_aspect_ratio;
-  filtersContext.outputWidth = expectedOutputWidth;
-  filtersContext.outputHeight = expectedOutputHeight;
-  filtersContext.outputFormat = AV_PIX_FMT_RGB24;
-  filtersContext.timeBase = timeBase;
-
-  std::stringstream filters;
-  filters << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
-  filters << ":sws_flags=bilinear";
-
-  filtersContext.filters = filters.str();
 
   // By default, we want to use swscale for color conversion because it is
   // faster. However, it has width requirements, so we may need to fall back
@@ -101,12 +90,27 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
       videoStreamOptions.colorConversionLibrary.value_or(defaultLibrary);
 
   if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
+    // We need to compare the current frame context with our previous frame
+    // context. If they are different, then we need to re-create our colorspace
+    // conversion objects. We create our colorspace conversion objects late so
+    // that we don't have to depend on the unreliable metadata in the header.
+    // And we sometimes re-create them because it's possible for frame
+    // resolution to change mid-stream. Finally, we want to reuse the colorspace
+    // conversion objects as much as possible for performance reasons.
+    SwsFrameContext swsFrameContext;
+
+    swsFrameContext.inputWidth = avFrame->width;
+    swsFrameContext.inputHeight = avFrame->height;
+    swsFrameContext.inputFormat = frameFormat;
+    swsFrameContext.outputWidth = expectedOutputWidth;
+    swsFrameContext.outputHeight = expectedOutputHeight;
+
     outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
         expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
-    if (!swsContext_ || prevFiltersContext_ != filtersContext) {
-      createSwsContext(filtersContext, avFrame->colorspace);
-      prevFiltersContext_ = std::move(filtersContext);
+    if (!swsContext_ || prevSwsFrameContext_ != swsFrameContext) {
+      createSwsContext(swsFrameContext, avFrame->colorspace);
+      prevSwsFrameContext_ = swsFrameContext;
     }
     int resultHeight =
         convertAVFrameToTensorUsingSwsScale(avFrame, outputTensor);
@@ -122,6 +126,23 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
 
     frameOutput.data = outputTensor;
   } else if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+    FiltersContext filtersContext;
+
+    filtersContext.inputWidth = avFrame->width;
+    filtersContext.inputHeight = avFrame->height;
+    filtersContext.inputFormat = frameFormat;
+    filtersContext.inputAspectRatio = avFrame->sample_aspect_ratio;
+    filtersContext.outputWidth = expectedOutputWidth;
+    filtersContext.outputHeight = expectedOutputHeight;
+    filtersContext.outputFormat = AV_PIX_FMT_RGB24;
+    filtersContext.timeBase = timeBase;
+
+    std::stringstream filters;
+    filters << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
+    filters << ":sws_flags=bilinear";
+
+    filtersContext.filtergraphStr = filters.str();
+
     if (!filterGraphContext_ || prevFiltersContext_ != filtersContext) {
       filterGraphContext_ =
           std::make_unique<FilterGraph>(filtersContext, videoStreamOptions);
@@ -196,15 +217,15 @@ torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
 }
 
 void CpuDeviceInterface::createSwsContext(
-    const FiltersContext& filtersContext,
+    const SwsFrameContext& swsFrameContext,
     const enum AVColorSpace colorspace) {
   SwsContext* swsContext = sws_getContext(
-      filtersContext.inputWidth,
-      filtersContext.inputHeight,
-      filtersContext.inputFormat,
-      filtersContext.outputWidth,
-      filtersContext.outputHeight,
-      filtersContext.outputFormat,
+      swsFrameContext.inputWidth,
+      swsFrameContext.inputHeight,
+      swsFrameContext.inputFormat,
+      swsFrameContext.outputWidth,
+      swsFrameContext.outputHeight,
+      AV_PIX_FMT_RGB24,
       SWS_BILINEAR,
       nullptr,
       nullptr,

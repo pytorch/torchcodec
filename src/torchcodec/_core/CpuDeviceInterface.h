@@ -42,8 +42,18 @@ class CpuDeviceInterface : public DeviceInterface {
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(
       const UniqueAVFrame& avFrame);
 
+  struct SwsFrameContext {
+    int inputWidth;
+    int inputHeight;
+    AVPixelFormat inputFormat;
+    int outputWidth;
+    int outputHeight;
+    bool operator==(const SwsFrameContext&) const;
+    bool operator!=(const SwsFrameContext&) const;
+  };
+
   void createSwsContext(
-      const FiltersContext& filtersContext,
+      const SwsFrameContext& swsFrameContext,
       const enum AVColorSpace colorspace);
 
   // color-conversion fields. Only one of FilterGraphContext and
@@ -53,6 +63,7 @@ class CpuDeviceInterface : public DeviceInterface {
 
   // Used to know whether a new FilterGraphContext or UniqueSwsContext should
   // be created before decoding a new frame.
+  SwsFrameContext prevSwsFrameContext_;
   FiltersContext prevFiltersContext_;
 };
 

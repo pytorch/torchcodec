@@ -20,12 +20,12 @@ struct FiltersContext {
   int outputHeight = 0;
   AVPixelFormat outputFormat = AV_PIX_FMT_NONE;
 
-  std::string filters;
+  std::string filtergraphStr;
   AVRational timeBase = {0, 0};
   UniqueAVBufferRef hwFramesCtx;
 
-  bool operator==(const FiltersContext&);
-  bool operator!=(const FiltersContext&);
+  bool operator==(const FiltersContext&) const;
+  bool operator!=(const FiltersContext&) const;
 };
 
 class FilterGraph {
