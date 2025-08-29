@@ -464,41 +464,46 @@ void SingleStreamDecoder::addStream(
 
   codecContext->time_base = streamInfo.stream->time_base;
 
-  // Initialize bitstream filter for H.264 MP4 containers
-  if (mediaType == AVMEDIA_TYPE_VIDEO && 
+  // TODONVDEC probably best to extract-out the BSF logic in separate files.
+  // Also need to handle more codecs. Pynvvideocodec also handles
+  // AV_CODEC_ID_HEVC. Docs:
+  // https://ffmpeg.org/doxygen/7.0/group__lavc__bsf.html
+  if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly() &&
+      mediaType == AVMEDIA_TYPE_VIDEO &&
       codecContext->codec_id == AV_CODEC_ID_H264) {
-    
-    // Check if this is an MP4-style container that needs bitstream filtering
-    const char* formatName = formatContext_->iformat->long_name;
-    bool isMP4Container = (strcmp(formatName, "QuickTime / MOV") == 0 ||
-                          strcmp(formatName, "FLV (Flash Video)") == 0 ||
-                          strcmp(formatName, "Matroska / WebM") == 0);
-    
-    if (isMP4Container) {
-      // printf("Initializing H.264 MP4 to Annex B bitstream filter for %s container\n", formatName);
-      
-      const AVBitStreamFilter* bsf = av_bsf_get_by_name("h264_mp4toannexb");
-      TORCH_CHECK(bsf != nullptr, "Failed to find h264_mp4toannexb bitstream filter");
-      
-      AVBSFContext* rawBsf = nullptr;
-      retVal = av_bsf_alloc(bsf, &rawBsf);
-      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to allocate bitstream filter: ", 
-                  getFFMPEGErrorStringFromErrorCode(retVal));
-      
-      streamInfo.bitstreamFilter.reset(rawBsf);
-      
-      retVal = avcodec_parameters_copy(streamInfo.bitstreamFilter->par_in, 
-                                       streamInfo.stream->codecpar);
-      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to copy codec parameters: ", 
-                  getFFMPEGErrorStringFromErrorCode(retVal));
-      
-      retVal = av_bsf_init(streamInfo.bitstreamFilter.get());
-      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to initialize bitstream filter: ", 
-                  getFFMPEGErrorStringFromErrorCode(retVal));
-      
-      streamInfo.needsBitstreamFiltering = true;
-      // printf("Successfully initialized bitstream filter\n");
-    }
+    // TODONVDEC note that the pynvvideocodec implementation relies on this
+    // check for setting up the BSF: bMp4H264 = eVideoCodec == AV_CODEC_ID_H264
+    // && (
+    //     !strcmp(fmtc->iformat->long_name, "QuickTime / MOV")
+    //     || !strcmp(fmtc->iformat->long_name, "FLV (Flash Video)")
+    //     || !strcmp(fmtc->iformat->long_name, "Matroska / WebM")
+    // );
+
+    const AVBitStreamFilter* avBSF = av_bsf_get_by_name("h264_mp4toannexb");
+    TORCH_CHECK(
+        avBSF != nullptr, "Failed to find h264_mp4toannexb bitstream filter");
+
+    AVBSFContext* avBSFContext = nullptr;
+    retVal = av_bsf_alloc(avBSF, &avBSFContext);
+    TORCH_CHECK(
+        retVal >= AVSUCCESS,
+        "Failed to allocate bitstream filter: ",
+        getFFMPEGErrorStringFromErrorCode(retVal));
+
+    streamInfo.bitstreamFilter.reset(avBSFContext);
+
+    retVal = avcodec_parameters_copy(
+        streamInfo.bitstreamFilter->par_in, streamInfo.stream->codecpar);
+    TORCH_CHECK(
+        retVal >= AVSUCCESS,
+        "Failed to copy codec parameters: ",
+        getFFMPEGErrorStringFromErrorCode(retVal));
+
+    retVal = av_bsf_init(streamInfo.bitstreamFilter.get());
+    TORCH_CHECK(
+        retVal == AVSUCCESS,
+        "Failed to initialize bitstream filter: ",
+        getFFMPEGErrorStringFromErrorCode(retVal));
   }
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
       std::string(avcodec_get_name(codecContext->codec_id));
@@ -1215,27 +1220,31 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       ReferenceAVPacket* packetToSend = &packet;
       AutoAVPacket filteredAutoPacket;
       ReferenceAVPacket filteredPacket(filteredAutoPacket);
-      
+
       // Apply bitstream filtering if needed
-      if (streamInfo.needsBitstreamFiltering && streamInfo.bitstreamFilter) {
-        // Send packet to bitstream filter
-        int retVal = av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
-        TORCH_CHECK(retVal >= AVSUCCESS, "Failed to send packet to bitstream filter: ", 
-                    getFFMPEGErrorStringFromErrorCode(retVal));
-        
-        // Receive filtered packet
-        retVal = av_bsf_receive_packet(streamInfo.bitstreamFilter.get(), filteredPacket.get());
-        TORCH_CHECK(retVal >= AVSUCCESS, "Failed to receive packet from bitstream filter: ", 
-                    getFFMPEGErrorStringFromErrorCode(retVal));
-        
+      if (streamInfo.bitstreamFilter != nullptr) {
+        int retVal =
+            av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
+        TORCH_CHECK(
+            retVal >= AVSUCCESS,
+            "Failed to send packet to bitstream filter: ",
+            getFFMPEGErrorStringFromErrorCode(retVal));
+
+        retVal = av_bsf_receive_packet(
+            streamInfo.bitstreamFilter.get(), filteredPacket.get());
+        TORCH_CHECK(
+            retVal >= AVSUCCESS,
+            "Failed to receive packet from bitstream filter: ",
+            getFFMPEGErrorStringFromErrorCode(retVal));
+
         packetToSend = &filteredPacket;
       }
-      
+
       // Use custom packet decoding (e.g., direct NVDEC)
       UniqueAVFrame decodedFrame =
           deviceInterface_->decodePacketDirectly(*packetToSend);
       decodeStats_.numPacketsSentToDecoder++;
-      
+
       if (decodedFrame && filterFunction(decodedFrame)) {
         // We got the frame we're looking for from direct decoding
         avFrame = std::move(decodedFrame);

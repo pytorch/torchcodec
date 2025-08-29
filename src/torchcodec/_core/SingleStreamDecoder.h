@@ -241,7 +241,6 @@ class SingleStreamDecoder {
 
     // Bitstream filter for MP4 to Annex B conversion
     UniqueAVBSFContext bitstreamFilter;
-    bool needsBitstreamFiltering = false;
   };
 
   // --------------------------------------------------------------------------
