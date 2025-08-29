@@ -65,9 +65,7 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
 
   // Video format info
   CUVIDEOFORMAT videoFormat_;
-  AVCodecID currentCodecId_ = AV_CODEC_ID_NONE;
-  bool isInitialized_ = false;
-  bool parserInitialized_ = false;
+  bool parserCreated_ = false;
 
   // Frame queue for async decoding - stores frame pointer, pitch, and display info
   struct FrameData {
@@ -78,11 +76,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   std::queue<FrameData> frameQueue_;
   std::mutex frameQueueMutex_;
 
-  // Custom context initialization for direct NVDEC usage
-  void initializeNvdecDecoder(AVCodecID codecId);
 
   // Initialize video parser
-  void initializeVideoParser(AVCodecID codecId, uint8_t* extradata, int extradata_size);
+  void createVideoParser();
 
   // Convert CUDA frame pointer to AVFrame
   UniqueAVFrame convertCudaFrameToAVFrame(

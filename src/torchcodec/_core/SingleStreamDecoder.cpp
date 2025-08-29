@@ -455,6 +455,9 @@ void SingleStreamDecoder::addStream(
   // TODO_CODE_QUALITY same as above.
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
     if (deviceInterface_) {
+      // TODONVDEC consider changing the name of this, it's not just about
+      // ACodecContext initialization anymore, it's more generally about
+      // initializing the device interface
       deviceInterface_->initializeContext(codecContext);
     }
   }
@@ -1222,6 +1225,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       ReferenceAVPacket filteredPacket(filteredAutoPacket);
 
       // Apply bitstream filtering if needed
+      // TODONVDEC see other todos above about BSF logic needing to be more robust.
       if (streamInfo.bitstreamFilter != nullptr) {
         int retVal =
             av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
@@ -1241,15 +1245,20 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       }
 
       // Use custom packet decoding (e.g., direct NVDEC)
+      printf("SingleStreamDecoder calling CNI::decodePacketDirectly\n");
+      fflush(stdout);
       UniqueAVFrame decodedFrame =
           deviceInterface_->decodePacketDirectly(*packetToSend);
-      decodeStats_.numPacketsSentToDecoder++;
 
       if (decodedFrame && filterFunction(decodedFrame)) {
         // We got the frame we're looking for from direct decoding
+        printf("SingleStreamDecoder: we've got the frame!\n");
+        fflush(stdout);
         avFrame = std::move(decodedFrame);
         break;
       }
+      printf("SingleStreamDecoder: that's not the frame, continuing loop\n");
+      fflush(stdout);
       // If custom decoding didn't produce the desired frame, continue the loop
     }
   } else {
