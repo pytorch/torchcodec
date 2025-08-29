@@ -216,8 +216,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // codepath, and send it back to the GPU at the very end.
     // TODO: A possibly better solution would be to send the frame to the GPU
     // first, and do the color conversion there.
-  printf("A\n");
-  fflush(stdout);
     auto cpuDevice = torch::Device(torch::kCPU);
     auto cpuInterface = createDeviceInterface(cpuDevice);
 
@@ -232,8 +230,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
   }
-  printf("B\n");
-  fflush(stdout);
 
   // TODONVDEC: We're currently calling this function from within the CNI
   // (Custome NVDEC Interface). But the AVFrame's hw_frames_ctx doesn't exist,
@@ -286,38 +282,24 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     dst = allocateEmptyHWCTensor(height, width, device_);
   }
 
-  printf("C\n");
-  fflush(stdout);
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
-  printf("Ca %d\n", deviceIndex);
-  fflush(stdout);
   nppCtx_->hStream = at::cuda::getCurrentCUDAStream(deviceIndex).stream();
-  printf("Cb\n");
-  fflush(stdout);
   cudaError_t err =
       cudaStreamGetFlags(nppCtx_->hStream, &nppCtx_->nStreamFlags);
-  printf("Cc\n");
-  fflush(stdout);
   TORCH_CHECK(
       err == cudaSuccess,
       "cudaStreamGetFlags failed: ",
       cudaGetErrorString(err));
-  printf("Cd\n");
-  fflush(stdout);
 
   NppiSize oSizeROI = {width, height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;
 
-  printf("D\n");
-  fflush(stdout);
   // For background, see
   // Note [YUV -> RGB Color Conversion, color space and color range]
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
 
-  printf("E\n");
-  fflush(stdout);
     if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
       // NPP provides a pre-defined color conversion function for BT.709 full
       // range: nppiNV12ToRGB_709HDTV_8u_P2C3R_Ctx. But it's not closely
@@ -355,8 +337,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     }
   } else {
 
-  printf("F\n");
-  fflush(stdout);
     // TODO we're assuming BT.601 color space (and probably limited range) by
     // calling nppiNV12ToRGB_8u_P2C3R_Ctx. We should handle BT.601 full range,
     // and other color-spaces like 2020.
