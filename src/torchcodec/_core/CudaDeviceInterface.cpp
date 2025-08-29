@@ -16,7 +16,7 @@ extern "C" {
 namespace facebook::torchcodec {
 namespace {
 
-static bool g_cuda =
+static bool g_cuda_default =
     registerDeviceInterface(torch::kCUDA, [](const torch::Device& device) {
       return new CudaDeviceInterface(device);
     });
@@ -171,7 +171,7 @@ std::unique_ptr<NppStreamContext> getNppStreamContext(
 
 CudaDeviceInterface::CudaDeviceInterface(const torch::Device& device)
     : DeviceInterface(device) {
-  TORCH_CHECK(g_cuda, "CudaDeviceInterface was not registered!");
+  TORCH_CHECK(g_cuda_default, "CudaDeviceInterface was not registered!");
   TORCH_CHECK(
       device_.type() == torch::kCUDA, "Unsupported device: ", device_.str());
 }
@@ -205,6 +205,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  printf("In default's CUDA interface convertAVFrameToFrameOutput\n");
+  fflush(stdout);
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
     // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
@@ -229,29 +231,35 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     return;
   }
 
-  // Above we checked that the AVFrame was on GPU, but that's not enough, we
-  // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
-  // because this is what the NPP color conversion routines expect.
-  // TODO: we should investigate how to can perform color conversion for
-  // non-8bit videos. This is supported on CPU.
-  TORCH_CHECK(
-      avFrame->hw_frames_ctx != nullptr,
-      "The AVFrame does not have a hw_frames_ctx. "
-      "That's unexpected, please report this to the TorchCodec repo.");
+  // TODONVDEC: We're currently calling this function from within the CNI
+  // (Custome NVDEC Interface). But the AVFrame's hw_frames_ctx doesn't exist,
+  // so we error. Not sure how to solve this: either set the field in a
+  // meaningful way, or allow to bypass the check, but then how do we know the
+  // pix format?
 
-  auto hwFramesCtx =
-      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
-  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
-  TORCH_CHECK(
-      actualFormat == AV_PIX_FMT_NV12,
-      "The AVFrame is ",
-      (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
-                                         : "unknown"),
-      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
-      "the video isn't 8bit, which is not supported on CUDA at the moment. "
-      "Try using the CPU device instead. "
-      "If the video is 10bit, we are tracking 10bit support in "
-      "https://github.com/pytorch/torchcodec/issues/776");
+  // // Above we checked that the AVFrame was on GPU, but that's not enough, we
+  // // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
+  // // because this is what the NPP color conversion routines expect.
+  // // TODO: we should investigate how to can perform color conversion for
+  // // non-8bit videos. This is supported on CPU.
+  // TORCH_CHECK(
+  //     avFrame->hw_frames_ctx != nullptr,
+  //     "The AVFrame does not have a hw_frames_ctx. "
+  //     "That's unexpected, please report this to the TorchCodec repo.");
+
+  // auto hwFramesCtx =
+  //     reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  // AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+  // TORCH_CHECK(
+  //     actualFormat == AV_PIX_FMT_NV12,
+  //     "The AVFrame is ",
+  //     (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
+  //                                        : "unknown"),
+  //     ", but we expected AV_PIX_FMT_NV12. This typically happens when "
+  //     "the video isn't 8bit, which is not supported on CUDA at the moment. "
+  //     "Try using the CPU device instead. "
+  //     "If the video is 10bit, we are tracking 10bit support in "
+  //     "https://github.com/pytorch/torchcodec/issues/776");
 
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
@@ -291,6 +299,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   // For background, see
   // Note [YUV -> RGB Color Conversion, color space and color range]
   if (avFrame->colorspace == AVColorSpace::AVCOL_SPC_BT709) {
+
     if (avFrame->color_range == AVColorRange::AVCOL_RANGE_JPEG) {
       // NPP provides a pre-defined color conversion function for BT.709 full
       // range: nppiNV12ToRGB_709HDTV_8u_P2C3R_Ctx. But it's not closely
@@ -327,6 +336,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
           *nppCtx_);
     }
   } else {
+
     // TODO we're assuming BT.601 color space (and probably limited range) by
     // calling nppiNV12ToRGB_8u_P2C3R_Ctx. We should handle BT.601 full range,
     // and other color-spaces like 2020.
