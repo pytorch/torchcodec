@@ -11,6 +11,29 @@ conda install -y pybind11 -c conda-forge
 # Search for nvcuvid library in various locations for debugging CI build issues
 echo "[NVCUVID-SEARCH] === Searching for nvcuvid library ==="
 
+# First, let's find where CUDA nppi libraries are located
+echo "[NVCUVID-SEARCH] Looking for CUDA nppi libraries to find potential nvcuvid location..."
+NPPI_LOCATIONS=()
+
+# Search for CUDA nppi libraries that CMake should find
+for nppi_lib in "libnppi.so*" "libnppicc.so*" "nppi.so*" "nppicc.so*" "libnppi*" "libnppicc*"; do
+    found_nppi=$(find /usr -name "$nppi_lib" 2>/dev/null | head -5)
+    if [ -n "$found_nppi" ]; then
+        echo "[NVCUVID-SEARCH] Found CUDA nppi library: $found_nppi"
+        while IFS= read -r lib_path; do
+            lib_dir=$(dirname "$lib_path")
+            if [[ ! " ${NPPI_LOCATIONS[@]} " =~ " $lib_dir " ]]; then
+                NPPI_LOCATIONS+=("$lib_dir")
+            fi
+        done <<< "$found_nppi"
+    fi
+done
+
+# Add these locations to our search paths
+for nppi_dir in "${NPPI_LOCATIONS[@]}"; do
+    echo "[NVCUVID-SEARCH] Adding CUDA library directory to search: $nppi_dir"
+done
+
 # Standard library search paths
 SEARCH_PATHS=(
     "/usr/lib"
@@ -26,6 +49,11 @@ SEARCH_PATHS=(
     "/usr/local/cuda-*/lib64"
     "/usr/local/cuda-*/lib"
 )
+
+# Add the CUDA nppi library directories to our search paths
+for nppi_dir in "${NPPI_LOCATIONS[@]}"; do
+    SEARCH_PATHS+=("$nppi_dir")
+done
 
 # Library name variations to search for
 LIB_PATTERNS=(
