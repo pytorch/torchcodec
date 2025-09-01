@@ -192,7 +192,8 @@ void CustomNvdecDeviceInterface::createVideoParser() {
 
 // This callback is called by the parser within cuvidParseVideoData, either when
 // the parser encounters the start of the headers, or when "there is a change in
-// the sequence" - I don't know what that means. Maybe a resolution change?
+// the sequence" - which, I assume means a change in any one of CUVIDEOFORMAT
+// fields?
 int CustomNvdecDeviceInterface::handleVideoSequence(
     CUVIDEOFORMAT* pVideoFormat) {
   printf("    IN CNI::handleVideoSequence\n");
@@ -204,7 +205,7 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
 
 
   // Create decoder with the video format
-  CUVIDDECODECREATEINFO createInfo = {};
+  CUVIDDECODECREATEINFO createInfo = { 0 };
   createInfo.CodecType = pVideoFormat->codec;
   createInfo.ulWidth = pVideoFormat->coded_width;
   createInfo.ulHeight = pVideoFormat->coded_height;
@@ -218,28 +219,43 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
   createInfo.vidLock = nullptr;
 
+  // TODONVDEC: We are re-recreating a decoder, which I think assumes there is
+  // no sequence change and that this is only called at the start of the header
+  // (see comment above).
+  // We should consider change of sequence, and also look into re-configuring
+  // APIs. Also need a CUVideoDecoder cache somewhere.
   CUresult result = cuvidCreateDecoder(&decoder_, &createInfo);
   if (result != CUDA_SUCCESS) {
     TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
   }
 
-  return 1; // Success
+  return 1;
 }
 
+// Parser triggers this callback when bitstream data for one frame is ready
 int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
   printf("    IN CNI::handlePictureDecode\n");
   fflush(stdout);
+
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
+  TORCH_CHECK(
+      decoder_ != nullptr, "Decoder not initialized before picture decode");
 
-  if (!decoder_) {
-    return 0; // No decoder available
-  }
-
+  // TODONVDEC: Better understand the CUVIDPICPARAMS object. Confusingly the doc
+  // say that it's up to the application to fill it up:
+  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#decoding-the-framefield
+  
+  // Doc say that calling cuvidDecodePicture kicks of the hardware decoding of the frame (async!).
+  // We know the frame was successfully decoded when cuvidMapVideoFrame returns
+  // successfully.
+  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
   CUresult result = cuvidDecodePicture(decoder_, pPicParams);
   return (result == CUDA_SUCCESS) ? 1 : 0;
 }
 
+// Parser triggers this callback when a frame in display order is ready.
+// How on earth is it the parser that knows when a frame is ready for display?
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
   printf("    IN CNI::handlePictureDisplay\n");
@@ -257,15 +273,39 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
   procParams.top_field_first = pDispInfo->top_field_first;
   procParams.unpaired_field = pDispInfo->repeat_first_field < 0;
 
+  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
+  // THIS IS BLOCKING. It waits for the hardware to finish decoding the frame.
+  // Docs suggest that cuvidMapVideoFrame could be called from a separate thread
+  // ("mapping thread"), different from the one calling cuvidDecodePicture
+  // (decoding thread)
+  // See also
+  // http://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#writing-an-efficient-decode-application
+  // where they suggest using 3 threads: demux, decode, and display.
+  // They do mention that the internal hardware queue is only 4 frames deep, so
+  // it can be bottlenecked and having a threaded application may not make sense
+  // if the queue tends to already be full - e.g. with multiple decoder
+  // instances already??
+
+  // TODONVDEC I actually don't understand how the actual hardware decoder is
+  // selected. I know there are 5 or 7 decoder per GPU depending on the model
+  // but how does cuvidDecodePicture and cuvidMapVideoFrame know which one to
+  // use?
+
   CUresult result = cuvidMapVideoFrame(
       decoder_,
       pDispInfo->picture_index,
       &framePtr,
       &pitch,
       &procParams);
+  // TODONVDEC probs need to call cuvidGetDecodeStatus here. See pynvvideocodec.
   if (result == CUDA_SUCCESS) {
+    printf("      Pushing a frame in the queue!\n");
     FrameData frameData = {framePtr, pitch, *pDispInfo};
     frameQueue_.push(frameData);
+  } else {
+    printf("      Failed to push a frame in the queue! %d\n", result);
+    fflush(stdout);
+    return 0;
   }
 
   return 1;
