@@ -114,9 +114,9 @@ ffmpeg -f lavfi -i \
    easy way to install it is to use `conda`:
 
    ```bash
-   conda install ffmpeg
+   conda install "ffmpeg<8"
    # or
-   conda install ffmpeg -c conda-forge
+   conda install "ffmpeg<8" -c conda-forge
    ```
 
 3. Install TorchCodec:
@@ -157,9 +157,9 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    easy way to install it is to use `conda`:
 
    ```bash
-   conda install ffmpeg
+   conda install "ffmpeg<8"
    # or
-   conda install ffmpeg -c conda-forge
+   conda install "ffmpeg<8" -c conda-forge
    ```
 
    If you are building FFmpeg from source you can follow Nvidia's guide to
