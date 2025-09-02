@@ -57,6 +57,59 @@ class AudioEncoder {
   bool encodeWasCalled_ = false;
   int64_t lastEncodedAVFramePts_ = 0;
 };
+
+class VideoEncoder {
+ public:
+  ~VideoEncoder();
+
+  VideoEncoder(
+      const torch::Tensor& frames,
+      int frameRate,
+      std::string_view fileName,
+      const VideoStreamOptions& videoStreamOptions);
+
+  VideoEncoder(
+      const torch::Tensor& frames,
+      int frameRate,
+      std::string_view formatName,
+      std::unique_ptr<AVIOContextHolder> avioContextHolder,
+      const VideoStreamOptions& videoStreamOptions);
+
+  void encode();
+
+  torch::Tensor encodeToTensor();
+
+ private:
+  void initializeEncoder(const VideoStreamOptions& videoStreamOptions);
+  UniqueAVFrame convertTensorToAVFrame(
+      const torch::Tensor& frameTensor,
+      int frameIndex);
+  void encodeFrame(AutoAVPacket& autoAVPacket, const UniqueAVFrame& avFrame);
+  void flushBuffers();
+  void close_avio();
+
+  UniqueEncodingAVFormatContext avFormatContext_;
+  UniqueAVCodecContext avCodecContext_;
+  int streamIndex_;
+  UniqueSwsContext swsContext_;
+
+  const torch::Tensor frames_;
+  int frameRate_;
+
+  bool isNCHW_ = false;
+  int inWidth_ = -1;
+  int inHeight_ = -1;
+  AVPixelFormat inPixelFormat_ = AV_PIX_FMT_NONE;
+
+  int outWidth_ = -1;
+  int outHeight_ = -1;
+  AVPixelFormat outPixelFormat_ = AV_PIX_FMT_NONE;
+
+  std::unique_ptr<AVIOContextHolder> avioContextHolder_;
+
+  bool encodeWasCalled_ = false;
+  int64_t lastEncodedAVFramePts_ = 0;
+};
 } // namespace facebook::torchcodec
 
 /* clang-format off */

@@ -28,6 +28,7 @@ from torchcodec._core import (
     create_from_file_like,
     create_from_tensor,
     encode_audio_to_file,
+    encode_video_to_file,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -48,6 +49,7 @@ from .utils import (
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
+    psnr,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
@@ -1222,6 +1224,32 @@ class TestAudioEncoderOps:
                 sample_rate=10,
                 filename="./file.bad_extension",
             )
+
+
+class TestVideoEncoderOps:
+
+    def decode(self, file_path) -> torch.Tensor:
+        decoder = create_from_file(str(file_path), seek_mode="approximate")
+        add_video_stream(decoder)
+        frames, *_ = get_frames_in_range(decoder, start=0, stop=60)
+        return frames
+
+    @pytest.mark.parametrize("format", ("mov", "mp4", "avi"))
+    # TODO-VideoEncoder: enable additional formats (mkv, webm)
+    def test_video_encoder_test_round_trip(self, tmp_path, format):
+        asset = NASA_VIDEO
+        encoded_path = str(tmp_path / f"encoder_output.{format}")
+
+        source_frames = self.decode(str(asset.path)).data
+        frame_rate = 30
+
+        # Use C++ encode_video_to_file function directly
+        encode_video_to_file(source_frames, frame_rate, encoded_path)
+
+        # Check that PSNR for decode(encode(samples)) is above 30
+        for s_frame, d_frame in zip(source_frames, self.decode(encoded_path).data):
+            res = psnr(s_frame, d_frame)
+            assert res > 30
 
 
 if __name__ == "__main__":
