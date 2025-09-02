@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
     name: Build and Upload wheel
-    uses: nicolashug/test-infra/.github/workflows/build_wheels_linux.yml@nvidia-driver
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: pytorch/torchcodec
       ref: ""
