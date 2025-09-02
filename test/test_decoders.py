@@ -1682,26 +1682,25 @@ class TestAudioDecoder:
             frames_44100_to_8000.data, frames_8000.data, atol=0.03, rtol=0
         )
 
-    def test_s16_ffmpeg4_bug(self):
-        # s16 fails on FFmpeg4 but can be decoded on other versions.
-        # Debugging logs show that we're hitting:
-        # [SWR @ 0x560a7abdaf80] Input channel count and layout are unset
-        # which seems to point to:
-        # https://github.com/FFmpeg/FFmpeg/blob/40a6963fbd0c47be358a3760480180b7b532e1e9/libswresample/swresample.c#L293-L305
-        # ¯\_(ツ)_/¯
+    def test_decode_s16_ffmpeg4(self):
+        # Non-regression test for https://github.com/pytorch/torchcodec/issues/843
+        # Ensures that decoding s16 on FFmpeg4 handles
+        # unset input channel count and layout
 
         asset = SINE_MONO_S16
         decoder = AudioDecoder(asset.path)
         assert decoder.metadata.sample_rate == asset.sample_rate
         assert decoder.metadata.sample_format == asset.sample_format
 
-        cm = (
-            pytest.raises(RuntimeError, match="The frame has 0 channels, expected 1.")
-            if get_ffmpeg_major_version() == 4
-            else contextlib.nullcontext()
+        test_frames = decoder.get_samples_played_in_range()
+        assert test_frames.data.shape[0] == decoder.metadata.num_channels
+        assert test_frames.sample_rate == decoder.metadata.sample_rate
+        reference_frames = asset.get_frame_data_by_range(
+            start=0, stop=1, stream_index=0
         )
-        with cm:
-            decoder.get_samples_played_in_range()
+        torch.testing.assert_close(
+            test_frames.data[0], reference_frames, atol=0, rtol=0
+        )
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
     @pytest.mark.parametrize("sample_rate", (None, 8000, 16_000, 44_1000))
