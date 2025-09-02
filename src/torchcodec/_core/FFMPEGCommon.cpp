@@ -67,7 +67,7 @@ int getNumChannels(const UniqueAVFrame& avFrame) {
   // to allow successful initialization of SwrContext
   if (numChannels == 0 && avFrame->channels > 0) {
     avFrame->channel_layout = av_get_default_channel_layout(avFrame->channels);
-    return avFrame->channels;
+    numChannels = avFrame->channels;
   }
   return numChannels;
 #endif

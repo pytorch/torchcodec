@@ -1692,14 +1692,14 @@ class TestAudioDecoder:
         assert decoder.metadata.sample_rate == asset.sample_rate
         assert decoder.metadata.sample_format == asset.sample_format
 
-        test_frames = decoder.get_samples_played_in_range()
-        assert test_frames.data.shape[0] == decoder.metadata.num_channels
-        assert test_frames.sample_rate == decoder.metadata.sample_rate
+        test_samples = decoder.get_samples_played_in_range()
+        assert test_samples.data.shape[0] == decoder.metadata.num_channels
+        assert test_samples.sample_rate == decoder.metadata.sample_rate
         reference_frames = asset.get_frame_data_by_range(
             start=0, stop=1, stream_index=0
         )
         torch.testing.assert_close(
-            test_frames.data[0], reference_frames, atol=0, rtol=0
+            test_samples.data[0], reference_frames, atol=0, rtol=0
         )
 
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3))
