@@ -1284,7 +1284,6 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
     }
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
-        streamInfo.timeBase,
         avFrame,
         frameOutput,
         preAllocatedOutputTensor);

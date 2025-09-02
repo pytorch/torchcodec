@@ -117,7 +117,6 @@ std::unique_ptr<FiltersContext> CpuDeviceInterface::initializeFiltersContext(
 // `dimension_order` parameter. It's up to callers to re-shape it if needed.
 void CpuDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {

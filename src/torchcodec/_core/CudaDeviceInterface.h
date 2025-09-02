@@ -28,7 +28,6 @@ class CudaDeviceInterface : public DeviceInterface {
 
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =
