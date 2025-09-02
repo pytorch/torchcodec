@@ -263,7 +263,6 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -281,11 +280,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
-        videoStreamOptions,
-        timeBase,
-        avFrame,
-        cpuFrameOutput,
-        preAllocatedOutputTensor);
+        videoStreamOptions, avFrame, cpuFrameOutput, preAllocatedOutputTensor);
 
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
