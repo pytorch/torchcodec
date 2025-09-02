@@ -126,6 +126,8 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
 
     frameOutput.data = outputTensor;
   } else if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
+    // See comment above in swscale branch about the filterGraphContext_
+    // creation. creation
     FiltersContext filtersContext;
 
     filtersContext.inputWidth = avFrame->width;
