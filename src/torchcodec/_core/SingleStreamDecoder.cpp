@@ -1276,20 +1276,16 @@ void SingleStreamDecoder::convertAudioAVFrameToFrameOutputOnCPU(
   int outSampleRate =
       streamInfo.audioStreamOptions.sampleRate.value_or(srcSampleRate);
 
-  int srcNumChannels = getNumChannels(srcAVFrame);
-  int srcNumChannelsFromCodec = getNumChannels(streamInfo.codecContext);
-  // Use number of channels from codec if 0 returned from frame
-  if (srcNumChannels == 0 && srcNumChannelsFromCodec > 0) {
-    srcNumChannels = srcNumChannelsFromCodec;
-  } else {
-    // Check if the number of channels from the frame matches the codec
-    TORCH_CHECK(
-        srcNumChannels == srcNumChannelsFromCodec,
-        "The frame has ",
-        srcNumChannels,
-        " channels, expected ",
-        srcNumChannelsFromCodec);
-  };
+  int srcNumChannels = getNumChannels(streamInfo.codecContext);
+  TORCH_CHECK(
+      srcNumChannels == getNumChannels(srcAVFrame),
+      "The frame has ",
+      getNumChannels(srcAVFrame),
+      " channels, expected ",
+      srcNumChannels,
+      ". If you are hitting this, it may be because you are using "
+      "a buggy FFmpeg version. FFmpeg4 is known to fail here in some "
+      "valid scenarios. Try to upgrade FFmpeg?");
   int outNumChannels =
       streamInfo.audioStreamOptions.numChannels.value_or(srcNumChannels);
 
