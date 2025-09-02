@@ -38,6 +38,11 @@ struct VideoStreamOptions {
   std::optional<ColorConversionLibrary> colorConversionLibrary;
   // By default we use CPU for decoding for both C++ and python users.
   torch::Device device = torch::kCPU;
+
+  // Encoding options
+  std::optional<int> bitRate;
+  std::optional<int> gopSize;
+  std::optional<int> maxBFrames;
 };
 
 struct AudioStreamOptions {
