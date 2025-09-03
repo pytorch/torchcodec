@@ -1241,9 +1241,8 @@ class TestVideoEncoderOps:
         encoded_path = str(tmp_path / f"encoder_output.{format}")
 
         source_frames = self.decode(str(asset.path)).data
-        frame_rate = 30
+        frame_rate = 30  # Frame rate is fixed with num frames decoded
 
-        # Use C++ encode_video_to_file function directly
         encode_video_to_file(source_frames, frame_rate, encoded_path)
 
         # Check that PSNR for decode(encode(samples)) is above 30

@@ -1,7 +1,3 @@
-#include <iostream>
-extern "C" {
-#include <libavutil/pixdesc.h>
-}
 #include <sstream>
 
 #include "src/torchcodec/_core/AVIOTensorContext.h"
