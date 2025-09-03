@@ -559,18 +559,10 @@ TensorFormat analyzeTensorFormat(const torch::Tensor& frames) {
 } // namespace
 
 VideoEncoder::~VideoEncoder() {
-  close_avio();
-}
-
-void VideoEncoder::close_avio() {
   if (avFormatContext_ && avFormatContext_->pb) {
     avio_flush(avFormatContext_->pb);
-
-    if (!avioContextHolder_) {
-      avio_close(avFormatContext_->pb);
-      // avoids closing again in destructor, which would segfault.
-      avFormatContext_->pb = nullptr;
-    }
+    avio_close(avFormatContext_->pb);
+    avFormatContext_->pb = nullptr;
   }
 }
 
@@ -783,7 +775,7 @@ void VideoEncoder::encode() {
       "Error in av_write_trailer: ",
       getFFMPEGErrorStringFromErrorCode(status));
 
-  close_avio();
+  // close_avio();
 }
 
 void VideoEncoder::encodeFrame(
