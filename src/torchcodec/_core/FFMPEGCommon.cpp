@@ -62,8 +62,8 @@ int getNumChannels(const UniqueAVFrame& avFrame) {
   return avFrame->ch_layout.nb_channels;
 #else
   int numChannels = av_get_channel_layout_nb_channels(avFrame->channel_layout);
-  // Handle FFmpeg 4 bug where channel_layout is 0 or unset
-  // Set it to the default layout for the number of channels
+  // Handle FFmpeg 4 bug where channel_layout and numChannels are 0 or unset
+  // Set values based on avFrame->channels which appears to be correct
   // to allow successful initialization of SwrContext
   if (numChannels == 0 && avFrame->channels > 0) {
     avFrame->channel_layout = av_get_default_channel_layout(avFrame->channels);
