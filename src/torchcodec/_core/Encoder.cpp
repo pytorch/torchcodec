@@ -541,7 +541,6 @@ TensorFormat analyzeTensorFormat(const torch::Tensor& frames) {
       sizes.size() == 4, "Expected 4D tensor (N, C, H, W) or (N, H, W, C)");
 
   bool isNCHW = sizes[1] == 3 || sizes[1] == 4;
-
   int numChannels = isNCHW ? sizes[1] : sizes[3];
   int height = isNCHW ? sizes[2] : sizes[1];
   int width = isNCHW ? sizes[3] : sizes[2];
@@ -771,8 +770,8 @@ void VideoEncoder::encode() {
   AutoAVPacket autoAVPacket;
   int numFrames = frames_.sizes()[0];
   for (int i = 0; i < numFrames; ++i) {
-    torch::Tensor singleFrame = frames_.select(0, i);
-    UniqueAVFrame avFrame = convertTensorToAVFrame(singleFrame, i);
+    torch::Tensor currFrame = frames_[i];
+    UniqueAVFrame avFrame = convertTensorToAVFrame(currFrame, i);
     encodeFrame(autoAVPacket, avFrame);
   }
 
@@ -831,7 +830,7 @@ void VideoEncoder::encodeFrame(
 
 void VideoEncoder::flushBuffers() {
   AutoAVPacket autoAVPacket;
-  // Send NULL frame to signal end of input
+  // Send null frame to signal end of input
   encodeFrame(autoAVPacket, UniqueAVFrame(nullptr));
 }
 
