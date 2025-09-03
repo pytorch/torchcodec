@@ -55,7 +55,7 @@ jobs:
           # the wheel unless the label cliflow/binaries/all is present in the
           # PR.
         python-version: ['3.10']
-        cuda-version: ['12.8']
+        cuda-version: ['12.6']
         ffmpeg-version-for-tests: ['7']
     container:
       image: "pytorch/manylinux2_28-builder:cuda${{ matrix.cuda-version }}"
