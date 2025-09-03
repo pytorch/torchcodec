@@ -243,11 +243,16 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
+  // Instead of iterating over all streams unconditionally:
   for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
-    // We want to scan and update the metadata of all streams.
-    TORCH_CHECK(
-        formatContext_->streams[i]->discard != AVDISCARD_ALL,
-        "Did you add a stream before you called for a scan?");
+    AVStream* stream = formatContext_->streams[i];
+    auto codecType = stream->codecpar->codec_type;
+    // Only enforce the check for video and audio streams.
+    if (codecType == AVMEDIA_TYPE_VIDEO || codecType == AVMEDIA_TYPE_AUDIO) {
+      TORCH_CHECK(
+          stream->discard != AVDISCARD_ALL,
+          "Did you add a stream before you called for a scan?");
+    }
   }
 
   AutoAVPacket autoAVPacket;
