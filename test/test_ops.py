@@ -337,7 +337,7 @@ class TestVideoDecoderOps:
 
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
-        reference_last_frame = NASA_VIDEO.get_frame_data_by_index(289)
+        reference_last_frame = NASA_VIDEO.get_frame_data_by_index(389)
         assert_frames_equal(last_frame, reference_last_frame.to(device))
         with pytest.raises(IndexError, match="no more frames"):
             get_next_frame(decoder)
@@ -1059,7 +1059,7 @@ class TestAudioDecoderOps:
         seek_to_pts(decoder, 12.979633)
 
         frame_last, *_ = get_next_frame(decoder)
-        reference_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
+        reference_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
         assert_frames_equal(frame_last, reference_frame_last.to(device))
 
         assert file_counter.num_seeks > initialization_seeks
