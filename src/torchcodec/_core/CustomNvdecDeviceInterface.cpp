@@ -46,13 +46,8 @@ HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
   return decoder->handlePictureDecode(pPicParams);
 }
 
-static int CUDAAPI
-HandlePictureDisplay(void* pUserData, CUVIDPARSERDISPINFO* pDispInfo) {
-  // printf("Static HandlePictureDisplay called\n");
-  CustomNvdecDeviceInterface* decoder =
-      static_cast<CustomNvdecDeviceInterface*>(pUserData);
-  return decoder->handlePictureDisplay(pDispInfo);
-}
+// HandlePictureDisplay callback removed - we now call handlePictureDisplay directly
+// from handlePictureDecode like DALI does
 
 } // namespace
 
@@ -175,7 +170,7 @@ void CustomNvdecDeviceInterface::createVideoParser() {
   parserParams.pUserData = this;
   parserParams.pfnSequenceCallback = HandleVideoSequence;
   parserParams.pfnDecodePicture = HandlePictureDecode;
-  parserParams.pfnDisplayPicture = HandlePictureDisplay;
+  parserParams.pfnDisplayPicture = nullptr;  // Like DALI - we handle display manually
 
   CUresult result = cuvidCreateVideoParser(&videoParser_, &parserParams);
   TORCH_CHECK(
@@ -245,11 +240,30 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   // successfully.
   // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
   CUresult result = cuvidDecodePicture(decoder_, pPicParams);
-  return (result == CUDA_SUCCESS) ? 1 : 0;
+  
+  if (result == CUDA_SUCCESS) {
+    // Like DALI: manually create display info and call handlePictureDisplay directly
+    CUVIDPARSERDISPINFO dispInfo = {};
+    dispInfo.picture_index = pPicParams->CurrPicIdx;
+    dispInfo.progressive_frame = !pPicParams->field_pic_flag;
+    dispInfo.top_field_first = pPicParams->bottom_field_flag ^ 1;
+    dispInfo.repeat_first_field = 0;
+    dispInfo.timestamp = 0; // Will be set properly by the caller
+    
+    printf("    Calling handlePictureDisplay directly from decode callback\n");
+    fflush(stdout);
+    handlePictureDisplay(&dispInfo);
+    
+    return 1;
+  } else {
+    printf("    cuvidDecodePicture failed with result: %d\n", result);
+    fflush(stdout);
+    return 0;
+  }
 }
 
-// Parser triggers this callback when a frame in display order is ready.
-// How on earth is it the parser that knows when a frame is ready for display?
+// Called directly from handlePictureDecode when a frame is ready for display.
+// This is no longer triggered by the parser - we control timing manually like DALI.
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
   printf("    IN CNI::handlePictureDisplay\n");
