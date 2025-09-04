@@ -205,7 +205,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  printf("In default's CUDA interface convertAVFrameToFrameOutput\n");
+  // printf("In default's CUDA interface convertAVFrameToFrameOutput\n");
   fflush(stdout);
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on

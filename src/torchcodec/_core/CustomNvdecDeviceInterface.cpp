@@ -55,7 +55,7 @@ HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
 CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
     const torch::Device& device)
     : DeviceInterface(device) {
-  printf("  IN CNI::CustomNvdecDeviceInterface\n");
+  // printf("  IN CNI::CustomNvdecDeviceInterface\n");
   fflush(stdout);
   TORCH_CHECK(
       g_cuda_custom_nvdec, "CustomNvdecDeviceInterface was not registered!");
@@ -68,13 +68,13 @@ CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
   // Initialize decode surface tracking (like DALI)
   surfaceInUse_.resize(MAX_DECODE_SURFACES, false);
   
-  printf("  Initialized frame buffer with %d slots and %d decode surfaces\n", 
-         MAX_DECODE_SURFACES, MAX_DECODE_SURFACES);
+  // printf("  Initialized frame buffer with %d slots and %d decode surfaces\n", 
+  //        MAX_DECODE_SURFACES, MAX_DECODE_SURFACES);
   fflush(stdout);
 }
 
 CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
-  printf("  IN CNI::destructor\n");
+  // printf("  IN CNI::destructor\n");
   fflush(stdout);
   // Clean up any remaining frames in the buffer
   {
@@ -104,7 +104,7 @@ std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
     const AVCodecID& codecId) {
 
   // TODONVDEC uhh???
-  printf("  IN CNI::findCodec\n");
+  // printf("  IN CNI::findCodec\n");
   fflush(stdout);
   // For custom NVDEC, we bypass FFmpeg codec selection entirely
   // We'll handle the codec selection in our own NVDEC initialization
@@ -114,7 +114,7 @@ std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
 
 void CustomNvdecDeviceInterface::initializeContext(
     AVCodecContext* codecContext) {
-  printf("  IN CNI::initializeContext\n");
+  // printf("  IN CNI::initializeContext\n");
   fflush(stdout);
   // Don't set hw_device_ctx - we handle decoding directly with NVDEC SDK
   // Just ensure CUDA context exists for PyTorch tensors
@@ -165,7 +165,7 @@ void CustomNvdecDeviceInterface::initializeContext(
 
 
 void CustomNvdecDeviceInterface::createVideoParser() {
-  printf("  IN CNI::createVideoParser\n");
+  // printf("  IN CNI::createVideoParser\n");
   fflush(stdout);
   if (parserCreated_) {
     // TODONVDEC - is this needed?
@@ -199,7 +199,7 @@ void CustomNvdecDeviceInterface::createVideoParser() {
 // fields?
 int CustomNvdecDeviceInterface::handleVideoSequence(
     CUVIDEOFORMAT* pVideoFormat) {
-  printf("    IN CNI::handleVideoSequence\n");
+  // printf("    IN CNI::handleVideoSequence\n");
   fflush(stdout);
   TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
 
@@ -212,8 +212,8 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   if (numSurfaces == 0) {
     numSurfaces = 20;  // DALI's fallback value
   }
-  printf("    Video format reports min_num_decode_surfaces = %u, using %u\n", 
-         pVideoFormat->min_num_decode_surfaces, numSurfaces);
+  // printf("    Video format reports min_num_decode_surfaces = %u, using %u\n", 
+  //        pVideoFormat->min_num_decode_surfaces, numSurfaces);
   fflush(stdout);
 
   // Create decoder with the video format
@@ -225,8 +225,8 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   createInfo.ChromaFormat = pVideoFormat->chroma_format;
   createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
   createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
-  createInfo.ulTargetWidth = pVideoFormat->coded_width;
-  createInfo.ulTargetHeight = pVideoFormat->coded_height;
+  createInfo.ulTargetWidth = pVideoFormat->display_area.right - pVideoFormat->display_area.left;
+  createInfo.ulTargetHeight = pVideoFormat->display_area.bottom - pVideoFormat->display_area.top;
   createInfo.ulNumOutputSurfaces = 2;
   createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
   createInfo.vidLock = nullptr;
@@ -249,7 +249,7 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
 // Parser triggers this callback when bitstream data for one frame is ready
 int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
-  printf("    IN CNI::handlePictureDecode\n");
+  // printf("    IN CNI::handlePictureDecode\n");
   fflush(stdout);
 
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
@@ -263,20 +263,20 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   constexpr bool enableTimeout = false;
   
   int surfaceIndex = pPicParams->CurrPicIdx;
-  printf("    Waiting for surface %d to become available\n", surfaceIndex);
+  // printf("    Waiting for surface %d to become available\n", surfaceIndex);
   fflush(stdout);
   
   while (surfaceIndex < surfaceInUse_.size() && surfaceInUse_[surfaceIndex]) {
     if (enableTimeout && totalWait++ > timeoutSec * 1000000 / sleepPeriod) {
-      printf("    ERROR: Waited too long (%d seconds) for surface %d to become available\n", 
-             timeoutSec, surfaceIndex);
+      // printf("    ERROR: Waited too long (%d seconds) for surface %d to become available\n", 
+      //        timeoutSec, surfaceIndex);
       fflush(stdout);
       return 0;
     }
     usleep(sleepPeriod);
   }
 
-  printf("    Surface %d is now available, proceeding with decode\n", surfaceIndex);
+  // printf("    Surface %d is now available, proceeding with decode\n", surfaceIndex);
   fflush(stdout);
 
   // Doc say that calling cuvidDecodePicture kicks of the hardware decoding of the frame (async!).
@@ -289,7 +289,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     // Mark surface as in-use (like DALI)
     if (surfaceIndex < surfaceInUse_.size()) {
       surfaceInUse_[surfaceIndex] = true;
-      printf("    Marked surface %d as in-use\n", surfaceIndex);
+      // printf("    Marked surface %d as in-use\n", surfaceIndex);
       fflush(stdout);
     }
     
@@ -308,13 +308,13 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     }
     dispInfo.timestamp = framePts;
     
-    printf("    Calling handlePictureDisplay directly from decode callback, assigned PTS=%ld (from queue)\n", framePts);
+    // printf("    Calling handlePictureDisplay directly from decode callback, assigned PTS=%ld (from queue)\n", framePts);
     fflush(stdout);
     handlePictureDisplay(&dispInfo);
     
     return 1;
   } else {
-    printf("    cuvidDecodePicture failed with result: %d\n", result);
+    // printf("    cuvidDecodePicture failed with result: %d\n", result);
     fflush(stdout);
     return 0;
   }
@@ -324,7 +324,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
 // This is no longer triggered by the parser - we control timing manually like DALI.
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
-  printf("    IN CNI::handlePictureDisplay, PTS=%ld\n", pDispInfo->timestamp);
+  // printf("    IN CNI::handlePictureDisplay, PTS=%ld\n", pDispInfo->timestamp);
   fflush(stdout);
   TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
 
@@ -335,20 +335,20 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
   slot->pts = pDispInfo->timestamp;
   slot->available = true;
   
-  printf("      Buffered frame with PTS=%ld in slot, buffer has %zu frames available\n", 
-         slot->pts, std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
-         [](const BufferedFrame& f) { return f.available; }));
+  // printf("      Buffered frame with PTS=%ld in slot, buffer has %zu frames available\n", 
+  //        slot->pts, std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
+  //        [](const BufferedFrame& f) { return f.available; }));
   fflush(stdout);
 
   return 1;
 }
 
 int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
-  printf("  IN CNI::sendPacket\n");
+  // printf("  IN CNI::sendPacket\n");
   fflush(stdout);
 
   if (!parserCreated_) {
-    printf("  Parser not created, returning error\n");
+    // printf("  Parser not created, returning error\n");
     return AVERROR(EINVAL);
   }
 
@@ -363,28 +363,28 @@ int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
     
     // Like DALI: store PTS in queue to assign to frames as they come out
     pipedPts_.push(packet->pts);
-    printf("  Sending packet with size %d, pts %ld (queued for frame assignment)\n", packet->size, packet->pts);
+    // printf("  Sending packet with size %d, pts %ld (queued for frame assignment)\n", packet->size, packet->pts);
   } else {
     // End of stream packet
     cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
     eofSent_ = true;
-    printf("  Sending end of stream packet\n");
+    // printf("  Sending end of stream packet\n");
   }
 
   CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
   if (result != CUDA_SUCCESS) {
-    printf("  cuvidParseVideoData failed with result: %d\n", result);
+    // printf("  cuvidParseVideoData failed with result: %d\n", result);
     fflush(stdout);
     return AVERROR_EXTERNAL;
   }
 
-  printf("  Packet sent successfully\n");
+  // printf("  Packet sent successfully\n");
   fflush(stdout);
   return 0;
 }
 
 int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
-  printf("  IN CNI::receiveFrame\n");
+  // printf("  IN CNI::receiveFrame\n");
   fflush(stdout);
 
   std::lock_guard<std::mutex> lock(frameBufferMutex_);
@@ -394,11 +394,11 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   
   if (earliestFrame == nullptr) {
     if (eofSent_) {
-      printf("  No frames available and EOF sent, returning AVERROR_EOF\n");
+      // printf("  No frames available and EOF sent, returning AVERROR_EOF\n");
       fflush(stdout);
       return AVERROR_EOF;
     } else {
-      printf("  No frames available, returning AVERROR(EAGAIN)\n");
+      // printf("  No frames available, returning AVERROR(EAGAIN)\n");
       fflush(stdout);
       return AVERROR(EAGAIN);
     }
@@ -411,9 +411,9 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   earliestFrame->available = false;
   earliestFrame->pts = -1;
 
-  printf("  Processing frame with PTS=%ld in display order, remaining available frames: %zu\n", 
-         pts, std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
-         [](const BufferedFrame& f) { return f.available; }));
+  // printf("  Processing frame with PTS=%ld in display order, remaining available frames: %zu\n", 
+  //        pts, std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
+  //        [](const BufferedFrame& f) { return f.available; }));
 
   // Now map the frame (this was previously done in handlePictureDisplay)
   CUdeviceptr framePtr = 0;
@@ -431,12 +431,12 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
       &procParams);
 
   if (result != CUDA_SUCCESS) {
-    printf("  cuvidMapVideoFrame failed with result: %d\n", result);
+    // printf("  cuvidMapVideoFrame failed with result: %d\n", result);
     fflush(stdout);
     return AVERROR_EXTERNAL;
   }
 
-  printf("  Frame mapped successfully, converting to AVFrame\n");
+  // printf("  Frame mapped successfully, converting to AVFrame\n");
   
   // Convert the NVDEC frame to AVFrame
   frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo);
@@ -448,17 +448,17 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   int surfaceIndex = dispInfo.picture_index;
   if (surfaceIndex < surfaceInUse_.size()) {
     surfaceInUse_[surfaceIndex] = false;
-    printf("  Marked surface %d as free after frame processing\n", surfaceIndex);
+    // printf("  Marked surface %d as free after frame processing\n", surfaceIndex);
     fflush(stdout);
   }
 
-  printf("  Frame received and converted successfully (PTS=%ld)\n", pts);
+  // printf("  Frame received and converted successfully (PTS=%ld)\n", pts);
   fflush(stdout);
   return 0;
 }
 
 void CustomNvdecDeviceInterface::flush() {
-  printf("  IN CNI::flush\n");
+  // printf("  IN CNI::flush\n");
   fflush(stdout);
 
   // Send end of stream packet to flush decoder
@@ -476,7 +476,7 @@ void CustomNvdecDeviceInterface::flush() {
     frame.pts = -1;
   }
 
-  printf("  Flush completed\n");
+  // printf("  Flush completed\n");
   fflush(stdout);
 }
 
@@ -488,9 +488,10 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
     const CUVIDPARSERDISPINFO& dispInfo) {
   TORCH_CHECK(framePtr != 0, "Invalid CUDA frame pointer");
 
-  // Get frame dimensions from video format
-  int width = videoFormat_.coded_width;
-  int height = videoFormat_.coded_height;
+  // Get frame dimensions from video format display area (not coded dimensions)
+  // This matches DALI's approach and avoids padding issues
+  int width = videoFormat_.display_area.right - videoFormat_.display_area.left;
+  int height = videoFormat_.display_area.bottom - videoFormat_.display_area.top;
 
   TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
   TORCH_CHECK(pitch >= width, "Pitch must be >= width");
@@ -507,6 +508,40 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
   avFrame->pts = dispInfo.timestamp;
   avFrame->duration = 0; // Will be set by caller if needed
+
+  // Set color space and color range from NVDEC video format (like DALI does)
+  // This is crucial for proper color conversion!
+  
+  // Map NVDEC matrix coefficients to FFmpeg color space
+  switch (videoFormat_.video_signal_description.matrix_coefficients) {
+    case 1:  // ITU-R BT.709
+      avFrame->colorspace = AVCOL_SPC_BT709;
+      break;
+    case 5:  // ITU-R BT.470-2 System B, G (BT.601 PAL)
+    case 6:  // ITU-R BT.601-6 NTSC  
+      avFrame->colorspace = AVCOL_SPC_SMPTE170M; // BT.601
+      break;
+    default:
+      // Default to BT.709 for unknown coefficients
+      avFrame->colorspace = AVCOL_SPC_BT709;
+      // printf("  Unknown matrix_coefficients=%d, defaulting to BT.709\n", 
+      //        videoFormat_.video_signal_description.matrix_coefficients);
+      break;
+  }
+  
+  // Set color range from full range flag
+  if (videoFormat_.video_signal_description.video_full_range_flag) {
+    avFrame->color_range = AVCOL_RANGE_JPEG;  // Full range (0-255)
+    // printf("  Setting color range to FULL RANGE (0-255)\n");
+  } else {
+    avFrame->color_range = AVCOL_RANGE_MPEG;  // Limited range (16-235)
+    // printf("  Setting color range to LIMITED RANGE (16-235)\n");
+  }
+  
+  // printf("  Color space: %s, Color range: %s\n",
+  //        avFrame->colorspace == AVCOL_SPC_BT709 ? "BT.709" : "BT.601",
+  //        avFrame->color_range == AVCOL_RANGE_JPEG ? "FULL" : "LIMITED");
+  // fflush(stdout);
 
   // For NVDEC output in NV12 format, we need to set up the data pointers
   // The framePtr points to the beginning of the NV12 data
@@ -531,8 +566,8 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
 
-  printf("  In CNI convertAVFrameToFrameOutput\n");
-  fflush(stdout);
+  // printf("  In CNI convertAVFrameToFrameOutput\n");
+  // fflush(stdout);
 
   TORCH_CHECK(
       avFrame->format == AV_PIX_FMT_CUDA,
@@ -569,7 +604,7 @@ CustomNvdecDeviceInterface::findEmptySlot() {
   }
   // If no empty slots, expand buffer like DALI does
   frameBuffer_.emplace_back();
-  printf("  Expanded frame buffer to size %zu\n", frameBuffer_.size());
+  // printf("  Expanded frame buffer to size %zu\n", frameBuffer_.size());
   fflush(stdout);
   return &frameBuffer_.back();
 }

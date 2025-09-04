@@ -1212,14 +1212,14 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       // Is this the kind of frame we're looking for?
       if (status == 0 && filterFunction(avFrame)) {
         // Yes, this is the frame we'll return; break out of the decoding loop.
-        printf("SingleStreamDecoder: we've got the frame!\n");
-        fflush(stdout);
+        // printf("SingleStreamDecoder: we've got the frame!\n");
+        // fflush(stdout);
         break;
       } else if (status == 0) {
         // No, but we received a valid frame - just not the kind we're looking
         // for. Skip reading more packets and try to receive more frames.
-        printf("SingleStreamDecoder: received frame but doesn't match filter, continuing\n");
-        fflush(stdout);
+        // printf("SingleStreamDecoder: received frame but doesn't match filter, continuing\n");
+        // fflush(stdout);
         continue;
       }
 
@@ -1291,8 +1291,8 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       }
 
       // Use custom send/receive API (similar to avcodec_send_packet)
-      printf("SingleStreamDecoder sending packet to custom decoder\n");
-      fflush(stdout);
+      // printf("SingleStreamDecoder sending packet to custom decoder\n");
+      // fflush(stdout);
       status = deviceInterface_->sendPacket(*packetToSend);
       TORCH_CHECK(
           status >= 0,
