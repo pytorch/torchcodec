@@ -527,35 +527,6 @@ torch::Tensor validateFrames(const torch::Tensor& frames) {
   return frames.contiguous();
 }
 
-struct TensorFormat {
-  bool isNCHW;
-  int numChannels;
-  int width;
-  int height;
-  AVPixelFormat pixelFormat;
-};
-
-TensorFormat analyzeTensorFormat(const torch::Tensor& frames) {
-  auto sizes = frames.sizes();
-  TORCH_CHECK(
-      sizes.size() == 4, "Expected 4D tensor (N, C, H, W) or (N, H, W, C)");
-
-  bool isNCHW = sizes[1] == 3 || sizes[1] == 4;
-  int numChannels = isNCHW ? sizes[1] : sizes[3];
-  int height = isNCHW ? sizes[2] : sizes[1];
-  int width = isNCHW ? sizes[3] : sizes[2];
-
-  AVPixelFormat pixelFormat;
-  if (isNCHW) {
-    pixelFormat =
-        (numChannels == 3) ? AV_PIX_FMT_GBRP : AV_PIX_FMT_GBRAP; // Planar
-  } else {
-    pixelFormat =
-        (numChannels == 3) ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_RGBA; // Packed
-  }
-  return {isNCHW, numChannels, width, height, pixelFormat};
-}
-
 } // namespace
 
 VideoEncoder::~VideoEncoder() {
@@ -624,12 +595,13 @@ void VideoEncoder::initializeEncoder(
   avCodecContext_->time_base = {1, frameRate_};
   avCodecContext_->framerate = {frameRate_, 1};
 
-  // Analyze tensor format once and store results in member variables
-  TensorFormat format = analyzeTensorFormat(frames_);
-  isNCHW_ = format.isNCHW;
-  inWidth_ = format.width;
-  inHeight_ = format.height;
-  inPixelFormat_ = format.pixelFormat;
+  // Store dimension order and input pixel format
+  // TODO-VideoEncoder: Remove assumption that tensor in NCHW format
+  auto sizes = frames_.sizes();
+  inPixelFormat_ =
+      (sizes[1] == 3) ? AV_PIX_FMT_GBRP : AV_PIX_FMT_GBRAP; // Planar
+  inHeight_ = sizes[2];
+  inWidth_ = sizes[3];
 
   // Use specified dimensions or input dimensions
   // TODO-VideoEncoder: Allow height and width to be set
@@ -718,23 +690,16 @@ UniqueAVFrame VideoEncoder::convertTensorToAVFrame(
 
   uint8_t* tensorData = static_cast<uint8_t*>(frameTensor.data_ptr());
 
-  if (isNCHW_) {
-    int channelSize = inHeight_ * inWidth_;
-    // Reorder RGB -> GBR for AV_PIX_FMT_GBRP or AV_PIX_FMT_GBRAP formats
-    inputFrame->data[0] = tensorData + channelSize;
-    inputFrame->data[1] = tensorData + (2 * channelSize);
-    inputFrame->data[2] = tensorData;
+  // TODO-VideoEncoder: Reorder tensor if in NHWC format
+  int channelSize = inHeight_ * inWidth_;
+  // Reorder RGB -> GBR for AV_PIX_FMT_GBRP or AV_PIX_FMT_GBRAP formats
+  inputFrame->data[0] = tensorData + channelSize;
+  inputFrame->data[1] = tensorData + (2 * channelSize);
+  inputFrame->data[2] = tensorData;
 
-    inputFrame->linesize[0] = inWidth_; // width of B channel
-    inputFrame->linesize[1] = inWidth_; // width of G channel
-    inputFrame->linesize[2] = inWidth_; // width of R channel
-  } else {
-    // NHWC is usually in packed format
-    inputFrame->data[0] = tensorData;
-    auto sizes = frameTensor.sizes();
-    // width * channels
-    inputFrame->linesize[0] = inWidth_ * sizes[sizes.size() - 1];
-  }
+  inputFrame->linesize[0] = inWidth_; // width of B channel
+  inputFrame->linesize[1] = inWidth_; // width of G channel
+  inputFrame->linesize[2] = inWidth_; // width of R channel
   // Perform scaling/conversion
   status = sws_scale(
       swsContext_.get(),
