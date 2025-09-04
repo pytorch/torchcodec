@@ -243,13 +243,6 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
-  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
-    // We want to scan and update the metadata of all streams.
-    TORCH_CHECK(
-        formatContext_->streams[i]->discard != AVDISCARD_ALL,
-        "Did you add a stream before you called for a scan?");
-  }
-
   AutoAVPacket autoAVPacket;
   while (true) {
     ReferenceAVPacket packet(autoAVPacket);
