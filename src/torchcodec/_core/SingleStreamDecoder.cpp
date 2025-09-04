@@ -1175,8 +1175,11 @@ void SingleStreamDecoder::maybeSeekToBeforeDesiredPts() {
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
   
-  // NOTE: Removed automatic device interface flush as it was causing hangs
-  // The PTS queue synchronization is now handled by earliest-PTS selection instead
+  // Flush device interface to clear custom decoder state (PTS queue, frame buffers)
+  // This is essential for proper seek behavior with custom NVDEC decoder
+  if (deviceInterface_) {
+    deviceInterface_->flush();
+  }
 }
 
 // --------------------------------------------------------------------------

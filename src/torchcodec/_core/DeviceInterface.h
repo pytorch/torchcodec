@@ -105,9 +105,8 @@ class DeviceInterface {
 
   // Flush remaining frames from decoder
   virtual void flush() {
-    TORCH_CHECK(
-        false,
-        "Send/receive packet decoding not implemented for this device interface");
+    // Default implementation is no-op for standard decoders
+    // Custom decoders can override this method
   }
 
  protected:

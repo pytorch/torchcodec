@@ -15,6 +15,7 @@
 
 #include "src/torchcodec/_core/nvcuvid_include/cuviddec.h"
 #include "src/torchcodec/_core/nvcuvid_include/nvcuvid.h"
+#include <cuda_runtime.h>  // For cudaStreamSynchronize
 
 extern "C" {
 #include <libavutil/hwcontext_cuda.h>
@@ -257,6 +258,12 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
   // printf("    IN CNI::handlePictureDecode\n");
   fflush(stdout);
+
+  // Like DALI: if we're flushing, don't process new decode operations
+  if (flush_) {
+    printf("    Skipping decode during flush (like DALI)\n");
+    return 0;
+  }
 
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
   TORCH_CHECK(
@@ -512,36 +519,68 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
 }
 
 void CustomNvdecDeviceInterface::flush() {
-  // printf("  IN CNI::flush\n");
+  printf("  IN CNI::flush - DALI-style flush with EOS and flush flag\n");
   fflush(stdout);
 
-  // Clear the PTS queue to start fresh
+  // Set flush flag like DALI to prevent new decode operations
+  flush_ = true;
+  printf("    Set flush flag to prevent new decode operations\n");
+
+  // Send EOS packet to drain decoder like DALI does
+  if (parserCreated_ && !eofSent_) {
+    printf("    Sending EOS packet to drain decoder\n");
+    CUVIDSOURCEDATAPACKET cudaPacket = {0};
+    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
+    CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+    if (result == CUDA_SUCCESS) {
+      eofSent_ = true;
+      printf("    EOS packet sent successfully\n");
+    } else {
+      printf("    WARNING: EOS packet failed with result=%d\n", result);
+    }
+  }
+
+  // Clear flush flag like DALI does
+  flush_ = false;
+  printf("    Cleared flush flag\n");
+
+  // Clear frame buffer like DALI
+  size_t availableFrames = 0;
+  {
+    std::lock_guard<std::mutex> lock(frameBufferMutex_);
+    availableFrames = std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
+        [](const BufferedFrame& f) { return f.available; });
+    for (auto& frame : frameBuffer_) {
+      frame.available = false;
+      frame.pts = -1;
+    }
+  }
+  printf("    Cleared frame buffer (had %zu available frames)\n", availableFrames);
+
+  // Clear PTS queue like DALI
+  size_t ptsQueueSize = pipedPts_.size();
   while (!pipedPts_.empty()) {
     pipedPts_.pop();
   }
+  printf("    Cleared PTS queue (had %zu items)\n", ptsQueueSize);
 
-  // Send end of stream packet to flush decoder
-  if (parserCreated_ && !eofSent_) {
-    CUVIDSOURCEDATAPACKET cudaPacket = {0};
-    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
-    cuvidParseVideoData(videoParser_, &cudaPacket);
-    eofSent_ = true;
+  // Synchronize CUDA stream to ensure all operations complete
+  cudaStreamSynchronize(0);
+  printf("    Synchronized CUDA stream\n");
+
+  // Clear decode surface usage tracking
+  for (size_t i = 0; i < surfaceInUse_.size(); ++i) {
+    surfaceInUse_[i] = false;
   }
-
-  // Clear any remaining frames in buffer
-  std::lock_guard<std::mutex> lock(frameBufferMutex_);
-  for (auto& frame : frameBuffer_) {
-    frame.available = false;
-    frame.pts = -1;
-  }
-
-  // Reset EOF flag so we can decode more
-  eofSent_ = false;
+  printf("    Cleared all decode surface usage flags\n");
   
   // Reset current PTS like DALI does
   currentPts_ = AV_NOPTS_VALUE;
 
-  // printf("  Flush completed, cleared PTS queue and frame buffer\n");
+  // Reset EOF flag so we can decode more (like DALI does)
+  eofSent_ = false;
+
+  printf("  DALI-style flush completed\n");
   fflush(stdout);
 }
 

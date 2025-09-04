@@ -102,6 +102,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // Current PTS being processed (like DALI's current_pts_)
   int64_t currentPts_ = AV_NOPTS_VALUE;
   
+  // Flush flag to prevent decode operations during flush (like DALI's flush_)
+  bool flush_ = false;
+  
   // Store timeBase for duration calculations
   AVRational timeBase_ = {0, 0};
 
