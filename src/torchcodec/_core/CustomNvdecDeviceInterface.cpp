@@ -7,6 +7,7 @@
 #include <torch/types.h>
 #include <mutex>
 #include <vector>
+#include <unistd.h>  // For usleep
 
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "src/torchcodec/_core/DeviceInterface.h"
@@ -63,7 +64,12 @@ CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
   
   // Initialize frame buffer for B-frame reordering
   frameBuffer_.resize(MAX_DECODE_SURFACES);
-  printf("  Initialized frame buffer with %d slots\n", MAX_DECODE_SURFACES);
+  
+  // Initialize decode surface tracking (like DALI)
+  surfaceInUse_.resize(MAX_DECODE_SURFACES, false);
+  
+  printf("  Initialized frame buffer with %d slots and %d decode surfaces\n", 
+         MAX_DECODE_SURFACES, MAX_DECODE_SURFACES);
   fflush(stdout);
 }
 
@@ -169,6 +175,8 @@ void CustomNvdecDeviceInterface::createVideoParser() {
   // Set up video parser parameters
   CUVIDPARSERPARAMS parserParams = {};
   parserParams.CodecType = videoFormat_.codec;
+  // Set to dummy value initially, sequence callback will update this
+  // as recommended by NVDEC docs
   parserParams.ulMaxNumDecodeSurfaces = 1;
   parserParams.ulClockRate = 1000;
   parserParams.ulErrorThreshold = 0;
@@ -198,13 +206,22 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   // Store video format
   videoFormat_ = *pVideoFormat;
 
+  // Use min_num_decode_surfaces from video format for optimal memory allocation
+  // as recommended by NVDEC docs and implemented in DALI
+  unsigned int numSurfaces = pVideoFormat->min_num_decode_surfaces;
+  if (numSurfaces == 0) {
+    numSurfaces = 20;  // DALI's fallback value
+  }
+  printf("    Video format reports min_num_decode_surfaces = %u, using %u\n", 
+         pVideoFormat->min_num_decode_surfaces, numSurfaces);
+  fflush(stdout);
 
   // Create decoder with the video format
   CUVIDDECODECREATEINFO createInfo = { 0 };
   createInfo.CodecType = pVideoFormat->codec;
   createInfo.ulWidth = pVideoFormat->coded_width;
   createInfo.ulHeight = pVideoFormat->coded_height;
-  createInfo.ulNumDecodeSurfaces = 4;
+  createInfo.ulNumDecodeSurfaces = numSurfaces;
   createInfo.ChromaFormat = pVideoFormat->chroma_format;
   createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
   createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
@@ -224,7 +241,9 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
     TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
   }
 
-  return 1;
+  // Return the number of decode surfaces to update parser's ulMaxNumDecodeSurfaces
+  // This follows NVDEC docs recommendation and DALI's implementation
+  return numSurfaces;
 }
 
 // Parser triggers this callback when bitstream data for one frame is ready
@@ -237,10 +256,29 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   TORCH_CHECK(
       decoder_ != nullptr, "Decoder not initialized before picture decode");
 
-  // TODONVDEC: Better understand the CUVIDPICPARAMS object. Confusingly the doc
-  // say that it's up to the application to fill it up:
-  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#decoding-the-framefield
+  // Like DALI: wait for decode surface to become available
+  int totalWait = 0;
+  constexpr int sleepPeriod = 500; // microseconds
+  constexpr int timeoutSec = 20;
+  constexpr bool enableTimeout = false;
   
+  int surfaceIndex = pPicParams->CurrPicIdx;
+  printf("    Waiting for surface %d to become available\n", surfaceIndex);
+  fflush(stdout);
+  
+  while (surfaceIndex < surfaceInUse_.size() && surfaceInUse_[surfaceIndex]) {
+    if (enableTimeout && totalWait++ > timeoutSec * 1000000 / sleepPeriod) {
+      printf("    ERROR: Waited too long (%d seconds) for surface %d to become available\n", 
+             timeoutSec, surfaceIndex);
+      fflush(stdout);
+      return 0;
+    }
+    usleep(sleepPeriod);
+  }
+
+  printf("    Surface %d is now available, proceeding with decode\n", surfaceIndex);
+  fflush(stdout);
+
   // Doc say that calling cuvidDecodePicture kicks of the hardware decoding of the frame (async!).
   // We know the frame was successfully decoded when cuvidMapVideoFrame returns
   // successfully.
@@ -248,6 +286,13 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   CUresult result = cuvidDecodePicture(decoder_, pPicParams);
   
   if (result == CUDA_SUCCESS) {
+    // Mark surface as in-use (like DALI)
+    if (surfaceIndex < surfaceInUse_.size()) {
+      surfaceInUse_[surfaceIndex] = true;
+      printf("    Marked surface %d as in-use\n", surfaceIndex);
+      fflush(stdout);
+    }
+    
     // Like DALI: manually create display info and call handlePictureDisplay directly
     CUVIDPARSERDISPINFO dispInfo = {};
     dispInfo.picture_index = pPicParams->CurrPicIdx;
@@ -398,6 +443,14 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
 
   // Unmap the frame
   cuvidUnmapVideoFrame(decoder_, framePtr);
+
+  // Mark surface as free (like DALI does in convert_frame)
+  int surfaceIndex = dispInfo.picture_index;
+  if (surfaceIndex < surfaceInUse_.size()) {
+    surfaceInUse_[surfaceIndex] = false;
+    printf("  Marked surface %d as free after frame processing\n", surfaceIndex);
+    fflush(stdout);
+  }
 
   printf("  Frame received and converted successfully (PTS=%ld)\n", pts);
   fflush(stdout);

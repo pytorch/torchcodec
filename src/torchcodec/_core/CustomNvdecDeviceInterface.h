@@ -90,6 +90,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // PTS queue for proper packet-to-frame mapping (like DALI)
   std::queue<int64_t> pipedPts_;
 
+  // Decode surface tracking (like DALI's frame_in_use_)
+  std::vector<uint8_t> surfaceInUse_;
+
   // EOF tracking
   bool eofSent_ = false;
 
