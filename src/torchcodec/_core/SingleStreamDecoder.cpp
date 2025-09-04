@@ -459,6 +459,12 @@ void SingleStreamDecoder::addStream(
       // ACodecContext initialization anymore, it's more generally about
       // initializing the device interface
       deviceInterface_->initializeContext(codecContext);
+      
+      // For custom NVDEC, pass the timeBase for duration calculations
+      if (deviceVariant_ == "custom_nvdec") {
+        auto customNvdecInterface = static_cast<CustomNvdecDeviceInterface*>(deviceInterface_.get());
+        customNvdecInterface->setTimeBase(streamInfo.timeBase);
+      }
     }
   }
 
@@ -1146,6 +1152,9 @@ void SingleStreamDecoder::maybeSeekToBeforeDesiredPts() {
     desiredPts = streamInfo.keyFrames[desiredKeyFrameIndex].pts;
   }
 
+  // printf("    DEBUG: Seeking to PTS=%ld (frame wants PTS=%ld)\n", desiredPts, cursor_);
+  fflush(stdout);
+  
   int status = avformat_seek_file(
       formatContext_.get(),
       streamInfo.streamIndex,
@@ -1159,9 +1168,15 @@ void SingleStreamDecoder::maybeSeekToBeforeDesiredPts() {
       std::to_string(desiredPts),
       ": ",
       getFFMPEGErrorStringFromErrorCode(status));
+      
+  // printf("    DEBUG: Seek completed successfully\n");
+  fflush(stdout);
 
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
+  
+  // NOTE: Removed automatic device interface flush as it was causing hangs
+  // The PTS queue synchronization is now handled by earliest-PTS selection instead
 }
 
 // --------------------------------------------------------------------------

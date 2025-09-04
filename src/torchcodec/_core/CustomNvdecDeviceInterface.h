@@ -31,6 +31,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
 
   void initializeContext(AVCodecContext* codecContext) override;
 
+  // Set the timeBase for duration calculations
+  void setTimeBase(const AVRational& timeBase);
+
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       const AVRational& timeBase,
@@ -95,6 +98,12 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
 
   // EOF tracking
   bool eofSent_ = false;
+  
+  // Current PTS being processed (like DALI's current_pts_)
+  int64_t currentPts_ = AV_NOPTS_VALUE;
+  
+  // Store timeBase for duration calculations
+  AVRational timeBase_ = {0, 0};
 
   // Helper methods for frame reordering
   BufferedFrame* findEmptySlot();
@@ -108,7 +117,8 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   UniqueAVFrame convertCudaFrameToAVFrame(
       CUdeviceptr framePtr,
       unsigned int pitch,
-      const CUVIDPARSERDISPINFO& dispInfo);
+      const CUVIDPARSERDISPINFO& dispInfo,
+      const AVRational& timeBase);
 };
 
 } // namespace facebook::torchcodec

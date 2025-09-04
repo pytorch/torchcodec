@@ -163,6 +163,12 @@ void CustomNvdecDeviceInterface::initializeContext(
   createVideoParser();
 }
 
+void CustomNvdecDeviceInterface::setTimeBase(const AVRational& timeBase) {
+  timeBase_ = timeBase;
+  printf("  DEBUG: TimeBase set to %d/%d\n", timeBase.num, timeBase.den);
+  fflush(stdout);
+}
+
 
 void CustomNvdecDeviceInterface::createVideoParser() {
   // printf("  IN CNI::createVideoParser\n");
@@ -300,15 +306,8 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     dispInfo.top_field_first = pPicParams->bottom_field_flag ^ 1;
     dispInfo.repeat_first_field = 0;
     
-    // Like DALI: get PTS from queue for proper frame timing
-    int64_t framePts = AV_NOPTS_VALUE;
-    if (!pipedPts_.empty()) {
-      framePts = pipedPts_.front();
-      pipedPts_.pop();
-    }
-    dispInfo.timestamp = framePts;
-    
-    // printf("    Calling handlePictureDisplay directly from decode callback, assigned PTS=%ld (from queue)\n", framePts);
+    // Like DALI: call handlePictureDisplay directly, PTS will be assigned there
+    // printf("    Calling handlePictureDisplay directly from decode callback\n");
     fflush(stdout);
     handlePictureDisplay(&dispInfo);
     
@@ -324,15 +323,59 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
 // This is no longer triggered by the parser - we control timing manually like DALI.
 int CustomNvdecDeviceInterface::handlePictureDisplay(
     CUVIDPARSERDISPINFO* pDispInfo) {
-  // printf("    IN CNI::handlePictureDisplay, PTS=%ld\n", pDispInfo->timestamp);
-  fflush(stdout);
   TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
+
+  // EXPERIMENT: More robust PTS assignment
+  // Instead of simple FIFO, find the smallest unused PTS from queue
+  // This handles cases where queue gets out of sync due to B-frame reordering
+  if (!pipedPts_.empty()) {
+    // Find the smallest PTS in the queue (earliest in time)
+    std::vector<int64_t> queueContents;
+    std::queue<int64_t> tempQueue = pipedPts_;
+    while (!tempQueue.empty()) {
+      queueContents.push_back(tempQueue.front());
+      tempQueue.pop();
+    }
+    
+    // Find minimum PTS
+    auto minIt = std::min_element(queueContents.begin(), queueContents.end());
+    currentPts_ = *minIt;
+    
+    // Rebuild queue without the selected PTS
+    std::queue<int64_t> newQueue;
+    bool removed = false;
+    for (int64_t pts : queueContents) {
+      if (pts != currentPts_ || removed) {
+        newQueue.push(pts);
+      } else {
+        removed = true; // Remove only the first instance
+      }
+    }
+    pipedPts_ = newQueue;
+    
+    // printf("    DEBUG: Selected earliest PTS=%ld from queue (queue size was %zu, now %zu)\n", 
+          //  currentPts_, queueContents.size(), pipedPts_.size());
+    fflush(stdout);
+  } else {
+    // Like DALI: handle case where one packet produces multiple frames
+    // Reuse the current PTS for unexpected extra frames
+    // printf("    DEBUG: No PTS in queue, reusing current PTS=%ld for extra frame\n", currentPts_);
+    fflush(stdout);
+  }
+  
+  int64_t framePts = currentPts_;
+  
+  // Set the PTS in the display info
+  pDispInfo->timestamp = framePts;
+  
+  // printf("    IN CNI::handlePictureDisplay, assigned PTS=%ld\n", framePts);
+  fflush(stdout);
 
   // Buffer frame for B-frame reordering (like DALI)
   std::lock_guard<std::mutex> lock(frameBufferMutex_);
   BufferedFrame* slot = findEmptySlot();
   slot->dispInfo = *pDispInfo;
-  slot->pts = pDispInfo->timestamp;
+  slot->pts = framePts;  // Use the PTS we just assigned
   slot->available = true;
   
   // printf("      Buffered frame with PTS=%ld in slot, buffer has %zu frames available\n", 
@@ -363,7 +406,18 @@ int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
     
     // Like DALI: store PTS in queue to assign to frames as they come out
     pipedPts_.push(packet->pts);
-    // printf("  Sending packet with size %d, pts %ld (queued for frame assignment)\n", packet->size, packet->pts);
+    // printf("  DEBUG: Sending packet with size %d, pts %ld (queued, queue size now %zu)", packet->size, packet->pts, pipedPts_.size());
+    
+    // Debug: show queue contents
+    // printf(" Queue contents: [");
+    std::queue<int64_t> tempQueue = pipedPts_;
+    while (!tempQueue.empty()) {
+      // printf("%ld", tempQueue.front());
+      tempQueue.pop();
+      if (!tempQueue.empty()) printf(", ");
+    }
+    // printf("]\n");
+    fflush(stdout);
   } else {
     // End of stream packet
     cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
@@ -438,8 +492,8 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
 
   // printf("  Frame mapped successfully, converting to AVFrame\n");
   
-  // Convert the NVDEC frame to AVFrame
-  frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo);
+  // Convert the NVDEC frame to AVFrame, passing the correct PTS
+  frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo, timeBase_);
 
   // Unmap the frame
   cuvidUnmapVideoFrame(decoder_, framePtr);
@@ -461,6 +515,11 @@ void CustomNvdecDeviceInterface::flush() {
   // printf("  IN CNI::flush\n");
   fflush(stdout);
 
+  // Clear the PTS queue to start fresh
+  while (!pipedPts_.empty()) {
+    pipedPts_.pop();
+  }
+
   // Send end of stream packet to flush decoder
   if (parserCreated_ && !eofSent_) {
     CUVIDSOURCEDATAPACKET cudaPacket = {0};
@@ -476,7 +535,13 @@ void CustomNvdecDeviceInterface::flush() {
     frame.pts = -1;
   }
 
-  // printf("  Flush completed\n");
+  // Reset EOF flag so we can decode more
+  eofSent_ = false;
+  
+  // Reset current PTS like DALI does
+  currentPts_ = AV_NOPTS_VALUE;
+
+  // printf("  Flush completed, cleared PTS queue and frame buffer\n");
   fflush(stdout);
 }
 
@@ -485,7 +550,8 @@ void CustomNvdecDeviceInterface::flush() {
 UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
     CUdeviceptr framePtr,
     unsigned int pitch,
-    const CUVIDPARSERDISPINFO& dispInfo) {
+    const CUVIDPARSERDISPINFO& dispInfo,
+    const AVRational& timeBase) {
   TORCH_CHECK(framePtr != 0, "Invalid CUDA frame pointer");
 
   // Get frame dimensions from video format display area (not coded dimensions)
@@ -506,8 +572,31 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   avFrame->width = width;
   avFrame->height = height;
   avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
-  avFrame->pts = dispInfo.timestamp;
-  avFrame->duration = 0; // Will be set by caller if needed
+  avFrame->pts = dispInfo.timestamp; // This PTS was set correctly by handlePictureDisplay
+  
+  // Calculate frame duration from NVDEC frame rate and stream timebase
+  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0 &&
+      timeBase.num > 0 && timeBase.den > 0) {
+    // Duration in seconds = frame_rate.denominator / frame_rate.numerator
+    // Duration in timebase units = (duration_seconds * timeBase.den) / timeBase.num
+    // = (frame_rate.denominator * timeBase.den) / (frame_rate.numerator * timeBase.num)
+    avFrame->duration = (int64_t)((videoFormat_.frame_rate.denominator * timeBase.den) / 
+                                  (videoFormat_.frame_rate.numerator * timeBase.num));
+    printf("    DEBUG: Set frame duration=%ld (frame_rate=%d/%d, timeBase=%d/%d)\n", 
+           avFrame->duration, 
+           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+           timeBase.num, timeBase.den);
+    fflush(stdout);
+  } else {
+    avFrame->duration = 0; // Unknown duration
+    printf("    DEBUG: Could not calculate frame duration (frame_rate=%d/%d, timeBase=%d/%d)\n", 
+           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+           timeBase.num, timeBase.den);
+    fflush(stdout);
+  }
+  
+  // printf("    DEBUG: AVFrame created with PTS=%ld\n", avFrame->pts);
+  fflush(stdout);
 
   // Set color space and color range from NVDEC video format (like DALI does)
   // This is crucial for proper color conversion!
@@ -566,6 +655,9 @@ void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
 
+  // Store timeBase for duration calculations in convertCudaFrameToAVFrame
+  timeBase_ = timeBase;
+
   // printf("  In CNI convertAVFrameToFrameOutput\n");
   // fflush(stdout);
 
@@ -621,6 +713,12 @@ CustomNvdecDeviceInterface::findFrameWithEarliestPts() {
       }
     }
   }
+  
+  if (earliest) {
+    // printf("    DEBUG: Returning frame with earliest PTS=%ld (reordering enabled)\n", earliest->pts);
+    fflush(stdout);
+  }
+  
   return earliest;
 }
 
