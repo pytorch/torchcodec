@@ -94,7 +94,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           # We install conda packages at the start because otherwise conda may have conflicts with dependencies.
           # Note: xorg-libxau was addded to fix a problem with ffmpeg 4. We should consider removing it.
-          default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia/label/cuda-${{ matrix.cuda-version }}.0::cuda-version=${{ matrix.cuda-version }} nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }} conda-forge::xorg-libxau"
+          default-packages: "nvidia/label/cuda-${{ matrix.cuda-version }}.0::libnpp nvidia::cuda-nvrtc=${{ matrix.cuda-version }} nvidia::cuda-toolkit=${{ matrix.cuda-version }} nvidia::cuda-cudart=${{ matrix.cuda-version }} nvidia::cuda-driver-dev=${{ matrix.cuda-version }} conda-forge::ffmpeg=${{ matrix.ffmpeg-version-for-tests }} conda-forge::xorg-libxau"
       - name: Check env
         run: |
           ${CONDA_RUN} env
