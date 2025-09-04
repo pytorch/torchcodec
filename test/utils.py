@@ -71,7 +71,6 @@ def psnr(a, b, max_val=255) -> float:
 # not guarantee bit-for-bit equality across systems and architectures, so we
 # also cannot. We currently use Linux on x86_64 as our reference system.
 def assert_frames_equal(*args, **kwargs):
-    psnr_value = psnr(args[0], args[1])
     if sys.platform == "linux":
         if args[0].device.type == "cuda":
             atol = 2
@@ -80,27 +79,7 @@ def assert_frames_equal(*args, **kwargs):
                     args[0], args[1], percentage=95, atol=atol
                 )
             else:
-                try:
-                    # torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
-                    assert psnr_value > 45, f"PSNR too low: {psnr_value} dB"
-                except AssertionError as e:
-                    import os
-                    from torchvision.io import write_png
-                    from torchvision.utils import make_grid
-                    
-                    # Get current test name
-                    test_name = os.environ.get('PYTEST_CURRENT_TEST', 'unknown_test').split('::')[-1].split()[0]
-                    
-                    # Create results directory if it doesn't exist
-                    os.makedirs("results", exist_ok=True)
-                    
-                    # Save comparison image
-                    images = make_grid(torch.stack([args[0], args[1]]), nrow=2).cpu()
-                    output_path = f"results/{test_name}.png"
-                    write_png(images, output_path)
-                    
-                    # Re-raise the assertion error
-                    raise e
+                torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:
