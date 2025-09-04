@@ -165,7 +165,7 @@ void CustomNvdecDeviceInterface::initializeContext(
 
 void CustomNvdecDeviceInterface::setTimeBase(const AVRational& timeBase) {
   timeBase_ = timeBase;
-  printf("  DEBUG: TimeBase set to %d/%d\n", timeBase.num, timeBase.den);
+  // printf("  DEBUG: TimeBase set to %d/%d\n", timeBase.num, timeBase.den);
   fflush(stdout);
 }
 
@@ -414,7 +414,7 @@ int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
     while (!tempQueue.empty()) {
       // printf("%ld", tempQueue.front());
       tempQueue.pop();
-      if (!tempQueue.empty()) printf(", ");
+      // if (!tempQueue.empty()) printf(", ");
     }
     // printf("]\n");
     fflush(stdout);
@@ -582,16 +582,16 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
     // = (frame_rate.denominator * timeBase.den) / (frame_rate.numerator * timeBase.num)
     avFrame->duration = (int64_t)((videoFormat_.frame_rate.denominator * timeBase.den) / 
                                   (videoFormat_.frame_rate.numerator * timeBase.num));
-    printf("    DEBUG: Set frame duration=%ld (frame_rate=%d/%d, timeBase=%d/%d)\n", 
-           avFrame->duration, 
-           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
-           timeBase.num, timeBase.den);
+    // printf("    DEBUG: Set frame duration=%ld (frame_rate=%d/%d, timeBase=%d/%d)\n", 
+    //        avFrame->duration, 
+    //        videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+    //        timeBase.num, timeBase.den);
     fflush(stdout);
   } else {
     avFrame->duration = 0; // Unknown duration
-    printf("    DEBUG: Could not calculate frame duration (frame_rate=%d/%d, timeBase=%d/%d)\n", 
-           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
-           timeBase.num, timeBase.den);
+    // printf("    DEBUG: Could not calculate frame duration (frame_rate=%d/%d, timeBase=%d/%d)\n", 
+    //        videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+    //        timeBase.num, timeBase.den);
     fflush(stdout);
   }
   

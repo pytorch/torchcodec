@@ -14,6 +14,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/bsf.h>
 #include <libavfilter/avfilter.h>
+#include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #include <libavutil/audio_fifo.h>
@@ -35,6 +36,15 @@ namespace facebook::torchcodec {
 // wrap FFMPEG structs with unique_ptrs for ease of use.
 template <typename T, typename R, R (*Fn)(T**)>
 struct Deleterp {
+  inline void operator()(T* p) const {
+    if (p) {
+      Fn(&p);
+    }
+  }
+};
+
+template <typename T, typename R, R (*Fn)(void*)>
+struct Deleterv {
   inline void operator()(T* p) const {
     if (p) {
       Fn(&p);
@@ -81,6 +91,9 @@ using UniqueAVBSFContext = std::
     unique_ptr<AVBSFContext, Deleterp<AVBSFContext, void, av_bsf_free>>;
 using UniqueAVBufferRef =
     std::unique_ptr<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>;
+using UniqueAVBufferSrcParameters = std::unique_ptr<
+    AVBufferSrcParameters,
+    Deleterv<AVBufferSrcParameters, void, av_freep>>;
 
 // These 2 classes share the same underlying AVPacket object. They are meant to
 // be used in tandem, like so:
