@@ -94,9 +94,7 @@ def assert_frames_equal(*args, **kwargs):
 
                 metric = PeakSignalNoiseRatio()
                 metric.update(args[0], args[1])
-                mmm = metric.compute()
-                print(f">>> metric={mmm}")
-                assert mmm >= 40
+                assert metric.compute() >= 40
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:

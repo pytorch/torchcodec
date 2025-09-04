@@ -261,7 +261,9 @@ void XpuDeviceInterface::convertAVFrameToFrameOutput(
 
   std::stringstream filters;
   filters << "scale_vaapi=" << width << ":" << height;
-  filters << ":format=rgba"; //: out_color_matrix=bt709:out_range=tv";
+  // CPU device interface outputs RGB in full (pc) color range.
+  // We are doing the same to match.
+  filters << ":format=rgba:out_range=pc";
 
   filtersContext.filters = filters.str();
 
