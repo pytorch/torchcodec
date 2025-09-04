@@ -15,6 +15,18 @@ static bool g_cpu = registerDeviceInterface(
 
 } // namespace
 
+CpuDeviceInterface::SwsFrameContext::SwsFrameContext(
+    int inputWidth,
+    int inputHeight,
+    AVPixelFormat inputFormat,
+    int outputWidth,
+    int outputHeight)
+    : inputWidth(inputWidth),
+      inputHeight(inputHeight),
+      inputFormat(inputFormat),
+      outputWidth(outputWidth),
+      outputHeight(outputHeight) {}
+
 bool CpuDeviceInterface::SwsFrameContext::operator==(
     const CpuDeviceInterface::SwsFrameContext& other) const {
   return inputWidth == other.inputWidth && inputHeight == other.inputHeight &&
@@ -97,13 +109,12 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     // And we sometimes re-create them because it's possible for frame
     // resolution to change mid-stream. Finally, we want to reuse the colorspace
     // conversion objects as much as possible for performance reasons.
-    SwsFrameContext swsFrameContext;
-
-    swsFrameContext.inputWidth = avFrame->width;
-    swsFrameContext.inputHeight = avFrame->height;
-    swsFrameContext.inputFormat = frameFormat;
-    swsFrameContext.outputWidth = expectedOutputWidth;
-    swsFrameContext.outputHeight = expectedOutputHeight;
+    SwsFrameContext swsFrameContext(
+        avFrame->width,
+        avFrame->height,
+        frameFormat,
+        expectedOutputWidth,
+        expectedOutputHeight);
 
     outputTensor = preAllocatedOutputTensor.value_or(allocateEmptyHWCTensor(
         expectedOutputHeight, expectedOutputWidth, torch::kCPU));
@@ -128,22 +139,20 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
   } else if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
     // See comment above in swscale branch about the filterGraphContext_
     // creation. creation
-    FiltersContext filtersContext;
-
-    filtersContext.inputWidth = avFrame->width;
-    filtersContext.inputHeight = avFrame->height;
-    filtersContext.inputFormat = frameFormat;
-    filtersContext.inputAspectRatio = avFrame->sample_aspect_ratio;
-    filtersContext.outputWidth = expectedOutputWidth;
-    filtersContext.outputHeight = expectedOutputHeight;
-    filtersContext.outputFormat = AV_PIX_FMT_RGB24;
-    filtersContext.timeBase = timeBase;
-
     std::stringstream filters;
     filters << "scale=" << expectedOutputWidth << ":" << expectedOutputHeight;
     filters << ":sws_flags=bilinear";
 
-    filtersContext.filtergraphStr = filters.str();
+    FiltersContext filtersContext(
+        avFrame->width,
+        avFrame->height,
+        frameFormat,
+        avFrame->sample_aspect_ratio,
+        expectedOutputWidth,
+        expectedOutputHeight,
+        AV_PIX_FMT_RGB24,
+        filters.str(),
+        timeBase);
 
     if (!filterGraphContext_ || prevFiltersContext_ != filtersContext) {
       filterGraphContext_ =

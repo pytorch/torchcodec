@@ -48,6 +48,14 @@ class CpuDeviceInterface : public DeviceInterface {
     AVPixelFormat inputFormat;
     int outputWidth;
     int outputHeight;
+
+    SwsFrameContext() = default;
+    SwsFrameContext(
+        int inputWidth,
+        int inputHeight,
+        AVPixelFormat inputFormat,
+        int outputWidth,
+        int outputHeight);
     bool operator==(const SwsFrameContext&) const;
     bool operator!=(const SwsFrameContext&) const;
   };
