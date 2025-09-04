@@ -72,12 +72,30 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   CUVIDEOFORMAT videoFormat_;
   bool parserCreated_ = false;
 
-  // Frame queue for async decoding - now stores display info only for deferred mapping
-  std::queue<CUVIDPARSERDISPINFO> frameQueue_;
-  std::mutex frameQueueMutex_;
+  // Frame buffer for B-frame reordering (like DALI)
+  struct BufferedFrame {
+    CUVIDPARSERDISPINFO dispInfo;
+    int64_t pts;
+    bool available = false;
+    
+    BufferedFrame() : pts(-1), available(false) {
+      memset(&dispInfo, 0, sizeof(dispInfo));
+    }
+  };
+  
+  static constexpr int MAX_DECODE_SURFACES = 32; // NVDEC max
+  std::vector<BufferedFrame> frameBuffer_;
+  std::mutex frameBufferMutex_;
+
+  // PTS queue for proper packet-to-frame mapping (like DALI)
+  std::queue<int64_t> pipedPts_;
 
   // EOF tracking
   bool eofSent_ = false;
+
+  // Helper methods for frame reordering
+  BufferedFrame* findEmptySlot();
+  BufferedFrame* findFrameWithEarliestPts();
 
 
   // Initialize video parser
