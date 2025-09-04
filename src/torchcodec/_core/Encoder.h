@@ -87,7 +87,6 @@ class VideoEncoder {
   const torch::Tensor frames_;
   int frameRate_;
 
-  bool isNCHW_ = false;
   int inWidth_ = -1;
   int inHeight_ = -1;
   AVPixelFormat inPixelFormat_ = AV_PIX_FMT_NONE;
