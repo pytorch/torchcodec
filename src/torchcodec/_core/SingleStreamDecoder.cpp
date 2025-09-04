@@ -1192,19 +1192,64 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
   // abstractions/extension points.
   if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly()) {
     while (true) {
-      if (reachedEOF) {
-        throw SingleStreamDecoder::EndOfFileException(
-            "Requested next frame while there are no more frames left to "
-            "decode.");
+      // Try to receive a frame first (similar to avcodec_receive_frame)
+      status = deviceInterface_->receiveFrame(avFrame);
+
+      if (status != 0 && status != AVERROR(EAGAIN)) {
+        // Non-retriable error or EOF
+        if (status == AVERROR_EOF) {
+          throw SingleStreamDecoder::EndOfFileException(
+              "Requested next frame while there are no more frames left to "
+              "decode.");
+        }
+        TORCH_CHECK(
+            false,
+            "Could not receive frame from custom decoder: ",
+            getFFMPEGErrorStringFromErrorCode(status));
       }
 
-      // Read packets and send them to the decoder
+      decodeStats_.numFramesReceivedByDecoder++;
+      // Is this the kind of frame we're looking for?
+      if (status == 0 && filterFunction(avFrame)) {
+        // Yes, this is the frame we'll return; break out of the decoding loop.
+        printf("SingleStreamDecoder: we've got the frame!\n");
+        fflush(stdout);
+        break;
+      } else if (status == 0) {
+        // No, but we received a valid frame - just not the kind we're looking
+        // for. Skip reading more packets and try to receive more frames.
+        printf("SingleStreamDecoder: received frame but doesn't match filter, continuing\n");
+        fflush(stdout);
+        continue;
+      }
+
+      if (reachedEOF) {
+        // We don't have any more packets to receive. So keep on pulling frames
+        // from decoder's internal buffers.
+        continue;
+      }
+
+      // We still haven't found the frame we're looking for. So let's read more
+      // packets and send them to the decoder.
       ReferenceAVPacket packet(autoAVPacket);
       do {
         status = av_read_frame(formatContext_.get(), packet.get());
         decodeStats_.numPacketsRead++;
 
         if (status == AVERROR_EOF) {
+          // End of file reached. We must drain the decoder by sending an empty
+          // packet (similar to standard FFmpeg path)
+          AutoAVPacket eofAutoPacket;
+          ReferenceAVPacket eofPacket(eofAutoPacket);
+          // Clear packet data to signal EOF
+          eofPacket->data = nullptr;
+          eofPacket->size = 0;
+          status = deviceInterface_->sendPacket(eofPacket);
+          TORCH_CHECK(
+              status >= 0,
+              "Could not flush custom decoder: ",
+              getFFMPEGErrorStringFromErrorCode(status));
+
           reachedEOF = true;
           break;
         }
@@ -1217,6 +1262,8 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       } while (packet->stream_index != activeStreamIndex_);
 
       if (reachedEOF) {
+        // We don't have any more packets to send to the decoder. So keep on
+        // pulling frames from its internal buffers.
         continue;
       }
 
@@ -1225,7 +1272,6 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       ReferenceAVPacket filteredPacket(filteredAutoPacket);
 
       // Apply bitstream filtering if needed
-      // TODONVDEC see other todos above about BSF logic needing to be more robust.
       if (streamInfo.bitstreamFilter != nullptr) {
         int retVal =
             av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
@@ -1244,22 +1290,16 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
         packetToSend = &filteredPacket;
       }
 
-      // Use custom packet decoding (e.g., direct NVDEC)
-      printf("SingleStreamDecoder calling CNI::decodePacketDirectly\n");
+      // Use custom send/receive API (similar to avcodec_send_packet)
+      printf("SingleStreamDecoder sending packet to custom decoder\n");
       fflush(stdout);
-      UniqueAVFrame decodedFrame =
-          deviceInterface_->decodePacketDirectly(*packetToSend);
+      status = deviceInterface_->sendPacket(*packetToSend);
+      TORCH_CHECK(
+          status >= 0,
+          "Could not push packet to custom decoder: ",
+          getFFMPEGErrorStringFromErrorCode(status));
 
-      if (decodedFrame && filterFunction(decodedFrame)) {
-        // We got the frame we're looking for from direct decoding
-        printf("SingleStreamDecoder: we've got the frame!\n");
-        fflush(stdout);
-        avFrame = std::move(decodedFrame);
-        break;
-      }
-      printf("SingleStreamDecoder: that's not the frame, continuing loop\n");
-      fflush(stdout);
-      // If custom decoding didn't produce the desired frame, continue the loop
+      decodeStats_.numPacketsSentToDecoder++;
     }
   } else {
     // Standard FFmpeg decoding path

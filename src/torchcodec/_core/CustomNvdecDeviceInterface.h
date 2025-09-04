@@ -44,12 +44,18 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
     return true;
   }
 
-  UniqueAVFrame decodePacketDirectly(ReferenceAVPacket& packet) override;
+  // New send/receive API (FFmpeg-style)
+  // Send packet for decoding (non-blocking)
+  // Returns 0 on success, AVERROR(EAGAIN) if decoder queue full, or other AVERROR on failure
+  int sendPacket(ReferenceAVPacket& packet);
 
-  // Legacy method name - kept for compatibility
-  UniqueAVFrame decodePacket(ReferenceAVPacket& packet) {
-    return decodePacketDirectly(packet);
-  }
+  // Receive decoded frame (non-blocking) 
+  // Returns 0 on success, AVERROR(EAGAIN) if no frame ready, AVERROR_EOF if end of stream,
+  // or other AVERROR on failure
+  int receiveFrame(UniqueAVFrame& frame);
+
+  // Flush remaining frames from decoder
+  void flush();
 
  public:
   // NVDEC callback functions (must be public for C callbacks)
@@ -66,14 +72,12 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   CUVIDEOFORMAT videoFormat_;
   bool parserCreated_ = false;
 
-  // Frame queue for async decoding - stores frame pointer, pitch, and display info
-  struct FrameData {
-    CUdeviceptr framePtr;
-    unsigned int pitch;
-    CUVIDPARSERDISPINFO dispInfo;
-  };
-  std::queue<FrameData> frameQueue_;
+  // Frame queue for async decoding - now stores display info only for deferred mapping
+  std::queue<CUVIDPARSERDISPINFO> frameQueue_;
   std::mutex frameQueueMutex_;
+
+  // EOF tracking
+  bool eofSent_ = false;
 
 
   // Initialize video parser

@@ -74,13 +74,7 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
   {
     std::lock_guard<std::mutex> lock(frameQueueMutex_);
     while (!frameQueue_.empty()) {
-      FrameData frameData = frameQueue_.front();
       frameQueue_.pop();
-
-      // Unmap the frame if it's still mapped
-      if (decoder_ && frameData.framePtr != 0) {
-        cuvidUnmapVideoFrame(decoder_, frameData.framePtr);
-      }
     }
   }
 
@@ -262,104 +256,130 @@ int CustomNvdecDeviceInterface::handlePictureDisplay(
   fflush(stdout);
   TORCH_CHECK(pDispInfo != nullptr, "Invalid display info");
 
-  // Queue the frame for later retrieval
+  // Store display info for deferred frame mapping in receiveFrame()
   std::lock_guard<std::mutex> lock(frameQueueMutex_);
-
-  // Map the decoded frame
-  CUdeviceptr framePtr = 0;
-  unsigned int pitch = 0;
-  CUVIDPROCPARAMS procParams = {};
-  procParams.progressive_frame = pDispInfo->progressive_frame;
-  procParams.top_field_first = pDispInfo->top_field_first;
-  procParams.unpaired_field = pDispInfo->repeat_first_field < 0;
-
-  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
-  // THIS IS BLOCKING. It waits for the hardware to finish decoding the frame.
-  // Docs suggest that cuvidMapVideoFrame could be called from a separate thread
-  // ("mapping thread"), different from the one calling cuvidDecodePicture
-  // (decoding thread)
-  // See also
-  // http://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#writing-an-efficient-decode-application
-  // where they suggest using 3 threads: demux, decode, and display.
-  // They do mention that the internal hardware queue is only 4 frames deep, so
-  // it can be bottlenecked and having a threaded application may not make sense
-  // if the queue tends to already be full - e.g. with multiple decoder
-  // instances already??
-
-  // TODONVDEC I actually don't understand how the actual hardware decoder is
-  // selected. I know there are 5 or 7 decoder per GPU depending on the model
-  // but how does cuvidDecodePicture and cuvidMapVideoFrame know which one to
-  // use?
-
-  CUresult result = cuvidMapVideoFrame(
-      decoder_,
-      pDispInfo->picture_index,
-      &framePtr,
-      &pitch,
-      &procParams);
-  // TODONVDEC probs need to call cuvidGetDecodeStatus here. See pynvvideocodec.
-  if (result == CUDA_SUCCESS) {
-    printf("      Pushing a frame in the queue!\n");
-    FrameData frameData = {framePtr, pitch, *pDispInfo};
-    frameQueue_.push(frameData);
-  } else {
-    printf("      Failed to push a frame in the queue! %d\n", result);
-    fflush(stdout);
-    return 0;
-  }
+  frameQueue_.push(*pDispInfo);
+  printf("      Queued display info for deferred processing, queue size: %zu\n", frameQueue_.size());
 
   return 1;
 }
 
-UniqueAVFrame CustomNvdecDeviceInterface::decodePacketDirectly(
-    ReferenceAVPacket& packet) {
-  printf("  IN CNI::decodePacketDirectly\n");
+int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
+  printf("  IN CNI::sendPacket\n");
   fflush(stdout);
 
-  // Extract compressed data from AVPacket
-  uint8_t* compressedData = packet->data;
-  int size = packet->size;
-  int64_t pts = packet->pts;
-
-  TORCH_CHECK(compressedData != nullptr && size > 0, "Invalid packet data");
-  TORCH_CHECK(parserCreated_, "Video parser not initialized");
-
-  // TODONVDEC: double check this against pynvvideocodec, especially the flags
-  // which should be used to indicate end of stream
-  CUVIDSOURCEDATAPACKET cudaPacket = {0};
-  cudaPacket.payload = compressedData;
-  cudaPacket.payload_size = size;
-  cudaPacket.flags = CUVID_PKT_TIMESTAMP;
-  cudaPacket.timestamp = pts;
-
-  printf("  In CNI calling cuvidParseVideoData\n");
-  fflush(stdout);
-  CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
-  printf("  In CNI after cuvidParseVideoData\n");
-  fflush(stdout);
-  TORCH_CHECK(result == CUDA_SUCCESS, "Failed to parse video data: ", result);
-
-  std::lock_guard<std::mutex> lock(frameQueueMutex_);
-  if (frameQueue_.empty()) {
-    printf("  No frame ready after parsing\n");
-    fflush(stdout);
-    // TODONVDEC: might want return AVERROR(EAGAIN), since this seems morally
-    // equivalent.
-    return UniqueAVFrame(nullptr);
+  if (!parserCreated_) {
+    printf("  Parser not created, returning error\n");
+    return AVERROR(EINVAL);
   }
 
-  FrameData frameData = frameQueue_.front();
+  CUVIDSOURCEDATAPACKET cudaPacket = {0};
+  
+  if (packet.get() && packet->data && packet->size > 0) {
+    // Regular packet with data
+    cudaPacket.payload = packet->data;
+    cudaPacket.payload_size = packet->size;
+    cudaPacket.flags = CUVID_PKT_TIMESTAMP;
+    cudaPacket.timestamp = packet->pts;
+    printf("  Sending packet with size %d, pts %ld\n", packet->size, packet->pts);
+  } else {
+    // End of stream packet
+    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
+    eofSent_ = true;
+    printf("  Sending end of stream packet\n");
+  }
+
+  CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+  if (result != CUDA_SUCCESS) {
+    printf("  cuvidParseVideoData failed with result: %d\n", result);
+    fflush(stdout);
+    return AVERROR_EXTERNAL;
+  }
+
+  printf("  Packet sent successfully\n");
+  fflush(stdout);
+  return 0;
+}
+
+int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
+  printf("  IN CNI::receiveFrame\n");
+  fflush(stdout);
+
+  std::lock_guard<std::mutex> lock(frameQueueMutex_);
+  
+  if (frameQueue_.empty()) {
+    if (eofSent_) {
+      printf("  No frames available and EOF sent, returning AVERROR_EOF\n");
+      fflush(stdout);
+      return AVERROR_EOF;
+    } else {
+      printf("  No frames available, returning AVERROR(EAGAIN)\n");
+      fflush(stdout);
+      return AVERROR(EAGAIN);
+    }
+  }
+
+  CUVIDPARSERDISPINFO dispInfo = frameQueue_.front();
   frameQueue_.pop();
 
+  printf("  Processing frame from queue, remaining frames: %zu\n", frameQueue_.size());
+
+  // Now map the frame (this was previously done in handlePictureDisplay)
+  CUdeviceptr framePtr = 0;
+  unsigned int pitch = 0;
+  CUVIDPROCPARAMS procParams = {};
+  procParams.progressive_frame = dispInfo.progressive_frame;
+  procParams.top_field_first = dispInfo.top_field_first;
+  procParams.unpaired_field = dispInfo.repeat_first_field < 0;
+
+  CUresult result = cuvidMapVideoFrame(
+      decoder_,
+      dispInfo.picture_index,
+      &framePtr,
+      &pitch,
+      &procParams);
+
+  if (result != CUDA_SUCCESS) {
+    printf("  cuvidMapVideoFrame failed with result: %d\n", result);
+    fflush(stdout);
+    return AVERROR_EXTERNAL;
+  }
+
+  printf("  Frame mapped successfully, converting to AVFrame\n");
+  
   // Convert the NVDEC frame to AVFrame
-  UniqueAVFrame avFrame = convertCudaFrameToAVFrame(frameData.framePtr, frameData.pitch, frameData.dispInfo);
+  frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo);
 
-  // TODONVDEC: Understand this. This is related to the concept of "output surface". 
-  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
-  cuvidUnmapVideoFrame(decoder_, frameData.framePtr);
+  // Unmap the frame
+  cuvidUnmapVideoFrame(decoder_, framePtr);
 
-  return avFrame;
+  printf("  Frame received and converted successfully\n");
+  fflush(stdout);
+  return 0;
 }
+
+void CustomNvdecDeviceInterface::flush() {
+  printf("  IN CNI::flush\n");
+  fflush(stdout);
+
+  // Send end of stream packet to flush decoder
+  if (parserCreated_ && !eofSent_) {
+    CUVIDSOURCEDATAPACKET cudaPacket = {0};
+    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
+    cuvidParseVideoData(videoParser_, &cudaPacket);
+    eofSent_ = true;
+  }
+
+  // Clear any remaining frames in queue
+  std::lock_guard<std::mutex> lock(frameQueueMutex_);
+  while (!frameQueue_.empty()) {
+    frameQueue_.pop();
+  }
+
+  printf("  Flush completed\n");
+  fflush(stdout);
+}
+
 
 
 UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(

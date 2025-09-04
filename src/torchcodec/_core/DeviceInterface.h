@@ -83,6 +83,33 @@ class DeviceInterface {
     return UniqueAVFrame(nullptr);
   }
 
+  // New send/receive API for custom decoders (FFmpeg-style)
+  // Send packet for decoding (non-blocking)
+  // Returns 0 on success, AVERROR(EAGAIN) if decoder queue full, or other AVERROR on failure
+  virtual int sendPacket(ReferenceAVPacket& /* packet */) {
+    TORCH_CHECK(
+        false,
+        "Send/receive packet decoding not implemented for this device interface");
+    return AVERROR(ENOSYS);
+  }
+
+  // Receive decoded frame (non-blocking) 
+  // Returns 0 on success, AVERROR(EAGAIN) if no frame ready, AVERROR_EOF if end of stream,
+  // or other AVERROR on failure
+  virtual int receiveFrame(UniqueAVFrame& /* frame */) {
+    TORCH_CHECK(
+        false,
+        "Send/receive packet decoding not implemented for this device interface");
+    return AVERROR(ENOSYS);
+  }
+
+  // Flush remaining frames from decoder
+  virtual void flush() {
+    TORCH_CHECK(
+        false,
+        "Send/receive packet decoding not implemented for this device interface");
+  }
+
  protected:
   torch::Device device_;
 };
