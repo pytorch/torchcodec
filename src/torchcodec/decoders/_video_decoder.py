@@ -140,8 +140,8 @@ class VideoDecoder:
 
         if isinstance(device, torch_device):
             device = str(device)
-        # if "cuda" in device:
-        #     device = f"{device}:0:custom_nvdec"
+        if "cuda" in device:
+            device = f"{device}:0:custom_nvdec"
 
         core.add_video_stream(
             self._decoder,

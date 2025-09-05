@@ -310,33 +310,14 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   dispInfo.repeat_first_field = 0;
   
   
-  // EXPERIMENT: More robust PTS assignment
-  // Instead of simple FIFO, find the smallest unused PTS from queue
+  // Efficient PTS assignment using min-heap priority queue
+  // Always assign the smallest (earliest) PTS from the queue
   // This handles cases where queue gets out of sync due to B-frame reordering
   if (!pipedPts_.empty()) {
-    // Find the smallest PTS in the queue (earliest in time)
-    std::vector<int64_t> queueContents;
-    std::queue<int64_t> tempQueue = pipedPts_;
-    while (!tempQueue.empty()) {
-      queueContents.push_back(tempQueue.front());
-      tempQueue.pop();
-    }
-    
-    // Find minimum PTS
-    auto minIt = std::min_element(queueContents.begin(), queueContents.end());
-    currentPts_ = *minIt;
-    
-    // Rebuild queue without the selected PTS
-    std::queue<int64_t> newQueue;
-    bool removed = false;
-    for (int64_t pts : queueContents) {
-      if (pts != currentPts_ || removed) {
-        newQueue.push(pts);
-      } else {
-        removed = true; // Remove only the first instance
-      }
-    }
-    pipedPts_ = newQueue;
+    // Get the smallest PTS (top of min-heap) - O(1)
+    currentPts_ = pipedPts_.top();
+    // Remove it from the queue - O(log n)
+    pipedPts_.pop();
     
   } else {
     // Like DALI: handle case where one packet produces multiple frames
@@ -728,15 +709,21 @@ void CustomNvdecDeviceInterface::printPtsQueue(const std::string& context) const
   }
   
   std::cout << "[DEBUG] " << indent << "PTS Queue (" << context << "): [";
-  std::queue<int64_t> tempQueue = pipedPts_;
-  bool first = true;
+  // Priority queue doesn't support iteration, so we make a copy to print contents
+  auto tempQueue = pipedPts_;
+  std::vector<int64_t> queueContents;
   while (!tempQueue.empty()) {
-    if (!first) std::cout << ", ";
-    std::cout << tempQueue.front();
+    queueContents.push_back(tempQueue.top());
     tempQueue.pop();
+  }
+  // Print in sorted order (smallest to largest)
+  bool first = true;
+  for (int64_t pts : queueContents) {
+    if (!first) std::cout << ", ";
+    std::cout << pts;
     first = false;
   }
-  std::cout << "] (size: " << pipedPts_.size() << ")" << std::endl;
+  std::cout << "] (size: " << pipedPts_.size() << ", min: " << (pipedPts_.empty() ? "N/A" : std::to_string(pipedPts_.top())) << ")" << std::endl;
 }
 
 void CustomNvdecDeviceInterface::printFrameBuffer(const std::string& context) const {

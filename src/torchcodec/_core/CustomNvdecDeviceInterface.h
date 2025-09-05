@@ -15,6 +15,7 @@
 #include <mutex>
 #include <queue>
 #include <unordered_map>
+#include <vector>
 
 #include "src/torchcodec/_core/nvcuvid_include/cuviddec.h"
 #include "src/torchcodec/_core/nvcuvid_include/nvcuvid.h"
@@ -92,8 +93,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   std::vector<BufferedFrame> frameBuffer_;
   std::mutex frameBufferMutex_;
 
-  // PTS queue for proper packet-to-frame mapping (like DALI)
-  std::queue<int64_t> pipedPts_;
+  // PTS priority queue for proper packet-to-frame mapping (like DALI)
+  // Using min-heap to efficiently get smallest PTS
+  std::priority_queue<int64_t, std::vector<int64_t>, std::greater<int64_t>> pipedPts_;
 
   // Decode surface tracking (like DALI's frame_in_use_)
   std::vector<uint8_t> surfaceInUse_;
