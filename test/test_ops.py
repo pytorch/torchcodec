@@ -48,6 +48,7 @@ from .utils import (
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
+    needs_xpu,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
@@ -730,6 +731,19 @@ class TestVideoDecoderOps:
         assert frame0.device.type == "cuda"
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to("cuda"))
+        assert pts == torch.tensor([0])
+        torch.testing.assert_close(
+            duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
+        )
+
+    @needs_xpu
+    def test_xpu_decoder(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        add_video_stream(decoder, device="xpu")
+        frame0, pts, duration = get_next_frame(decoder)
+        assert frame0.device.type == "xpu"
+        reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
+        assert_frames_equal(frame0, reference_frame0.to("xpu"))
         assert pts == torch.tensor([0])
         torch.testing.assert_close(
             duration, torch.tensor(0.0334).double(), atol=0, rtol=1e-3
