@@ -1246,7 +1246,11 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (deviceInterface_) {
+  } else {
+    TORCH_CHECK(
+        deviceInterface_ != nullptr,
+        "No device interface available for video decoding. This ",
+        "shouldn't happen, please report.");
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         streamInfo.timeBase,
