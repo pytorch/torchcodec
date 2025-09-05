@@ -27,7 +27,7 @@ def needs_cuda(test_item):
 
 
 def all_supported_devices():
-    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda))
+    return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda), pytest.param("cuda:0:custom_nvdec", marks=pytest.mark.needs_cuda))
 
 
 def get_ffmpeg_major_version():
