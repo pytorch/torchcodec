@@ -43,11 +43,11 @@ class CpuDeviceInterface : public DeviceInterface {
       const UniqueAVFrame& avFrame);
 
   struct SwsFrameContext {
-    int inputWidth;
-    int inputHeight;
-    AVPixelFormat inputFormat;
-    int outputWidth;
-    int outputHeight;
+    int inputWidth = 0;
+    int inputHeight = 0;
+    AVPixelFormat inputFormat = AV_PIX_FMT_NONE;
+    int outputWidth = 0;
+    int outputHeight = 0;
 
     SwsFrameContext() = default;
     SwsFrameContext(
