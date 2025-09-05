@@ -63,25 +63,6 @@ class VideoDecoder:
             probably is. Default: "exact".
             Read more about this parameter in:
             :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
-        custom_frame_mappings (str, bytes, or file-like object, optional):
-            Mapping of frames to their metadata, typically generated via ffprobe.
-            This enables accurate frame seeking without requiring a full video scan.
-            Do not set seek_mode when custom_frame_mappings is provided.
-            Expected JSON format:
-
-            .. code-block:: json
-
-                {
-                    "frames": [
-                        {
-                            "pts": 0,
-                            "duration": 1001,
-                            "key_frame": 1
-                        }
-                    ]
-                }
-
-            Alternative field names "pkt_pts" and "pkt_duration" are also supported.
 
     Attributes:
         metadata (VideoStreamMetadata): Metadata of the video stream.
@@ -99,9 +80,6 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
-        custom_frame_mappings: Optional[
-            Union[str, bytes, io.RawIOBase, io.BufferedReader]
-        ] = None,
     ):
         torch._C._log_api_usage_once("torchcodec.decoders.VideoDecoder")
         allowed_seek_modes = ("exact", "approximate")
@@ -111,6 +89,7 @@ class VideoDecoder:
                 f"Supported values are {', '.join(allowed_seek_modes)}."
             )
 
+        custom_frame_mappings = None
         # Validate seek_mode and custom_frame_mappings are not mismatched
         if custom_frame_mappings is not None and seek_mode == "approximate":
             raise ValueError(
