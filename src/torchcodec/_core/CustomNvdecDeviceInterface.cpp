@@ -473,6 +473,7 @@ void CustomNvdecDeviceInterface::flush() {
   }
 
   // Synchronize CUDA stream to ensure all operations complete
+  // TODONVDEC make sure this is syncing the right stream, not necessarily stream 0
   cudaStreamSynchronize(0);
 
   // Clear decode surface usage tracking
