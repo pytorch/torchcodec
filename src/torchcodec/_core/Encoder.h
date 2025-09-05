@@ -57,6 +57,46 @@ class AudioEncoder {
   bool encodeWasCalled_ = false;
   int64_t lastEncodedAVFramePts_ = 0;
 };
+
+class VideoEncoder {
+ public:
+  ~VideoEncoder();
+
+  VideoEncoder(
+      const torch::Tensor& frames,
+      int frameRate,
+      std::string_view fileName,
+      const VideoStreamOptions& videoStreamOptions);
+
+  void encode();
+
+ private:
+  void initializeEncoder(const VideoStreamOptions& videoStreamOptions);
+  UniqueAVFrame convertTensorToAVFrame(
+      const torch::Tensor& frameTensor,
+      int frameIndex);
+  void encodeFrame(AutoAVPacket& autoAVPacket, const UniqueAVFrame& avFrame);
+  void flushBuffers();
+  void close_avio();
+
+  UniqueEncodingAVFormatContext avFormatContext_;
+  UniqueAVCodecContext avCodecContext_;
+  int streamIndex_;
+  UniqueSwsContext swsContext_;
+
+  const torch::Tensor frames_;
+  int frameRate_;
+
+  int inWidth_ = -1;
+  int inHeight_ = -1;
+  AVPixelFormat inPixelFormat_ = AV_PIX_FMT_NONE;
+
+  int outWidth_ = -1;
+  int outHeight_ = -1;
+  AVPixelFormat outPixelFormat_ = AV_PIX_FMT_NONE;
+
+  bool encodeWasCalled_ = false;
+};
 } // namespace facebook::torchcodec
 
 /* clang-format off */
