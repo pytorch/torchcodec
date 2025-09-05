@@ -6,6 +6,9 @@
 
 #pragma once
 
+// Debug flag - set to 1 to enable debug output, 0 to disable
+#define CUSTOM_NVDEC_DEBUG 1
+
 #include "src/torchcodec/_core/DeviceInterface.h"
 
 #include <memory>
@@ -64,7 +67,6 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // NVDEC callback functions (must be public for C callbacks)
   int handleVideoSequence(CUVIDEOFORMAT* pVideoFormat);
   int handlePictureDecode(CUVIDPICPARAMS* pPicParams);
-  int handlePictureDisplay(CUVIDPARSERDISPINFO* pDispInfo);
 
  private:
   // NVDEC decoder context and parser
@@ -111,6 +113,12 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // Helper methods for frame reordering
   BufferedFrame* findEmptySlot();
   BufferedFrame* findFrameWithEarliestPts();
+  
+#if CUSTOM_NVDEC_DEBUG
+  // Debug helper functions
+  void printPtsQueue(const std::string& context) const;
+  void printFrameBuffer(const std::string& context) const;
+#endif
 
 
   // Initialize video parser
