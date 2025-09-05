@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 #include "torch/types.h"
 
 namespace facebook::torchcodec {
@@ -384,7 +385,8 @@ void SingleStreamDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
     const torch::Device& device,
-    std::optional<int> ffmpegThreadCount) {
+    std::optional<int> ffmpegThreadCount,
+    const std::string& deviceVariant) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
       "Can only add one single stream.");
@@ -412,7 +414,8 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface_ = createDeviceInterface(device);
+  deviceVariant_ = deviceVariant;
+  deviceInterface_ = createDeviceInterface(device, deviceVariant);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -453,6 +456,43 @@ void SingleStreamDecoder::addStream(
   TORCH_CHECK(retVal >= AVSUCCESS, getFFMPEGErrorStringFromErrorCode(retVal));
 
   codecContext->time_base = streamInfo.stream->time_base;
+
+  // Initialize bitstream filter for H.264 MP4 containers
+  if (mediaType == AVMEDIA_TYPE_VIDEO && 
+      codecContext->codec_id == AV_CODEC_ID_H264) {
+    
+    // Check if this is an MP4-style container that needs bitstream filtering
+    const char* formatName = formatContext_->iformat->long_name;
+    bool isMP4Container = (strcmp(formatName, "QuickTime / MOV") == 0 ||
+                          strcmp(formatName, "FLV (Flash Video)") == 0 ||
+                          strcmp(formatName, "Matroska / WebM") == 0);
+    
+    if (isMP4Container) {
+      // printf("Initializing H.264 MP4 to Annex B bitstream filter for %s container\n", formatName);
+      
+      const AVBitStreamFilter* bsf = av_bsf_get_by_name("h264_mp4toannexb");
+      TORCH_CHECK(bsf != nullptr, "Failed to find h264_mp4toannexb bitstream filter");
+      
+      AVBSFContext* rawBsf = nullptr;
+      retVal = av_bsf_alloc(bsf, &rawBsf);
+      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to allocate bitstream filter: ", 
+                  getFFMPEGErrorStringFromErrorCode(retVal));
+      
+      streamInfo.bitstreamFilter.reset(rawBsf);
+      
+      retVal = avcodec_parameters_copy(streamInfo.bitstreamFilter->par_in, 
+                                       streamInfo.stream->codecpar);
+      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to copy codec parameters: ", 
+                  getFFMPEGErrorStringFromErrorCode(retVal));
+      
+      retVal = av_bsf_init(streamInfo.bitstreamFilter.get());
+      TORCH_CHECK(retVal >= AVSUCCESS, "Failed to initialize bitstream filter: ", 
+                  getFFMPEGErrorStringFromErrorCode(retVal));
+      
+      streamInfo.needsBitstreamFiltering = true;
+      // printf("Successfully initialized bitstream filter\n");
+    }
+  }
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
       std::string(avcodec_get_name(codecContext->codec_id));
 
@@ -462,7 +502,7 @@ void SingleStreamDecoder::addStream(
   // important to discard/demux correctly in the inner decoding loop.
   for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
     if (i != static_cast<unsigned int>(activeStreamIndex_)) {
-      formatContext_->streams[i]->discard = AVDISCARD_ALL;
+      // formatContext_->streams[i]->discard = AVDISCARD_ALL;
     }
   }
 }
@@ -470,12 +510,14 @@ void SingleStreamDecoder::addStream(
 void SingleStreamDecoder::addVideoStream(
     int streamIndex,
     const VideoStreamOptions& videoStreamOptions,
-    std::optional<FrameMappings> customFrameMappings) {
+    std::optional<FrameMappings> customFrameMappings,
+    const std::string& deviceVariant) {
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
       videoStreamOptions.device,
-      videoStreamOptions.ffmpegThreadCount);
+      videoStreamOptions.ffmpegThreadCount,
+      deviceVariant);
 
   auto& streamMetadata =
       containerMetadata_.allStreamMetadata[activeStreamIndex_];
@@ -1193,15 +1235,52 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       continue;
     }
 
-    // We got a valid packet. Send it to the decoder, and we'll receive it in
-    // the next iteration.
-    status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
-    TORCH_CHECK(
-        status >= AVSUCCESS,
-        "Could not push packet to decoder: ",
-        getFFMPEGErrorStringFromErrorCode(status));
+    // Check if device interface can handle packet decoding directly
+    if (deviceInterface_ && deviceInterface_->canDecodePacketDirectly()) {
+      ReferenceAVPacket* packetToSend = &packet;
+      AutoAVPacket filteredAutoPacket;
+      ReferenceAVPacket filteredPacket(filteredAutoPacket);
+      
+      // Apply bitstream filtering if needed
+      if (streamInfo.needsBitstreamFiltering && streamInfo.bitstreamFilter) {
+        // printf("Applying bitstream filter to packet\n");
+        
+        // Send packet to bitstream filter
+        int retVal = av_bsf_send_packet(streamInfo.bitstreamFilter.get(), packet.get());
+        TORCH_CHECK(retVal >= AVSUCCESS, "Failed to send packet to bitstream filter: ", 
+                    getFFMPEGErrorStringFromErrorCode(retVal));
+        
+        // Receive filtered packet
+        retVal = av_bsf_receive_packet(streamInfo.bitstreamFilter.get(), filteredPacket.get());
+        TORCH_CHECK(retVal >= AVSUCCESS, "Failed to receive packet from bitstream filter: ", 
+                    getFFMPEGErrorStringFromErrorCode(retVal));
+        
+        packetToSend = &filteredPacket;
+        // printf("Bitstream filtering complete: original size=%d, filtered size=%d\n", 
+              //  packet->size, filteredPacket->size);
+      }
+      
+      // Use custom packet decoding (e.g., direct NVDEC)
+      UniqueAVFrame decodedFrame =
+          deviceInterface_->decodePacketDirectly(*packetToSend);
+      if (decodedFrame && filterFunction(decodedFrame)) {
+        // We got the frame we're looking for from direct decoding
+        avFrame = std::move(decodedFrame);
+        decodeStats_.numPacketsSentToDecoder++;
+        break;
+      }
+      // If custom decoding didn't produce the desired frame, continue the loop
+      decodeStats_.numPacketsSentToDecoder++;
+    } else {
+      // Use standard FFmpeg decoding path
+      status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+      TORCH_CHECK(
+          status >= AVSUCCESS,
+          "Could not push packet to decoder: ",
+          getFFMPEGErrorStringFromErrorCode(status));
 
-    decodeStats_.numPacketsSentToDecoder++;
+      decodeStats_.numPacketsSentToDecoder++;
+    }
   }
 
   if (status < AVSUCCESS) {
