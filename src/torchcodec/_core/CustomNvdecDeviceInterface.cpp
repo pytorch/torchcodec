@@ -12,7 +12,7 @@
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 
 // Debug flag - set to 1 to enable debug output, 0 to disable
-#define CUSTOM_NVDEC_DEBUG 1
+#define CUSTOM_NVDEC_DEBUG 0
 
 #if CUSTOM_NVDEC_DEBUG
 #include <iostream>  // For debug output
@@ -31,6 +31,132 @@ extern "C" {
 
 namespace facebook::torchcodec {
 
+// Simplified NVDEC Cache Implementation following Cache.h patterns
+NVDECCache& NVDECCache::GetCache(int device_id) {
+  static NVDECCache cache_inst[32]; // Support up to 32 GPUs like PyTorch
+  if (device_id == -1) {
+    cudaGetDevice(&device_id);
+  }
+  return cache_inst[device_id];
+}
+
+NVDECDecoderKey NVDECCache::createKey(CUVIDEOFORMAT* video_format) {
+  unsigned num_decode_surfaces = video_format->min_num_decode_surfaces;
+  if (num_decode_surfaces == 0) {
+    num_decode_surfaces = 20;  // Default fallback
+  }
+  
+  return NVDECDecoderKey{
+    video_format->codec,
+    video_format->coded_width,
+    video_format->coded_height,
+    video_format->chroma_format,
+    video_format->bit_depth_luma_minus8,
+    num_decode_surfaces
+  };
+}
+
+UniqueCUvideodecoder NVDECCache::getDecoder(const NVDECDecoderKey& key) {
+  std::lock_guard<std::mutex> lock(cache_lock_);
+  
+  auto it = cache_.find(key);
+  if (it != cache_.end()) {
+    // Found cached decoder, return it
+    auto decoder = std::move(it->second);
+    cache_.erase(it);
+    return decoder;
+  }
+  
+  return nullptr; // No cached decoder available
+}
+
+bool NVDECCache::returnDecoder(const NVDECDecoderKey& key, UniqueCUvideodecoder decoder) {
+  if (!decoder) {
+    return false;
+  }
+  
+  std::lock_guard<std::mutex> lock(cache_lock_);
+  
+  // Check cache size limit
+  if (cache_.size() >= MAX_CACHE_SIZE) {
+    // Cache full, don't store decoder (it will be auto-destroyed)
+    return false;
+  }
+  
+  cache_[key] = std::move(decoder);
+  return true;
+}
+
+UniqueCUvideodecoder NVDECCache::createDecoder(CUVIDEOFORMAT* video_format) {
+  auto codec_type = video_format->codec;
+  unsigned height = video_format->coded_height;
+  unsigned width = video_format->coded_width;
+  auto num_decode_surfaces = video_format->min_num_decode_surfaces;
+  auto chroma_format = video_format->chroma_format;
+  auto bit_depth_luma_minus8 = video_format->bit_depth_luma_minus8;
+
+  if (num_decode_surfaces == 0) {
+    num_decode_surfaces = 20;
+  }
+  
+  // Check decoder capabilities
+  auto caps = CUVIDDECODECAPS{};
+  caps.eCodecType = codec_type;
+  caps.eChromaFormat = chroma_format;
+  caps.nBitDepthMinus8 = bit_depth_luma_minus8;
+  CUresult caps_result = cuvidGetDecoderCaps(&caps);
+  TORCH_CHECK(caps_result == CUDA_SUCCESS, "Failed to get decoder caps: ", caps_result);
+  
+  TORCH_CHECK(caps.bIsSupported, 
+              "Codec configuration not supported on this GPU. "
+              "Codec: ", static_cast<int>(codec_type), 
+              ", chroma format: ", static_cast<int>(chroma_format),
+              ", bit depth: ", bit_depth_luma_minus8 + 8);
+
+  TORCH_CHECK(width >= caps.nMinWidth && height >= caps.nMinHeight,
+              "Video is too small in at least one dimension. Provided: ",
+              width, "x", height, " vs supported:", caps.nMinWidth, "x", caps.nMinHeight);
+
+  TORCH_CHECK(width <= caps.nMaxWidth && height <= caps.nMaxHeight,
+              "Video is too large in at least one dimension. Provided: ",
+              width, "x", height, " vs supported:", caps.nMaxWidth, "x", caps.nMaxHeight);
+
+  TORCH_CHECK(width * height / 256 <= caps.nMaxMBCount,
+              "Video is too large (too many macroblocks). "
+              "Provided (width * height / 256): ",
+              width * height / 256, " vs supported:", caps.nMaxMBCount);
+
+  // Create new decoder
+  CUVIDDECODECREATEINFO decoder_info;
+  memset(&decoder_info, 0, sizeof(CUVIDDECODECREATEINFO));
+
+  decoder_info.bitDepthMinus8 = bit_depth_luma_minus8;
+  decoder_info.ChromaFormat = chroma_format;
+  decoder_info.CodecType = codec_type;
+  decoder_info.ulHeight = height;
+  decoder_info.ulWidth = width;
+  decoder_info.ulMaxHeight = height;
+  decoder_info.ulMaxWidth = width;
+  decoder_info.ulTargetHeight = video_format->display_area.bottom - video_format->display_area.top;
+  decoder_info.ulTargetWidth = video_format->display_area.right - video_format->display_area.left;
+  decoder_info.ulNumDecodeSurfaces = num_decode_surfaces;
+  decoder_info.ulNumOutputSurfaces = 2;
+  decoder_info.ulCreationFlags = cudaVideoCreate_PreferCUVID;
+  decoder_info.vidLock = nullptr;
+
+  auto& area = decoder_info.display_area;
+  area.left = video_format->display_area.left;
+  area.right = video_format->display_area.right;
+  area.top = video_format->display_area.top;
+  area.bottom = video_format->display_area.bottom;
+
+  CUvideodecoder raw_decoder;
+  CUresult result = cuvidCreateDecoder(&raw_decoder, &decoder_info);
+  TORCH_CHECK(result == CUDA_SUCCESS, "Failed to create NVDEC decoder: ", result);
+
+  // Wrap in unique_ptr with custom deleter
+  return UniqueCUvideodecoder(raw_decoder, CUvideoDecoderDeleter{});
+}
 
 namespace {
 
@@ -89,10 +215,9 @@ CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
     }
   }
 
-  // Clean up decoder
+  // Return decoder to cache if we have one
   if (decoder_) {
-    cuvidDestroyDecoder(decoder_);
-    decoder_ = nullptr;
+    NVDECCache::GetCache(device_.index()).returnDecoder(decoderKey_, std::move(decoder_));
   }
 
   // Clean up video parser
@@ -206,36 +331,27 @@ int CustomNvdecDeviceInterface::handleVideoSequence(
   // Store video format
   videoFormat_ = *pVideoFormat;
 
+  // Get or create decoder using simplified cache
+  if (!decoder_) {
+    // Create cache key from video format
+    decoderKey_ = NVDECCache::createKey(pVideoFormat);
+    
+    // Try to get decoder from cache first
+    decoder_ = NVDECCache::GetCache(device_.index()).getDecoder(decoderKey_);
+    
+    // If no cached decoder available, create new one
+    if (!decoder_) {
+      decoder_ = NVDECCache::createDecoder(pVideoFormat);
+    }
+    
+    TORCH_CHECK(decoder_, "Failed to get or create decoder");
+  }
+
   // Use min_num_decode_surfaces from video format for optimal memory allocation
   // as recommended by NVDEC docs and implemented in DALI
   unsigned int numSurfaces = pVideoFormat->min_num_decode_surfaces;
   if (numSurfaces == 0) {
     numSurfaces = 20;  // DALI's fallback value
-  }
-
-  // Create decoder with the video format
-  CUVIDDECODECREATEINFO createInfo = { 0 };
-  createInfo.CodecType = pVideoFormat->codec;
-  createInfo.ulWidth = pVideoFormat->coded_width;
-  createInfo.ulHeight = pVideoFormat->coded_height;
-  createInfo.ulNumDecodeSurfaces = numSurfaces;
-  createInfo.ChromaFormat = pVideoFormat->chroma_format;
-  createInfo.OutputFormat = cudaVideoSurfaceFormat_NV12;
-  createInfo.bitDepthMinus8 = pVideoFormat->bit_depth_luma_minus8;
-  createInfo.ulTargetWidth = pVideoFormat->display_area.right - pVideoFormat->display_area.left;
-  createInfo.ulTargetHeight = pVideoFormat->display_area.bottom - pVideoFormat->display_area.top;
-  createInfo.ulNumOutputSurfaces = 2;
-  createInfo.ulCreationFlags = cudaVideoCreate_PreferCUVID;
-  createInfo.vidLock = nullptr;
-
-  // TODONVDEC: We are re-recreating a decoder, which I think assumes there is
-  // no sequence change and that this is only called at the start of the header
-  // (see comment above).
-  // We should consider change of sequence, and also look into re-configuring
-  // APIs. Also need a CUVideoDecoder cache somewhere.
-  CUresult result = cuvidCreateDecoder(&decoder_, &createInfo);
-  if (result != CUDA_SUCCESS) {
-    TORCH_CHECK(false, "Failed to create NVDEC decoder: ", result);
   }
 
   // Return the number of decode surfaces to update parser's ulMaxNumDecodeSurfaces
@@ -269,7 +385,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
 
   TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
   TORCH_CHECK(
-      decoder_ != nullptr, "Decoder not initialized before picture decode");
+      decoder_, "Decoder not initialized before picture decode");
 
   // Like DALI: wait for decode surface to become available
   int totalWait = 0;
@@ -291,7 +407,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   // We know the frame was successfully decoded when cuvidMapVideoFrame returns
   // successfully.
   // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
-  CUresult result = cuvidDecodePicture(decoder_, pPicParams);
+  CUresult result = cuvidDecodePicture(static_cast<CUvideodecoder>(decoder_.get()), pPicParams);
   
   if (result != CUDA_SUCCESS) {
     return 0;
@@ -446,7 +562,7 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   procParams.unpaired_field = dispInfo.repeat_first_field < 0;
 
   CUresult result = cuvidMapVideoFrame(
-      decoder_,
+      static_cast<CUvideodecoder>(decoder_.get()),
       dispInfo.picture_index,
       &framePtr,
       &pitch,
@@ -477,7 +593,7 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
 #endif
 
   // Unmap the frame
-  cuvidUnmapVideoFrame(decoder_, framePtr);
+  cuvidUnmapVideoFrame(static_cast<CUvideodecoder>(decoder_.get()), framePtr);
 
   // Mark surface as free (like DALI does in convert_frame)
   int surfaceIndex = dispInfo.picture_index;
