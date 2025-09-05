@@ -248,7 +248,18 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     CUVIDPICPARAMS* pPicParams) {
 
 #if CUSTOM_NVDEC_DEBUG
-  std::cout << "[DEBUG] handlePictureDecode: Called for surface " << pPicParams->CurrPicIdx << std::endl;
+  // NVDEC picture types (from cuviddec.h)
+  const char* picTypeStr = "unknown";
+  if (pPicParams->intra_pic_flag) {
+    picTypeStr = "I-frame";
+  } else if (pPicParams->ref_pic_flag) {
+    picTypeStr = "P-frame"; 
+  } else {
+    picTypeStr = "B-frame";
+  }
+  
+  std::cout << "[DEBUG] handlePictureDecode: Called for surface " << pPicParams->CurrPicIdx 
+            << ", type=" << picTypeStr << std::endl;
 #endif
 
   // Like DALI: if we're flushing, don't process new decode operations
@@ -367,7 +378,13 @@ int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
     if (packet.get() && packet->data && packet->size > 0) {
       // Regular packet with data
 #if CUSTOM_NVDEC_DEBUG
-      std::cout << "[DEBUG] sendPacket: Sending packet with PTS=" << packet->pts << ", size=" << packet->size << std::endl;
+      std::string frameType = "unknown";
+      if (packet->flags & AV_PKT_FLAG_KEY) {
+        frameType = "keyframe";
+      } else {
+        frameType = "non-keyframe";
+      }
+      std::cout << "[DEBUG] sendPacket: Sending packet with PTS=" << packet->pts << ", size=" << packet->size << ", type=" << frameType << std::endl;
 #endif
       
       cudaPacket.payload = packet->data;
@@ -464,6 +481,19 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   
   // Convert the NVDEC frame to AVFrame, passing the correct PTS
   frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo, timeBase_);
+
+#if CUSTOM_NVDEC_DEBUG
+  // Print frame type information from the AVFrame
+  const char* frameTypeStr = "unknown";
+  if (frame->key_frame) {
+    frameTypeStr = "keyframe";
+  } else {
+    frameTypeStr = "non-keyframe";
+  }
+  std::cout << "[DEBUG] receiveFrame: AVFrame created - PTS=" << pts 
+            << ", picture_index=" << dispInfo.picture_index 
+            << ", key_frame=" << frameTypeStr << std::endl;
+#endif
 
   // Unmap the frame
   cuvidUnmapVideoFrame(decoder_, framePtr);

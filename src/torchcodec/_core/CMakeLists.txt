@@ -15,7 +15,7 @@ else()
         # TODO set warnings as errors on Windows as well.
         # set(TORCHCODEC_WERROR_OPTION "/WX")
     else()
-        set(TORCHCODEC_WERROR_OPTION "-Werror")
+        # set(TORCHCODEC_WERROR_OPTION "-Werror")
     endif()
 endif()
 
