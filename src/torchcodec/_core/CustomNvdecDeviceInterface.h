@@ -7,7 +7,7 @@
 #pragma once
 
 // Debug flag - set to 1 to enable debug output, 0 to disable
-#define CUSTOM_NVDEC_DEBUG 1
+#define CUSTOM_NVDEC_DEBUG 0
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/Cache.h"

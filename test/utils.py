@@ -64,6 +64,18 @@ def psnr(a, b, max_val=255) -> float:
         return float("inf")
     return 20 * torch.log10(max_val / torch.sqrt(mse)).item()
 
+def assert_psnr(a, b, threshold, max_val=255):
+    def assert_pnsr_single_frame(a, b):
+        psnr_val = psnr(a, b, max_val=max_val)
+        assert (
+            psnr_val > threshold
+        ), f"PSNR too low: {psnr_val} (threshold: {threshold})"
+    if a.dim() == 3:
+        assert_pnsr_single_frame(a, b)
+    else:
+        for a_i, b_i in zip(a, b):
+            assert_pnsr_single_frame(a_i, b_i)
+
 
 # For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
 # equality. On CUDA Linux, we expect a small tolerance.
@@ -83,6 +95,7 @@ def assert_frames_equal(*args, **kwargs):
                 assert_tensor_close_on_at_least(
                     args[0], args[1], percentage=94, atol=atol
                 )
+                assert_psnr(args[0], args[1], threshold=45)
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
     else:
