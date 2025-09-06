@@ -7,7 +7,7 @@
 #pragma once
 
 // Debug flag - set to 1 to enable debug output, 0 to disable
-#define CUSTOM_NVDEC_DEBUG 0
+#define CUSTOM_NVDEC_DEBUG 1
 
 #include "src/torchcodec/_core/DeviceInterface.h"
 #include "src/torchcodec/_core/Cache.h"
@@ -143,9 +143,10 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   struct BufferedFrame {
     CUVIDPARSERDISPINFO dispInfo;
     int64_t pts;
+    int64_t frame_offset;  // AV1 frame_offset for tie-breaking
     bool available = false;
     
-    BufferedFrame() : pts(-1), available(false) {
+    BufferedFrame() : pts(-1), frame_offset(0), available(false) {
       memset(&dispInfo, 0, sizeof(dispInfo));
     }
   };

@@ -374,9 +374,9 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   } else {
     picTypeStr = "B-frame";
   }
-  
-  std::cout << "[DEBUG] handlePictureDecode: Called for surface " << pPicParams->CurrPicIdx 
-            << ", type=" << picTypeStr << std::endl;
+
+  std::cout << "[DEBUG] handlePictureDecode: Called for surface " << pPicParams->CurrPicIdx
+            << ", type=" << picTypeStr << ", frame_offset=" << pPicParams->CodecSpecific.av1.frame_offset << std::endl;
 #endif
 
   // Like DALI: if we're flushing, don't process new decode operations
@@ -456,6 +456,14 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   BufferedFrame* slot = findEmptySlot();
   slot->dispInfo = dispInfo;
   slot->pts = framePts;  // Use the PTS we just assigned
+  
+  // Store frame_offset for AV1 tie-breaking
+  if (videoFormat_.codec == cudaVideoCodec_AV1) {
+    slot->frame_offset = pPicParams->CodecSpecific.av1.frame_offset;
+  } else {
+    slot->frame_offset = 0;  // Not applicable for non-AV1 codecs
+  }
+  
   slot->available = true;
   
 #if CUSTOM_NVDEC_DEBUG
@@ -546,7 +554,7 @@ int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
   int64_t pts = earliestFrame->pts;
   
 #if CUSTOM_NVDEC_DEBUG
-  std::cout << "[DEBUG] receiveFrame: Returning frame with PTS=" << pts << ", picture_index=" << dispInfo.picture_index << std::endl;
+  std::cout << "[DEBUG] receiveFrame: Returning frame with PTS=" << pts << ", frame_offset=" << earliestFrame->frame_offset << ", picture_index=" << dispInfo.picture_index << std::endl;
 #endif
   
   // Mark slot as used
@@ -813,6 +821,7 @@ CustomNvdecDeviceInterface::findEmptySlot() {
 }
 
 // Helper method to find frame with earliest PTS for display order
+// For AV1 codecs, uses frame_offset as tie-breaker when PTS values are equal
 CustomNvdecDeviceInterface::BufferedFrame* 
 CustomNvdecDeviceInterface::findFrameWithEarliestPts() {
   BufferedFrame* earliest = nullptr;
@@ -821,15 +830,21 @@ CustomNvdecDeviceInterface::findFrameWithEarliestPts() {
     if (frame.available) {
       if (earliest == nullptr || frame.pts < earliest->pts) {
         earliest = &frame;
+      } else if (frame.pts == earliest->pts) {
+        // Tie-breaker: for AV1 codecs, prefer smaller frame_offset
+        if (videoFormat_.codec == cudaVideoCodec_AV1) {
+          if (frame.frame_offset < earliest->frame_offset) {
+            earliest = &frame;
+          }
+        }
+        // For non-AV1 codecs, keep the first one found (existing behavior)
       }
     }
   }
   
-  if (earliest) {
-  }
-  
   return earliest;
 }
+
 
 #if CUSTOM_NVDEC_DEBUG
 // Debug helper functions
@@ -874,9 +889,9 @@ void CustomNvdecDeviceInterface::printFrameBuffer(const std::string& context) co
   for (size_t i = 0; i < frameBuffer_.size(); ++i) {
     if (!first) std::cout << ", ";
     if (frameBuffer_[i].available) {
-      std::cout << "{slot:" << i << ", pts:" << frameBuffer_[i].pts << ", avail:true}";
+      std::cout << "{slot:" << i << ", pts:" << frameBuffer_[i].pts << ", offset:" << frameBuffer_[i].frame_offset << ", avail:true}";
     } else {
-      std::cout << "{slot:" << i << ", pts:N/A, avail:false}";
+      std::cout << "{slot:" << i << ", pts:N/A, offset:N/A, avail:false}";
     }
     first = false;
   }
