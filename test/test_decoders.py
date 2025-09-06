@@ -595,6 +595,7 @@ class TestVideoDecoder:
         decoded_frame10 = decoder.get_frame_at(10)
         assert decoded_frame10.duration_seconds == ref_frame_info10.duration_seconds
         assert decoded_frame10.pts_seconds == ref_frame_info10.pts_seconds
+        device = cleanup_device_str(device)
         assert_frames_equal(decoded_frame10.data, ref_frame10.to(device=device))
 
     @pytest.mark.parametrize("device", all_supported_devices())

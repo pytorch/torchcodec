@@ -11,9 +11,6 @@
 
 #include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
 
-// Debug flag - set to 1 to enable debug output, 0 to disable
-#define CUSTOM_NVDEC_DEBUG 0
-
 #if CUSTOM_NVDEC_DEBUG
 #include <iostream>  // For debug output
 #endif
@@ -290,6 +287,10 @@ void CustomNvdecDeviceInterface::initializeContext(
 
 void CustomNvdecDeviceInterface::setTimeBase(const AVRational& timeBase) {
   timeBase_ = timeBase;
+}
+
+void CustomNvdecDeviceInterface::setFrameRate(const AVRational& frameRate) {
+  fallbackFrameRate_ = frameRate;
 }
 
 
@@ -690,15 +691,32 @@ UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
   avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
   avFrame->pts = dispInfo.timestamp; // This PTS was set correctly by handlePictureDisplay
   
-  // Calculate frame duration from NVDEC frame rate and stream timebase
-  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0 &&
+  // Calculate frame duration from NVDEC frame rate, fallback frame rate, and stream timebase
+  AVRational effectiveFrameRate = {0, 0};
+  
+  // First try NVDEC frame rate
+  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0) {
+    effectiveFrameRate.num = videoFormat_.frame_rate.numerator;
+    effectiveFrameRate.den = videoFormat_.frame_rate.denominator;
+  } 
+  // Fallback to FFmpeg frame rate if NVDEC frame rate is unavailable
+  else if (fallbackFrameRate_.num > 0 && fallbackFrameRate_.den > 0) {
+    effectiveFrameRate = fallbackFrameRate_;
+  }
+  
+  if (effectiveFrameRate.num > 0 && effectiveFrameRate.den > 0 &&
       timeBase.num > 0 && timeBase.den > 0) {
-    // Duration in seconds = frame_rate.denominator / frame_rate.numerator
+    // Duration in seconds = frame_rate.den / frame_rate.num
     // Duration in timebase units = (duration_seconds * timeBase.den) / timeBase.num
-    // = (frame_rate.denominator * timeBase.den) / (frame_rate.numerator * timeBase.num)
-    avFrame->duration = (int64_t)((videoFormat_.frame_rate.denominator * timeBase.den) / 
-                                  (videoFormat_.frame_rate.numerator * timeBase.num));
+    // = (frame_rate.den * timeBase.den) / (frame_rate.num * timeBase.num)
+    avFrame->duration = (int64_t)((effectiveFrameRate.den * timeBase.den) / 
+                                  (effectiveFrameRate.num * timeBase.num));
   } else {
+    printf("[WARN] Unable to determine frame duration from frame rate or timebase\n");
+    printf("       NVDEC frame rate: %d/%d, fallback frame rate: %d/%d, timebase: %d/%d\n", 
+           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+           fallbackFrameRate_.num, fallbackFrameRate_.den,
+           timeBase.num, timeBase.den);
     avFrame->duration = 0; // Unknown duration
   }
   

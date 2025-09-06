@@ -460,10 +460,11 @@ void SingleStreamDecoder::addStream(
       // initializing the device interface
       deviceInterface_->initializeContext(codecContext);
       
-      // For custom NVDEC, pass the timeBase for duration calculations
+      // For custom NVDEC, pass the timeBase and frameRate for duration calculations
       if (deviceVariant_ == "custom_nvdec") {
         auto customNvdecInterface = static_cast<CustomNvdecDeviceInterface*>(deviceInterface_.get());
         customNvdecInterface->setTimeBase(streamInfo.timeBase);
+        customNvdecInterface->setFrameRate(streamInfo.stream->r_frame_rate);
       }
     }
   }

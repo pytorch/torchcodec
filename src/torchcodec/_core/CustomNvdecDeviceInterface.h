@@ -95,6 +95,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   // Set the timeBase for duration calculations
   void setTimeBase(const AVRational& timeBase);
 
+  // Set the frame rate for duration calculations
+  void setFrameRate(const AVRational& frameRate);
+
   void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
       const AVRational& timeBase,
@@ -169,6 +172,9 @@ class CustomNvdecDeviceInterface : public DeviceInterface {
   
   // Store timeBase for duration calculations
   AVRational timeBase_ = {0, 0};
+  
+  // Store frame rate for duration calculations (fallback when NVDEC frame rate is unavailable)
+  AVRational fallbackFrameRate_ = {0, 0};
 
   // Helper methods for frame reordering
   BufferedFrame* findEmptySlot();

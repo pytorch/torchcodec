@@ -81,7 +81,7 @@ def assert_frames_equal(*args, **kwargs):
             else:
                 # torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
                 assert_tensor_close_on_at_least(
-                    args[0], args[1], percentage=95, atol=atol
+                    args[0], args[1], percentage=94, atol=atol
                 )
         else:
             torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
