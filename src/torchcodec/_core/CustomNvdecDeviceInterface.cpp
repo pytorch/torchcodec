@@ -200,6 +200,10 @@ CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
   // Initialize decode surface tracking (like DALI)
   surfaceInUse_.resize(MAX_DECODE_SURFACES, false);
   
+  // Initialize PTS tracking for multi-frame packets
+  basePts_ = AV_NOPTS_VALUE;
+  frameIndexInPacket_ = 0;
+  
 }
 
 CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
@@ -427,7 +431,7 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
   dispInfo.repeat_first_field = 0;
   
   
-  // Efficient PTS assignment using min-heap priority queue
+  // Efficient PTS assignment using min-heap priority queue with incremental PTS for multi-frame packets
   // Always assign the smallest (earliest) PTS from the queue
   // This handles cases where queue gets out of sync due to B-frame reordering
   if (!pipedPts_.empty()) {
@@ -436,12 +440,45 @@ int CustomNvdecDeviceInterface::handlePictureDecode(
     // Remove it from the queue - O(log n)
     pipedPts_.pop();
     
+    // This is the first frame from a new packet - reset frame index and set base PTS
+    basePts_ = currentPts_;
+    frameIndexInPacket_ = 0;
+    
   } else {
-    // Like DALI: handle case where one packet produces multiple frames
-    // Reuse the current PTS for unexpected extra frames
+    // Handle case where one packet produces multiple frames
+    // Assign incremental PTS values based on frame duration
+    frameIndexInPacket_++;
   }
   
-  int64_t framePts = currentPts_;
+  // Calculate PTS based on frame order
+  int64_t frameDuration = calculateFrameDuration();
+  int64_t framePts;
+  
+  if (videoFormat_.codec == cudaVideoCodec_AV1) {
+    // For AV1, calculate PTS index based on frame_offset to ensure proper temporal ordering
+    // Smaller frame_offset should get earlier (smaller) PTS
+    int64_t currentFrameOffset = pPicParams->CodecSpecific.av1.frame_offset;
+    
+    // Simple mapping: use frame_offset to determine PTS order
+    // Since frame_offset is typically a power of 2 sequence in reverse order,
+    // we can use a simple formula to get the PTS index
+    int ptsIndex = 0;
+    int64_t tempOffset = currentFrameOffset;
+    
+    // Count the number of times we can divide by 2 to get the reverse index
+    while (tempOffset > 1) {
+      tempOffset >>= 1;  // Divide by 2
+      ptsIndex++;
+    }
+    
+    // Map frame_offset to PTS index: smaller frame_offset gets smaller PTS
+    // For frame_offsets 16,8,4,2,1 we want PTS indices 4,3,2,1,0 
+    // so that frame_offset=1 gets PTS index=0 (earliest PTS)
+    framePts = basePts_ + (ptsIndex * frameDuration);
+  } else {
+    // For non-AV1 codecs, use simple increment
+    framePts = basePts_ + (frameIndexInPacket_ * frameDuration);
+  }
   
 #if CUSTOM_NVDEC_DEBUG
   std::cout << "[DEBUG]   Assigned PTS=" << framePts << " to picture_index " << dispInfo.picture_index << std::endl;
@@ -665,6 +702,10 @@ void CustomNvdecDeviceInterface::flush() {
   
   // Reset current PTS like DALI does
   currentPts_ = AV_NOPTS_VALUE;
+  
+  // Reset PTS tracking for multi-frame packets
+  basePts_ = AV_NOPTS_VALUE;
+  frameIndexInPacket_ = 0;
 
   // Reset EOF flag so we can decode more (like DALI does)
   eofSent_ = false;
@@ -845,6 +886,33 @@ CustomNvdecDeviceInterface::findFrameWithEarliestPts() {
   return earliest;
 }
 
+// Helper method to calculate frame duration in timebase units
+int64_t CustomNvdecDeviceInterface::calculateFrameDuration() const {
+  // Calculate frame duration from NVDEC frame rate, fallback frame rate, and stream timebase
+  AVRational effectiveFrameRate = {0, 0};
+  
+  // First try NVDEC frame rate
+  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0) {
+    effectiveFrameRate.num = videoFormat_.frame_rate.numerator;
+    effectiveFrameRate.den = videoFormat_.frame_rate.denominator;
+  } 
+  // Fallback to FFmpeg frame rate if NVDEC frame rate is unavailable
+  else if (fallbackFrameRate_.num > 0 && fallbackFrameRate_.den > 0) {
+    effectiveFrameRate = fallbackFrameRate_;
+  }
+  
+  if (effectiveFrameRate.num > 0 && effectiveFrameRate.den > 0 &&
+      timeBase_.num > 0 && timeBase_.den > 0) {
+    // Duration in seconds = frame_rate.den / frame_rate.num
+    // Duration in timebase units = (duration_seconds * timeBase.den) / timeBase.num
+    // = (frame_rate.den * timeBase.den) / (frame_rate.num * timeBase.num)
+    return (int64_t)((effectiveFrameRate.den * timeBase_.den) / 
+                     (effectiveFrameRate.num * timeBase_.num));
+  }
+  
+  // If we can't calculate duration, return 0
+  return 0;
+}
 
 #if CUSTOM_NVDEC_DEBUG
 // Debug helper functions
