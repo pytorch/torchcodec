@@ -243,13 +243,6 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
     return;
   }
 
-  for (unsigned int i = 0; i < formatContext_->nb_streams; ++i) {
-    // We want to scan and update the metadata of all streams.
-    TORCH_CHECK(
-        formatContext_->streams[i]->discard != AVDISCARD_ALL,
-        "Did you add a stream before you called for a scan?");
-  }
-
   AutoAVPacket autoAVPacket;
   while (true) {
     ReferenceAVPacket packet(autoAVPacket);
@@ -1253,7 +1246,11 @@ FrameOutput SingleStreamDecoder::convertAVFrameToFrameOutput(
       formatContext_->streams[activeStreamIndex_]->time_base);
   if (streamInfo.avMediaType == AVMEDIA_TYPE_AUDIO) {
     convertAudioAVFrameToFrameOutputOnCPU(avFrame, frameOutput);
-  } else if (deviceInterface_) {
+  } else {
+    TORCH_CHECK(
+        deviceInterface_ != nullptr,
+        "No device interface available for video decoding. This ",
+        "shouldn't happen, please report.");
     deviceInterface_->convertAVFrameToFrameOutput(
         streamInfo.videoStreamOptions,
         streamInfo.timeBase,

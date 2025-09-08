@@ -13,6 +13,26 @@ extern "C" {
 
 namespace facebook::torchcodec {
 
+FiltersContext::FiltersContext(
+    int inputWidth,
+    int inputHeight,
+    AVPixelFormat inputFormat,
+    AVRational inputAspectRatio,
+    int outputWidth,
+    int outputHeight,
+    AVPixelFormat outputFormat,
+    const std::string& filtergraphStr,
+    AVRational timeBase)
+    : inputWidth(inputWidth),
+      inputHeight(inputHeight),
+      inputFormat(inputFormat),
+      inputAspectRatio(inputAspectRatio),
+      outputWidth(outputWidth),
+      outputHeight(outputHeight),
+      outputFormat(outputFormat),
+      filtergraphStr(filtergraphStr),
+      timeBase(timeBase) {}
+
 bool operator==(const AVRational& lhs, const AVRational& rhs) {
   return lhs.num == rhs.num && lhs.den == rhs.den;
 }
