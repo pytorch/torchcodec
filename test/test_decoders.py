@@ -1389,6 +1389,17 @@ class TestVideoDecoder:
     #                     custom_frame_mappings=custom_frame_mappings,
     #                 )
 
+    def test_get_frames_at_tensor_indices(self):
+        # Non-regression test for tensor support in get_frames_at() and
+        # get_frames_played_at()
+        decoder = VideoDecoder(NASA_VIDEO.path)
+
+        decoder.get_frames_at(torch.tensor([0, 10], dtype=torch.int))
+        decoder.get_frames_at(torch.tensor([0, 10], dtype=torch.float))
+
+        decoder.get_frames_played_at(torch.tensor([0, 1], dtype=torch.int))
+        decoder.get_frames_played_at(torch.tensor([0, 1], dtype=torch.float))
+
 
 class TestAudioDecoder:
     @pytest.mark.parametrize("asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32))
