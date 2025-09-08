@@ -47,12 +47,12 @@ First let's consider implementing the "easy" case of Resize.
    `VideoDecoder`. It is a sequence of TorchVision Transforms.
 2. During VideoDecoder object creation, we walk the list, capturing two
    pieces of information:
-       a. The transform name that the C++ layer will understand. (We will
-          have to decide if we want to just use the FFmpeg filter name
-          here, the fully resolved Transform name, or introduce a new
-          naming layer.)
-       b. The parameters in a format that the C++ layer will understand. We
-          obtain them by calling `make_params()` on the Transform object.
+   1. The transform name that the C++ layer will understand. (We will
+      have to decide if we want to just use the FFmpeg filter name
+      here, the fully resolved Transform name, or introduce a new
+      naming layer.)
+   2. The parameters in a format that the C++ layer will understand. We
+      obtain them by calling `make_params()` on the Transform object.
 3. We add an optional transforms parameter to `core.add_video_stream()`. This
    parameter will be a vector, but whether the vector contains strings,
    tensors, or some combination of them is TBD.
@@ -60,10 +60,10 @@ First let's consider implementing the "easy" case of Resize.
    the values passed from the Python layer into transform objects that the
    C++ layer knows about. We will have one class per transform we support.
    Each class will have:
-       a. A name which matches the FFmpeg filter name.
-       b. One member for each supported parameter.
-       c. A virtual member function that knows how to produce a string that
-          can be passed to FFmpeg's filtergraph.
+   1. A name which matches the FFmpeg filter name.
+   2. One member for each supported parameter.
+   3. A virtual member function that knows how to produce a string that
+      can be passed to FFmpeg's filtergraph.
 5. We add a vector of such transforms to
    `SingleStreamDecoder::addVideoStream`. We store the vector as a field in
    `SingleStreamDecoder`.
