@@ -33,7 +33,7 @@ These three transforms are instructive, as they force us to consider:
    static. Resize is such an example.
 2. Transforms that involve randomness. The main question we need to resolve
    is when the random value is resolved. I think this comes down to: once
-   upon Python VideoDecoder creation, or different for each frame decoded?
+   upon Python `VideoDecoder` creation, or different for each frame decoded?
    I made the call above that it should be once upon Python `VideoDecoder`
    creation, but we need to make sure that lines up with what we think
    users will want.
