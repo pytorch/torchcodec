@@ -247,6 +247,12 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames at the given indices.
         """
+        if isinstance(indices, torch.Tensor):
+            # TODO we should avoid converting tensors to lists and just let the
+            # core ops and C++ code natively accept tensors.  See
+            # https://github.com/pytorch/torchcodec/issues/879
+            indices = indices.to(torch.int).tolist()
+
         data, pts_seconds, duration_seconds = core.get_frames_at_indices(
             self._decoder, frame_indices=indices
         )
@@ -322,6 +328,12 @@ class VideoDecoder:
         Returns:
             FrameBatch: The frames that are played at ``seconds``.
         """
+        if isinstance(seconds, torch.Tensor):
+            # TODO we should avoid converting tensors to lists and just let the
+            # core ops and C++ code natively accept tensors.  See
+            # https://github.com/pytorch/torchcodec/issues/879
+            seconds = seconds.to(torch.float).tolist()
+
         data, pts_seconds, duration_seconds = core.get_frames_by_pts(
             self._decoder, timestamps=seconds
         )
