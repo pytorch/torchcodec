@@ -577,11 +577,8 @@ VideoEncoder::VideoEncoder(
 
 void VideoEncoder::initializeEncoder(
     const VideoStreamOptions& videoStreamOptions) {
-  // TODO-VideoEncoder: Allow FFmpeg to pick codec based on container format?
-  // Currently, this causes errors for some containers (avi)
-  // const AVCodec* avCodec =
-  // avcodec_find_encoder(avFormatContext_->oformat->video_codec);
-  const AVCodec* avCodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+  const AVCodec* avCodec =
+      avcodec_find_encoder(avFormatContext_->oformat->video_codec);
   TORCH_CHECK(avCodec != nullptr, "Video codec not found");
 
   AVCodecContext* avCodecContext = avcodec_alloc_context3(avCodec);
@@ -633,7 +630,7 @@ void VideoEncoder::initializeEncoder(
   if (videoStreamOptions.maxBFrames.has_value()) {
     avCodecContext_->max_b_frames = *videoStreamOptions.maxBFrames;
   } else {
-    avCodecContext_->max_b_frames = 2; // Default max B-frames
+    avCodecContext_->max_b_frames = 0; // No max B-frames to reduce compression
   }
 
   int status = avcodec_open2(avCodecContext_.get(), avCodec, nullptr);
@@ -644,6 +641,9 @@ void VideoEncoder::initializeEncoder(
 
   AVStream* avStream = avformat_new_stream(avFormatContext_.get(), nullptr);
   TORCH_CHECK(avStream != nullptr, "Couldn't create new stream.");
+
+  // Set the stream time base to encode correct frame timestamps
+  avStream->time_base = avCodecContext_->time_base;
   status = avcodec_parameters_from_context(
       avStream->codecpar, avCodecContext_.get());
   TORCH_CHECK(
@@ -773,6 +773,8 @@ void VideoEncoder::encodeFrame(
         status >= 0,
         "Error receiving packet: ",
         getFFMPEGErrorStringFromErrorCode(status));
+
+    packet->stream_index = streamIndex_;
 
     status = av_interleaved_write_frame(avFormatContext_.get(), packet.get());
     TORCH_CHECK(
