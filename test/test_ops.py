@@ -1238,16 +1238,18 @@ class TestVideoEncoderOps:
     # TODO-VideoEncoder: enable additional formats (mkv, webm)
     def test_video_encoder_test_round_trip(self, tmp_path, format):
         asset = NASA_VIDEO
-        encoded_path = str(tmp_path / f"encoder_output.{format}")
 
+        # Test that decode(encode(decode(asset))) == decode(asset)
         source_frames = self.decode(str(asset.path)).data
-        frame_rate = 30  # Frame rate is fixed with num frames decoded
 
+        encoded_path = str(tmp_path / f"encoder_output.{format}")
+        frame_rate = 30  # Frame rate is fixed with num frames decoded
         encode_video_to_file(source_frames, frame_rate, encoded_path)
+        round_trip_frames = self.decode(encoded_path).data
 
         # Check that PSNR for decode(encode(samples)) is above 30
-        for s_frame, d_frame in zip(source_frames, self.decode(encoded_path).data):
-            res = psnr(s_frame, d_frame)
+        for s_frame, rt_frame in zip(source_frames, round_trip_frames):
+            res = psnr(s_frame, rt_frame)
             assert res > 30
 
 
