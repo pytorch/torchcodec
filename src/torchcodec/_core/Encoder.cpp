@@ -516,14 +516,19 @@ namespace {
 
 torch::Tensor validateFrames(const torch::Tensor& frames) {
   TORCH_CHECK(
-      frames.dtype() == torch::kFloat32 || frames.dtype() == torch::kUInt8,
-      "frames must have float32 or kUInt8 dtype, got ",
+      frames.dtype() == torch::kUInt8,
+      "frames must have kUInt8 dtype, got ",
       frames.dtype());
   TORCH_CHECK(
       frames.dim() == 4,
-      "frames must have 4 dimensions (N, H, W, C) or (N, C, H, W), got ",
+      "frames must have 4 dimensions (N, C, H, W), got ",
       frames.dim());
-
+  TORCH_CHECK(
+      frames.sizes()[1] == 3,
+      "frame must have 3 channels (R, G, B), got ",
+      frames.sizes()[1]);
+  // TODO-VideoEncoder: Add tests for above validations
+  // TODO-VideoEncoder: Investigate if non-contiguous frames can be returned
   return frames.contiguous();
 }
 
@@ -542,7 +547,7 @@ VideoEncoder::VideoEncoder(
     int frameRate,
     std::string_view fileName,
     const VideoStreamOptions& videoStreamOptions)
-    : frames_(validateFrames(frames)), frameRate_(frameRate) {
+    : frames_(validateFrames(frames)), inFrameRate_(frameRate) {
   setFFmpegLogLevel();
 
   // Allocate output format context
@@ -566,6 +571,7 @@ VideoEncoder::VideoEncoder(
       fileName,
       ", make sure it's a valid path? ",
       getFFMPEGErrorStringFromErrorCode(status));
+  // TODO-VideoEncoder: Add tests for above fileName related checks
 
   initializeEncoder(videoStreamOptions);
 }
@@ -592,14 +598,13 @@ void VideoEncoder::initializeEncoder(
   }
   avCodecContext_->bit_rate = desiredBitRate.value_or(0);
   // TODO-VideoEncoder: Verify that frame_rate and time_base are correct
-  avCodecContext_->time_base = {1, frameRate_};
-  avCodecContext_->framerate = {frameRate_, 1};
+  avCodecContext_->time_base = {1, inFrameRate_};
+  avCodecContext_->framerate = {inFrameRate_, 1};
 
   // Store dimension order and input pixel format
   // TODO-VideoEncoder: Remove assumption that tensor in NCHW format
   auto sizes = frames_.sizes();
-  inPixelFormat_ =
-      (sizes[1] == 3) ? AV_PIX_FMT_GBRP : AV_PIX_FMT_GBRAP; // Planar
+  inPixelFormat_ = AV_PIX_FMT_GBRP;
   inHeight_ = sizes[2];
   inWidth_ = sizes[3];
 
@@ -609,6 +614,7 @@ void VideoEncoder::initializeEncoder(
   outHeight_ = videoStreamOptions.height.value_or(inHeight_);
 
   // Use YUV420P as default output format
+  // TODO-VideoEncoder: Enable other pixel formats
   outPixelFormat_ = AV_PIX_FMT_YUV420P;
 
   // Configure codec parameters
@@ -616,7 +622,7 @@ void VideoEncoder::initializeEncoder(
   avCodecContext_->width = outWidth_;
   avCodecContext_->height = outHeight_;
   avCodecContext_->pix_fmt = outPixelFormat_;
-  avCodecContext_->time_base = {1, frameRate_};
+  avCodecContext_->time_base = {1, inFrameRate_};
 
   // TODO-VideoEncoder: Allow GOP size and max B-frames to be set
   if (videoStreamOptions.gopSize.has_value()) {
@@ -648,71 +654,6 @@ void VideoEncoder::initializeEncoder(
   streamIndex_ = avStream->index;
 }
 
-UniqueAVFrame VideoEncoder::convertTensorToAVFrame(
-    const torch::Tensor& frameTensor,
-    int frameIndex) {
-  // Initialize and cache scaling context if it does not exist
-  if (!swsContext_) {
-    swsContext_.reset(sws_getContext(
-        inWidth_,
-        inHeight_,
-        inPixelFormat_,
-        outWidth_,
-        outHeight_,
-        outPixelFormat_,
-        SWS_BILINEAR,
-        nullptr,
-        nullptr,
-        nullptr));
-    TORCH_CHECK(swsContext_ != nullptr, "Failed to create scaling context");
-  }
-
-  UniqueAVFrame avFrame(av_frame_alloc());
-  TORCH_CHECK(avFrame != nullptr, "Failed to allocate AVFrame");
-
-  // Set output frame properties
-  avFrame->format = outPixelFormat_;
-  avFrame->width = outWidth_;
-  avFrame->height = outHeight_;
-  avFrame->pts = frameIndex;
-
-  int status = av_frame_get_buffer(avFrame.get(), 32);
-  TORCH_CHECK(status >= 0, "Failed to allocate frame buffer");
-
-  // Need to convert/scale the frame
-  // Create temporary frame with input format
-  UniqueAVFrame inputFrame(av_frame_alloc());
-  TORCH_CHECK(inputFrame != nullptr, "Failed to allocate input AVFrame");
-
-  inputFrame->format = inPixelFormat_;
-  inputFrame->width = inWidth_;
-  inputFrame->height = inHeight_;
-
-  uint8_t* tensorData = static_cast<uint8_t*>(frameTensor.data_ptr());
-
-  // TODO-VideoEncoder: Reorder tensor if in NHWC format
-  int channelSize = inHeight_ * inWidth_;
-  // Reorder RGB -> GBR for AV_PIX_FMT_GBRP or AV_PIX_FMT_GBRAP formats
-  inputFrame->data[0] = tensorData + channelSize;
-  inputFrame->data[1] = tensorData + (2 * channelSize);
-  inputFrame->data[2] = tensorData;
-
-  inputFrame->linesize[0] = inWidth_; // width of B channel
-  inputFrame->linesize[1] = inWidth_; // width of G channel
-  inputFrame->linesize[2] = inWidth_; // width of R channel
-  // Perform scaling/conversion
-  status = sws_scale(
-      swsContext_.get(),
-      inputFrame->data,
-      inputFrame->linesize,
-      0,
-      inputFrame->height,
-      avFrame->data,
-      avFrame->linesize);
-  TORCH_CHECK(status == outHeight_, "sws_scale failed");
-  return avFrame;
-}
-
 void VideoEncoder::encode() {
   // To be on the safe side we enforce that encode() can only be called once
   TORCH_CHECK(!encodeWasCalled_, "Cannot call encode() twice.");
@@ -739,8 +680,71 @@ void VideoEncoder::encode() {
       status == AVSUCCESS,
       "Error in av_write_trailer: ",
       getFFMPEGErrorStringFromErrorCode(status));
+}
 
-  // close_avio();
+UniqueAVFrame VideoEncoder::convertTensorToAVFrame(
+    const torch::Tensor& frame,
+    int frameIndex) {
+  // Initialize and cache scaling context if it does not exist
+  if (!swsContext_) {
+    swsContext_.reset(sws_getContext(
+        inWidth_,
+        inHeight_,
+        inPixelFormat_,
+        outWidth_,
+        outHeight_,
+        outPixelFormat_,
+        SWS_BILINEAR,
+        nullptr,
+        nullptr,
+        nullptr));
+    TORCH_CHECK(swsContext_ != nullptr, "Failed to create scaling context");
+  }
+
+  UniqueAVFrame avFrame(av_frame_alloc());
+  TORCH_CHECK(avFrame != nullptr, "Failed to allocate AVFrame");
+
+  // Set output frame properties
+  avFrame->format = outPixelFormat_;
+  avFrame->width = outWidth_;
+  avFrame->height = outHeight_;
+  avFrame->pts = frameIndex;
+
+  int status = av_frame_get_buffer(avFrame.get(), 0);
+  TORCH_CHECK(status >= 0, "Failed to allocate frame buffer");
+
+  // Need to convert/scale the frame
+  // Create temporary frame with input format
+  UniqueAVFrame inputFrame(av_frame_alloc());
+  TORCH_CHECK(inputFrame != nullptr, "Failed to allocate input AVFrame");
+
+  inputFrame->format = inPixelFormat_;
+  inputFrame->width = inWidth_;
+  inputFrame->height = inHeight_;
+
+  uint8_t* tensorData = static_cast<uint8_t*>(frame.data_ptr());
+
+  // TODO-VideoEncoder: Reorder tensor if in NHWC format
+  int channelSize = inHeight_ * inWidth_;
+  // Reorder RGB -> GBR for AV_PIX_FMT_GBRP format
+  inputFrame->data[0] = tensorData + channelSize;
+  inputFrame->data[1] = tensorData + (2 * channelSize);
+  inputFrame->data[2] = tensorData;
+
+  inputFrame->linesize[0] = inWidth_;
+  inputFrame->linesize[1] = inWidth_;
+  inputFrame->linesize[2] = inWidth_;
+
+  status = sws_scale(
+      swsContext_.get(),
+      inputFrame->data,
+      inputFrame->linesize,
+      0,
+      inputFrame->height,
+      avFrame->data,
+      avFrame->linesize);
+  TORCH_CHECK(status == outHeight_, "sws_scale failed");
+  return avFrame;
 }
 
 void VideoEncoder::encodeFrame(
@@ -770,12 +774,6 @@ void VideoEncoder::encodeFrame(
         status >= 0,
         "Error receiving packet: ",
         getFFMPEGErrorStringFromErrorCode(status));
-
-    av_packet_rescale_ts(
-        packet.get(),
-        avCodecContext_->time_base,
-        avFormatContext_->streams[streamIndex_]->time_base);
-    packet->stream_index = streamIndex_;
 
     status = av_interleaved_write_frame(avFormatContext_.get(), packet.get());
     TORCH_CHECK(
