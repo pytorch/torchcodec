@@ -88,7 +88,7 @@ For the transforms that do not exist in TorchVision, we can build on the above:
 3. We implement the mimimum needed to hook the new transforms into the
    machinery defined above.
 
-## Open questions:
+## Open Questions:
 
 1. Is `torchcodec.transforms` the right namespace?
 2. For random transforms, when should the value be fixed?
