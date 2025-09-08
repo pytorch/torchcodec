@@ -8,11 +8,6 @@ set -ex
 # CMake helpers.
 conda install -y pybind11 -c conda-forge
 
-# Need to create a symlink for libnvcuvid.so.1 to libnvcuvid.so becuase that's
-# what Cmake is looking for and it doesn't exist by default. This is pretty
-# brittle.
-sudo ln -s /usr/lib64/libnvcuvid.so.1 /usr/lib64/libnvcuvid.so
-
 
 # Search for nvcuvid library in various locations for debugging CI build issues
 echo "[NVCUVID-SEARCH] === Searching for nvcuvid library ==="
