@@ -1228,6 +1228,36 @@ class TestAudioEncoderOps:
 
 class TestVideoEncoderOps:
 
+    def test_bad_input(self, tmp_path):
+        output_file = str(tmp_path / ".mp3")
+
+        with pytest.raises(
+            RuntimeError, match="frames must have uint8 dtype, got float"
+        ):
+            encode_video_to_file(
+                frames=torch.rand((10, 3, 60, 60), dtype=torch.float),
+                frame_rate=10,
+                filename=output_file,
+            )
+
+        with pytest.raises(
+            RuntimeError, match=r"frames must have 4 dimensions \(N, C, H, W\), got 3"
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=1, size=(3, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename=output_file,
+            )
+
+        with pytest.raises(
+            RuntimeError, match=r"frame must have 3 channels \(R, G, B\), got 2"
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=1, size=(10, 2, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename=output_file,
+            )
+
     def decode(self, file_path) -> torch.Tensor:
         decoder = create_from_file(str(file_path), seek_mode="approximate")
         add_video_stream(decoder)

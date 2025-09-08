@@ -517,7 +517,7 @@ namespace {
 torch::Tensor validateFrames(const torch::Tensor& frames) {
   TORCH_CHECK(
       frames.dtype() == torch::kUInt8,
-      "frames must have kUInt8 dtype, got ",
+      "frames must have uint8 dtype, got ",
       frames.dtype());
   TORCH_CHECK(
       frames.dim() == 4,
@@ -527,7 +527,6 @@ torch::Tensor validateFrames(const torch::Tensor& frames) {
       frames.sizes()[1] == 3,
       "frame must have 3 channels (R, G, B), got ",
       frames.sizes()[1]);
-  // TODO-VideoEncoder: Add tests for above validations
   // TODO-VideoEncoder: Investigate if non-contiguous frames can be returned
   return frames.contiguous();
 }
