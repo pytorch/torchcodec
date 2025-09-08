@@ -43,14 +43,8 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    cleanup_device_str,
 )
-
-
-def cleanup_device_str(device: str) -> str:
-    # Remove any custom cuda device suffixes like ":custom_nvdec"
-    if device.startswith("cuda:"):
-        return device.split(":")[0] + ":" + device.split(":")[1]
-    return device
 
 
 class TestDecoder:

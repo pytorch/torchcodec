@@ -51,6 +51,7 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    cleanup_device_str,
 )
 
 torch._dynamo.config.capture_dynamic_output_shape_ops = True
@@ -63,6 +64,7 @@ class TestVideoDecoderOps:
     def test_seek_and_next(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
@@ -80,6 +82,7 @@ class TestVideoDecoderOps:
     def test_seek_to_negative_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
@@ -92,6 +95,7 @@ class TestVideoDecoderOps:
     def test_get_frame_at_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         # This frame has pts=6.006 and duration=0.033367, so it should be visible
         # at timestamps in the range [6.006, 6.039367) (not including the last timestamp).
         frame6, _, _ = get_frame_at_pts(decoder, 6.006)
@@ -116,6 +120,7 @@ class TestVideoDecoderOps:
     def test_get_frame_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frame0, _, _ = get_frame_at_index(decoder, frame_index=0)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
@@ -134,6 +139,7 @@ class TestVideoDecoderOps:
     def test_get_frame_with_info_at_index(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frame6, pts, duration = get_frame_at_index(decoder, frame_index=180)
         reference_frame6 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
@@ -146,6 +152,7 @@ class TestVideoDecoderOps:
     def test_get_frames_at_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
@@ -158,6 +165,7 @@ class TestVideoDecoderOps:
     def test_get_frames_at_indices_unsorted_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         frame_indices = [2, 0, 1, 0, 2]
 
@@ -185,6 +193,7 @@ class TestVideoDecoderOps:
     def test_get_frames_at_indices_negative_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frames389and387and1, *_ = get_frames_at_indices(
             decoder, frame_indices=[-1, -3, -389]
         )
@@ -199,6 +208,7 @@ class TestVideoDecoderOps:
     def test_get_frames_at_indices_fail_on_invalid_negative_indices(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         with pytest.raises(
             IndexError,
             match="negative indices must have an absolute value less than the number of frames",
@@ -211,6 +221,7 @@ class TestVideoDecoderOps:
     def test_get_frames_by_pts(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         _add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         # Note: 13.01 should give the last video frame for the NASA video
         timestamps = [2, 0, 1, 0 + 1e-3, 13.01, 2 + 1e-3]
@@ -243,6 +254,7 @@ class TestVideoDecoderOps:
         # we get the expected frame.
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         metadata = get_json_metadata(decoder)
         metadata_dict = json.loads(metadata)
@@ -294,6 +306,7 @@ class TestVideoDecoderOps:
     def test_get_frames_in_range(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         # ensure that the degenerate case of a range of size 1 works
         ref_frame0 = NASA_VIDEO.get_frame_data_by_range(0, 1)
@@ -334,6 +347,7 @@ class TestVideoDecoderOps:
     def test_throws_exception_at_eof(self, device):
         decoder = create_from_file(str(NASA_VIDEO.path))
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         seek_to_pts(decoder, 12.979633)
         last_frame, _, _ = get_next_frame(decoder)
@@ -362,6 +376,7 @@ class TestVideoDecoderOps:
         @torch.compile(fullgraph=True, backend="eager")
         def get_frame1_and_frame_time6(decoder):
             add_video_stream(decoder, device=device)
+            device = cleanup_device_str(device)
             frame0, _, _ = get_next_frame(decoder)
             seek_to_pts(decoder, 6.0)
             frame_time6, _, _ = get_next_frame(decoder)
@@ -405,6 +420,7 @@ class TestVideoDecoderOps:
             raise ValueError("Oops, double check the parametrization of this test!")
 
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
         frame0, _, _ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         assert_frames_equal(frame0, reference_frame0.to(device))
@@ -510,6 +526,7 @@ class TestVideoDecoderOps:
         decoder = create_from_file(
             str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
         )
+        device = cleanup_device_str(device)
         add_video_stream(
             decoder,
             device=device,
@@ -1042,6 +1059,7 @@ class TestAudioDecoderOps:
         )
         decoder = create_from_file_like(file_counter, "approximate")
         add_video_stream(decoder, device=device)
+        device = cleanup_device_str(device)
 
         frame0, *_ = get_next_frame(decoder)
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)

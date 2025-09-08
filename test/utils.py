@@ -30,6 +30,15 @@ def all_supported_devices():
     return ("cpu", pytest.param("cuda", marks=pytest.mark.needs_cuda), pytest.param("cuda:0:custom_nvdec", marks=pytest.mark.needs_cuda))
 
 
+def cleanup_device_str(device: str) -> str:
+    # Remove any custom cuda device suffixes like ":custom_nvdec"
+    # To be called before calling `.to(device)` on a tensor.
+    # TODO THIS IS AWFUL.
+    if device.startswith("cuda:"):
+        return device.split(":")[0] + ":" + device.split(":")[1]
+    return device
+
+
 def get_ffmpeg_major_version():
     ffmpeg_version = get_ffmpeg_library_versions()["ffmpeg_version"]
     # When building FFmpeg from source there can be a `n` prefix in the version
