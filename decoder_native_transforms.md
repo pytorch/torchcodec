@@ -1,3 +1,6 @@
+# Decoder Native Transforms
+
+## API
 We want to support this user-facing API:
 
  ```python
@@ -29,6 +32,7 @@ What the user is asking for, in English:
       chosen randomly upon the creation of the Python `VideoDecoder` object. All decoded
       frames use the same values for x and y.
 
+## Design Considerations
 These three transforms are instructive, as they force us to consider:
 
 1. How "easy" TorchVision transforms will be handled, where all values are
@@ -43,6 +47,7 @@ These three transforms are instructive, as they force us to consider:
    TorchVision. In particular, FPS is something that multiple users have
    asked for.
 
+## Implementation Sketch
 First let's consider implementing the "easy" case of `Resize`.
 
 1. We add an optional `transforms` parameter to the initialization of
@@ -83,7 +88,7 @@ For the transforms that do not exist in TorchVision, we can build on the above:
 3. We implement the mimimum needed to hook the new transforms into the
    machinery defined above.
 
-Open questions:
+## Open questions:
 
 1. Is `torchcodec.transforms` the right namespace?
 2. For random transforms, when should the value be fixed?
