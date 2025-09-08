@@ -23,9 +23,9 @@ What the user is asking for, in English:
 
 1. I want to decode frames from the file `"vid.mp4".`
 2. For each decoded frame, I want each frame to pass through the following transforms:
-   a. Add or remove frames as necessary to ensure a constant 30 frames per second.
-   b. Resize the frame to 640x480. Use the algorithm that is TorchVision's default.
-   c. Inside the resized frame, crop the image to 32x32. The x and y coordinates are chosen randomly upon the creation of the Python VideoDecoder object. All decoded frames use the same values for x and y.
+   1. Add or remove frames as necessary to ensure a constant 30 frames per second.
+   2. Resize the frame to 640x480. Use the algorithm that is TorchVision's default.
+   3. Inside the resized frame, crop the image to 32x32. The x and y coordinates are chosen randomly upon the creation of the Python VideoDecoder object. All decoded frames use the same values for x and y.
 
 These three transforms are instructive, as they force us to consider:
 
