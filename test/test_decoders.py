@@ -180,7 +180,7 @@ class TestVideoDecoder:
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0).to(device)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1).to(device)
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
-        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289).to(device)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389).to(device)
 
         assert_frames_equal(ref_frame0, decoder[0])
         assert_frames_equal(ref_frame1, decoder[1])
@@ -193,7 +193,7 @@ class TestVideoDecoder:
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1)
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180)
-        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389)
 
         # test against numpy.int64
         assert_frames_equal(ref_frame0, decoder[numpy.int64(0)])
@@ -404,7 +404,7 @@ class TestVideoDecoder:
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9).to(device)
         ref_frame35 = NASA_VIDEO.get_frame_data_by_index(35).to(device)
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
-        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(289).to(device)
+        ref_frame_last = NASA_VIDEO.get_frame_data_by_index(389).to(device)
 
         # Access an arbitrary frame to make sure that the later iteration
         # still works as expected. The underlying C++ decoder object is
