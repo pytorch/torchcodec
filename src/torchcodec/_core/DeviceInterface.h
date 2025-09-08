@@ -36,14 +36,6 @@ struct DeviceInterfaceKey {
       : deviceType(type), variant(var) {}
 };
 
-// Note that all these device functions should only be called if the device is
-// not a CPU device. CPU device functions are already implemented in the
-// SingleStreamDecoder implementation.
-// These functions should only be called from within an if block like this:
-// if (device.type() != torch::kCPU) {
-//   deviceFunction(device, ...);
-// }
-
 class DeviceInterface {
  public:
   DeviceInterface(const torch::Device& device) : device_(device) {}
