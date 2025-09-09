@@ -404,7 +404,12 @@ void encode_video_to_file(
     int64_t frame_rate,
     std::string_view file_name) {
   VideoStreamOptions videoStreamOptions;
-  VideoEncoder(frames, frame_rate, file_name, videoStreamOptions).encode();
+  VideoEncoder(
+      frames,
+      validateInt64ToInt(frame_rate, "frame_rate"),
+      file_name,
+      videoStreamOptions)
+      .encode();
 }
 
 void encode_audio_to_file(
