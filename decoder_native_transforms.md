@@ -22,7 +22,7 @@ We want to support this user-facing API:
 
 What the user is asking for, in English:
 
-1. I want to decode frames from the file `"vid.mp4".`
+1. I want to decode frames from the file `"vid.mp4"`.
 2. For each decoded frame, I want each frame to pass through the following transforms:
    1. Add or remove frames as necessary to ensure a constant 30 frames per second.
    2. Resize the frame to 640x480. Use the algorithm that is TorchVision's default.
