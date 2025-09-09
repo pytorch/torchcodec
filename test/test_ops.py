@@ -1229,7 +1229,7 @@ class TestAudioEncoderOps:
 class TestVideoEncoderOps:
 
     def test_bad_input(self, tmp_path):
-        output_file = str(tmp_path / ".mp3")
+        output_file = str(tmp_path / ".mp4")
 
         with pytest.raises(
             RuntimeError, match="frames must have uint8 dtype, got float"

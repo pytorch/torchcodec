@@ -527,7 +527,7 @@ torch::Tensor validateFrames(const torch::Tensor& frames) {
       frames.sizes()[1] == 3,
       "frame must have 3 channels (R, G, B), got ",
       frames.sizes()[1]);
-  // TODO-VideoEncoder: Investigate if non-contiguous frames can be returned
+  // TODO-VideoEncoder: Investigate if non-contiguous frames can be accepted
   return frames.contiguous();
 }
 
@@ -593,9 +593,6 @@ void VideoEncoder::initializeEncoder(
         *desiredBitRate >= 0, "bit_rate=", *desiredBitRate, " must be >= 0.");
   }
   avCodecContext_->bit_rate = desiredBitRate.value_or(0);
-  // TODO-VideoEncoder: Verify that frame_rate and time_base are correct
-  avCodecContext_->time_base = {1, inFrameRate_};
-  avCodecContext_->framerate = {inFrameRate_, 1};
 
   // Store dimension order and input pixel format
   // TODO-VideoEncoder: Remove assumption that tensor in NCHW format
@@ -618,7 +615,9 @@ void VideoEncoder::initializeEncoder(
   avCodecContext_->width = outWidth_;
   avCodecContext_->height = outHeight_;
   avCodecContext_->pix_fmt = outPixelFormat_;
+  // TODO-VideoEncoder: Verify that frame_rate and time_base are correct
   avCodecContext_->time_base = {1, inFrameRate_};
+  avCodecContext_->framerate = {inFrameRate_, 1};
 
   // TODO-VideoEncoder: Allow GOP size and max B-frames to be set
   if (videoStreamOptions.gopSize.has_value()) {
@@ -726,6 +725,7 @@ UniqueAVFrame VideoEncoder::convertTensorToAVFrame(
   // TODO-VideoEncoder: Reorder tensor if in NHWC format
   int channelSize = inHeight_ * inWidth_;
   // Reorder RGB -> GBR for AV_PIX_FMT_GBRP format
+  // TODO-VideoEncoder: Determine if FFmpeg supports RGB input format directly
   inputFrame->data[0] = tensorData + channelSize;
   inputFrame->data[1] = tensorData + (2 * channelSize);
   inputFrame->data[2] = tensorData;
