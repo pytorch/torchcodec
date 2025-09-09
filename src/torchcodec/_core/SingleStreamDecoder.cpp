@@ -490,6 +490,7 @@ void SingleStreamDecoder::addVideoStream(
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.videoStreamOptions = videoStreamOptions;
+  streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
 
   streamMetadata.width = streamInfo.codecContext->width;
   streamMetadata.height = streamInfo.codecContext->height;
@@ -501,7 +502,7 @@ void SingleStreamDecoder::addVideoStream(
         customFrameMappings.has_value(),
         "Missing frame mappings when custom_frame_mappings seek mode is set.");
     readCustomFrameMappingsUpdateMetadataAndIndex(
-        streamIndex, customFrameMappings.value());
+        activeStreamIndex_, customFrameMappings.value());
   }
 }
 
