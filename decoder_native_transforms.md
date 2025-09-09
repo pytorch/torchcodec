@@ -11,12 +11,10 @@ We want to support this user-facing API:
                 fps=30,
             ),
             torchvision.transforms.v2.Resize(
-                width=640,
-                height=480,
+                size=(640, 480)
             ),
             torchvision.transforms.v2.RandomCrop(
-                width=32,
-                height=32,
+                size=(32, 32)
             ),
         ]
     )
