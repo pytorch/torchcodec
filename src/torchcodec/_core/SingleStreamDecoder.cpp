@@ -336,10 +336,10 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
   int64_t numFrames = all_frames.size(0);
   streamInfos_[streamIndex].allFrames.reserve(numFrames);
   streamInfos_[streamIndex].keyFrames.reserve(numFrames);
-  // Access tensor data directly rather than element wise to speed up loop below
-  auto* pts_data = all_frames.data_ptr<int64_t>();
-  auto* is_key_frame_data = is_key_frame.data_ptr<bool>();
-  auto* duration_data = duration.data_ptr<int64_t>();
+  // Use accessor to efficiently access tensor elements
+  auto pts_data = all_frames.accessor<int64_t, 1>();
+  auto is_key_frame_data = is_key_frame.accessor<bool, 1>();
+  auto duration_data = duration.accessor<int64_t, 1>();
 
   auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
 
