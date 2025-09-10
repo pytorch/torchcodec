@@ -11,14 +11,27 @@
 
 #include "src/torchcodec/_core/AVIOContextHolder.h"
 
+// pybind11 has specific visibility rules; see:
+//  https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+// This file is included in both pybind_ops.cpp and custom_ops.cpp. We compile
+// pybind_ops.cpp with the global visibility flag as required. On the
+// custom_ops.cpp side we don't need to do that. However, we do need to ensure
+// that this class is also seen as the same visibility.
+//
+// This only matters on Linux and Mac; on Windows we don't need to do anything.
+#ifdef _WIN32
+#define VISIBILITY_HIDDEN
+#else
+#define VISIBILITY_HIDDEN __attribute__((visibility("hidden")))
+#endif
+
 namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
 // Enables uers to pass in a Python file-like object. We then forward all read
 // and seek calls back up to the methods on the Python object.
-class __attribute__((visibility("hidden"))) AVIOFileLikeContext
-    : public AVIOContextHolder {
+class VISIBILITY_HIDDEN AVIOFileLikeContext : public AVIOContextHolder {
  public:
   explicit AVIOFileLikeContext(const py::object& fileLike, bool isForWriting);
 

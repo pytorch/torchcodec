@@ -207,10 +207,12 @@ at::Tensor create_from_tensor(
     realSeek = seekModeFromString(seek_mode.value());
   }
 
-  auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
+  auto avioContextHolder =
+      std::make_unique<AVIOFromTensorContext>(video_tensor);
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
-      std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
+      std::make_unique<SingleStreamDecoder>(
+          std::move(avioContextHolder), realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
@@ -219,8 +221,9 @@ at::Tensor _create_from_file_like(
     std::optional<std::string_view> seek_mode) {
   auto fileLikeContext =
       reinterpret_cast<AVIOFileLikeContext*>(file_like_context);
-  TORCH_CHECK(fileLikeContext != nullptr, "file_like must be a valid pointer");
-  std::unique_ptr<AVIOFileLikeContext> contextHolder(fileLikeContext);
+  TORCH_CHECK(
+      fileLikeContext != nullptr, "file_like_context must be a valid pointer");
+  std::unique_ptr<AVIOFileLikeContext> avioContextHolder(fileLikeContext);
 
   SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
   if (seek_mode.has_value()) {
@@ -228,7 +231,8 @@ at::Tensor _create_from_file_like(
   }
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
-      std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
+      std::make_unique<SingleStreamDecoder>(
+          std::move(avioContextHolder), realSeek);
   return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
 }
 
