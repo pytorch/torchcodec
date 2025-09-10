@@ -197,12 +197,12 @@ format you want. Refer to Nvidia's GPU support matrix for more details
 
 #### Windows
 
-On Windows (experimental support), you'll need to rely on `conda` to install
-both pytorch and TorchCodec:
+2. On Windows (experimental support), you'll need to rely on `conda` to install
+   both pytorch and TorchCodec:
 
-```bash
-conda install -c conda-forge "torchcodec=*=*cuda*"
-```
+   ```bash
+   conda install -c conda-forge "torchcodec=*=*cuda*"
+   ```
 
 ## Benchmark Results
 
