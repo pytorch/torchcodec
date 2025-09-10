@@ -332,9 +332,10 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
           is_key_frame.size(0) == duration.size(0),
       "all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.");
 
-  // Allocate vector using num frames to reduce reallocations
+  // Allocate vectors using num frames to reduce reallocations
   int64_t numFrames = all_frames.size(0);
   streamInfos_[streamIndex].allFrames.reserve(numFrames);
+  streamInfos_[streamIndex].keyFrames.reserve(numFrames);
   // Access tensor data directly rather than element wise to speed up loop below
   auto* pts_data = all_frames.data_ptr<int64_t>();
   auto* is_key_frame_data = is_key_frame.data_ptr<bool>();
