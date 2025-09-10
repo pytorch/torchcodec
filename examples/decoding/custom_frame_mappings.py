@@ -134,7 +134,7 @@ def decode_frames_from_n_videos(video_path, seek_mode = "exact", custom_frame_ma
             seek_mode=seek_mode,
             custom_frame_mappings=custom_frame_mappings
         )
-    decoder.get_frames_in_range(start=0, stop=10)
+        decoder.get_frames_in_range(start=0, stop=10)
 
 
 for video_path, json_path in ((short_video_path, short_json_path), (long_video_path, long_json_path)):
