@@ -180,23 +180,23 @@ format you want. Refer to Nvidia's GPU support matrix for more details
 
 3. Install TorchCodec
 
-   **On Linux**, pass in an `--index-url` parameter that corresponds
-   to your CUDA Toolkit version, for example:
+   - **On Linux**, pass in an `--index-url` parameter that corresponds
+     to your CUDA Toolkit version, for example:
 
-   ```bash
-   # This corresponds to CUDA Toolkit version 12.6. It should be the same one
-   # you used when you installed PyTorch (If you installed PyTorch with pip).
-   pip install torchcodec --index-url=https://download.pytorch.org/whl/cu126
-   ```
+     ```bash
+     # This corresponds to CUDA Toolkit version 12.6. It should be the same one
+     # you used when you installed PyTorch (If you installed PyTorch with pip).
+     pip install torchcodec --index-url=https://download.pytorch.org/whl/cu126
+     ```
 
-   Note that without passing in the `--index-url` parameter, `pip` installs
-   the CPU-only version of TorchCodec.
+     Note that without passing in the `--index-url` parameter, `pip` installs
+     the CPU-only version of TorchCodec.
 
-   **On Windows** (experimental support), you'll need to rely on `conda`:
+   - **On Windows** (experimental support), you'll need to rely on `conda`:
 
-   ```bash
-   conda install torchcodec -c conda-forge
-   ```
+     ```bash
+     conda install torchcodec -c conda-forge
+     ```
 
 ## Benchmark Results
 
