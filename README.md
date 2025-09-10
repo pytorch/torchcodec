@@ -131,6 +131,7 @@ The following table indicates the compatibility between versions of
 | `torchcodec`       | `torch`            | Python              |
 | ------------------ | ------------------ | ------------------- |
 | `main` / `nightly` | `main` / `nightly` | `>=3.10`, `<=3.13`   |
+| `0.7`              | `2.8`              | `>=3.9`, `<=3.13`   |
 | `0.6`              | `2.8`              | `>=3.9`, `<=3.13`   |
 | `0.5`              | `2.7`              | `>=3.9`, `<=3.13`   |
 | `0.4`              | `2.7`              | `>=3.9`, `<=3.13`   |
@@ -162,10 +163,6 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    conda install "ffmpeg<8" -c conda-forge
    ```
 
-   If you are building FFmpeg from source you can follow Nvidia's guide to
-   configuring and installing FFmpeg with NVDEC support
-   [here](https://docs.nvidia.com/video-technologies/video-codec-sdk/12.0/ffmpeg-with-nvidia-gpu/index.html).
-
    After installing FFmpeg make sure it has NVDEC support when you list the supported
    decoders:
 
@@ -181,8 +178,9 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    ffmpeg -hwaccel cuda -hwaccel_output_format cuda -i test/resources/nasa_13013.mp4 -f null -
    ```
 
-3. Install TorchCodec by passing in an `--index-url` parameter that corresponds
-   to your CUDA Toolkit version, example:
+3. Install TorchCodec
+   **On Linux**, pass in an `--index-url` parameter that corresponds
+   to your CUDA Toolkit version, for example:
 
    ```bash
    # This corresponds to CUDA Toolkit version 12.6. It should be the same one
@@ -192,6 +190,12 @@ format you want. Refer to Nvidia's GPU support matrix for more details
 
    Note that without passing in the `--index-url` parameter, `pip` installs
    the CPU-only version of TorchCodec.
+
+   **On Windows** (experimental support), you'll need to rely on `conda`:
+
+   ```bash
+   conda install torchcodec -c conda-forge
+   ```
 
 ## Benchmark Results
 
