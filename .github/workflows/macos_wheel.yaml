@@ -52,6 +52,7 @@ jobs:
       pre-script: packaging/pre_build_script.sh
       post-script: packaging/post_build_script.sh
       smoke-test-script: packaging/fake_smoke_test.py
+      setup-miniconda: true
       runner-type: macos-14
       package-name: torchcodec
       trigger-event: ${{ github.event_name }}
