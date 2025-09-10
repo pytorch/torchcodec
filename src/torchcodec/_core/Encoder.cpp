@@ -725,7 +725,7 @@ UniqueAVFrame VideoEncoder::convertTensorToAVFrame(
   // TODO-VideoEncoder: Reorder tensor if in NHWC format
   int channelSize = inHeight_ * inWidth_;
   // Reorder RGB -> GBR for AV_PIX_FMT_GBRP format
-  // TODO-VideoEncoder: Determine if FFmpeg supports RGB input format directly
+  // TODO-VideoEncoder: Determine if FFmpeg supports planar RGB input format
   inputFrame->data[0] = tensorData + channelSize;
   inputFrame->data[1] = tensorData + (2 * channelSize);
   inputFrame->data[2] = tensorData;

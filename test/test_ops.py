@@ -1267,6 +1267,7 @@ class TestVideoEncoderOps:
     @pytest.mark.parametrize("format", ("mov", "mp4", "avi"))
     # TODO-VideoEncoder: enable additional formats (mkv, webm)
     def test_video_encoder_test_round_trip(self, tmp_path, format):
+        # TODO-VideoEncoder: Test with FFmpeg's testsrc2 video
         asset = NASA_VIDEO
 
         # Test that decode(encode(decode(asset))) == decode(asset)
