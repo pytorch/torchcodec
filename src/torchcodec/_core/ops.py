@@ -104,9 +104,6 @@ create_from_tensor = torch._dynamo.disallow_in_graph(
 _create_from_file_like = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns._create_from_file_like.default
 )
-_convert_to_tensor = torch._dynamo.disallow_in_graph(
-    torch.ops.torchcodec_ns._convert_to_tensor.default
-)
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
 _add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
 add_audio_stream = torch.ops.torchcodec_ns.add_audio_stream.default
@@ -254,11 +251,6 @@ def _encode_audio_to_file_like_abstract(
 def create_from_tensor_abstract(
     video_tensor: torch.Tensor, seek_mode: Optional[str]
 ) -> torch.Tensor:
-    return torch.empty([], dtype=torch.long)
-
-
-@register_fake("torchcodec_ns::_convert_to_tensor")
-def _convert_to_tensor_abstract(decoder_ptr: int) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
