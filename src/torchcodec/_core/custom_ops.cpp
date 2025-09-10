@@ -32,6 +32,8 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "encode_audio_to_file(Tensor samples, int sample_rate, str filename, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> ()");
   m.def(
+      "encode_video_to_file(Tensor frames, int frame_rate, str filename) -> ()");
+  m.def(
       "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> Tensor");
   m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
@@ -397,6 +399,19 @@ OpsAudioFramesOutput get_frames_by_pts_in_range_audio(
   return makeOpsAudioFramesOutput(result);
 }
 
+void encode_video_to_file(
+    const at::Tensor& frames,
+    int64_t frame_rate,
+    std::string_view file_name) {
+  VideoStreamOptions videoStreamOptions;
+  VideoEncoder(
+      frames,
+      validateInt64ToInt(frame_rate, "frame_rate"),
+      file_name,
+      videoStreamOptions)
+      .encode();
+}
+
 void encode_audio_to_file(
     const at::Tensor& samples,
     int64_t sample_rate,
@@ -701,6 +716,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
 
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("encode_audio_to_file", &encode_audio_to_file);
+  m.impl("encode_video_to_file", &encode_video_to_file);
   m.impl("encode_audio_to_tensor", &encode_audio_to_tensor);
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
