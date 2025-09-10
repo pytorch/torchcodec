@@ -14,9 +14,8 @@ In this example, we will describe the ``custom_frame_mappings`` parameter of the
 """
 
 # %%
-# Create an HD video using ffmpeg and use the ffmpeg CLI to repeat it 100 times.
-# To get videos: a short video of approximately 30 seconds and a long one of about 22 mins.
-
+# Create an HD video using ffmpeg and use the ffmpeg CLI to repeat it 10 times
+# to get two videos: a short video of approximately 30 seconds and a long one of about 10 mins.
 
 import tempfile
 from pathlib import Path
@@ -43,19 +42,19 @@ subprocess.run(ffmpeg_generate_video_command)
 long_video_path = Path(temp_dir) / "long_video.mp4"
 ffmpeg_command = [
     "ffmpeg",
-    "-stream_loop", "20",  # repeat video 20 times to get a ~20 min video
+    "-stream_loop", "20",  # repeat video 20 times to get a 10 min video
     "-i", f"{short_video_path}",
     "-c", "copy",
     f"{long_video_path}"
 ]
 subprocess.run(ffmpeg_command)
 
-test_decoder = VideoDecoder(short_video_path)
-print(f"Short video duration: {test_decoder.metadata.duration_seconds} seconds")
+print(f"Short video duration: {VideoDecoder(short_video_path).metadata.duration_seconds} seconds")
 print(f"Long video duration: {VideoDecoder(long_video_path).metadata.duration_seconds / 60} minutes")
 
 # %%
-# Preprocessing step
+# Preprocessing step to create frame mappings for the videos using ffprobe.
+
 from pathlib import Path
 import subprocess
 import tempfile
@@ -80,7 +79,8 @@ with open(short_json_path, "w") as f:
     print(f"Wrote {len(ffprobe_result.stdout)} characters to {short_json_path}")
 
 # %%
-# Define benchmarking function
+# Define benchmarking function. When a file_like object is passed in, its necessary to seek
+# to the beginning of the file before reading it in the next iteration.
 
 import torch
 
@@ -143,7 +143,6 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
     with open(json_path, "r") as f:
         bench(decode_frames_from_n_videos, video_path=video_path, custom_frame_mappings=(f.read()))
 
-    # Compare against seek_modes
     print("Decoding frames with seek_mode='exact':")
     bench(decode_frames_from_n_videos, video_path=video_path, seek_mode="exact")
 
