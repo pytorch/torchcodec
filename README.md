@@ -201,7 +201,7 @@ On Windows (experimental support), you'll need to rely on `conda` to install
 both pytorch and TorchCodec:
 
 ```bash
-conda install -c conda-forge torchcodec=*=*cuda*
+conda install -c conda-forge "torchcodec=*=*cuda*"
 ```
 
 ## Benchmark Results
