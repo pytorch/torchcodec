@@ -244,7 +244,7 @@ def _encode_audio_to_file_like_abstract(
     num_channels: Optional[int] = None,
     desired_sample_rate: Optional[int] = None,
 ) -> None:
-    return torch.empty([], dtype=torch.long)
+    return
 
 
 @register_fake("torchcodec_ns::create_from_tensor")
