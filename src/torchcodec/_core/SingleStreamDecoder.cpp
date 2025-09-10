@@ -499,7 +499,6 @@ void SingleStreamDecoder::addVideoStream(
 
   auto& streamInfo = streamInfos_[activeStreamIndex_];
   streamInfo.videoStreamOptions = videoStreamOptions;
-  streamInfo.timeBase = formatContext_->streams[activeStreamIndex_]->time_base;
 
   streamMetadata.width = streamInfo.codecContext->width;
   streamMetadata.height = streamInfo.codecContext->height;
