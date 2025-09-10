@@ -322,19 +322,29 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
     int streamIndex,
     FrameMappings customFrameMappings) {
-  auto& all_frames = customFrameMappings.all_frames;
-  auto& is_key_frame = customFrameMappings.is_key_frame;
-  auto& duration = customFrameMappings.duration;
+  const torch::Tensor& all_frames =
+      customFrameMappings.all_frames.to(torch::kLong);
+  const torch::Tensor& is_key_frame =
+      customFrameMappings.is_key_frame.to(torch::kBool);
+  const torch::Tensor& duration = customFrameMappings.duration.to(torch::kLong);
   TORCH_CHECK(
       all_frames.size(0) == is_key_frame.size(0) &&
           is_key_frame.size(0) == duration.size(0),
       "all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.");
 
+  // Allocate vector using num frames to reduce reallocations
+  int64_t numFrames = all_frames.size(0);
+  streamInfos_[streamIndex].allFrames.reserve(numFrames);
+  // Access tensor data directly rather than element wise to speed up loop below
+  auto* pts_data = all_frames.data_ptr<int64_t>();
+  auto* is_key_frame_data = is_key_frame.data_ptr<bool>();
+  auto* duration_data = duration.data_ptr<int64_t>();
+
   auto& streamMetadata = containerMetadata_.allStreamMetadata[streamIndex];
 
-  streamMetadata.beginStreamPtsFromContent = all_frames[0].item<int64_t>();
+  streamMetadata.beginStreamPtsFromContent = pts_data[0];
   streamMetadata.endStreamPtsFromContent =
-      all_frames[-1].item<int64_t>() + duration[-1].item<int64_t>();
+      pts_data[numFrames - 1] + duration_data[numFrames - 1];
 
   auto avStream = formatContext_->streams[streamIndex];
   streamMetadata.beginStreamPtsSecondsFromContent = ptsToSeconds(
@@ -343,17 +353,16 @@ void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
   streamMetadata.endStreamPtsSecondsFromContent = ptsToSeconds(
       *streamMetadata.endStreamPtsFromContent, avStream->time_base);
 
-  streamMetadata.numFramesFromContent = all_frames.size(0);
-  for (int64_t i = 0; i < all_frames.size(0); ++i) {
+  streamMetadata.numFramesFromContent = numFrames;
+  for (int64_t i = 0; i < numFrames; ++i) {
     FrameInfo frameInfo;
-    frameInfo.pts = all_frames[i].item<int64_t>();
-    frameInfo.isKeyFrame = is_key_frame[i].item<bool>();
+    frameInfo.pts = pts_data[i];
+    frameInfo.isKeyFrame = is_key_frame_data[i];
     streamInfos_[streamIndex].allFrames.push_back(frameInfo);
     if (frameInfo.isKeyFrame) {
       streamInfos_[streamIndex].keyFrames.push_back(frameInfo);
     }
   }
-  // Sort all frames by their pts
   sortAllFrames();
 }
 
