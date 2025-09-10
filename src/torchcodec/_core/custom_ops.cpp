@@ -10,6 +10,7 @@
 #include <string>
 #include "c10/core/SymIntArrayRef.h"
 #include "c10/util/Exception.h"
+#include "src/torchcodec/_core/AVIOFileLikeContext.h"
 #include "src/torchcodec/_core/AVIOTensorContext.h"
 #include "src/torchcodec/_core/Encoder.h"
 #include "src/torchcodec/_core/SingleStreamDecoder.h"
@@ -34,7 +35,11 @@ TORCH_LIBRARY(torchcodec_ns, m) {
   m.def(
       "encode_audio_to_tensor(Tensor samples, int sample_rate, str format, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> Tensor");
   m.def(
+      "_encode_audio_to_file_like(Tensor samples, int sample_rate, str format, int file_like_context, int? bit_rate=None, int? num_channels=None, int? desired_sample_rate=None) -> ()");
+  m.def(
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
+  m.def(
+      "_create_from_file_like(int file_like_context, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
   m.def(
       "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None, str? color_conversion_library=None) -> ()");
@@ -204,6 +209,24 @@ at::Tensor create_from_tensor(
   }
 
   auto contextHolder = std::make_unique<AVIOFromTensorContext>(video_tensor);
+
+  std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
+      std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
+  return wrapDecoderPointerToTensor(std::move(uniqueDecoder));
+}
+
+at::Tensor _create_from_file_like(
+    int64_t file_like_context,
+    std::optional<std::string_view> seek_mode) {
+  auto fileLikeContext =
+      reinterpret_cast<AVIOFileLikeContext*>(file_like_context);
+  TORCH_CHECK(fileLikeContext != nullptr, "file_like must be a valid pointer");
+  std::unique_ptr<AVIOFileLikeContext> contextHolder(fileLikeContext);
+
+  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
+  if (seek_mode.has_value()) {
+    realSeek = seekModeFromString(seek_mode.value());
+  }
 
   std::unique_ptr<SingleStreamDecoder> uniqueDecoder =
       std::make_unique<SingleStreamDecoder>(std::move(contextHolder), realSeek);
@@ -439,6 +462,36 @@ at::Tensor encode_audio_to_tensor(
              std::move(avioContextHolder),
              audioStreamOptions)
       .encodeToTensor();
+}
+
+void _encode_audio_to_file_like(
+    const at::Tensor& samples,
+    int64_t sample_rate,
+    std::string_view format,
+    int64_t file_like_context,
+    std::optional<int64_t> bit_rate = std::nullopt,
+    std::optional<int64_t> num_channels = std::nullopt,
+    std::optional<int64_t> desired_sample_rate = std::nullopt) {
+  auto fileLikeContext =
+      reinterpret_cast<AVIOFileLikeContext*>(file_like_context);
+  TORCH_CHECK(
+      fileLikeContext != nullptr, "file_like_context must be a valid pointer");
+  std::unique_ptr<AVIOFileLikeContext> avioContextHolder(fileLikeContext);
+
+  AudioStreamOptions audioStreamOptions;
+  audioStreamOptions.bitRate = validateOptionalInt64ToInt(bit_rate, "bit_rate");
+  audioStreamOptions.numChannels =
+      validateOptionalInt64ToInt(num_channels, "num_channels");
+  audioStreamOptions.sampleRate =
+      validateOptionalInt64ToInt(desired_sample_rate, "desired_sample_rate");
+
+  AudioEncoder encoder(
+      samples,
+      validateInt64ToInt(sample_rate, "sample_rate"),
+      format,
+      std::move(avioContextHolder),
+      audioStreamOptions);
+  encoder.encode();
 }
 
 // For testing only. We need to implement this operation as a core library
@@ -694,6 +747,7 @@ void scan_all_streams_to_update_metadata(at::Tensor& decoder) {
 TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
   m.impl("create_from_file", &create_from_file);
   m.impl("create_from_tensor", &create_from_tensor);
+  m.impl("_create_from_file_like", &_create_from_file_like);
   m.impl("_convert_to_tensor", &_convert_to_tensor);
   m.impl(
       "_get_json_ffmpeg_library_versions", &_get_json_ffmpeg_library_versions);
@@ -702,6 +756,7 @@ TORCH_LIBRARY_IMPL(torchcodec_ns, BackendSelect, m) {
 TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
   m.impl("encode_audio_to_file", &encode_audio_to_file);
   m.impl("encode_audio_to_tensor", &encode_audio_to_tensor);
+  m.impl("_encode_audio_to_file_like", &_encode_audio_to_file_like);
   m.impl("seek_to_pts", &seek_to_pts);
   m.impl("add_video_stream", &add_video_stream);
   m.impl("_add_video_stream", &_add_video_stream);

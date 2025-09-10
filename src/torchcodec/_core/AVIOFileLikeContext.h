@@ -17,7 +17,8 @@ namespace facebook::torchcodec {
 
 // Enables uers to pass in a Python file-like object. We then forward all read
 // and seek calls back up to the methods on the Python object.
-class AVIOFileLikeContext : public AVIOContextHolder {
+class __attribute__((visibility("hidden"))) AVIOFileLikeContext
+    : public AVIOContextHolder {
  public:
   explicit AVIOFileLikeContext(const py::object& fileLike, bool isForWriting);
 
