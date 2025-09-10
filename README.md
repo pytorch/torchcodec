@@ -179,6 +179,7 @@ format you want. Refer to Nvidia's GPU support matrix for more details
    ```
 
 3. Install TorchCodec
+
    **On Linux**, pass in an `--index-url` parameter that corresponds
    to your CUDA Toolkit version, for example:
 
