@@ -175,9 +175,16 @@ function(make_torchcodec_libraries
     # stray initialization of py::objects. The rest of the object code must
     # match. See:
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+    # We have to do this for both pybind_ops and custom_ops because they include
+    # some of the same headers.
     if(NOT WIN32)
         target_compile_options(
             ${pybind_ops_library_name}
+            PUBLIC
+            "-fvisibility=hidden"
+        )
+        target_compile_options(
+            ${custom_ops_library_name}
             PUBLIC
             "-fvisibility=hidden"
         )
