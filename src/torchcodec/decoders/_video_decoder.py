@@ -63,6 +63,8 @@ class VideoDecoder:
             probably is. Default: "exact".
             Read more about this parameter in:
             :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`
+        pixel_format (str, optional): The pixel format of the decoded frames. Default: "rgb24".
+            Supported values are "rgb24" and "rgb48". "rgb24" is 8-bit RGB, and "rgb48" is 16-bit RGB.
         custom_frame_mappings (str, bytes, or file-like object, optional):
             Mapping of frames to their metadata, typically generated via ffprobe.
             This enables accurate frame seeking without requiring a full video scan.
@@ -99,6 +101,7 @@ class VideoDecoder:
         num_ffmpeg_threads: int = 1,
         device: Optional[Union[str, torch_device]] = "cpu",
         seek_mode: Literal["exact", "approximate"] = "exact",
+        pixel_format: Literal["rgb24", "rgb48"] = "rgb24",
         custom_frame_mappings: Optional[
             Union[str, bytes, io.RawIOBase, io.BufferedReader]
         ] = None,
@@ -116,6 +119,13 @@ class VideoDecoder:
             raise ValueError(
                 "custom_frame_mappings is incompatible with seek_mode='approximate'. "
                 "Use seek_mode='custom_frame_mappings' or leave it unspecified to automatically use custom frame mappings."
+            )
+
+        allowed_pixel_formats = ("rgb24", "rgb48")
+        if pixel_format not in allowed_pixel_formats:
+            raise ValueError(
+                f"Invalid pixel format ({pixel_format}). "
+                f"Supported values are 'rgb24' and 'rgb48'."
             )
 
         # Auto-select custom_frame_mappings seek_mode and process data when mappings are provided
@@ -141,11 +151,18 @@ class VideoDecoder:
         if isinstance(device, torch_device):
             device = str(device)
 
+        if device != "cpu" and pixel_format != "rgb24":
+            raise ValueError(
+                f"Only 'rgb24' pixel format is supported for non-CPU devices. "
+                f"Got {pixel_format = } and {device = }."
+            )
+
         core.add_video_stream(
             self._decoder,
             stream_index=stream_index,
             dimension_order=dimension_order,
             num_threads=num_ffmpeg_threads,
+            pixel_format=pixel_format,
             device=device,
             custom_frame_mappings=custom_frame_mappings_data,
         )

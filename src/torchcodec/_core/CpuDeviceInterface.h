@@ -40,7 +40,8 @@ class CpuDeviceInterface : public DeviceInterface {
       torch::Tensor& outputTensor);
 
   torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      const UniqueAVFrame& avFrame);
+      const UniqueAVFrame& avFrame,
+      const AVPixelFormat pixelFormat);
 
   struct SwsFrameContext {
     int inputWidth = 0;
@@ -62,7 +63,8 @@ class CpuDeviceInterface : public DeviceInterface {
 
   void createSwsContext(
       const SwsFrameContext& swsFrameContext,
-      const enum AVColorSpace colorspace);
+      const enum AVColorSpace colorspace,
+      const enum AVPixelFormat pixelFormat);
 
   // color-conversion fields. Only one of FilterGraphContext and
   // UniqueSwsContext should be non-null.

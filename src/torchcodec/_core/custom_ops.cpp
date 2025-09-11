@@ -39,9 +39,9 @@ TORCH_LIBRARY(torchcodec_ns, m) {
       "create_from_tensor(Tensor video_tensor, str? seek_mode=None) -> Tensor");
   m.def("_convert_to_tensor(int decoder_ptr) -> Tensor");
   m.def(
-      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None, str? color_conversion_library=None) -> ()");
+      "_add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? pixel_format=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None, str? color_conversion_library=None) -> ()");
   m.def(
-      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None) -> ()");
+      "add_video_stream(Tensor(a!) decoder, *, int? width=None, int? height=None, int? num_threads=None, str? dimension_order=None, int? stream_index=None, str? pixel_format=None, str? device=None, (Tensor, Tensor, Tensor)? custom_frame_mappings=None) -> ()");
   m.def(
       "add_audio_stream(Tensor(a!) decoder, *, int? stream_index=None, int? sample_rate=None, int? num_channels=None) -> ()");
   m.def("seek_to_pts(Tensor(a!) decoder, float seconds) -> ()");
@@ -167,6 +167,16 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   return ss.str();
 }
 
+AVPixelFormat pixelFormatFromString(std::string_view pixelFormat) {
+  if (pixelFormat == "rgb24") {
+    return AV_PIX_FMT_RGB24;
+  } else if (pixelFormat == "rgb48") {
+    return AV_PIX_FMT_RGB48;
+  } else {
+    TORCH_CHECK(false, "Invalid pixel format: " + std::string(pixelFormat));
+  }
+}
+
 } // namespace
 
 // ==============================
@@ -225,6 +235,7 @@ void _add_video_stream(
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<std::string_view> pixel_format = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>
         custom_frame_mappings = std::nullopt,
@@ -255,6 +266,10 @@ void _add_video_stream(
           ". color_conversion_library must be either filtergraph or swscale.");
     }
   }
+  if (pixel_format.has_value()) {
+    videoStreamOptions.pixelFormat =
+        pixelFormatFromString(pixel_format.value());
+  }
   if (device.has_value()) {
     videoStreamOptions.device = createTorchDevice(std::string(device.value()));
   }
@@ -275,6 +290,7 @@ void add_video_stream(
     std::optional<int64_t> num_threads = std::nullopt,
     std::optional<std::string_view> dimension_order = std::nullopt,
     std::optional<int64_t> stream_index = std::nullopt,
+    std::optional<std::string_view> pixel_format = std::nullopt,
     std::optional<std::string_view> device = std::nullopt,
     const std::optional<std::tuple<at::Tensor, at::Tensor, at::Tensor>>&
         custom_frame_mappings = std::nullopt) {
@@ -285,6 +301,7 @@ void add_video_stream(
       num_threads,
       dimension_order,
       stream_index,
+      pixel_format,
       device,
       custom_frame_mappings);
 }

@@ -272,6 +272,7 @@ def _add_video_stream_abstract(
     num_threads: Optional[int] = None,
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
+    pixel_format: Optional[str] = None,
     device: Optional[str] = None,
     custom_frame_mappings: Optional[
         tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -290,6 +291,7 @@ def add_video_stream_abstract(
     num_threads: Optional[int] = None,
     dimension_order: Optional[str] = None,
     stream_index: Optional[int] = None,
+    pixel_format: Optional[str] = None,
     device: Optional[str] = None,
     custom_frame_mappings: Optional[
         tuple[torch.Tensor, torch.Tensor, torch.Tensor]

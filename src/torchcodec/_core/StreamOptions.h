@@ -9,6 +9,7 @@
 #include <torch/types.h>
 #include <optional>
 #include <string>
+#include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 
@@ -36,6 +37,7 @@ struct VideoStreamOptions {
   std::optional<int> width;
   std::optional<int> height;
   std::optional<ColorConversionLibrary> colorConversionLibrary;
+  AVPixelFormat pixelFormat = AV_PIX_FMT_RGB24;
   // By default we use CPU for decoding for both C++ and python users.
   torch::Device device = torch::kCPU;
 

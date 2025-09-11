@@ -120,7 +120,8 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
         expectedOutputHeight, expectedOutputWidth, torch::kCPU));
 
     if (!swsContext_ || prevSwsFrameContext_ != swsFrameContext) {
-      createSwsContext(swsFrameContext, avFrame->colorspace);
+      createSwsContext(
+          swsFrameContext, avFrame->colorspace, videoStreamOptions.pixelFormat);
       prevSwsFrameContext_ = swsFrameContext;
     }
     int resultHeight =
@@ -150,7 +151,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
         avFrame->sample_aspect_ratio,
         expectedOutputWidth,
         expectedOutputHeight,
-        AV_PIX_FMT_RGB24,
+        videoStreamOptions.pixelFormat,
         filters.str(),
         timeBase);
 
@@ -159,7 +160,8 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
           std::make_unique<FilterGraph>(filtersContext, videoStreamOptions);
       prevFiltersContext_ = std::move(filtersContext);
     }
-    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
+    outputTensor = convertAVFrameToTensorUsingFilterGraph(
+        avFrame, videoStreamOptions.pixelFormat);
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -209,10 +211,11 @@ int CpuDeviceInterface::convertAVFrameToTensorUsingSwsScale(
 }
 
 torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
-    const UniqueAVFrame& avFrame) {
+    const UniqueAVFrame& avFrame,
+    AVPixelFormat pixelFormat) {
   UniqueAVFrame filteredAVFrame = filterGraphContext_->convert(avFrame);
 
-  TORCH_CHECK_EQ(filteredAVFrame->format, AV_PIX_FMT_RGB24);
+  TORCH_CHECK_EQ(filteredAVFrame->format, pixelFormat);
 
   auto frameDims = getHeightAndWidthFromResizedAVFrame(*filteredAVFrame.get());
   int height = frameDims.height;
@@ -229,14 +232,15 @@ torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
 
 void CpuDeviceInterface::createSwsContext(
     const SwsFrameContext& swsFrameContext,
-    const enum AVColorSpace colorspace) {
+    const enum AVColorSpace colorspace,
+    const AVPixelFormat pixelFormat) {
   SwsContext* swsContext = sws_getContext(
       swsFrameContext.inputWidth,
       swsFrameContext.inputHeight,
       swsFrameContext.inputFormat,
       swsFrameContext.outputWidth,
       swsFrameContext.outputHeight,
-      AV_PIX_FMT_RGB24,
+      pixelFormat,
       SWS_BILINEAR,
       nullptr,
       nullptr,
