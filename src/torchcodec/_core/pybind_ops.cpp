@@ -14,13 +14,25 @@ namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
-// In principle, this should be able to return a tensor. But when we try that,
-// we run into the bug reported here:
+// Note: It's not immediately obvous why we need both custom_ops.cpp and
+//       pybind_ops.cpp. We do all other Python to C++ bridging in
+//       custom_ops.cpp, and that even depends on pybind11, so why have an
+//       explicit pybind-only file?
 //
-//   https://github.com/pytorch/pytorch/issues/136664
+//       The reason is that we want to accept OWNERSHIP of a file-like object
+//       from the Python side. In order to do that, we need a proper
+//       py::object. For raw bytes, we can launder that through a tensor on the
+//       custom_ops.cpp side, but we can't launder a proper Python object
+//       through a tensor. Custom ops can't accept a proper Python object
+//       through py::object, so we have to do direct pybind11 here.
 //
-// So we instead launder the pointer through an int, and then use a conversion
-// function on the custom ops side to launder that int into a tensor.
+// TODO: Investigate if we can do something better here. See:
+//         https://github.com/pytorch/torchcodec/issues/896
+//       Short version is that we're laundering a pointer through an int, the
+//       Python side forwards that to decoder creation functions in
+//       custom_ops.cpp and we do another cast on that side to get a pointer
+//       again. We want to investigate if we can do something cleaner by
+//       defining proper pybind objects.
 int64_t create_file_like_context(py::object file_like, bool is_for_writing) {
   AVIOFileLikeContext* context =
       new AVIOFileLikeContext(file_like, is_for_writing);

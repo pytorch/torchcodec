@@ -169,6 +169,18 @@ std::string mapToJson(const std::map<std::string, std::string>& metadataMap) {
   return ss.str();
 }
 
+SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode) {
+  if (seekMode == "exact") {
+    return SingleStreamDecoder::SeekMode::exact;
+  } else if (seekMode == "approximate") {
+    return SingleStreamDecoder::SeekMode::approximate;
+  } else if (seekMode == "custom_frame_mappings") {
+    return SingleStreamDecoder::SeekMode::custom_frame_mappings;
+  } else {
+    TORCH_CHECK(false, "Invalid seek mode: " + std::string(seekMode));
+  }
+}
+
 } // namespace
 
 // ==============================

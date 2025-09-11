@@ -375,6 +375,4 @@ std::ostream& operator<<(
     std::ostream& os,
     const SingleStreamDecoder::DecodeStats& stats);
 
-SingleStreamDecoder::SeekMode seekModeFromString(std::string_view seekMode);
-
 } // namespace facebook::torchcodec
