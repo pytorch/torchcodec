@@ -7,6 +7,7 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 #include <c10/util/Exception.h>
+#include <iostream>
 
 namespace facebook::torchcodec {
 
@@ -109,7 +110,33 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 }
 
 void validateNumChannels(const AVCodec& avCodec, int numChannels) {
-#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+#if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
+  std::stringstream supportedNumChannels;
+  std::cout << "ffmpeg7? " << std::endl;
+  const AVChannelLayout* supported_layouts = nullptr;
+  int num_layouts = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_CHANNEL_LAYOUT,
+      0,
+      (const void**)&supported_layouts, // use this instead of building
+                                        // supportedNumChannels?
+      &num_layouts);
+  if (ret < 0 || supported_layouts == nullptr) {
+    // If we can't validate, assume it'll be fine??
+    return;
+  }
+  for (int i = 0; supported_layouts[i].nb_channels != 0; ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << supported_layouts[i].nb_channels;
+    if (numChannels == supported_layouts[i].nb_channels) {
+      return;
+    }
+  }
+#elif LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   if (avCodec.ch_layouts == nullptr) {
     // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
     // eventually raise.
