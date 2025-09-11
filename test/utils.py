@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import pathlib
+import platform
 import subprocess
 import sys
 
@@ -81,7 +82,12 @@ def assert_frames_equal(*args, **kwargs):
             else:
                 torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
         else:
-            torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
+            arch = platform.machine().lower()
+            if arch == "x86_64":
+                torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
+            else:
+                # linux aarch64
+                torch.testing.assert_close(*args, **kwargs, atol=3, rtol=0)
     else:
         torch.testing.assert_close(*args, **kwargs, atol=3, rtol=0)
 
