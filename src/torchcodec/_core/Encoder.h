@@ -125,6 +125,16 @@ class VideoEncoder {
  public:
   ~VideoEncoder();
 
+  // Rule of Five requires that we define copy and move
+  // constructors and assignment operators.
+  // Both are deleted because we have unique_ptr members
+  VideoEncoder(const VideoEncoder&) = delete;
+  VideoEncoder& operator=(const VideoEncoder&) = delete;
+
+  // Move assignment operator deleted since we have a const member
+  VideoEncoder(VideoEncoder&&) = default;
+  VideoEncoder& operator=(VideoEncoder&&) = delete;
+
   VideoEncoder(
       const torch::Tensor& frames,
       int frameRate,
@@ -143,7 +153,7 @@ class VideoEncoder {
 
   UniqueEncodingAVFormatContext avFormatContext_;
   UniqueAVCodecContext avCodecContext_;
-  int streamIndex_;
+  int streamIndex_ = -1;
   UniqueSwsContext swsContext_;
 
   const torch::Tensor frames_;
