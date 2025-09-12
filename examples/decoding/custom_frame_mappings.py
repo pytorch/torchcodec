@@ -124,56 +124,54 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
     bench(VideoDecoder, source=video_path, stream_index=stream_index, seek_mode="exact")
 
 # %%
-# Decode frames from multiple videos with custom_frame_mappings vs exact seek_mode
+# Decode frames with custom_frame_mappings vs exact seek_mode
 
 
-def decode_frames_from_n_videos(video_path, seek_mode = "exact", custom_frame_mappings = None, num_videos = 10):
-    for _ in range(num_videos):
-        decoder = VideoDecoder(
-            source=video_path,
-            seek_mode=seek_mode,
-            custom_frame_mappings=custom_frame_mappings
-        )
-        decoder.get_frames_in_range(start=0, stop=10)
+def decode_frames(video_path, seek_mode = "exact", custom_frame_mappings = None):
+    decoder = VideoDecoder(
+        source=video_path,
+        seek_mode=seek_mode,
+        custom_frame_mappings=custom_frame_mappings
+    )
+    decoder.get_frames_in_range(start=0, stop=10)
 
 
 for video_path, json_path in ((short_video_path, short_json_path), (long_video_path, long_json_path)):
     print(f"Running benchmarks on {Path(video_path).name}")
     print("Decoding frames with custom_frame_mappings JSON str from file:")
     with open(json_path, "r") as f:
-        bench(decode_frames_from_n_videos, video_path=video_path, custom_frame_mappings=(f.read()))
+        bench(decode_frames, video_path=video_path, custom_frame_mappings=(f.read()))
 
     print("Decoding frames with seek_mode='exact':")
-    bench(decode_frames_from_n_videos, video_path=video_path, seek_mode="exact")
+    bench(decode_frames, video_path=video_path, seek_mode="exact")
 
 # %%
-# Compare performance of sampling clips from multiple videos with custom_frame_mappings vs exact seek_mode
+# Compare frame accuracy with custom_frame_mappings vs exact seek_mode
+video_path = short_video_path
+json_path = short_json_path
+with open(json_path, "r") as f:
+    custom_frame_mappings = f.read()
+    custom_frame_mappings_decoder = VideoDecoder(
+        source=video_path,
+        custom_frame_mappings=custom_frame_mappings
+    )
 
+exact_decoder = VideoDecoder(short_video_path, seek_mode="exact")
+approx_decoder = VideoDecoder(short_video_path, seek_mode="approximate")
 
-from torchcodec import samplers
+print("Metadata of short video with custom_frame_mappings:")
+print(custom_frame_mappings_decoder.metadata)
+print("Metadata of short video with seek_mode='exact':")
+print(exact_decoder.metadata)
+print("Metadata of short video with seek_mode='approximate':")
+print(approx_decoder.metadata)
 
-
-def sample_clips_from_n_videos(video_path, seek_mode = "exact", custom_frame_mappings = None, num_videos = 10):
-    for _ in range(num_videos):
-        return samplers.clips_at_random_indices(
-            decoder=VideoDecoder(
-                source=video_path,
-                seek_mode=seek_mode,
-                custom_frame_mappings=custom_frame_mappings
-            ),
-            num_clips=5,
-            num_frames_per_clip=2,
-        )
-
-
-for video_path, json_path in ((short_video_path, short_json_path), (long_video_path, long_json_path)):
-    print(f"Running benchmarks on {Path(video_path).name}")
-    print("Sampling clips with custom_frame_mappings:")
-    with open(json_path, "r") as f:
-        mappings = f.read()
-        bench(sample_clips_from_n_videos, file_like=False, video_path=video_path, custom_frame_mappings=mappings)
-
-    print("Sampling clips with seek_mode='exact':")
-    bench(sample_clips_from_n_videos, video_path=video_path, seek_mode="exact")
+for i in range(len(approx_decoder)):
+    torch.testing.assert_close(
+        approx_decoder.get_frame_at(i).data,
+        custom_frame_mappings_decoder.get_frame_at(i).data,
+        atol=0, rtol=0,
+    )
+print("Frame seeking is the same for this video!")
 
 # %%
