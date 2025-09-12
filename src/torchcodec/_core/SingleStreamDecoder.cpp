@@ -322,6 +322,11 @@ void SingleStreamDecoder::scanFileAndUpdateMetadataAndIndex() {
 void SingleStreamDecoder::readCustomFrameMappingsUpdateMetadataAndIndex(
     int streamIndex,
     FrameMappings customFrameMappings) {
+  TORCH_CHECK(
+      customFrameMappings.all_frames.dtype() == torch::kLong &&
+          customFrameMappings.is_key_frame.dtype() == torch::kBool &&
+          customFrameMappings.duration.dtype() == torch::kLong,
+      "all_frames and duration tensors must be int64 dtype, and is_key_frame tensor must be a bool dtype.");
   const torch::Tensor& all_frames =
       customFrameMappings.all_frames.to(torch::kLong);
   const torch::Tensor& is_key_frame =
