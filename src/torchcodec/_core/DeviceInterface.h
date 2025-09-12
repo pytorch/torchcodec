@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include "FFMPEGCommon.h"
+#include "src/torchcodec/_core/FilterGraph.h"
 #include "src/torchcodec/_core/Frame.h"
 #include "src/torchcodec/_core/StreamOptions.h"
 
@@ -33,9 +34,20 @@ class DeviceInterface {
   // support CUDA and others only support CPU.
   virtual void initializeContext(AVCodecContext* codecContext) = 0;
 
+  // Returns FilterContext if device interface can't handle conversion of the
+  // frame on its own within a call to convertAVFrameToFrameOutput().
+  // FilterContext contains input and output initialization parameters
+  // describing required conversion. Output can further be passed to
+  // convertAVFrameToFrameOutput() to generate output tensor.
+  virtual std::unique_ptr<FiltersContext> initializeFiltersContext(
+      [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
+      [[maybe_unused]] const UniqueAVFrame& avFrame,
+      [[maybe_unused]] const AVRational& timeBase) {
+    return nullptr;
+  };
+
   virtual void convertAVFrameToFrameOutput(
       const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
