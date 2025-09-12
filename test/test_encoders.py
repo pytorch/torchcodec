@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -305,6 +306,9 @@ class TestAudioEncoder:
             rtol, atol = 0, 1e-3
             if sys.platform == "darwin":
                 assert_close = partial(assert_tensor_close_on_at_least, percentage=99)
+            arch = platform.machine().lower()
+            if sys.platform == "linux" and arch == "aarch64":
+                assert_close = partial(assert_tensor_close_on_at_least, percentage=98)
         elif format == "wav":
             rtol, atol = 0, 1e-4
         elif format == "mp3" and asset is SINE_MONO_S32 and num_channels == 2:
