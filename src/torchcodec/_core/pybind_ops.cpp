@@ -7,72 +7,36 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <cstdint>
-#include <string>
 
 #include "src/torchcodec/_core/AVIOFileLikeContext.h"
-#include "src/torchcodec/_core/Encoder.h"
-#include "src/torchcodec/_core/SingleStreamDecoder.h"
-#include "src/torchcodec/_core/StreamOptions.h"
-#include "src/torchcodec/_core/ValidationUtils.h"
 
 namespace py = pybind11;
 
 namespace facebook::torchcodec {
 
-// In principle, this should be able to return a tensor. But when we try that,
-// we run into the bug reported here:
+// Note: It's not immediately obvous why we need both custom_ops.cpp and
+//       pybind_ops.cpp. We do all other Python to C++ bridging in
+//       custom_ops.cpp, and that even depends on pybind11, so why have an
+//       explicit pybind-only file?
 //
-//   https://github.com/pytorch/pytorch/issues/136664
+//       The reason is that we want to accept OWNERSHIP of a file-like object
+//       from the Python side. In order to do that, we need a proper
+//       py::object. For raw bytes, we can launder that through a tensor on the
+//       custom_ops.cpp side, but we can't launder a proper Python object
+//       through a tensor. Custom ops can't accept a proper Python object
+//       through py::object, so we have to do direct pybind11 here.
 //
-// So we instead launder the pointer through an int, and then use a conversion
-// function on the custom ops side to launder that int into a tensor.
-int64_t create_from_file_like(
-    py::object file_like,
-    std::optional<std::string_view> seek_mode) {
-  SingleStreamDecoder::SeekMode realSeek = SingleStreamDecoder::SeekMode::exact;
-  if (seek_mode.has_value()) {
-    realSeek = seekModeFromString(seek_mode.value());
-  }
-
-  auto avioContextHolder =
-      std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/false);
-
-  SingleStreamDecoder* decoder =
-      new SingleStreamDecoder(std::move(avioContextHolder), realSeek);
-  return reinterpret_cast<int64_t>(decoder);
-}
-
-void encode_audio_to_file_like(
-    int64_t data_ptr,
-    const std::vector<int64_t>& shape,
-    int64_t sample_rate,
-    std::string_view format,
-    py::object file_like,
-    std::optional<int64_t> bit_rate = std::nullopt,
-    std::optional<int64_t> num_channels = std::nullopt,
-    std::optional<int64_t> desired_sample_rate = std::nullopt) {
-  // We assume float32 *and* contiguity, this must be enforced by the caller.
-  auto tensor_options = torch::TensorOptions().dtype(torch::kFloat32);
-  auto samples = torch::from_blob(
-      reinterpret_cast<void*>(data_ptr), shape, tensor_options);
-
-  AudioStreamOptions audioStreamOptions;
-  audioStreamOptions.bitRate = validateOptionalInt64ToInt(bit_rate, "bit_rate");
-  audioStreamOptions.numChannels =
-      validateOptionalInt64ToInt(num_channels, "num_channels");
-  audioStreamOptions.sampleRate =
-      validateOptionalInt64ToInt(desired_sample_rate, "desired_sample_rate");
-
-  auto avioContextHolder =
-      std::make_unique<AVIOFileLikeContext>(file_like, /*isForWriting=*/true);
-
-  AudioEncoder encoder(
-      samples,
-      validateInt64ToInt(sample_rate, "sample_rate"),
-      format,
-      std::move(avioContextHolder),
-      audioStreamOptions);
-  encoder.encode();
+// TODO: Investigate if we can do something better here. See:
+//         https://github.com/pytorch/torchcodec/issues/896
+//       Short version is that we're laundering a pointer through an int, the
+//       Python side forwards that to decoder creation functions in
+//       custom_ops.cpp and we do another cast on that side to get a pointer
+//       again. We want to investigate if we can do something cleaner by
+//       defining proper pybind objects.
+int64_t create_file_like_context(py::object file_like, bool is_for_writing) {
+  AVIOFileLikeContext* context =
+      new AVIOFileLikeContext(file_like, is_for_writing);
+  return reinterpret_cast<int64_t>(context);
 }
 
 #ifndef PYBIND_OPS_MODULE_NAME
@@ -80,8 +44,7 @@ void encode_audio_to_file_like(
 #endif
 
 PYBIND11_MODULE(PYBIND_OPS_MODULE_NAME, m) {
-  m.def("create_from_file_like", &create_from_file_like);
-  m.def("encode_audio_to_file_like", &encode_audio_to_file_like);
+  m.def("create_file_like_context", &create_file_like_context);
 }
 
 } // namespace facebook::torchcodec

@@ -98,11 +98,14 @@ encode_video_to_file = torch._dynamo.disallow_in_graph(
 encode_audio_to_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.encode_audio_to_tensor.default
 )
+_encode_audio_to_file_like = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns._encode_audio_to_file_like.default
+)
 create_from_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.create_from_tensor.default
 )
-_convert_to_tensor = torch._dynamo.disallow_in_graph(
-    torch.ops.torchcodec_ns._convert_to_tensor.default
+_create_from_file_like = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns._create_from_file_like.default
 )
 add_video_stream = torch.ops.torchcodec_ns.add_video_stream.default
 _add_video_stream = torch.ops.torchcodec_ns._add_video_stream.default
@@ -151,7 +154,12 @@ def create_from_file_like(
     file_like: Union[io.RawIOBase, io.BufferedReader], seek_mode: Optional[str] = None
 ) -> torch.Tensor:
     assert _pybind_ops is not None
-    return _convert_to_tensor(_pybind_ops.create_from_file_like(file_like, seek_mode))
+    return _create_from_file_like(
+        _pybind_ops.create_file_like_context(
+            file_like, False  # False means not for writing
+        ),
+        seek_mode,
+    )
 
 
 def encode_audio_to_file_like(
@@ -179,35 +187,15 @@ def encode_audio_to_file_like(
     if samples.dtype != torch.float32:
         raise ValueError(f"samples must have dtype torch.float32, got {samples.dtype}")
 
-    # We're having the same problem as with the decoder's create_from_file_like:
-    # We should be able to pass a tensor directly, but this leads to a pybind
-    # error. In order to work around this, we pass the pointer to the tensor's
-    # data, and its shape, in order to re-construct it in C++. For this to work:
-    # - the tensor must be float32
-    # - the tensor  must be contiguous, which is why we call contiguous().
-    #   In theory we could avoid this restriction by also passing the strides?
-    # - IMPORTANT: the input samples tensor and its underlying data must be
-    #   alive during the call.
-    #
-    # A more elegant solution would be to cast the tensor into a py::object, but
-    # casting the py::object backk to a tensor in C++ seems to lead to the same
-    # pybing error.
-
-    samples = samples.contiguous()
-    _pybind_ops.encode_audio_to_file_like(
-        samples.data_ptr(),
-        list(samples.shape),
+    _encode_audio_to_file_like(
+        samples,
         sample_rate,
         format,
-        file_like,
+        _pybind_ops.create_file_like_context(file_like, True),  # True means for writing
         bit_rate,
         num_channels,
         desired_sample_rate,
     )
-
-    # This check is useless but it's critical to keep it to ensures that samples
-    # is still alive during the call to encode_audio_to_file_like.
-    assert samples.is_contiguous()
 
 
 # ==============================
@@ -215,6 +203,13 @@ def encode_audio_to_file_like(
 # ==============================
 @register_fake("torchcodec_ns::create_from_file")
 def create_from_file_abstract(filename: str, seek_mode: Optional[str]) -> torch.Tensor:
+    return torch.empty([], dtype=torch.long)
+
+
+@register_fake("torchcodec_ns::_create_from_file_like")
+def _create_from_file_like_abstract(
+    file_like: int, seek_mode: Optional[str]
+) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 
@@ -251,15 +246,23 @@ def encode_audio_to_tensor_abstract(
     return torch.empty([], dtype=torch.long)
 
 
+@register_fake("torchcodec_ns::_encode_audio_to_file_like")
+def _encode_audio_to_file_like_abstract(
+    samples: torch.Tensor,
+    sample_rate: int,
+    format: str,
+    file_like_context: int,
+    bit_rate: Optional[int] = None,
+    num_channels: Optional[int] = None,
+    desired_sample_rate: Optional[int] = None,
+) -> None:
+    return
+
+
 @register_fake("torchcodec_ns::create_from_tensor")
 def create_from_tensor_abstract(
     video_tensor: torch.Tensor, seek_mode: Optional[str]
 ) -> torch.Tensor:
-    return torch.empty([], dtype=torch.long)
-
-
-@register_fake("torchcodec_ns::_convert_to_tensor")
-def _convert_to_tensor_abstract(decoder_ptr: int) -> torch.Tensor:
     return torch.empty([], dtype=torch.long)
 
 

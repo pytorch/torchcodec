@@ -598,8 +598,8 @@ void VideoEncoder::initializeEncoder(
   // TODO-VideoEncoder: Remove assumption that tensor in NCHW format
   auto sizes = frames_.sizes();
   inPixelFormat_ = AV_PIX_FMT_GBRP;
-  inHeight_ = sizes[2];
-  inWidth_ = sizes[3];
+  inHeight_ = static_cast<int>(sizes[2]);
+  inWidth_ = static_cast<int>(sizes[3]);
 
   // Use specified dimensions or input dimensions
   // TODO-VideoEncoder: Allow height and width to be set
@@ -664,7 +664,7 @@ void VideoEncoder::encode() {
       getFFMPEGErrorStringFromErrorCode(status));
 
   AutoAVPacket autoAVPacket;
-  int numFrames = frames_.sizes()[0];
+  int numFrames = static_cast<int>(frames_.sizes()[0]);
   for (int i = 0; i < numFrames; ++i) {
     torch::Tensor currFrame = frames_[i];
     UniqueAVFrame avFrame = convertTensorToAVFrame(currFrame, i);
