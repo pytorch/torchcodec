@@ -28,6 +28,7 @@ from torchcodec._core import (
     create_from_file_like,
     create_from_tensor,
     encode_audio_to_file,
+    encode_video_to_file,
     get_ffmpeg_library_versions,
     get_frame_at_index,
     get_frame_at_pts,
@@ -48,6 +49,7 @@ from .utils import (
     NASA_AUDIO_MP3,
     NASA_VIDEO,
     needs_cuda,
+    psnr,
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
@@ -1222,6 +1224,64 @@ class TestAudioEncoderOps:
                 sample_rate=10,
                 filename="./file.bad_extension",
             )
+
+
+class TestVideoEncoderOps:
+
+    def test_bad_input(self, tmp_path):
+        output_file = str(tmp_path / ".mp4")
+
+        with pytest.raises(
+            RuntimeError, match="frames must have uint8 dtype, got float"
+        ):
+            encode_video_to_file(
+                frames=torch.rand((10, 3, 60, 60), dtype=torch.float),
+                frame_rate=10,
+                filename=output_file,
+            )
+
+        with pytest.raises(
+            RuntimeError, match=r"frames must have 4 dimensions \(N, C, H, W\), got 3"
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=1, size=(3, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename=output_file,
+            )
+
+        with pytest.raises(
+            RuntimeError, match=r"frame must have 3 channels \(R, G, B\), got 2"
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=1, size=(10, 2, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename=output_file,
+            )
+
+    def decode(self, file_path) -> torch.Tensor:
+        decoder = create_from_file(str(file_path), seek_mode="approximate")
+        add_video_stream(decoder)
+        frames, *_ = get_frames_in_range(decoder, start=0, stop=60)
+        return frames
+
+    @pytest.mark.parametrize("format", ("mov", "mp4", "avi"))
+    # TODO-VideoEncoder: enable additional formats (mkv, webm)
+    def test_video_encoder_test_round_trip(self, tmp_path, format):
+        # TODO-VideoEncoder: Test with FFmpeg's testsrc2 video
+        asset = NASA_VIDEO
+
+        # Test that decode(encode(decode(asset))) == decode(asset)
+        source_frames = self.decode(str(asset.path)).data
+
+        encoded_path = str(tmp_path / f"encoder_output.{format}")
+        frame_rate = 30  # Frame rate is fixed with num frames decoded
+        encode_video_to_file(source_frames, frame_rate, encoded_path)
+        round_trip_frames = self.decode(encoded_path).data
+
+        # Check that PSNR for decode(encode(samples)) is above 30
+        for s_frame, rt_frame in zip(source_frames, round_trip_frames):
+            res = psnr(s_frame, rt_frame)
+            assert res > 30
 
 
 if __name__ == "__main__":

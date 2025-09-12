@@ -92,6 +92,9 @@ create_from_file = torch._dynamo.disallow_in_graph(
 encode_audio_to_file = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.encode_audio_to_file.default
 )
+encode_video_to_file = torch._dynamo.disallow_in_graph(
+    torch.ops.torchcodec_ns.encode_video_to_file.default
+)
 encode_audio_to_tensor = torch._dynamo.disallow_in_graph(
     torch.ops.torchcodec_ns.encode_audio_to_tensor.default
 )
@@ -218,6 +221,15 @@ def encode_audio_to_file_abstract(
     bit_rate: Optional[int] = None,
     num_channels: Optional[int] = None,
     desired_sample_rate: Optional[int] = None,
+) -> None:
+    return
+
+
+@register_fake("torchcodec_ns::encode_video_to_file")
+def encode_video_to_file_abstract(
+    frames: torch.Tensor,
+    frame_rate: int,
+    filename: str,
 ) -> None:
     return
 
