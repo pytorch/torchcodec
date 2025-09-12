@@ -177,7 +177,11 @@ function(make_torchcodec_libraries
     #   https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
     # We have to do this for both pybind_ops and custom_ops because they include
     # some of the same headers.
-    if(NOT WIN32)
+    #
+    # Note that this is Linux only. It's not necessary on Windows, and on Mac
+    # hiding visibility can actually break dyanmic casts across share libraries
+    # because the type infos don't get exported.
+    if(LINUX)
         target_compile_options(
             ${pybind_ops_library_name}
             PUBLIC
