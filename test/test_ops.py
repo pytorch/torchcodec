@@ -9,6 +9,8 @@ import io
 import os
 from functools import partial
 
+from .utils import in_fbcode
+
 os.environ["TORCH_LOGS"] = "output_code"
 import json
 import subprocess
@@ -480,6 +482,10 @@ class TestVideoDecoderOps:
             )
             assert pts_is_equal
 
+    @pytest.mark.skipif(
+        in_fbcode(),
+        reason="ffprobe not available internally",
+    )
     def test_seek_mode_custom_frame_mappings_fails(self):
         decoder = create_from_file(
             str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
@@ -506,6 +512,10 @@ class TestVideoDecoderOps:
                 decoder, stream_index=0, custom_frame_mappings=different_lengths
             )
 
+    @pytest.mark.skipif(
+        in_fbcode(),
+        reason="ffprobe not available internally",
+    )
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_seek_mode_custom_frame_mappings(self, device):
         stream_index = 3  # custom_frame_index seek mode requires a stream index
