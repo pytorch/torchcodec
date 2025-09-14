@@ -577,6 +577,9 @@ class TestVideoDecoder:
         if device == "cuda" and get_ffmpeg_major_version() == 4:
             return
 
+        if device == "cuda" and in_fbcode():
+            pytest.skip("AV1 decoding on CUDA is not supported internally")
+
         decoder = VideoDecoder(AV1_VIDEO.path, device=device)
         ref_frame10 = AV1_VIDEO.get_frame_data_by_index(10)
         ref_frame_info10 = AV1_VIDEO.get_frame_info(10)
@@ -1292,6 +1295,10 @@ class TestVideoDecoder:
             # Return the custom frame mappings as a JSON string
             return custom_frame_mappings
 
+    @pytest.mark.skipif(
+        in_fbcode(),
+        reason="ffprobe not available internally",
+    )
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("stream_index", [0, 3])
     @pytest.mark.parametrize(
@@ -1338,12 +1345,16 @@ class TestVideoDecoder:
             ),
         )
 
+    @pytest.mark.skipif(
+        in_fbcode(),
+        reason="ffprobe not available internally",
+    )
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize(
         "custom_frame_mappings,expected_match",
         [
             pytest.param(
-                NASA_VIDEO.generate_custom_frame_mappings(0),
+                None,
                 "seek_mode",
                 id="valid_content_approximate",
             ),
@@ -1361,6 +1372,8 @@ class TestVideoDecoder:
     def test_custom_frame_mappings_init_fails(
         self, device, custom_frame_mappings, expected_match
     ):
+        if custom_frame_mappings is None:
+            custom_frame_mappings = NASA_VIDEO.generate_custom_frame_mappings(0)
         with pytest.raises(ValueError, match=expected_match):
             VideoDecoder(
                 NASA_VIDEO.path,
