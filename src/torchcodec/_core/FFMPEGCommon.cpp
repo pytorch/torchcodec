@@ -7,7 +7,6 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
 #include <c10/util/Exception.h>
-#include <iostream>
 
 namespace facebook::torchcodec {
 
@@ -110,9 +109,8 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 }
 
 void validateNumChannels(const AVCodec& avCodec, int numChannels) {
-#if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
   std::stringstream supportedNumChannels;
-  std::cout << "ffmpeg7? " << std::endl;
   const AVChannelLayout* supported_layouts = nullptr;
   int num_layouts = 0;
   int ret = avcodec_get_supported_config(
@@ -158,7 +156,7 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
     }
     supportedNumChannels << avCodec.ch_layouts[i].nb_channels;
   }
-#else
+#else // FFmpeg <= 4
   if (avCodec.channel_layouts == nullptr) {
     // can't validate, same as above.
     return;

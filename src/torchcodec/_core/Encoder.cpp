@@ -34,7 +34,7 @@ torch::Tensor validateSamples(const torch::Tensor& samples) {
 
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
   const int* supportedSampleRates = nullptr;
-#if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
   int numSampleRates = 0;
   int ret = avcodec_get_supported_config(
       nullptr,
@@ -92,7 +92,7 @@ static const std::vector<AVSampleFormat> preferredFormatsOrder = {
 
 AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
   const AVSampleFormat* supportedSampleFormats = nullptr;
-#if LIBAVFILTER_VERSION_MAJOR >= 10 // FFmpeg >= 7
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
   int numSampleFormats = 0;
   int ret = avcodec_get_supported_config(
       nullptr,
