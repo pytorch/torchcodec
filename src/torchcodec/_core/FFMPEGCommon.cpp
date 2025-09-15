@@ -118,11 +118,10 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
       &avCodec,
       AV_CODEC_CONFIG_CHANNEL_LAYOUT,
       0,
-      (const void**)&supported_layouts, // use this instead of building
-                                        // supportedNumChannels?
+      (const void**)&supported_layouts,
       &num_layouts);
   if (ret < 0 || supported_layouts == nullptr) {
-    // If we can't validate, assume it'll be fine??
+    TORCH_CHECK(false, "Couldn't get supported channel layouts from encoder.");
     return;
   }
   for (int i = 0; supported_layouts[i].nb_channels != 0; ++i) {
