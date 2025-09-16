@@ -45,7 +45,6 @@ void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
       &numSampleRates);
   if (ret < 0 || supportedSampleRates == nullptr) {
     TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
-    return;
   }
 #else
   supportedSampleRates = avCodec.supported_samplerates;
