@@ -199,7 +199,7 @@ def _generic_time_based_sampler(
         clip_start_seconds = torch.arange(
             sampling_range_start,
             sampling_range_end,  # excluded
-            seconds_between_clip_starts,
+            round(seconds_between_clip_starts, 6),
         )
         num_clips = len(clip_start_seconds)
 
