@@ -59,7 +59,7 @@ print(f"Long video duration: {VideoDecoder(long_video_path).metadata.duration_se
 # .. _frame_mappings_creation:
 #
 # Creating custom frame mappings with ffprobe
-# --------------------------------------------
+# -------------------------------------------
 #
 # The key to using custom frame mappings is preprocessing your videos to extract
 # frame timing information, and whether or not a frame is a keyframe information.
@@ -91,7 +91,7 @@ with open(short_json_path, "w") as f:
 # .. _perf_creation:
 #
 # Performance: ``VideoDecoder`` creation with custom frame mappings
-# ------------------------------------------------------------------
+# -----------------------------------------------------------------
 #
 # Let's define a benchmarking function to measure performance. Note that when using
 # file-like objects for custom_frame_mappings, we need to seek back to the beginning
@@ -139,7 +139,7 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
 
 # %%
 # Performance: Frame decoding with custom frame mappings
-# --------------------------------------------------------
+# ------------------------------------------------------
 #
 # The performance benefits extend to frame decoding operations as well, since
 # each decoding workflow typically involves creating a VideoDecoder instance.
@@ -166,7 +166,7 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
 
 # %%
 # Accuracy: High accuracy frame seeking with custom frame mappings
-# -----------------------------------------------------------
+# ----------------------------------------------------------------
 #
 # The main advantage of using custom frame mappings over approximate mode is that
 # frame seeking accuracy is as high as exact mode.
@@ -204,7 +204,7 @@ print("Frame seeking is the same for this video!")
 # accuracy benefits.
 #
 # Which approach should I use?
-# -----------------------------
+# ----------------------------
 #
 # - For fastest decoding, "approximate" mode is strongly recommended.
 #
