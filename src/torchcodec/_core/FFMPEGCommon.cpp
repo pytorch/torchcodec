@@ -56,6 +56,46 @@ int64_t getDuration(const UniqueAVFrame& avFrame) {
 #endif
 }
 
+const int* getSupportedSampleRates(const AVCodec& avCodec) {
+  const int* supportedSampleRates = nullptr;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
+  int numSampleRates = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_SAMPLE_RATE,
+      0,
+      reinterpret_cast<const void**> & supportedSampleRates,
+      &numSampleRates);
+  if (ret < 0 || supportedSampleRates == nullptr) {
+    TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
+  }
+#else
+  supportedSampleRates = avCodec.supported_samplerates;
+#endif
+  return supportedSampleRates;
+}
+
+const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec) {
+  const AVSampleFormat* supportedSampleFormats = nullptr;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
+  int numSampleFormats = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_SAMPLE_FORMAT,
+      0,
+      reinterpret_cast<const void**> & supportedSampleFormats,
+      &numSampleFormats);
+  if (ret < 0 || supportedSampleFormats == nullptr) {
+    TORCH_CHECK(false, "Couldn't get supported sample formats from encoder.");
+  }
+#else
+  supportedSampleFormats = avCodec.sample_fmts;
+#endif
+  return supportedSampleFormats;
+}
+
 int getNumChannels(const UniqueAVFrame& avFrame) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
@@ -109,7 +149,31 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 }
 
 void validateNumChannels(const AVCodec& avCodec, int numChannels) {
-#if LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
+  std::stringstream supportedNumChannels;
+  const AVChannelLayout* supported_layouts = nullptr;
+  int num_layouts = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_CHANNEL_LAYOUT,
+      0,
+      reinterpret_cast<const void**> & supported_layouts,
+      &num_layouts);
+  if (ret < 0 || supported_layouts == nullptr) {
+    TORCH_CHECK(false, "Couldn't get supported channel layouts from encoder.");
+    return;
+  }
+  for (int i = 0; supported_layouts[i].nb_channels != 0; ++i) {
+    if (i > 0) {
+      supportedNumChannels << ", ";
+    }
+    supportedNumChannels << supported_layouts[i].nb_channels;
+    if (numChannels == supported_layouts[i].nb_channels) {
+      return;
+    }
+  }
+#elif LIBAVFILTER_VERSION_MAJOR > 7 // FFmpeg > 4
   if (avCodec.ch_layouts == nullptr) {
     // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
     // eventually raise.
@@ -131,7 +195,7 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
     }
     supportedNumChannels << avCodec.ch_layouts[i].nb_channels;
   }
-#else
+#else // FFmpeg <= 4
   if (avCodec.channel_layouts == nullptr) {
     // can't validate, same as above.
     return;
