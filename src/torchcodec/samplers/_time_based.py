@@ -196,11 +196,18 @@ def _generic_time_based_sampler(
         )
     else:
         assert seconds_between_clip_starts is not None  # appease type-checker
+        # The torch.arange documentation warns that floating point rounding errors
+        # are possible for non-integer steps when comparing to end.
+        # To prevent this, we check if the last clip_start_seconds value is
+        # equal to the end value, and remove it.
+        # docs.pytorch.org/docs/2.8/generated/torch.arange.html
         clip_start_seconds = torch.arange(
             sampling_range_start,
             sampling_range_end,  # excluded
-            round(seconds_between_clip_starts, 6),
+            seconds_between_clip_starts,
         )
+        if clip_start_seconds[-1] >= sampling_range_end:
+            clip_start_seconds = clip_start_seconds[:-1]
         num_clips = len(clip_start_seconds)
 
     all_clips_timestamps = _build_all_clips_timestamps(
