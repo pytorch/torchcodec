@@ -706,7 +706,7 @@ def test_floating_point_precision_in_clips_at_regular_timestamps(policy):
     # Using 1/3 would cause arange to include sampling_range_end, which gets filtered out
     # in _build_all_clips_timestamps, leaving clips with no frames.
     # The fix rounds seconds_between_clip_starts to prevent this.
-    seconds_between_clip_starts = 1 / 3
+    seconds_between_clip_starts = 1 / 3 - 1e-9
 
     decoder = VideoDecoder(H265_10BITS.path)  # Video is 1 second long
     # Set sampling range so that last clip will have frame timestamp ≈ end_stream_seconds
