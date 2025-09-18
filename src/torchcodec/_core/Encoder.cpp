@@ -33,23 +33,7 @@ torch::Tensor validateSamples(const torch::Tensor& samples) {
 }
 
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
-  const int* supportedSampleRates = nullptr;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
-  int numSampleRates = 0;
-  int ret = avcodec_get_supported_config(
-      nullptr,
-      &avCodec,
-      AV_CODEC_CONFIG_SAMPLE_RATE,
-      0,
-      (const void**)&supportedSampleRates,
-      &numSampleRates);
-  if (ret < 0 || supportedSampleRates == nullptr) {
-    TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
-  }
-#else
-  supportedSampleRates = avCodec.supported_samplerates;
-#endif
-
+  const int* supportedSampleRates = getSupportedSampleRates(avCodec);
   if (supportedSampleRates == nullptr) {
     return;
   }
@@ -90,22 +74,8 @@ static const std::vector<AVSampleFormat> preferredFormatsOrder = {
     AV_SAMPLE_FMT_U8};
 
 AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
-  const AVSampleFormat* supportedSampleFormats = nullptr;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
-  int numSampleFormats = 0;
-  int ret = avcodec_get_supported_config(
-      nullptr,
-      &avCodec,
-      AV_CODEC_CONFIG_SAMPLE_FORMAT,
-      0,
-      (const void**)&supportedSampleFormats,
-      &numSampleFormats);
-  if (ret < 0 || supportedSampleFormats == nullptr) {
-    TORCH_CHECK(false, "Couldn't get supported sample formats from encoder.");
-  }
-#else
-  supportedSampleFormats = avCodec.sample_fmts;
-#endif
+  const AVSampleFormat* supportedSampleFormats =
+      getSupportedOutputSampleFormats(avCodec);
 
   // Find a sample format that the encoder supports. We prefer using FLT[P],
   // since this is the format of the input samples. If FLTP isn't supported

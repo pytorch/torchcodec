@@ -56,6 +56,46 @@ int64_t getDuration(const UniqueAVFrame& avFrame) {
 #endif
 }
 
+const int* getSupportedSampleRates(const AVCodec& avCodec) {
+  const int* supportedSampleRates = nullptr;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
+  int numSampleRates = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_SAMPLE_RATE,
+      0,
+      (const void**)&supportedSampleRates,
+      &numSampleRates);
+  if (ret < 0 || supportedSampleRates == nullptr) {
+    TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
+  }
+#else
+  supportedSampleRates = avCodec.supported_samplerates;
+#endif
+  return supportedSampleRates;
+}
+
+const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec) {
+  const AVSampleFormat* supportedSampleFormats = nullptr;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
+  int numSampleFormats = 0;
+  int ret = avcodec_get_supported_config(
+      nullptr,
+      &avCodec,
+      AV_CODEC_CONFIG_SAMPLE_FORMAT,
+      0,
+      (const void**)&supportedSampleFormats,
+      &numSampleFormats);
+  if (ret < 0 || supportedSampleFormats == nullptr) {
+    TORCH_CHECK(false, "Couldn't get supported sample formats from encoder.");
+  }
+#else
+  supportedSampleFormats = avCodec.sample_fmts;
+#endif
+  return supportedSampleFormats;
+}
+
 int getNumChannels(const UniqueAVFrame& avFrame) {
 #if LIBAVFILTER_VERSION_MAJOR > 8 || \
     (LIBAVFILTER_VERSION_MAJOR == 8 && LIBAVFILTER_VERSION_MINOR >= 44)
