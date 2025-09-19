@@ -15,6 +15,7 @@ namespace facebook::torchcodec {
 class Transform {
  public:
   virtual std::string getFilterGraphCpu() const = 0;
+  virtual ~Transform() = default;
 
   // If the transformation does not change the output frame dimensions, then
   // there is no need to override this member function. The default
