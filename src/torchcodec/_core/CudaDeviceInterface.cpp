@@ -225,7 +225,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     auto cpuInterface = createDeviceInterface(cpuDevice);
     TORCH_CHECK(
         cpuInterface != nullptr, "Failed to create CPU device interface");
-    cpuDeviceInterface->initialize(
+    cpuInterface->initialize(
         nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
 
     FrameOutput cpuFrameOutput;
