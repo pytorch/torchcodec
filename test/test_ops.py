@@ -487,27 +487,41 @@ class TestVideoDecoderOps:
         reason="ffprobe not available internally",
     )
     def test_seek_mode_custom_frame_mappings_fails(self):
-        decoder = create_from_file(
-            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
-        )
         with pytest.raises(
             RuntimeError,
             match="Missing frame mappings when custom_frame_mappings seek mode is set.",
         ):
+            decoder = create_from_file(
+                str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+            )
             add_video_stream(decoder, stream_index=0, custom_frame_mappings=None)
 
-        decoder = create_from_file(
-            str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
-        )
-        different_lengths = (
-            torch.tensor([1, 2, 3]),
-            torch.tensor([1, 2]),
-            torch.tensor([1, 2, 3]),
-        )
+        with pytest.raises(
+            RuntimeError,
+            match="all_frames and duration tensors must be int64 dtype, and is_key_frame tensor must be a bool dtype.",
+        ):
+            decoder = create_from_file(
+                str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+            )
+            wrong_types = (
+                torch.tensor([1.1, 2.2, 3.3]),
+                torch.tensor([1, 2]),
+                torch.tensor([1, 2, 3]),
+            )
+            add_video_stream(decoder, stream_index=0, custom_frame_mappings=wrong_types)
+
         with pytest.raises(
             RuntimeError,
             match="all_frames, is_key_frame, and duration from custom_frame_mappings were not same size.",
         ):
+            decoder = create_from_file(
+                str(NASA_VIDEO.path), seek_mode="custom_frame_mappings"
+            )
+            different_lengths = (
+                torch.tensor([1, 2, 3]),
+                torch.tensor([False, False]),
+                torch.tensor([1, 2, 3]),
+            )
             add_video_stream(
                 decoder, stream_index=0, custom_frame_mappings=different_lengths
             )
