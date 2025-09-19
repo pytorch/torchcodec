@@ -43,6 +43,7 @@ from .utils import (
     SINE_MONO_S32,
     SINE_MONO_S32_44100,
     SINE_MONO_S32_8000,
+    cleanup_device_str,
 )
 
 
@@ -177,6 +178,7 @@ class TestVideoDecoder:
             seek_mode=seek_mode,
         )
 
+        device = cleanup_device_str(device)
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0).to(device)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1).to(device)
         ref_frame180 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
@@ -224,6 +226,7 @@ class TestVideoDecoder:
 
         # ensure that the degenerate case of a range of size 1 works
 
+        device = cleanup_device_str(device)
         ref0 = NASA_VIDEO.get_frame_data_by_range(0, 1).to(device)
         slice0 = decoder[0:1]
         assert slice0.shape == torch.Size(
@@ -399,6 +402,7 @@ class TestVideoDecoder:
     def test_iteration(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
+        device = cleanup_device_str(device)
         ref_frame0 = NASA_VIDEO.get_frame_data_by_index(0).to(device)
         ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1).to(device)
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9).to(device)
@@ -446,6 +450,7 @@ class TestVideoDecoder:
     def test_get_frame_at(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
+        device = cleanup_device_str(device)
         ref_frame9 = NASA_VIDEO.get_frame_data_by_index(9).to(device)
         frame9 = decoder.get_frame_at(9)
 
@@ -514,6 +519,7 @@ class TestVideoDecoder:
 
         assert isinstance(frames, FrameBatch)
 
+        device = cleanup_device_str(device)
         assert_frames_equal(
             frames[0].data, NASA_VIDEO.get_frame_data_by_index(35).to(device)
         )
@@ -586,6 +592,7 @@ class TestVideoDecoder:
         decoded_frame10 = decoder.get_frame_at(10)
         assert decoded_frame10.duration_seconds == ref_frame_info10.duration_seconds
         assert decoded_frame10.pts_seconds == ref_frame_info10.pts_seconds
+        device = cleanup_device_str(device)
         assert_frames_equal(decoded_frame10.data, ref_frame10.to(device=device))
 
     @pytest.mark.parametrize("device", all_supported_devices())
@@ -593,6 +600,7 @@ class TestVideoDecoder:
     def test_get_frame_played_at(self, device, seek_mode):
         decoder = VideoDecoder(NASA_VIDEO.path, device=device, seek_mode=seek_mode)
 
+        device = cleanup_device_str(device)
         ref_frame_played_at_6 = NASA_VIDEO.get_frame_data_by_index(180).to(device)
         assert_frames_equal(
             ref_frame_played_at_6, decoder.get_frame_played_at(6.006).data
@@ -642,6 +650,7 @@ class TestVideoDecoder:
 
         assert isinstance(frames, FrameBatch)
 
+        device = cleanup_device_str(device)
         for i in range(len(reference_indices)):
             assert_frames_equal(
                 frames.data[i],
@@ -692,6 +701,7 @@ class TestVideoDecoder:
             seek_mode=seek_mode,
         )
 
+        device = cleanup_device_str(device)
         # test degenerate case where we only actually get 1 frame
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
             start=9, stop=10, stream_index=stream_index
@@ -806,6 +816,7 @@ class TestVideoDecoder:
                 NASA_VIDEO.get_width(stream_index=3),
             ]
         )
+        device = cleanup_device_str(device)
         ref_frame387_389 = NASA_VIDEO.get_frame_data_by_range(
             start=387, stop=390, stream_index=3
         ).to(device)
@@ -882,6 +893,7 @@ class TestVideoDecoder:
 
         # Test get_frames_in_range Python logic which uses the num_frames metadata mocked earlier.
         # The frame is read at the C++ level.
+        device = cleanup_device_str(device)
         ref_frames9 = NASA_VIDEO.get_frame_data_by_range(
             start=9, stop=10, stream_index=3
         ).to(device)
@@ -938,6 +950,7 @@ class TestVideoDecoder:
             device=device,
             seek_mode=seek_mode,
         )
+        device = cleanup_device_str(device)
 
         # Note that we are comparing the results of VideoDecoder's method:
         #   get_frames_played_in_range()
@@ -1155,6 +1168,7 @@ class TestVideoDecoder:
 
             frames = get_some_frames(decoder)
 
+            device = cleanup_device_str(device)
             ref_frame1 = NASA_VIDEO.get_frame_data_by_index(1).to(device)
             ref_frame3 = NASA_VIDEO.get_frame_data_by_index(3).to(device)
             ref_frame5 = NASA_VIDEO.get_frame_data_by_index(5).to(device)
@@ -1204,6 +1218,8 @@ class TestVideoDecoder:
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
 
+    # TODONVDEC make sure the needs_cuda test are passing on new interface.
+    # Right now they're not even ran with :nvdec
     @needs_cuda
     @pytest.mark.parametrize("asset", (BT709_FULL_RANGE, NASA_VIDEO))
     def test_full_and_studio_range_bt709_video(self, asset):
@@ -1327,6 +1343,7 @@ class TestVideoDecoder:
             )
         frame_0 = decoder.get_frame_at(0)
         frame_5 = decoder.get_frame_at(5)
+        device = cleanup_device_str(device)
         assert_frames_equal(
             frame_0.data,
             NASA_VIDEO.get_frame_data_by_index(0, stream_index=stream_index).to(device),

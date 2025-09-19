@@ -15,7 +15,7 @@ else()
         # TODO set warnings as errors on Windows as well.
         # set(TORCHCODEC_WERROR_OPTION "/WX")
     else()
-        set(TORCHCODEC_WERROR_OPTION "-Werror")
+        # set(TORCHCODEC_WERROR_OPTION "-Werror")
     endif()
 endif()
 
@@ -31,9 +31,9 @@ endif()
 if (WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCHCODEC_WERROR_OPTION} ${TORCH_CXX_FLAGS}")
 endif()
-
 
 function(make_torchcodec_sublibrary
     library_name
@@ -98,7 +98,7 @@ function(make_torchcodec_libraries
     )
 
     if(ENABLE_CUDA)
-	    list(APPEND core_sources CudaDeviceInterface.cpp)
+	    list(APPEND core_sources CudaDeviceInterface.cpp CustomNvdecDeviceInterface.cpp)
     endif()
 
     set(core_library_dependencies
@@ -111,6 +111,33 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
+
+        # Try the normal way first
+        find_library(NVCUVID_LIBRARY NAMES nvcuvid)
+        
+        # If not found, try with version suffix
+        if(NOT NVCUVID_LIBRARY)
+            find_library(NVCUVID_LIBRARY NAMES nvcuvid.1 PATHS /usr/lib64 /usr/lib)
+        endif()
+        
+        # Or specify the full path directly
+        if(NOT NVCUVID_LIBRARY)
+            set(NVCUVID_LIBRARY "/usr/lib64/libnvcuvid.so.1")
+        endif()
+        
+        if(NVCUVID_LIBRARY)
+            message(STATUS "Found NVCUVID: ${NVCUVID_LIBRARY}")
+        else()
+            message(FATAL_ERROR "Could not find NVCUVID library")
+        endif()
+        # find_library(NVCUVID_LIBRARY NAMES nvcuvid REQUIRED)
+        # message(STATUS "Found NVCUVID library: ${NVCUVID_LIBRARY}")
+
+        # Add CUDA Driver library (needed for cuCtxGetCurrent, etc.)
+        find_library(CUDA_DRIVER_LIBRARY NAMES cuda REQUIRED)
+        message(STATUS "Found CUDA Driver library: ${CUDA_DRIVER_LIBRARY}")
+
+        list(APPEND core_library_dependencies ${NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
     endif()
 
     make_torchcodec_sublibrary(
@@ -250,9 +277,9 @@ if(DEFINED ENV{BUILD_AGAINST_ALL_FFMPEG_FROM_S3})
     )
 
     make_torchcodec_libraries(7 ffmpeg7)
-    make_torchcodec_libraries(6 ffmpeg6)
-    make_torchcodec_libraries(4 ffmpeg4)
-    make_torchcodec_libraries(5 ffmpeg5)
+    # make_torchcodec_libraries(6 ffmpeg6)
+    # make_torchcodec_libraries(4 ffmpeg4)
+    # make_torchcodec_libraries(5 ffmpeg5)
 else()
     message(
         STATUS

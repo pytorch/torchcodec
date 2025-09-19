@@ -1,0 +1,970 @@
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+// All rights reserved.
+//
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
+
+#include <torch/types.h>
+#include <mutex>
+#include <vector>
+#include <unistd.h>  // For usleep
+
+#include "src/torchcodec/_core/CustomNvdecDeviceInterface.h"
+
+#if CUSTOM_NVDEC_DEBUG
+#include <iostream>  // For debug output
+#endif
+#include "src/torchcodec/_core/DeviceInterface.h"
+#include "src/torchcodec/_core/FFMPEGCommon.h"
+
+#include "src/torchcodec/_core/nvcuvid_include/cuviddec.h"
+#include "src/torchcodec/_core/nvcuvid_include/nvcuvid.h"
+#include <cuda_runtime.h>  // For cudaStreamSynchronize
+
+extern "C" {
+#include <libavutil/hwcontext_cuda.h>
+#include <libavutil/pixdesc.h>
+}
+
+namespace facebook::torchcodec {
+
+// Simplified NVDEC Cache Implementation following Cache.h patterns
+NVDECCache& NVDECCache::GetCache(int device_id) {
+  static NVDECCache cache_inst[32]; // Support up to 32 GPUs like PyTorch
+  if (device_id == -1) {
+    cudaGetDevice(&device_id);
+  }
+  return cache_inst[device_id];
+}
+
+NVDECDecoderKey NVDECCache::createKey(CUVIDEOFORMAT* video_format) {
+  unsigned num_decode_surfaces = video_format->min_num_decode_surfaces;
+  if (num_decode_surfaces == 0) {
+    num_decode_surfaces = 20;  // Default fallback
+  }
+  
+  return NVDECDecoderKey{
+    video_format->codec,
+    video_format->coded_width,
+    video_format->coded_height,
+    video_format->chroma_format,
+    video_format->bit_depth_luma_minus8,
+    num_decode_surfaces
+  };
+}
+
+UniqueCUvideodecoder NVDECCache::getDecoder(const NVDECDecoderKey& key) {
+  std::lock_guard<std::mutex> lock(cache_lock_);
+  
+  auto it = cache_.find(key);
+  if (it != cache_.end()) {
+    // Found cached decoder, return it
+    auto decoder = std::move(it->second);
+    cache_.erase(it);
+    return decoder;
+  }
+  
+  return nullptr; // No cached decoder available
+}
+
+bool NVDECCache::returnDecoder(const NVDECDecoderKey& key, UniqueCUvideodecoder decoder) {
+  if (!decoder) {
+    return false;
+  }
+  
+  std::lock_guard<std::mutex> lock(cache_lock_);
+  
+  // Check cache size limit
+  if (cache_.size() >= MAX_CACHE_SIZE) {
+    // Cache full, don't store decoder (it will be auto-destroyed)
+    return false;
+  }
+  
+  cache_[key] = std::move(decoder);
+  return true;
+}
+
+UniqueCUvideodecoder NVDECCache::createDecoder(CUVIDEOFORMAT* video_format) {
+  auto codec_type = video_format->codec;
+  unsigned height = video_format->coded_height;
+  unsigned width = video_format->coded_width;
+  auto num_decode_surfaces = video_format->min_num_decode_surfaces;
+  auto chroma_format = video_format->chroma_format;
+  auto bit_depth_luma_minus8 = video_format->bit_depth_luma_minus8;
+
+  if (num_decode_surfaces == 0) {
+    num_decode_surfaces = 20;
+  }
+  
+  // Check decoder capabilities
+  auto caps = CUVIDDECODECAPS{};
+  caps.eCodecType = codec_type;
+  caps.eChromaFormat = chroma_format;
+  caps.nBitDepthMinus8 = bit_depth_luma_minus8;
+  CUresult caps_result = cuvidGetDecoderCaps(&caps);
+  TORCH_CHECK(caps_result == CUDA_SUCCESS, "Failed to get decoder caps: ", caps_result);
+  
+  TORCH_CHECK(caps.bIsSupported, 
+              "Codec configuration not supported on this GPU. "
+              "Codec: ", static_cast<int>(codec_type), 
+              ", chroma format: ", static_cast<int>(chroma_format),
+              ", bit depth: ", bit_depth_luma_minus8 + 8);
+
+  TORCH_CHECK(width >= caps.nMinWidth && height >= caps.nMinHeight,
+              "Video is too small in at least one dimension. Provided: ",
+              width, "x", height, " vs supported:", caps.nMinWidth, "x", caps.nMinHeight);
+
+  TORCH_CHECK(width <= caps.nMaxWidth && height <= caps.nMaxHeight,
+              "Video is too large in at least one dimension. Provided: ",
+              width, "x", height, " vs supported:", caps.nMaxWidth, "x", caps.nMaxHeight);
+
+  TORCH_CHECK(width * height / 256 <= caps.nMaxMBCount,
+              "Video is too large (too many macroblocks). "
+              "Provided (width * height / 256): ",
+              width * height / 256, " vs supported:", caps.nMaxMBCount);
+
+  // Create new decoder
+  CUVIDDECODECREATEINFO decoder_info;
+  memset(&decoder_info, 0, sizeof(CUVIDDECODECREATEINFO));
+
+  decoder_info.bitDepthMinus8 = bit_depth_luma_minus8;
+  decoder_info.ChromaFormat = chroma_format;
+  decoder_info.CodecType = codec_type;
+  decoder_info.ulHeight = height;
+  decoder_info.ulWidth = width;
+  decoder_info.ulMaxHeight = height;
+  decoder_info.ulMaxWidth = width;
+  decoder_info.ulTargetHeight = video_format->display_area.bottom - video_format->display_area.top;
+  decoder_info.ulTargetWidth = video_format->display_area.right - video_format->display_area.left;
+  decoder_info.ulNumDecodeSurfaces = num_decode_surfaces;
+  decoder_info.ulNumOutputSurfaces = 2;
+  decoder_info.ulCreationFlags = cudaVideoCreate_PreferCUVID;
+  decoder_info.vidLock = nullptr;
+
+  auto& area = decoder_info.display_area;
+  area.left = video_format->display_area.left;
+  area.right = video_format->display_area.right;
+  area.top = video_format->display_area.top;
+  area.bottom = video_format->display_area.bottom;
+
+  CUvideodecoder raw_decoder;
+  CUresult result = cuvidCreateDecoder(&raw_decoder, &decoder_info);
+  TORCH_CHECK(result == CUDA_SUCCESS, "Failed to create NVDEC decoder: ", result);
+
+  // Wrap in unique_ptr with custom deleter
+  return UniqueCUvideodecoder(raw_decoder, CUvideoDecoderDeleter{});
+}
+
+namespace {
+
+// Register the custom NVDEC device interface with 'custom_nvdec' variant
+static bool g_cuda_custom_nvdec = registerDeviceInterface(
+    DeviceInterfaceKey(torch::kCUDA, "custom_nvdec"),
+    [](const torch::Device& device) {
+      return new CustomNvdecDeviceInterface(device);
+    });
+
+// NVDEC callback functions
+static int CUDAAPI
+HandleVideoSequence(void* pUserData, CUVIDEOFORMAT* pVideoFormat) {
+  CustomNvdecDeviceInterface* decoder =
+      static_cast<CustomNvdecDeviceInterface*>(pUserData);
+  return decoder->handleVideoSequence(pVideoFormat);
+}
+
+static int CUDAAPI
+HandlePictureDecode(void* pUserData, CUVIDPICPARAMS* pPicParams) {
+  CustomNvdecDeviceInterface* decoder =
+      static_cast<CustomNvdecDeviceInterface*>(pUserData);
+  return decoder->handlePictureDecode(pPicParams);
+}
+
+// HandlePictureDisplay callback removed - we now call handlePictureDisplay directly
+// from handlePictureDecode like DALI does
+
+} // namespace
+
+CustomNvdecDeviceInterface::CustomNvdecDeviceInterface(
+    const torch::Device& device)
+    : DeviceInterface(device) {
+  TORCH_CHECK(
+      g_cuda_custom_nvdec, "CustomNvdecDeviceInterface was not registered!");
+  TORCH_CHECK(
+      device_.type() == torch::kCUDA, "Unsupported device: ", device_.str());
+  
+  // Initialize frame buffer for B-frame reordering
+  // TODONVDEC tune default size. Is this even supposed to be MAX_DECODE_SURFACES?
+  // frameBuffer_.resize(MAX_DECODE_SURFACES);
+  frameBuffer_.resize(4);
+  
+  // Initialize decode surface tracking (like DALI)
+  surfaceInUse_.resize(MAX_DECODE_SURFACES, false);
+  
+  // Initialize PTS tracking for multi-frame packets
+  basePts_ = AV_NOPTS_VALUE;
+  frameIndexInPacket_ = 0;
+  
+}
+
+CustomNvdecDeviceInterface::~CustomNvdecDeviceInterface() {
+  // Clean up any remaining frames in the buffer
+  {
+    std::lock_guard<std::mutex> lock(frameBufferMutex_);
+    for (auto& frame : frameBuffer_) {
+      frame.available = false;
+      frame.pts = -1;
+    }
+  }
+
+  // Return decoder to cache if we have one
+  if (decoder_) {
+    NVDECCache::GetCache(device_.index()).returnDecoder(decoderKey_, std::move(decoder_));
+  }
+
+  // Clean up video parser
+  if (videoParser_) {
+    cuvidDestroyVideoParser(videoParser_);
+    videoParser_ = nullptr;
+  }
+
+  parserCreated_ = false;
+}
+
+std::optional<const AVCodec*> CustomNvdecDeviceInterface::findCodec(
+    const AVCodecID& codecId) {
+
+  // TODONVDEC uhh???
+  // For custom NVDEC, we bypass FFmpeg codec selection entirely
+  // We'll handle the codec selection in our own NVDEC initialization
+  (void)codecId; // Suppress unused parameter warning
+  return std::nullopt;
+}
+
+void CustomNvdecDeviceInterface::initializeContext(
+    AVCodecContext* codecContext) {
+  // Don't set hw_device_ctx - we handle decoding directly with NVDEC SDK
+  // Just ensure CUDA context exists for PyTorch tensors
+  torch::Tensor dummyTensor = torch::empty(
+      {1}, torch::TensorOptions().dtype(torch::kUInt8).device(device_));
+
+  // Convert FFmpeg codec ID to NVDEC codec enum
+  cudaVideoCodec nvCodec;
+  switch (codecContext->codec_id) {
+    case AV_CODEC_ID_H264:
+      nvCodec = cudaVideoCodec_H264;
+      break;
+    case AV_CODEC_ID_HEVC:
+      nvCodec = cudaVideoCodec_HEVC;
+      break;
+    case AV_CODEC_ID_AV1:
+      nvCodec = cudaVideoCodec_AV1;
+      break;
+    case AV_CODEC_ID_VP8:
+      nvCodec = cudaVideoCodec_VP8;
+      break;
+    case AV_CODEC_ID_VP9:
+      nvCodec = cudaVideoCodec_VP9;
+      break;
+    default:
+      TORCH_CHECK(
+          false,
+          "Unsupported codec for custom NVDEC: ",
+          avcodec_get_name(codecContext->codec_id));
+  }
+
+  // TODONVDEC figure out why this is needed and where videoFormat_ is actually used.
+  // Maybe this isn't needed at all since this gets overridden in handleVideoSequence?
+  memset(&videoFormat_, 0, sizeof(videoFormat_));
+  videoFormat_.codec = nvCodec;
+  videoFormat_.coded_width = 0; // Will be set when we get the first frame
+  videoFormat_.coded_height = 0; // Will be set when we get the first frame
+  videoFormat_.chroma_format = cudaVideoChromaFormat_420;
+  videoFormat_.bit_depth_luma_minus8 = 0;
+  videoFormat_.bit_depth_chroma_minus8 = 0;
+
+  // TODONVDEC: The nvdec docs clearly state that the CUvideoparser is an
+  // optional component, and that we could just rely on FFMpeg instead:
+  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#video-decoder-pipeline.
+  // The tradeoff is unclear to me ATM.
+  createVideoParser();
+}
+
+void CustomNvdecDeviceInterface::setTimeBase(const AVRational& timeBase) {
+  timeBase_ = timeBase;
+}
+
+void CustomNvdecDeviceInterface::setFrameRate(const AVRational& frameRate) {
+  fallbackFrameRate_ = frameRate;
+}
+
+
+void CustomNvdecDeviceInterface::createVideoParser() {
+  if (parserCreated_) {
+    // TODONVDEC - is this needed?
+    return;
+  }
+  
+  // Set up video parser parameters
+  CUVIDPARSERPARAMS parserParams = {};
+  parserParams.CodecType = videoFormat_.codec;
+  // Set to dummy value initially, sequence callback will update this
+  // as recommended by NVDEC docs
+  parserParams.ulMaxNumDecodeSurfaces = 1;
+  parserParams.ulClockRate = 1000;
+  parserParams.ulErrorThreshold = 0;
+  parserParams.ulMaxDisplayDelay = 1;
+  parserParams.pUserData = this;
+  parserParams.pfnSequenceCallback = HandleVideoSequence;
+  parserParams.pfnDecodePicture = HandlePictureDecode;
+  parserParams.pfnDisplayPicture = nullptr;  // Like DALI - we handle display manually
+
+  CUresult result = cuvidCreateVideoParser(&videoParser_, &parserParams);
+  TORCH_CHECK(
+      result == CUDA_SUCCESS, "Failed to create video parser: ", result);
+
+  parserCreated_ = true;
+}
+
+// This callback is called by the parser within cuvidParseVideoData, either when
+// the parser encounters the start of the headers, or when "there is a change in
+// the sequence" - which, I assume means a change in any one of CUVIDEOFORMAT
+// fields?
+int CustomNvdecDeviceInterface::handleVideoSequence(
+    CUVIDEOFORMAT* pVideoFormat) {
+  TORCH_CHECK(pVideoFormat != nullptr, "Invalid video format");
+
+  // Store video format
+  videoFormat_ = *pVideoFormat;
+
+  // Get or create decoder using simplified cache
+  if (!decoder_) {
+    // Create cache key from video format
+    decoderKey_ = NVDECCache::createKey(pVideoFormat);
+    
+    // Try to get decoder from cache first
+    decoder_ = NVDECCache::GetCache(device_.index()).getDecoder(decoderKey_);
+    
+    // If no cached decoder available, create new one
+    if (!decoder_) {
+      decoder_ = NVDECCache::createDecoder(pVideoFormat);
+    }
+    
+    TORCH_CHECK(decoder_, "Failed to get or create decoder");
+  }
+
+  // Use min_num_decode_surfaces from video format for optimal memory allocation
+  // as recommended by NVDEC docs and implemented in DALI
+  unsigned int numSurfaces = pVideoFormat->min_num_decode_surfaces;
+  if (numSurfaces == 0) {
+    numSurfaces = 20;  // DALI's fallback value
+  }
+
+  // Return the number of decode surfaces to update parser's ulMaxNumDecodeSurfaces
+  // This follows NVDEC docs recommendation and DALI's implementation
+  return numSurfaces;
+}
+
+// Parser triggers this callback when bitstream data for one frame is ready
+int CustomNvdecDeviceInterface::handlePictureDecode(
+    CUVIDPICPARAMS* pPicParams) {
+
+#if CUSTOM_NVDEC_DEBUG
+  // NVDEC picture types (from cuviddec.h)
+  const char* picTypeStr = "unknown";
+  if (pPicParams->intra_pic_flag) {
+    picTypeStr = "I-frame";
+  } else if (pPicParams->ref_pic_flag) {
+    picTypeStr = "P-frame"; 
+  } else {
+    picTypeStr = "B-frame";
+  }
+
+  std::cout << "[DEBUG] handlePictureDecode: Called for surface " << pPicParams->CurrPicIdx
+            << ", type=" << picTypeStr << ", frame_offset=" << pPicParams->CodecSpecific.av1.frame_offset << std::endl;
+#endif
+
+  // Like DALI: if we're flushing, don't process new decode operations
+  if (flush_) {
+    return 0;
+  }
+
+  TORCH_CHECK(pPicParams != nullptr, "Invalid picture parameters");
+  TORCH_CHECK(
+      decoder_, "Decoder not initialized before picture decode");
+
+  // Like DALI: wait for decode surface to become available
+  int totalWait = 0;
+  constexpr int sleepPeriod = 500; // microseconds
+  constexpr int timeoutSec = 20;
+  constexpr bool enableTimeout = false;
+  
+  int surfaceIndex = pPicParams->CurrPicIdx;
+  
+  while (surfaceIndex < surfaceInUse_.size() && surfaceInUse_[surfaceIndex]) {
+    if (enableTimeout && totalWait++ > timeoutSec * 1000000 / sleepPeriod) {
+      return 0;
+    }
+    usleep(sleepPeriod);
+  }
+
+
+  // Doc say that calling cuvidDecodePicture kicks of the hardware decoding of the frame (async!).
+  // We know the frame was successfully decoded when cuvidMapVideoFrame returns
+  // successfully.
+  // https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/nvdec-video-decoder-api-prog-guide/index.html#preparing-the-decoded-frame-for-further-processing
+  CUresult result = cuvidDecodePicture(static_cast<CUvideodecoder>(decoder_.get()), pPicParams);
+  
+  if (result != CUDA_SUCCESS) {
+    return 0;
+  }
+  
+  // Mark surface as in-use (like DALI)
+  if (surfaceIndex < surfaceInUse_.size()) {
+    surfaceInUse_[surfaceIndex] = true;
+  }
+  
+  // Like DALI: manually create display info and handle picture display directly
+  CUVIDPARSERDISPINFO dispInfo = {};
+  dispInfo.picture_index = pPicParams->CurrPicIdx;
+  dispInfo.progressive_frame = !pPicParams->field_pic_flag;
+  dispInfo.top_field_first = pPicParams->bottom_field_flag ^ 1;
+  dispInfo.repeat_first_field = 0;
+  
+  
+  // Efficient PTS assignment using min-heap priority queue with incremental PTS for multi-frame packets
+  // Always assign the smallest (earliest) PTS from the queue
+  // This handles cases where queue gets out of sync due to B-frame reordering
+  if (!pipedPts_.empty()) {
+    // Get the smallest PTS (top of min-heap) - O(1)
+    currentPts_ = pipedPts_.top();
+    // Remove it from the queue - O(log n)
+    pipedPts_.pop();
+    
+    // This is the first frame from a new packet - reset frame index and set base PTS
+    basePts_ = currentPts_;
+    frameIndexInPacket_ = 0;
+    
+  } else {
+    // Handle case where one packet produces multiple frames
+    // Assign incremental PTS values based on frame duration
+    frameIndexInPacket_++;
+  }
+  
+  // Calculate PTS based on frame order
+  int64_t frameDuration = calculateFrameDuration();
+  int64_t framePts;
+  
+  if (videoFormat_.codec == cudaVideoCodec_AV1) {
+    // For AV1, calculate PTS index based on frame_offset to ensure proper temporal ordering
+    // Smaller frame_offset should get earlier (smaller) PTS
+    int64_t currentFrameOffset = pPicParams->CodecSpecific.av1.frame_offset;
+    
+    // Simple mapping: use frame_offset to determine PTS order
+    // Since frame_offset is typically a power of 2 sequence in reverse order,
+    // we can use a simple formula to get the PTS index
+    int ptsIndex = 0;
+    int64_t tempOffset = currentFrameOffset;
+    
+    // Count the number of times we can divide by 2 to get the reverse index
+    while (tempOffset > 1) {
+      tempOffset >>= 1;  // Divide by 2
+      ptsIndex++;
+    }
+    
+    // Map frame_offset to PTS index: smaller frame_offset gets smaller PTS
+    // For frame_offsets 16,8,4,2,1 we want PTS indices 4,3,2,1,0 
+    // so that frame_offset=1 gets PTS index=0 (earliest PTS)
+    framePts = basePts_ + (ptsIndex * frameDuration);
+  } else {
+    // For non-AV1 codecs, use simple increment
+    framePts = basePts_ + (frameIndexInPacket_ * frameDuration);
+  }
+  
+#if CUSTOM_NVDEC_DEBUG
+  std::cout << "[DEBUG]   Assigned PTS=" << framePts << " to picture_index " << dispInfo.picture_index << std::endl;
+  printPtsQueue("after PTS assignment");
+#endif
+  
+  // Set the PTS in the display info
+  dispInfo.timestamp = framePts;
+  
+  // Buffer frame for B-frame reordering (like DALI)
+  std::lock_guard<std::mutex> lock(frameBufferMutex_);
+  BufferedFrame* slot = findEmptySlot();
+  slot->dispInfo = dispInfo;
+  slot->pts = framePts;  // Use the PTS we just assigned
+  
+  // Store frame_offset for AV1 tie-breaking
+  if (videoFormat_.codec == cudaVideoCodec_AV1) {
+    slot->frame_offset = pPicParams->CodecSpecific.av1.frame_offset;
+  } else {
+    slot->frame_offset = 0;  // Not applicable for non-AV1 codecs
+  }
+  
+  slot->available = true;
+  
+#if CUSTOM_NVDEC_DEBUG
+  printFrameBuffer("after adding frame");
+#endif
+  
+  return 1;
+}
+
+int CustomNvdecDeviceInterface::sendPacket(ReferenceAVPacket& packet) {
+
+    if (!parserCreated_) {
+      return AVERROR(EINVAL);
+    }
+   
+    CUVIDSOURCEDATAPACKET cudaPacket = {0};
+    
+    if (packet.get() && packet->data && packet->size > 0) {
+      // Regular packet with data
+#if CUSTOM_NVDEC_DEBUG
+      std::string frameType = "unknown";
+      if (packet->flags & AV_PKT_FLAG_KEY) {
+        frameType = "keyframe";
+      } else {
+        frameType = "non-keyframe";
+      }
+      std::cout << "[DEBUG] sendPacket: Sending packet with PTS=" << packet->pts << ", size=" << packet->size << ", type=" << frameType << std::endl;
+#endif
+      
+      cudaPacket.payload = packet->data;
+    cudaPacket.payload_size = packet->size;
+    cudaPacket.flags = CUVID_PKT_TIMESTAMP;
+    cudaPacket.timestamp = packet->pts;
+    
+    // Like DALI: store PTS in queue to assign to frames as they come out
+    pipedPts_.push(packet->pts);
+#if CUSTOM_NVDEC_DEBUG
+    printPtsQueue("after sendPacket");
+#endif
+    
+  } else {
+    // End of stream packet
+    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
+    eofSent_ = true;
+  }
+
+  CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+  if (result != CUDA_SUCCESS) {
+#if CUSTOM_NVDEC_DEBUG
+    std::cout << "[DEBUG] sendPacket: Failed, returning AVERROR_EXTERNAL" << std::endl;
+#endif
+    return AVERROR_EXTERNAL;
+  }
+
+#if CUSTOM_NVDEC_DEBUG
+  std::cout << "[DEBUG] sendPacket: Success, returning 0" << std::endl;
+#endif
+  return 0;
+}
+
+int CustomNvdecDeviceInterface::receiveFrame(UniqueAVFrame& frame) {
+
+#if CUSTOM_NVDEC_DEBUG
+  std::cout << "[DEBUG] receiveFrame: Called" << std::endl;
+#endif
+  
+  std::lock_guard<std::mutex> lock(frameBufferMutex_);
+  
+#if CUSTOM_NVDEC_DEBUG
+  printFrameBuffer("receiveFrame start");
+#endif
+  
+  // Find frame with earliest PTS for display order (like DALI)
+  BufferedFrame* earliestFrame = findFrameWithEarliestPts();
+  
+  if (earliestFrame == nullptr) {
+#if CUSTOM_NVDEC_DEBUG
+    std::cout << "[DEBUG] receiveFrame: No frames available, returning " << (eofSent_ ? "AVERROR_EOF" : "AVERROR(EAGAIN)") << std::endl;
+#endif
+    if (eofSent_) {
+      return AVERROR_EOF;
+    } else {
+      return AVERROR(EAGAIN);
+    }
+  }
+
+  CUVIDPARSERDISPINFO dispInfo = earliestFrame->dispInfo;
+  int64_t pts = earliestFrame->pts;
+  
+#if CUSTOM_NVDEC_DEBUG
+  std::cout << "[DEBUG] receiveFrame: Returning frame with PTS=" << pts << ", frame_offset=" << earliestFrame->frame_offset << ", picture_index=" << dispInfo.picture_index << std::endl;
+#endif
+  
+  // Mark slot as used
+  earliestFrame->available = false;
+  earliestFrame->pts = -1;
+
+
+  // Now map the frame (this was previously done in handlePictureDisplay)
+  CUdeviceptr framePtr = 0;
+  unsigned int pitch = 0;
+  CUVIDPROCPARAMS procParams = {};
+  procParams.progressive_frame = dispInfo.progressive_frame;
+  procParams.top_field_first = dispInfo.top_field_first;
+  procParams.unpaired_field = dispInfo.repeat_first_field < 0;
+
+  CUresult result = cuvidMapVideoFrame(
+      static_cast<CUvideodecoder>(decoder_.get()),
+      dispInfo.picture_index,
+      &framePtr,
+      &pitch,
+      &procParams);
+
+  if (result != CUDA_SUCCESS) {
+#if CUSTOM_NVDEC_DEBUG
+    std::cout << "[DEBUG] receiveFrame: cuvidMapVideoFrame failed, returning AVERROR_EXTERNAL" << std::endl;
+#endif
+    return AVERROR_EXTERNAL;
+  }
+
+  
+  // Convert the NVDEC frame to AVFrame, passing the correct PTS
+  frame = convertCudaFrameToAVFrame(framePtr, pitch, dispInfo, timeBase_);
+
+#if CUSTOM_NVDEC_DEBUG
+  // Print frame type information from the AVFrame
+  const char* frameTypeStr = "unknown";
+  if (frame->key_frame) {
+    frameTypeStr = "keyframe";
+  } else {
+    frameTypeStr = "non-keyframe";
+  }
+  std::cout << "[DEBUG] receiveFrame: AVFrame created - PTS=" << pts 
+            << ", picture_index=" << dispInfo.picture_index 
+            << ", key_frame=" << frameTypeStr << std::endl;
+#endif
+
+  // Unmap the frame
+  cuvidUnmapVideoFrame(static_cast<CUvideodecoder>(decoder_.get()), framePtr);
+
+  // Mark surface as free (like DALI does in convert_frame)
+  int surfaceIndex = dispInfo.picture_index;
+  if (surfaceIndex < surfaceInUse_.size()) {
+    surfaceInUse_[surfaceIndex] = false;
+  }
+
+#if CUSTOM_NVDEC_DEBUG
+  printFrameBuffer("receiveFrame end");
+  std::cout << "[DEBUG] receiveFrame: Successfully returning frame" << std::endl;
+#endif
+
+  return 0;
+}
+
+void CustomNvdecDeviceInterface::flush() {
+
+  // Set flush flag like DALI to prevent new decode operations
+  flush_ = true;
+
+  // Send EOS packet to drain decoder like DALI does
+  if (parserCreated_ && !eofSent_) {
+    CUVIDSOURCEDATAPACKET cudaPacket = {0};
+    cudaPacket.flags = CUVID_PKT_ENDOFSTREAM;
+    CUresult result = cuvidParseVideoData(videoParser_, &cudaPacket);
+    if (result == CUDA_SUCCESS) {
+      eofSent_ = true;
+    }
+  }
+
+  // Clear flush flag like DALI does
+  flush_ = false;
+
+  // Clear frame buffer like DALI
+  size_t availableFrames = 0;
+  {
+    std::lock_guard<std::mutex> lock(frameBufferMutex_);
+    availableFrames = std::count_if(frameBuffer_.begin(), frameBuffer_.end(), 
+        [](const BufferedFrame& f) { return f.available; });
+    for (auto& frame : frameBuffer_) {
+      frame.available = false;
+      frame.pts = -1;
+    }
+  }
+
+  // Clear PTS queue like DALI
+  size_t ptsQueueSize = pipedPts_.size();
+  while (!pipedPts_.empty()) {
+    pipedPts_.pop();
+  }
+
+  // Synchronize CUDA stream to ensure all operations complete
+  // TODONVDEC make sure this is syncing the right stream, not necessarily stream 0
+  cudaStreamSynchronize(0);
+
+  // Clear decode surface usage tracking
+  for (size_t i = 0; i < surfaceInUse_.size(); ++i) {
+    surfaceInUse_[i] = false;
+  }
+  
+  // Reset current PTS like DALI does
+  currentPts_ = AV_NOPTS_VALUE;
+  
+  // Reset PTS tracking for multi-frame packets
+  basePts_ = AV_NOPTS_VALUE;
+  frameIndexInPacket_ = 0;
+
+  // Reset EOF flag so we can decode more (like DALI does)
+  eofSent_ = false;
+
+}
+
+
+
+UniqueAVFrame CustomNvdecDeviceInterface::convertCudaFrameToAVFrame(
+    CUdeviceptr framePtr,
+    unsigned int pitch,
+    const CUVIDPARSERDISPINFO& dispInfo,
+    const AVRational& timeBase) {
+  TORCH_CHECK(framePtr != 0, "Invalid CUDA frame pointer");
+
+  // Get frame dimensions from video format display area (not coded dimensions)
+  // This matches DALI's approach and avoids padding issues
+  int width = videoFormat_.display_area.right - videoFormat_.display_area.left;
+  int height = videoFormat_.display_area.bottom - videoFormat_.display_area.top;
+
+  TORCH_CHECK(width > 0 && height > 0, "Invalid frame dimensions");
+  TORCH_CHECK(pitch >= width, "Pitch must be >= width");
+
+
+  // Allocate AVFrame
+  UniqueAVFrame avFrame(av_frame_alloc());
+  TORCH_CHECK(avFrame.get() != nullptr, "Failed to allocate AVFrame");
+
+  // Set frame properties
+  avFrame->width = width;
+  avFrame->height = height;
+  avFrame->format = AV_PIX_FMT_CUDA; // Indicate this is GPU data
+  avFrame->pts = dispInfo.timestamp; // This PTS was set correctly by handlePictureDisplay
+  
+  // Calculate frame duration from NVDEC frame rate, fallback frame rate, and stream timebase
+  AVRational effectiveFrameRate = {0, 0};
+  
+  // First try NVDEC frame rate
+  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0) {
+    effectiveFrameRate.num = videoFormat_.frame_rate.numerator;
+    effectiveFrameRate.den = videoFormat_.frame_rate.denominator;
+  } 
+  // Fallback to FFmpeg frame rate if NVDEC frame rate is unavailable
+  else if (fallbackFrameRate_.num > 0 && fallbackFrameRate_.den > 0) {
+    effectiveFrameRate = fallbackFrameRate_;
+  }
+  
+  if (effectiveFrameRate.num > 0 && effectiveFrameRate.den > 0 &&
+      timeBase.num > 0 && timeBase.den > 0) {
+    // Duration in seconds = frame_rate.den / frame_rate.num
+    // Duration in timebase units = (duration_seconds * timeBase.den) / timeBase.num
+    // = (frame_rate.den * timeBase.den) / (frame_rate.num * timeBase.num)
+    avFrame->duration = (int64_t)((effectiveFrameRate.den * timeBase.den) / 
+                                  (effectiveFrameRate.num * timeBase.num));
+  } else {
+    printf("[WARN] Unable to determine frame duration from frame rate or timebase\n");
+    printf("       NVDEC frame rate: %d/%d, fallback frame rate: %d/%d, timebase: %d/%d\n", 
+           videoFormat_.frame_rate.numerator, videoFormat_.frame_rate.denominator,
+           fallbackFrameRate_.num, fallbackFrameRate_.den,
+           timeBase.num, timeBase.den);
+    avFrame->duration = 0; // Unknown duration
+  }
+  
+
+  // Set color space and color range from NVDEC video format (like DALI does)
+  // This is crucial for proper color conversion!
+  
+  // Map NVDEC matrix coefficients to FFmpeg color space
+  switch (videoFormat_.video_signal_description.matrix_coefficients) {
+    case 1:  // ITU-R BT.709
+      avFrame->colorspace = AVCOL_SPC_BT709;
+      break;
+    case 5:  // ITU-R BT.470-2 System B, G (BT.601 PAL)
+    case 6:  // ITU-R BT.601-6 NTSC  
+      avFrame->colorspace = AVCOL_SPC_SMPTE170M; // BT.601
+      break;
+    default:
+      // Default to BT.709 for unknown coefficients
+      avFrame->colorspace = AVCOL_SPC_BT709;
+      break;
+  }
+  
+  // Set color range from full range flag
+  if (videoFormat_.video_signal_description.video_full_range_flag) {
+    avFrame->color_range = AVCOL_RANGE_JPEG;  // Full range (0-255)
+  } else {
+    avFrame->color_range = AVCOL_RANGE_MPEG;  // Limited range (16-235)
+  }
+  
+
+  // For NVDEC output in NV12 format, we need to set up the data pointers
+  // The framePtr points to the beginning of the NV12 data
+  avFrame->data[0] = reinterpret_cast<uint8_t*>(framePtr); // Y plane
+  avFrame->data[1] = reinterpret_cast<uint8_t*>(framePtr + (pitch * height)); // UV plane (using pitch, not width)
+  avFrame->data[2] = nullptr;
+  avFrame->data[3] = nullptr;
+
+  // Set line sizes for NV12 format using the actual NVDEC pitch
+  avFrame->linesize[0] = pitch; // Y plane stride (use actual pitch from NVDEC)
+  avFrame->linesize[1] = pitch; // UV plane stride (use actual pitch from NVDEC)
+  avFrame->linesize[2] = 0;
+  avFrame->linesize[3] = 0;
+
+  return avFrame;
+}
+
+void CustomNvdecDeviceInterface::convertAVFrameToFrameOutput(
+    const VideoStreamOptions& videoStreamOptions,
+    const AVRational& timeBase,
+    UniqueAVFrame& avFrame,
+    FrameOutput& frameOutput,
+    std::optional<torch::Tensor> preAllocatedOutputTensor) {
+
+  // Store timeBase for duration calculations in convertCudaFrameToAVFrame
+  timeBase_ = timeBase;
+
+
+  TORCH_CHECK(
+      avFrame->format == AV_PIX_FMT_CUDA,
+      "Expected CUDA format frame from custom NVDEC decoder");
+
+  // TODONVDEC: we use the 'default' cuda device interface for color conversion.
+  // That's a temporary hack to make things work. *IF* we keep both device
+  // interfaces then we should abstract the color conversion stuff separately.
+  // If we only keep this device interface, we can just integrate the color
+  // conversion code here.
+  auto cudaDevice = torch::Device(torch::kCUDA);
+  auto cudaInterface = createDeviceInterface(cudaDevice);
+  AVCodecContext dummyCodecContext = {};
+  cudaInterface->initializeContext(&dummyCodecContext);
+
+  FrameOutput cudaFrameOutput;
+  cudaInterface->convertAVFrameToFrameOutput(
+      videoStreamOptions,
+      timeBase,
+      avFrame,
+      cudaFrameOutput,
+      preAllocatedOutputTensor);
+
+  frameOutput.data = cudaFrameOutput.data.to(device_);
+}
+
+// Helper method to find an empty slot in frame buffer (like DALI's FindEmptySlot)
+CustomNvdecDeviceInterface::BufferedFrame* 
+CustomNvdecDeviceInterface::findEmptySlot() {
+  for (auto& frame : frameBuffer_) {
+    if (!frame.available) {
+      return &frame;
+    }
+  }
+  // If no empty slots, expand buffer like DALI does
+  frameBuffer_.emplace_back();
+  return &frameBuffer_.back();
+}
+
+// Helper method to find frame with earliest PTS for display order
+// For AV1 codecs, uses frame_offset as tie-breaker when PTS values are equal
+CustomNvdecDeviceInterface::BufferedFrame* 
+CustomNvdecDeviceInterface::findFrameWithEarliestPts() {
+  BufferedFrame* earliest = nullptr;
+  
+  for (auto& frame : frameBuffer_) {
+    if (frame.available) {
+      if (earliest == nullptr || frame.pts < earliest->pts) {
+        earliest = &frame;
+      } else if (frame.pts == earliest->pts) {
+        // Tie-breaker: for AV1 codecs, prefer smaller frame_offset
+        if (videoFormat_.codec == cudaVideoCodec_AV1) {
+          if (frame.frame_offset < earliest->frame_offset) {
+            earliest = &frame;
+          }
+        }
+        // For non-AV1 codecs, keep the first one found (existing behavior)
+      }
+    }
+  }
+  
+  return earliest;
+}
+
+// Helper method to calculate frame duration in timebase units
+int64_t CustomNvdecDeviceInterface::calculateFrameDuration() const {
+  // Calculate frame duration from NVDEC frame rate, fallback frame rate, and stream timebase
+  AVRational effectiveFrameRate = {0, 0};
+  
+  // First try NVDEC frame rate
+  if (videoFormat_.frame_rate.numerator > 0 && videoFormat_.frame_rate.denominator > 0) {
+    effectiveFrameRate.num = videoFormat_.frame_rate.numerator;
+    effectiveFrameRate.den = videoFormat_.frame_rate.denominator;
+  } 
+  // Fallback to FFmpeg frame rate if NVDEC frame rate is unavailable
+  else if (fallbackFrameRate_.num > 0 && fallbackFrameRate_.den > 0) {
+    effectiveFrameRate = fallbackFrameRate_;
+  }
+  
+  if (effectiveFrameRate.num > 0 && effectiveFrameRate.den > 0 &&
+      timeBase_.num > 0 && timeBase_.den > 0) {
+    // Duration in seconds = frame_rate.den / frame_rate.num
+    // Duration in timebase units = (duration_seconds * timeBase.den) / timeBase.num
+    // = (frame_rate.den * timeBase.den) / (frame_rate.num * timeBase.num)
+    return (int64_t)((effectiveFrameRate.den * timeBase_.den) / 
+                     (effectiveFrameRate.num * timeBase_.num));
+  }
+  
+  // If we can't calculate duration, return 0
+  return 0;
+}
+
+#if CUSTOM_NVDEC_DEBUG
+// Debug helper functions
+void CustomNvdecDeviceInterface::printPtsQueue(const std::string& context) const {
+  // Add indentation based on context
+  std::string indent = "";
+  if (context.find("sendPacket") != std::string::npos || context.find("receiveFrame") != std::string::npos) {
+    indent = "";  // Level 0: sendPacket and receiveFrame
+  } else if (context.find("PTS assignment") != std::string::npos) {
+    indent = "  ";  // Level 1: operations within handlePictureDecode
+  }
+  
+  std::cout << "[DEBUG] " << indent << "PTS Queue (" << context << "): [";
+  // Priority queue doesn't support iteration, so we make a copy to print contents
+  auto tempQueue = pipedPts_;
+  std::vector<int64_t> queueContents;
+  while (!tempQueue.empty()) {
+    queueContents.push_back(tempQueue.top());
+    tempQueue.pop();
+  }
+  // Print in sorted order (smallest to largest)
+  bool first = true;
+  for (int64_t pts : queueContents) {
+    if (!first) std::cout << ", ";
+    std::cout << pts;
+    first = false;
+  }
+  std::cout << "] (size: " << pipedPts_.size() << ", min: " << (pipedPts_.empty() ? "N/A" : std::to_string(pipedPts_.top())) << ")" << std::endl;
+}
+
+void CustomNvdecDeviceInterface::printFrameBuffer(const std::string& context) const {
+  // Add indentation based on context
+  std::string indent = "";
+  if (context.find("receiveFrame") != std::string::npos) {
+    indent = "";  // Level 0: receiveFrame operations
+  } else if (context.find("adding frame") != std::string::npos) {
+    indent = "  ";  // Level 1: operations within handlePictureDecode
+  }
+  
+  std::cout << "[DEBUG] " << indent << "Frame Buffer (" << context << "): [";
+  bool first = true;
+  for (size_t i = 0; i < frameBuffer_.size(); ++i) {
+    if (!first) std::cout << ", ";
+    if (frameBuffer_[i].available) {
+      std::cout << "{slot:" << i << ", pts:" << frameBuffer_[i].pts << ", offset:" << frameBuffer_[i].frame_offset << ", avail:true}";
+    } else {
+      std::cout << "{slot:" << i << ", pts:N/A, offset:N/A, avail:false}";
+    }
+    first = false;
+  }
+  std::cout << "] (total slots: " << frameBuffer_.size() << ")" << std::endl;
+}
+#endif // CUSTOM_NVDEC_DEBUG
+
+} // namespace facebook::torchcodec
