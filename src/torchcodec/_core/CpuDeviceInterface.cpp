@@ -65,12 +65,12 @@ void CpuDeviceInterface::initialize(
   // choose color conversion library publicly; we only use this ability
   // internally.
 
-  // If any transforms are not swscale compatible, then we can't use swscale.
-  bool areTransformsSwScaleCompatible = true;
-  for (const auto& transform : transforms) {
-    areTransformsSwScaleCompatible =
-        areTransformsSwScaleCompatible && transform->isSwScaleCompatible();
-  }
+  // We can only use swscale when we have a single resize transform. Note that
+  // this means swscale will not support the case of having several,
+  // back-to-base resizes. There's no strong reason to even do that, but if
+  // someone does, it's more correct to implement that with filtergraph.
+  bool areTransformsSwScaleCompatible = transforms.empty() ||
+      (transforms.size() == 1 && transforms[0]->isResize());
 
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
@@ -95,8 +95,14 @@ void CpuDeviceInterface::initialize(
       (userRequestedSwScale || isWidthSwScaleCompatible)) {
     colorConversionLibrary_ = ColorConversionLibrary::SWSCALE;
 
-    // SCOTT NEXT TODO: set swsFlags_
-
+    // We established above that if the transforms are swscale compatible and
+    // non-empty, then they must have only one transforms, and that transform is
+    // ResizeTransform.
+    if (!transforms.empty()) {
+      auto resize = dynamic_cast<ResizeTransform*>(transforms[0].get());
+      TORCH_CHECK(resize != nullptr, "ResizeTransform expected but not found!")
+      swsFlags_ = resize->getSwsFlags();
+    }
   } else {
     colorConversionLibrary_ = ColorConversionLibrary::FILTERGRAPH;
 

@@ -56,7 +56,7 @@ std::optional<FrameDims> ResizeTransform::getOutputFrameDims() const {
   return FrameDims(width_, height_);
 }
 
-bool ResizeTransform::isSwScaleCompatible() const {
+bool ResizeTransform::isResize() const {
   return true;
 }
 

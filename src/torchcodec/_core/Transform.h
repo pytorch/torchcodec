@@ -28,7 +28,9 @@ class Transform {
     return std::nullopt;
   }
 
-  virtual bool isSwScaleCompatible() const {
+  // The ResizeTransform is special, because it is the only transform that
+  // swscale can handle.
+  virtual bool isResize() const {
     return false;
   }
 };
@@ -47,7 +49,7 @@ class ResizeTransform : public Transform {
 
   std::string getFilterGraphCpu() const override;
   std::optional<FrameDims> getOutputFrameDims() const override;
-  bool isSwScaleCompatible() const override;
+  bool isResize() const override;
 
   int getSwsFlags() const;
 

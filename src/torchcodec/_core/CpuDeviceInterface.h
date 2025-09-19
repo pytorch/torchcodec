@@ -72,8 +72,8 @@ class CpuDeviceInterface : public DeviceInterface {
   FrameDims outputDims_;
 
   // If we use swscale for resizing, the flags control the resizing algorithm.
-  // We exclusively get the value from the ResizeTransform.
-  int swsFlags_ = 0;
+  // We default to bilinear. Users can override this with a ResizeTransform.
+  int swsFlags_ = SWS_BILINEAR;
 
   // The copy filter just copies the input to the output. Computationally, it
   // should be a no-op. If we get no user-provided transforms, we will use the
