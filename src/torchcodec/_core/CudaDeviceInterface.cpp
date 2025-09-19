@@ -189,10 +189,11 @@ void CudaDeviceInterface::initialize(
     AVCodecContext* codecContext,
     [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>& transforms,
-    [[maybe_unused]] const AVRational& timeBase,
+    const AVRational& timeBase,
     const FrameDims& outputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
 
+  timeBase_ = timeBase;
   outputDims_ = outputDims;
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg

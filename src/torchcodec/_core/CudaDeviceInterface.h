@@ -34,6 +34,7 @@ class CudaDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
  private:
+  AVRational timeBase_;
   FrameDims outputDims_;
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;
