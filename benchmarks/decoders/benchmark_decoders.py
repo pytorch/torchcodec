@@ -9,6 +9,7 @@ import importlib.resources
 import os
 import platform
 from pathlib import Path
+import json
 
 import torch
 
@@ -106,6 +107,13 @@ def main() -> None:
         default=False,
         action=argparse.BooleanOptionalAction,
     )
+    parser.add_argument(
+        "--output-results",
+        help="Output the results to a JSON file",
+        type=str,
+        default="",
+
+    )
 
     args = parser.parse_args()
     specified_decoders = set(args.decoders.split(","))
@@ -146,6 +154,10 @@ def main() -> None:
             min_runtime_seconds=args.min_run_seconds,
             benchmark_video_creation=args.bm_video_creation,
         )
+        if args.output_results:
+            with open(args.output_results, "w") as f:
+                json.dump(results, f, indent=2)
+
         data = {
             "experiments": results,
             "system_metadata": {
