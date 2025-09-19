@@ -262,9 +262,23 @@ void _add_video_stream(
         custom_frame_mappings = std::nullopt,
     std::optional<std::string_view> color_conversion_library = std::nullopt) {
   VideoStreamOptions videoStreamOptions;
-  videoStreamOptions.width = width;
-  videoStreamOptions.height = height;
   videoStreamOptions.ffmpegThreadCount = num_threads;
+
+  // TODO: Eliminate this temporary bridge code. This exists because we have
+  //       not yet exposed the transforms API on the Python side. We also want
+  //       to remove the `width` and `height` arguments from the Python API.
+  //
+  // TEMPORARY BRIDGE CODE START
+  TORCH_CHECK(
+      width.has_value() == height.has_value(),
+      "width and height must both be set or unset.");
+  std::vector<Transform*> transforms;
+  if (width.has_value()) {
+    transforms.push_back(new ResizeTransform(width.value(), height.value()));
+    width.reset();
+    height.reset();
+  }
+  // TEMPORARY BRIDGE CODE END
 
   if (dimension_order.has_value()) {
     std::string stdDimensionOrder{dimension_order.value()};
@@ -296,7 +310,10 @@ void _add_video_stream(
       : std::nullopt;
   auto videoDecoder = unwrapTensorToGetDecoder(decoder);
   videoDecoder->addVideoStream(
-      stream_index.value_or(-1), videoStreamOptions, converted_mappings);
+      stream_index.value_or(-1),
+      transforms,
+      videoStreamOptions,
+      converted_mappings);
 }
 
 // Add a new video stream at `stream_index` using the provided options.

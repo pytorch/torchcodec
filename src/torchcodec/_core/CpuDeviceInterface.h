@@ -23,19 +23,21 @@ class CpuDeviceInterface : public DeviceInterface {
     return std::nullopt;
   }
 
-  void initializeContext(
-      [[maybe_unused]] AVCodecContext* codecContext) override {}
+  virtual void initialize(
+      [[maybe_unused]] AVCodecContext* codecContext,
+      const VideoStreamOptions& videoStreamOptions,
+      const std::vector<std::unique_ptr<Transform>>& transforms,
+      const AVRational& timeBase,
+      const FrameDims& outputDims) override;
 
   void convertAVFrameToFrameOutput(
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =
           std::nullopt) override;
 
  private:
-  int convertAVFrameToTensorUsingSwsScale(
+  int convertAVFrameToTensorUsingSwScale(
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
@@ -64,6 +66,20 @@ class CpuDeviceInterface : public DeviceInterface {
       const SwsFrameContext& swsFrameContext,
       const enum AVColorSpace colorspace);
 
+  VideoStreamOptions videoStreamOptions_;
+  ColorConversionLibrary colorConversionLibrary_;
+  AVRational timeBase_;
+  FrameDims outputDims_;
+
+  // If we use swscale for resizing, the flags control the resizing algorithm.
+  // We default to bilinear. Users can override this with a ResizeTransform.
+  int swsFlags_ = SWS_BILINEAR;
+
+  // The copy filter just copies the input to the output. Computationally, it
+  // should be a no-op. If we get no user-provided transforms, we will use the
+  // copy filter.
+  std::string filters_ = "copy";
+
   // color-conversion fields. Only one of FilterGraphContext and
   // UniqueSwsContext should be non-null.
   std::unique_ptr<FilterGraph> filterGraphContext_;
@@ -73,6 +89,8 @@ class CpuDeviceInterface : public DeviceInterface {
   // be created before decoding a new frame.
   SwsFrameContext prevSwsFrameContext_;
   FiltersContext prevFiltersContext_;
+
+  bool initialized_ = false;
 };
 
 } // namespace facebook::torchcodec

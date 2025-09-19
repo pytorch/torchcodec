@@ -137,7 +137,8 @@ FilterGraph::FilterGraph(
   TORCH_CHECK(
       status >= 0,
       "Failed to parse filter description: ",
-      getFFMPEGErrorStringFromErrorCode(status));
+      getFFMPEGErrorStringFromErrorCode(status),
+      ", provided filters: " + filtersContext.filtergraphStr);
 
   status = avfilter_graph_config(filterGraph_.get(), nullptr);
   TORCH_CHECK(

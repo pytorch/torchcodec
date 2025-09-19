@@ -19,17 +19,23 @@ class CudaDeviceInterface : public DeviceInterface {
 
   std::optional<const AVCodec*> findCodec(const AVCodecID& codecId) override;
 
-  void initializeContext(AVCodecContext* codecContext) override;
+  void initialize(
+      AVCodecContext* codecContext,
+      [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
+      [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>&
+          transforms,
+      [[maybe_unused]] const AVRational& timeBase,
+      const FrameDims& outputDims) override;
 
   void convertAVFrameToFrameOutput(
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =
           std::nullopt) override;
 
  private:
+  AVRational timeBase_;
+  FrameDims outputDims_;
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;
 };

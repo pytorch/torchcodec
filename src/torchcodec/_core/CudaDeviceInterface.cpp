@@ -185,8 +185,16 @@ CudaDeviceInterface::~CudaDeviceInterface() {
   }
 }
 
-void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
+void CudaDeviceInterface::initialize(
+    AVCodecContext* codecContext,
+    [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>& transforms,
+    const AVRational& timeBase,
+    const FrameDims& outputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
+
+  timeBase_ = timeBase;
+  outputDims_ = outputDims;
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
@@ -196,12 +204,9 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   ctx_ = getCudaContext(device_);
   nppCtx_ = getNppStreamContext(device_);
   codecContext->hw_device_ctx = av_buffer_ref(ctx_.get());
-  return;
 }
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
-    const VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -212,18 +217,21 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // Typically that happens if the video's encoder isn't supported by NVDEC.
     // Below, we choose to convert the frame's color-space using the CPU
     // codepath, and send it back to the GPU at the very end.
+    //
     // TODO: A possibly better solution would be to send the frame to the GPU
     // first, and do the color conversion there.
+    //
+    // TODO: If we're going to keep this around, we should probably cache it?
     auto cpuDevice = torch::Device(torch::kCPU);
     auto cpuInterface = createDeviceInterface(cpuDevice);
+    TORCH_CHECK(
+        cpuInterface != nullptr, "Failed to create CPU device interface");
+    cpuInterface->initialize(
+        nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
-        videoStreamOptions,
-        timeBase,
-        avFrame,
-        cpuFrameOutput,
-        preAllocatedOutputTensor);
+        avFrame, cpuFrameOutput, preAllocatedOutputTensor);
 
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
@@ -253,25 +261,21 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "If the video is 10bit, we are tracking 10bit support in "
       "https://github.com/pytorch/torchcodec/issues/776");
 
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
-  int height = frameDims.height;
-  int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
     auto shape = dst.sizes();
     TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
-            (shape[2] == 3),
+        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
+            (shape[1] == outputDims_.width) && (shape[2] == 3),
         "Expected tensor of shape ",
-        height,
+        outputDims_.height,
         "x",
-        width,
+        outputDims_.width,
         "x3, got ",
         shape);
   } else {
-    dst = allocateEmptyHWCTensor(height, width, device_);
+    dst = allocateEmptyHWCTensor(outputDims_, device_);
   }
 
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
@@ -308,7 +312,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "cudaStreamGetFlags failed: ",
       cudaGetErrorString(err));
 
-  NppiSize oSizeROI = {width, height};
+  NppiSize oSizeROI = {outputDims_.width, outputDims_.height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;
