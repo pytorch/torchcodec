@@ -94,6 +94,9 @@ void CpuDeviceInterface::initialize(
   if (areTransformsSwScaleCompatible &&
       (userRequestedSwScale || isWidthSwScaleCompatible)) {
     colorConversionLibrary_ = ColorConversionLibrary::SWSCALE;
+
+    // SCOTT NEXT TODO: set swsFlags_
+
   } else {
     colorConversionLibrary_ = ColorConversionLibrary::FILTERGRAPH;
 
@@ -112,6 +115,8 @@ void CpuDeviceInterface::initialize(
       filters_ = filters.str();
     }
   }
+
+  initialized_ = true;
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
@@ -127,6 +132,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  TORCH_CHECK(initialized_, "CpuDeviceInterface was not initialized.");
   if (preAllocatedOutputTensor.has_value()) {
     auto shape = preAllocatedOutputTensor.value().sizes();
     TORCH_CHECK(
@@ -167,7 +173,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
       prevSwsFrameContext_ = swsFrameContext;
     }
     int resultHeight =
-        convertAVFrameToTensorUsingSwsScale(avFrame, outputTensor);
+        convertAVFrameToTensorUsingSwScale(avFrame, outputTensor);
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?
@@ -227,7 +233,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
   }
 }
 
-int CpuDeviceInterface::convertAVFrameToTensorUsingSwsScale(
+int CpuDeviceInterface::convertAVFrameToTensorUsingSwScale(
     const UniqueAVFrame& avFrame,
     torch::Tensor& outputTensor) {
   uint8_t* pointers[4] = {

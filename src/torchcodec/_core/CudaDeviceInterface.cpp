@@ -216,10 +216,17 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // Typically that happens if the video's encoder isn't supported by NVDEC.
     // Below, we choose to convert the frame's color-space using the CPU
     // codepath, and send it back to the GPU at the very end.
+    //
     // TODO: A possibly better solution would be to send the frame to the GPU
     // first, and do the color conversion there.
+    //
+    // TODO: If we're going to keep this around, we should probably cache it?
     auto cpuDevice = torch::Device(torch::kCPU);
     auto cpuInterface = createDeviceInterface(cpuDevice);
+    TORCH_CHECK(
+        cpuInterface != nullptr, "Failed to create CPU device interface");
+    cpuDeviceInterface->initialize(
+        nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(

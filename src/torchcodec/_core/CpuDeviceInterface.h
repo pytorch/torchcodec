@@ -37,7 +37,7 @@ class CpuDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
  private:
-  int convertAVFrameToTensorUsingSwsScale(
+  int convertAVFrameToTensorUsingSwScale(
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
@@ -71,6 +71,10 @@ class CpuDeviceInterface : public DeviceInterface {
   AVRational timeBase_;
   FrameDims outputDims_;
 
+  // If we use swscale for resizing, the flags control the resizing algorithm.
+  // We exclusively get the value from the ResizeTransform.
+  int swsFlags_ = 0;
+
   // The copy filter just copies the input to the output. Computationally, it
   // should be a no-op. If we get no user-provided transforms, we will use the
   // copy filter.
@@ -85,6 +89,8 @@ class CpuDeviceInterface : public DeviceInterface {
   // be created before decoding a new frame.
   SwsFrameContext prevSwsFrameContext_;
   FiltersContext prevFiltersContext_;
+
+  bool initialized_ = false;
 };
 
 } // namespace facebook::torchcodec
