@@ -68,7 +68,8 @@ const int* getSupportedSampleRates(const AVCodec& avCodec) {
       reinterpret_cast<const void**>(&supportedSampleRates),
       &numSampleRates);
   if (ret < 0 || supportedSampleRates == nullptr) {
-    TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
+    // Return nullptr to skip validation in validateSampleRate.
+    return nullptr;
   }
 #else
   supportedSampleRates = avCodec.supported_samplerates;
@@ -88,7 +89,9 @@ const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec) {
       reinterpret_cast<const void**>(&supportedSampleFormats),
       &numSampleFormats);
   if (ret < 0 || supportedSampleFormats == nullptr) {
-    TORCH_CHECK(false, "Couldn't get supported sample formats from encoder.");
+    // Return nullptr to use default output format in
+    // findBestOutputSampleFormat.
+    return nullptr;
   }
 #else
   supportedSampleFormats = avCodec.sample_fmts;
@@ -161,10 +164,11 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
       reinterpret_cast<const void**>(&supported_layouts),
       &num_layouts);
   if (ret < 0 || supported_layouts == nullptr) {
-    TORCH_CHECK(false, "Couldn't get supported channel layouts from encoder.");
+    // If we can't validate, we must assume it'll be fine. If not, FFmpeg will
+    // eventually raise.
     return;
   }
-  for (int i = 0; supported_layouts[i].nb_channels != 0; ++i) {
+  for (int i = 0; i < num_layouts; ++i) {
     if (i > 0) {
       supportedNumChannels << ", ";
     }
