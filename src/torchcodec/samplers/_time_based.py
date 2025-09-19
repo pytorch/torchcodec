@@ -204,10 +204,8 @@ def _generic_time_based_sampler(
         clip_start_seconds = torch.arange(
             sampling_range_start,
             sampling_range_end,  # excluded
-            seconds_between_clip_starts,
+            seconds_between_clip_starts - 1e-6,
         )
-        if clip_start_seconds[-1] >= sampling_range_end:
-            clip_start_seconds = clip_start_seconds[:-1]
         num_clips = len(clip_start_seconds)
 
     all_clips_timestamps = _build_all_clips_timestamps(
