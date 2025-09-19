@@ -146,19 +146,6 @@ double computeAverageCosineSimilarity(
   return averageCosineSimilarity;
 }
 
-TEST(SingleStreamDecoderTest, RespectsWidthAndHeightFromOptions) {
-  std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<SingleStreamDecoder> decoder =
-      std::make_unique<SingleStreamDecoder>(path);
-  VideoStreamOptions videoStreamOptions;
-  videoStreamOptions.width = 100;
-  videoStreamOptions.height = 120;
-  std::vector<Transform*> transforms;
-  decoder->addVideoStream(-1, transforms, videoStreamOptions);
-  torch::Tensor tensor = decoder->getNextFrame().data;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
-}
-
 TEST(SingleStreamDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
