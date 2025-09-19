@@ -76,10 +76,8 @@ void CpuDeviceInterface::initialize(
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   bool isWidthSwScaleCompatible = (outputDims_.width % 32) == 0;
 
-  bool userRequestedSwScale =
-      videoStreamOptions_.colorConversionLibrary.has_value() &&
-      videoStreamOptions_.colorConversionLibrary.value() ==
-          ColorConversionLibrary::SWSCALE;
+  bool userRequestedSwScale = videoStreamOptions_.colorConversionLibrary ==
+      ColorConversionLibrary::SWSCALE;
 
   // Note that we treat the transform limitation differently from the width
   // limitation. That is, we consider the transforms being compatible with

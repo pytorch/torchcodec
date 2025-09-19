@@ -499,10 +499,6 @@ void SingleStreamDecoder::addVideoStream(
         streamIndex, customFrameMappings.value());
   }
 
-  TORCH_CHECK(
-      !videoStreamOptions.width.has_value(), "width should have no value!");
-  TORCH_CHECK(
-      !videoStreamOptions.height.has_value(), "height should have no value!");
   outputDims_ =
       FrameDims(streamMetadata.width.value(), streamMetadata.height.value());
   for (auto& transform : transforms) {
