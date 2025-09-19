@@ -21,7 +21,7 @@ class CudaDeviceInterface : public DeviceInterface {
 
   void initialize(
       AVCodecContext* codecContext,
-      [[maybe_unsued]] const VideoStreamOptions& videoStreamOptions,
+      [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
       [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>&
           transforms,
       [[maybe_unused]] const AVRational& timeBase,
