@@ -31,8 +31,6 @@ struct VideoStreamOptions {
   // Currently the dimension order can be either NHWC or NCHW.
   // H=height, W=width, C=channel.
   std::string dimensionOrder = "NCHW";
-  // The output height and width of the frame. If not specified, the output
-  // is the same as the original video.
   std::optional<int> width;
   std::optional<int> height;
   std::optional<ColorConversionLibrary> colorConversionLibrary;

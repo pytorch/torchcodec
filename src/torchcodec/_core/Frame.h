@@ -13,6 +13,15 @@
 
 namespace facebook::torchcodec {
 
+struct FrameDims {
+  int width = 0;
+  int height = 0;
+
+  FrameDims() = default;
+
+  FrameDims(int w, int h) : width(w), height(h) {}
+};
+
 // All public video decoding entry points return either a FrameOutput or a
 // FrameBatchOutput.
 // They are the equivalent of the user-facing Frame and FrameBatch classes in
@@ -34,10 +43,10 @@ struct FrameBatchOutput {
   torch::Tensor ptsSeconds; // 1D of shape (N,)
   torch::Tensor durationSeconds; // 1D of shape (N,)
 
-  explicit FrameBatchOutput(
+  FrameBatchOutput(
       int64_t numFrames,
-      const VideoStreamOptions& videoStreamOptions,
-      const StreamMetadata& streamMetadata);
+      const FrameDims& outputDims,
+      const torch::Device& device);
 };
 
 struct AudioFramesOutput {
@@ -55,6 +64,8 @@ struct AudioFramesOutput {
 // assume HWC tensors, since this is what FFmpeg natively handles. It's up to
 // the high-level decoding entry-points to permute that back to CHW, by calling
 // maybePermuteHWC2CHW().
+//
+// TODO: Rationalize the comment below with refactoring.
 //
 // Also, importantly, the way we figure out the the height and width of the
 // output frame tensor varies, and depends on the decoding entry-point. In
@@ -90,29 +101,9 @@ struct AudioFramesOutput {
 // it is very important to check the height and width assumptions where the
 // tensors memory is used/filled in order to avoid segfaults.
 
-struct FrameDims {
-  int height;
-  int width;
-
-  FrameDims(int h, int w) : height(h), width(w) {}
-};
-
-// There's nothing preventing you from calling this on a non-resized frame, but
-// please don't.
-FrameDims getHeightAndWidthFromResizedAVFrame(const AVFrame& resizedAVFrame);
-
-FrameDims getHeightAndWidthFromOptionsOrMetadata(
-    const VideoStreamOptions& videoStreamOptions,
-    const StreamMetadata& streamMetadata);
-
-FrameDims getHeightAndWidthFromOptionsOrAVFrame(
-    const VideoStreamOptions& videoStreamOptions,
-    const UniqueAVFrame& avFrame);
-
 torch::Tensor allocateEmptyHWCTensor(
-    int height,
-    int width,
-    torch::Device device,
+    const FrameDims& frameDims,
+    const torch::Device& device,
     std::optional<int> numFrames = std::nullopt);
 
 } // namespace facebook::torchcodec

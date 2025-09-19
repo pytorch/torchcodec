@@ -6,26 +6,62 @@
 
 #include "src/torchcodec/_core/Transform.h"
 #include <torch/types.h>
+#include "src/torchcodec/_core/FFMPEGCommon.h"
 
 namespace facebook::torchcodec {
 
-std::string toStringFilterGraph(Transform::InterpolationMode mode) {
+namespace {
+
+std::string toFilterGraphInterpolation(
+    ResizeTransform::InterpolationMode mode) {
   switch (mode) {
-    case Transform::InterpolationMode::BILINEAR:
-      return "BILINEAR";
-    case Transform::InterpolationMode::BICUBIC:
-      return "BICUBIC";
-    case Transform::InterpolationMode::NEAREST:
-      return "NEAREST";
+    case ResizeTransform::InterpolationMode::BILINEAR:
+      return "bilinear";
+    case ResizeTransform::InterpolationMode::BICUBIC:
+      return "bicubic";
+    case ResizeTransform::InterpolationMode::NEAREST:
+      return "nearest";
     default:
-      TORCH_CHECK(false, "Unknown interpolation mode: " + std::to_string(mode));
+      TORCH_CHECK(
+          false,
+          "Unknown interpolation mode: " +
+              std::to_string(static_cast<int>(mode)));
   }
 }
 
-std::string Transform::getFilterGraphCpu() const {
-  return "scale=width=" + std::to_string(width_) +
-      ":height=" + std::to_string(height_) +
-      ":sws_flags=" + toStringFilterGraph(interpolationMode_);
+int toSwsInterpolation(ResizeTransform::InterpolationMode mode) {
+  switch (mode) {
+    case ResizeTransform::InterpolationMode::BILINEAR:
+      return SWS_BILINEAR;
+    case ResizeTransform::InterpolationMode::BICUBIC:
+      return SWS_BICUBIC;
+    case ResizeTransform::InterpolationMode::NEAREST:
+      return SWS_POINT;
+    default:
+      TORCH_CHECK(
+          false,
+          "Unknown interpolation mode: " +
+              std::to_string(static_cast<int>(mode)));
+  }
+}
+
+} // namespace
+
+std::string ResizeTransform::getFilterGraphCpu() const {
+  return "scale=" + std::to_string(width_) + ":" + std::to_string(height_) +
+      ":sws_flags=" + toFilterGraphInterpolation(interpolationMode_);
+}
+
+std::optional<FrameDims> ResizeTransform::getOutputFrameDims() const {
+  return FrameDims(width_, height_);
+}
+
+bool ResizeTransform::isSwScaleCompatible() const {
+  return true;
+}
+
+int ResizeTransform::getSwsFlags() const {
+  return toSwsInterpolation(interpolationMode_);
 }
 
 } // namespace facebook::torchcodec

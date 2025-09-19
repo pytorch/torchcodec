@@ -6,33 +6,54 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
+#include "src/torchcodec/_core/Frame.h"
 
 namespace facebook::torchcodec {
 
 class Transform {
  public:
-  std::string getFilterGraphCpu() const = 0
+  virtual std::string getFilterGraphCpu() const = 0;
+
+  // If the transformation does not change the output frame dimensions, then
+  // there is no need to override this member function. The default
+  // implementation returns an empty optional, indicating that the output frame
+  // has the same dimensions as the input frame.
+  //
+  // If the transformation does change the output frame dimensions, then it
+  // must override this member function and return the output frame dimensions.
+  virtual std::optional<FrameDims> getOutputFrameDims() const {
+    return std::nullopt;
+  }
+
+  virtual bool isSwScaleCompatible() const {
+    return false;
+  }
 };
 
 class ResizeTransform : public Transform {
  public:
+  enum class InterpolationMode { BILINEAR, BICUBIC, NEAREST };
+
   ResizeTransform(int width, int height)
       : width_(width),
         height_(height),
-        interpolation_(InterpolationMode::BILINEAR) {}
+        interpolationMode_(InterpolationMode::BILINEAR) {}
 
-  ResizeTransform(int width, int height, InterpolationMode interpolation) =
-      default;
+  ResizeTransform(int width, int height, InterpolationMode interpolationMode)
+      : width_(width), height_(height), interpolationMode_(interpolationMode) {}
 
   std::string getFilterGraphCpu() const override;
+  std::optional<FrameDims> getOutputFrameDims() const override;
+  bool isSwScaleCompatible() const override;
 
-  enum class InterpolationMode { BILINEAR, BICUBIC, NEAREST };
+  int getSwsFlags() const;
 
  private:
   int width_;
   int height_;
-  InterpolationMode interpolation_;
-}
+  InterpolationMode interpolationMode_;
+};
 
 } // namespace facebook::torchcodec
