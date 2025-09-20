@@ -65,7 +65,7 @@ const int* getSupportedSampleRates(const AVCodec& avCodec) {
       &avCodec,
       AV_CODEC_CONFIG_SAMPLE_RATE,
       0,
-      reinterpret_cast<const void**> & supportedSampleRates,
+      reinterpret_cast<const void**>(&supportedSampleRates),
       &numSampleRates);
   if (ret < 0 || supportedSampleRates == nullptr) {
     TORCH_CHECK(false, "Couldn't get supported sample rates from encoder.");
@@ -85,7 +85,7 @@ const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec) {
       &avCodec,
       AV_CODEC_CONFIG_SAMPLE_FORMAT,
       0,
-      reinterpret_cast<const void**> & supportedSampleFormats,
+      reinterpret_cast<const void**>(&supportedSampleFormats),
       &numSampleFormats);
   if (ret < 0 || supportedSampleFormats == nullptr) {
     TORCH_CHECK(false, "Couldn't get supported sample formats from encoder.");
@@ -158,7 +158,7 @@ void validateNumChannels(const AVCodec& avCodec, int numChannels) {
       &avCodec,
       AV_CODEC_CONFIG_CHANNEL_LAYOUT,
       0,
-      reinterpret_cast<const void**> & supported_layouts,
+      reinterpret_cast<const void**>(&supported_layouts),
       &num_layouts);
   if (ret < 0 || supported_layouts == nullptr) {
     TORCH_CHECK(false, "Couldn't get supported channel layouts from encoder.");
