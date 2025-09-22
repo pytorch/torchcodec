@@ -192,6 +192,7 @@ void CudaDeviceInterface::initialize(
     const AVRational& timeBase,
     const FrameDims& outputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
+  TORCH_CHECK(codecContext != nullptr, "codecContext is null");
 
   timeBase_ = timeBase;
   outputDims_ = outputDims;
@@ -222,8 +223,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // first, and do the color conversion there.
     //
     // TODO: If we're going to keep this around, we should probably cache it?
-    auto cpuDevice = torch::Device(torch::kCPU);
-    auto cpuInterface = createDeviceInterface(cpuDevice);
+    auto cpuInterface = createDeviceInterface(torch::Device(torch::kCPU));
     TORCH_CHECK(
         cpuInterface != nullptr, "Failed to create CPU device interface");
     cpuInterface->initialize(
@@ -294,6 +294,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "The AVFrame's hw_frames_ctx does not have a device_ctx. ");
   auto cudaDeviceCtx =
       static_cast<AVCUDADeviceContext*>(hwFramesCtx->device_ctx->hwctx);
+  TORCH_CHECK(cudaDeviceCtx != nullptr, "The hardware context is null");
+
   at::cuda::CUDAEvent nvdecDoneEvent;
   at::cuda::CUDAStream nvdecStream = // That's always the default stream. Sad.
       c10::cuda::getStreamFromExternal(cudaDeviceCtx->stream, deviceIndex);
