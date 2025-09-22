@@ -79,7 +79,7 @@ const int* getSupportedSampleRates(const AVCodec& avCodec) {
 
 const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec) {
   const AVSampleFormat* supportedSampleFormats = nullptr;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7.1
   int numSampleFormats = 0;
   int ret = avcodec_get_supported_config(
       nullptr,
@@ -152,7 +152,7 @@ void setDefaultChannelLayout(UniqueAVFrame& avFrame, int numChannels) {
 }
 
 void validateNumChannels(const AVCodec& avCodec, int numChannels) {
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7.1
   std::stringstream supportedNumChannels;
   const AVChannelLayout* supportedLayouts = nullptr;
   int numLayouts = 0;
