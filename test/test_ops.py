@@ -146,13 +146,9 @@ class TestVideoDecoderOps:
 
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frames_at_indices(self, device):
-        print("test_get_frames_at_indices")
         decoder = create_from_file(str(NASA_VIDEO.path))
-        print("decoder created")
         add_video_stream(decoder, device=device)
-        print("stream added")
         frames0and180, *_ = get_frames_at_indices(decoder, frame_indices=[0, 180])
-        print("frames retrieved")
         reference_frame0 = NASA_VIDEO.get_frame_data_by_index(0)
         reference_frame180 = NASA_VIDEO.get_frame_data_by_index(
             INDEX_OF_FRAME_AT_6_SECONDS
