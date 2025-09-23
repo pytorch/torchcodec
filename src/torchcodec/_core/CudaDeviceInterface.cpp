@@ -230,8 +230,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
 
     FrameOutput cpuFrameOutput;
-    cpuInterface->convertAVFrameToFrameOutput(
-        avFrame, cpuFrameOutput);
+    cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);
 
     // TODO: explain that the pre-allocated tensor is on the GPU, but we need
     // to do the decoding on the CPU, and we can't pass the pre-allocated tensor

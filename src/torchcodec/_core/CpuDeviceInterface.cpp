@@ -169,10 +169,8 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
         outputDims_.width,
         outputDims_.height);
 
-
     outputTensor = preAllocatedOutputTensor.value_or(
         allocateEmptyHWCTensor(outputDims_, torch::kCPU));
-
 
     if (!swsContext_ || prevSwsFrameContext_ != swsFrameContext) {
       createSwsContext(swsFrameContext, avFrame->colorspace);
