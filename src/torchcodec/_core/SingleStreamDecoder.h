@@ -351,6 +351,10 @@ class SingleStreamDecoder {
   SeekMode seekMode_;
   ContainerMetadata containerMetadata_;
   UniqueDecodingAVFormatContext formatContext_;
+  // Current filter context. Used to know whether a new FilterGraph
+  // should be created to process a next frame.
+  std::unique_ptr<FiltersContext> filtersContext_;
+  std::unique_ptr<FilterGraph> filterGraph_;
   std::unique_ptr<DeviceInterface> deviceInterface_;
   std::map<int, StreamInfo> streamInfos_;
   const int NO_ACTIVE_STREAM = -2;

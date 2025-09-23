@@ -199,9 +199,70 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   return;
 }
 
+std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
+    const VideoStreamOptions& videoStreamOptions,
+    const UniqueAVFrame& avFrame,
+    const AVRational& timeBase) {
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(avFrame->format);
+
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    auto cpuDevice = torch::Device(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(cpuDevice);
+    return cpuInterface->initializeFiltersContext(
+        videoStreamOptions, avFrame, timeBase);
+  }
+
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
+  int height = frameDims.height;
+  int width = frameDims.width;
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+
+  if (actualFormat == AV_PIX_FMT_NV12) {
+    return nullptr;
+  }
+
+  AVPixelFormat outputFormat;
+  std::stringstream filters;
+
+  unsigned version_int = avfilter_version();
+  if (version_int < AV_VERSION_INT(8, 0, 103)) {
+    // Color conversion support ('format=' option) was added to scale_cuda from
+    // n5.0. With the earlier version of ffmpeg we have no choice but use CPU
+    // filters. See:
+    // https://github.com/FFmpeg/FFmpeg/commit/62dc5df941f5e196164c151691e4274195523e95
+    outputFormat = AV_PIX_FMT_RGB24;
+
+    filters << "hwdownload,format=" << av_pix_fmt_desc_get(actualFormat)->name;
+    filters << ",scale=" << width << ":" << height;
+    filters << ":sws_flags=bilinear";
+  } else {
+    // Actual output color format will be set via filter options
+    outputFormat = AV_PIX_FMT_CUDA;
+
+    filters << "scale_cuda=" << width << ":" << height;
+    filters << ":format=nv12:interp_algo=bilinear";
+  }
+
+  return std::make_unique<FiltersContext>(
+      avFrame->width,
+      avFrame->height,
+      frameFormat,
+      avFrame->sample_aspect_ratio,
+      width,
+      height,
+      outputFormat,
+      filters.str(),
+      timeBase,
+      av_buffer_ref(avFrame->hw_frames_ctx));
+}
+
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] const AVRational& timeBase,
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
@@ -219,11 +280,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
-        videoStreamOptions,
-        timeBase,
-        avFrame,
-        cpuFrameOutput,
-        preAllocatedOutputTensor);
+        videoStreamOptions, avFrame, cpuFrameOutput, preAllocatedOutputTensor);
 
     frameOutput.data = cpuFrameOutput.data.to(device_);
     return;
