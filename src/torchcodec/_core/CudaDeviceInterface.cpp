@@ -199,12 +199,127 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   return;
 }
 
+std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
+    const VideoStreamOptions& videoStreamOptions,
+    const UniqueAVFrame& avFrame,
+    const AVRational& timeBase) {
+  // We need FFmpeg filters to handle those conversion cases which are not
+  // directly implemented in CUDA or CPU device interface (in case of a
+  // fallback).
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(avFrame->format);
+
+  // Input frame is on CPU, we will just pass it to CPU device interface, so
+  // skipping filters context as CPU device interface will handle everythong for
+  // us.
+  if (avFrame->format != AV_PIX_FMT_CUDA) {
+    return nullptr;
+  }
+
+  TORCH_CHECK(
+      avFrame->hw_frames_ctx != nullptr,
+      "The AVFrame does not have a hw_frames_ctx. "
+      "That's unexpected, please report this to the TorchCodec repo.");
+
+  auto hwFramesCtx =
+      reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
+  AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+
+  // NV12 conversion is implemented directly with NPP, no need for filters.
+  if (actualFormat == AV_PIX_FMT_NV12) {
+    return nullptr;
+  }
+
+  auto frameDims =
+      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
+  int height = frameDims.height;
+  int width = frameDims.width;
+
+  AVPixelFormat outputFormat;
+  std::stringstream filters;
+
+  unsigned version_int = avfilter_version();
+  if (version_int < AV_VERSION_INT(8, 0, 103)) {
+    // Color conversion support ('format=' option) was added to scale_cuda from
+    // n5.0. With the earlier version of ffmpeg we have no choice but use CPU
+    // filters. See:
+    // https://github.com/FFmpeg/FFmpeg/commit/62dc5df941f5e196164c151691e4274195523e95
+    outputFormat = AV_PIX_FMT_RGB24;
+
+    auto actualFormatName = av_get_pix_fmt_name(actualFormat);
+    TORCH_CHECK(
+        actualFormatName != nullptr,
+        "The actual format of a frame is unknown to FFmpeg. "
+        "That's unexpected, please report this to the TorchCodec repo.");
+
+    filters << "hwdownload,format=" << actualFormatName;
+    filters << ",scale=" << width << ":" << height;
+    filters << ":sws_flags=bilinear";
+  } else {
+    // Actual output color format will be set via filter options
+    outputFormat = AV_PIX_FMT_CUDA;
+
+    filters << "scale_cuda=" << width << ":" << height;
+    filters << ":format=nv12:interp_algo=bilinear";
+  }
+
+  return std::make_unique<FiltersContext>(
+      avFrame->width,
+      avFrame->height,
+      frameFormat,
+      avFrame->sample_aspect_ratio,
+      width,
+      height,
+      outputFormat,
+      filters.str(),
+      timeBase,
+      av_buffer_ref(avFrame->hw_frames_ctx));
+}
+
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
     const VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] const AVRational& timeBase,
-    UniqueAVFrame& avFrame,
+    UniqueAVFrame& avInputFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  std::unique_ptr<FiltersContext> newFiltersContext =
+      initializeFiltersContext(videoStreamOptions, avInputFrame, timeBase);
+  UniqueAVFrame avFilteredFrame;
+  if (newFiltersContext) {
+    // We need to compare the current filter context with our previous filter
+    // context. If they are different, then we need to re-create a filter
+    // graph. We create a filter graph late so that we don't have to depend
+    // on the unreliable metadata in the header. And we sometimes re-create
+    // it because it's possible for frame resolution to change mid-stream.
+    // Finally, we want to reuse the filter graph as much as possible for
+    // performance reasons.
+    if (!filterGraph_ || *filtersContext_ != *newFiltersContext) {
+      filterGraph_ =
+          std::make_unique<FilterGraph>(*newFiltersContext, videoStreamOptions);
+      filtersContext_ = std::move(newFiltersContext);
+    }
+    avFilteredFrame = filterGraph_->convert(avInputFrame);
+
+    // If this check fails it means the frame wasn't
+    // reshaped to its expected dimensions by filtergraph.
+    TORCH_CHECK(
+        (avFilteredFrame->width == filtersContext_->outputWidth) &&
+            (avFilteredFrame->height == filtersContext_->outputHeight),
+        "Expected frame from filter graph of ",
+        filtersContext_->outputWidth,
+        "x",
+        filtersContext_->outputHeight,
+        ", got ",
+        avFilteredFrame->width,
+        "x",
+        avFilteredFrame->height);
+  }
+
+  UniqueAVFrame& avFrame = (avFilteredFrame) ? avFilteredFrame : avInputFrame;
+
+  // The filtered frame might be on CPU if CPU fallback has happenned on filter
+  // graph level. For example, that's how we handle color format conversion
+  // on FFmpeg 4.4 where scale_cuda did not have this supported implemented yet.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
     // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
@@ -232,8 +347,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   // Above we checked that the AVFrame was on GPU, but that's not enough, we
   // also need to check that the AVFrame is in AV_PIX_FMT_NV12 format (8 bits),
   // because this is what the NPP color conversion routines expect.
-  // TODO: we should investigate how to can perform color conversion for
-  // non-8bit videos. This is supported on CPU.
   TORCH_CHECK(
       avFrame->hw_frames_ctx != nullptr,
       "The AVFrame does not have a hw_frames_ctx. "
@@ -242,16 +355,14 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   auto hwFramesCtx =
       reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
   AVPixelFormat actualFormat = hwFramesCtx->sw_format;
+
   TORCH_CHECK(
       actualFormat == AV_PIX_FMT_NV12,
       "The AVFrame is ",
       (av_get_pix_fmt_name(actualFormat) ? av_get_pix_fmt_name(actualFormat)
                                          : "unknown"),
-      ", but we expected AV_PIX_FMT_NV12. This typically happens when "
-      "the video isn't 8bit, which is not supported on CUDA at the moment. "
-      "Try using the CPU device instead. "
-      "If the video is 10bit, we are tracking 10bit support in "
-      "https://github.com/pytorch/torchcodec/issues/776");
+      ", but we expected AV_PIX_FMT_NV12. "
+      "That's unexpected, please report this to the TorchCodec repo.");
 
   auto frameDims =
       getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
