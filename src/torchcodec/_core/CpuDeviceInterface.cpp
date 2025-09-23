@@ -169,8 +169,10 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
         outputDims_.width,
         outputDims_.height);
 
+
     outputTensor = preAllocatedOutputTensor.value_or(
         allocateEmptyHWCTensor(outputDims_, torch::kCPU));
+
 
     if (!swsContext_ || prevSwsFrameContext_ != swsFrameContext) {
       createSwsContext(swsFrameContext, avFrame->colorspace);
@@ -178,6 +180,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     }
     int resultHeight =
         convertAVFrameToTensorUsingSwScale(avFrame, outputTensor);
+
     // If this check failed, it would mean that the frame wasn't reshaped to
     // the expected height.
     // TODO: Can we do the same check for width?

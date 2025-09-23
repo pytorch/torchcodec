@@ -231,9 +231,18 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
 
     FrameOutput cpuFrameOutput;
     cpuInterface->convertAVFrameToFrameOutput(
-        avFrame, cpuFrameOutput, preAllocatedOutputTensor);
+        avFrame, cpuFrameOutput);
 
-    frameOutput.data = cpuFrameOutput.data.to(device_);
+    // TODO: explain that the pre-allocated tensor is on the GPU, but we need
+    // to do the decoding on the CPU, and we can't pass the pre-allocated tensor
+    // to do it. BUT WHY did it work before?
+    if (preAllocatedOutputTensor.has_value()) {
+      preAllocatedOutputTensor.value().copy_(cpuFrameOutput.data);
+      frameOutput.data = preAllocatedOutputTensor.value();
+    } else {
+      frameOutput.data = cpuFrameOutput.data.to(device_);
+    }
+
     return;
   }
 
