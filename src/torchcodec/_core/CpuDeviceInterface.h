@@ -41,8 +41,7 @@ class CpuDeviceInterface : public DeviceInterface {
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  torch::Tensor convertAVFrameToTensorUsingFilterGraph(
-      const UniqueAVFrame& avFrame);
+  torch::Tensor toTensor(const UniqueAVFrame& avFrame);
 
   struct SwsFrameContext {
     int inputWidth = 0;

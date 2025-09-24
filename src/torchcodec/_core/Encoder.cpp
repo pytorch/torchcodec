@@ -33,21 +33,22 @@ torch::Tensor validateSamples(const torch::Tensor& samples) {
 }
 
 void validateSampleRate(const AVCodec& avCodec, int sampleRate) {
-  if (avCodec.supported_samplerates == nullptr) {
+  const int* supportedSampleRates = getSupportedSampleRates(avCodec);
+  if (supportedSampleRates == nullptr) {
     return;
   }
 
-  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
-    if (sampleRate == avCodec.supported_samplerates[i]) {
+  for (auto i = 0; supportedSampleRates[i] != 0; ++i) {
+    if (sampleRate == supportedSampleRates[i]) {
       return;
     }
   }
   std::stringstream supportedRates;
-  for (auto i = 0; avCodec.supported_samplerates[i] != 0; ++i) {
+  for (auto i = 0; supportedSampleRates[i] != 0; ++i) {
     if (i > 0) {
       supportedRates << ", ";
     }
-    supportedRates << avCodec.supported_samplerates[i];
+    supportedRates << supportedSampleRates[i];
   }
 
   TORCH_CHECK(
@@ -73,19 +74,22 @@ static const std::vector<AVSampleFormat> preferredFormatsOrder = {
     AV_SAMPLE_FMT_U8};
 
 AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
+  const AVSampleFormat* supportedSampleFormats =
+      getSupportedOutputSampleFormats(avCodec);
+
   // Find a sample format that the encoder supports. We prefer using FLT[P],
   // since this is the format of the input samples. If FLTP isn't supported
   // then we'll need to convert the AVFrame's format. Our heuristic is to encode
   // into the format with the highest resolution.
-  if (avCodec.sample_fmts == nullptr) {
+  if (supportedSampleFormats == nullptr) {
     // Can't really validate anything in this case, best we can do is hope that
     // FLTP is supported by the encoder. If not, FFmpeg will raise.
     return AV_SAMPLE_FMT_FLTP;
   }
 
   for (AVSampleFormat preferredFormat : preferredFormatsOrder) {
-    for (int i = 0; avCodec.sample_fmts[i] != -1; ++i) {
-      if (avCodec.sample_fmts[i] == preferredFormat) {
+    for (int i = 0; supportedSampleFormats[i] != -1; ++i) {
+      if (supportedSampleFormats[i] == preferredFormat) {
         return preferredFormat;
       }
     }
@@ -93,7 +97,7 @@ AVSampleFormat findBestOutputSampleFormat(const AVCodec& avCodec) {
   // We should always find a match in preferredFormatsOrder, so we should always
   // return earlier. But in the event that a future FFmpeg version defines an
   // additional sample format that isn't in preferredFormatsOrder, we fallback:
-  return avCodec.sample_fmts[0];
+  return supportedSampleFormats[0];
 }
 
 } // namespace

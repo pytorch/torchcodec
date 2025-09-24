@@ -8,6 +8,7 @@
 
 #include <npp.h>
 #include "src/torchcodec/_core/DeviceInterface.h"
+#include "src/torchcodec/_core/FilterGraph.h"
 
 namespace facebook::torchcodec {
 
@@ -21,10 +22,10 @@ class CudaDeviceInterface : public DeviceInterface {
 
   void initialize(
       AVCodecContext* codecContext,
-      [[maybe_unused]] const VideoStreamOptions& videoStreamOptions,
+      const VideoStreamOptions& videoStreamOptions,
       [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>&
           transforms,
-      [[maybe_unused]] const AVRational& timeBase,
+      const AVRational& timeBase,
       const FrameDims& outputDims) override;
 
   void convertAVFrameToFrameOutput(
@@ -34,10 +35,19 @@ class CudaDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
  private:
+  std::unique_ptr<FiltersContext> initializeFiltersContext(
+      const UniqueAVFrame& avFrame);
+
+  VideoStreamOptions videoStreamOptions_;
   AVRational timeBase_;
   FrameDims outputDims_;
+
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;
+  // Current filter context. Used to know whether a new FilterGraph
+  // should be created to process the next frame.
+  std::unique_ptr<FiltersContext> filtersContext_;
+  std::unique_ptr<FilterGraph> filterGraph_;
 };
 
 } // namespace facebook::torchcodec

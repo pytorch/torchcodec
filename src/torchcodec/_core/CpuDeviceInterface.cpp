@@ -154,6 +154,24 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(avFrame->format);
 
+  // This is an early-return optimization: if the format is already what we
+  // need, and the dimensions are also what we need, we don't need to call
+  // swscale or filtergraph. We can just convert the AVFrame to a tensor.
+  if (frameFormat == AV_PIX_FMT_RGB24 &&
+      avFrame->width == outputDims_.width &&
+      avFrame->height == outputDims_.height) {
+    outputTensor = toTensor(avFrame);
+    if (preAllocatedOutputTensor.has_value()) {
+      // We have already validated that preAllocatedOutputTensor and
+      // outputTensor have the same shape.
+      preAllocatedOutputTensor.value().copy_(outputTensor);
+      frameOutput.data = preAllocatedOutputTensor.value();
+    } else {
+      frameOutput.data = outputTensor;
+    }
+    return;
+  }
+
   if (colorConversionLibrary_ == ColorConversionLibrary::SWSCALE) {
     // We need to compare the current frame context with our previous frame
     // context. If they are different, then we need to re-create our colorspace
@@ -207,7 +225,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
           std::make_unique<FilterGraph>(filtersContext, videoStreamOptions_);
       prevFiltersContext_ = std::move(filtersContext);
     }
-    outputTensor = convertAVFrameToTensorUsingFilterGraph(avFrame);
+    outputTensor = toTensor(filterGraphContext_->convert(avFrame));
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -256,22 +274,19 @@ int CpuDeviceInterface::convertAVFrameToTensorUsingSwScale(
   return resultHeight;
 }
 
-torch::Tensor CpuDeviceInterface::convertAVFrameToTensorUsingFilterGraph(
-    const UniqueAVFrame& avFrame) {
-  UniqueAVFrame filteredAVFrame = filterGraphContext_->convert(avFrame);
+torch::Tensor CpuDeviceInterface::toTensor(const UniqueAVFrame& avFrame) {
+  TORCH_CHECK_EQ(avFrame->format, AV_PIX_FMT_RGB24);
 
-  TORCH_CHECK_EQ(filteredAVFrame->format, AV_PIX_FMT_RGB24);
-
-  int height = filteredAVFrame->height;
-  int width = filteredAVFrame->width;
+  int height = avFrame->height;
+  int width = avFrame->width;
   std::vector<int64_t> shape = {height, width, 3};
-  std::vector<int64_t> strides = {filteredAVFrame->linesize[0], 3, 1};
-  AVFrame* filteredAVFramePtr = filteredAVFrame.release();
-  auto deleter = [filteredAVFramePtr](void*) {
-    UniqueAVFrame avFrameToDelete(filteredAVFramePtr);
+  std::vector<int64_t> strides = {avFrame->linesize[0], 3, 1};
+  AVFrame* avFrameClone = av_frame_clone(avFrame.get());
+  auto deleter = [avFrameClone](void*) {
+    UniqueAVFrame avFrameToDelete(avFrameClone);
   };
   return torch::from_blob(
-      filteredAVFramePtr->data[0], shape, strides, deleter, {torch::kUInt8});
+      avFrameClone->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
 void CpuDeviceInterface::createSwsContext(

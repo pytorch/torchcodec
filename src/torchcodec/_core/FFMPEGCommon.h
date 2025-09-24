@@ -162,6 +162,9 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 // support.
 int64_t getDuration(const UniqueAVFrame& frame);
 
+const int* getSupportedSampleRates(const AVCodec& avCodec);
+const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec);
+
 int getNumChannels(const UniqueAVFrame& avFrame);
 int getNumChannels(const UniqueAVCodecContext& avCodecContext);
 
