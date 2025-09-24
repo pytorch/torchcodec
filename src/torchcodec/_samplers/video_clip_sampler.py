@@ -105,25 +105,12 @@ class IndexBasedSamplerArgs(SamplerArgs):
     sample_step: int = 1
 
 
-class VideoClipSampler(nn.Module):
+class DEPRECATED_VideoClipSampler(nn.Module):
     """
-    VideoClipSampler will do video clip sampling with given video args and sampler args.
-    The video args contains video related information, frames_per_clip, dimensions etc.
-    The sampler args can be either time-based or index-based, it will be used to decide clip start time pts or index.
-    ClipSampling support, random, uniform, periodic, target, keyframe sampling etc.
+    DEPRECATED: Do not use. The supported samplers are in `torchcodec.samplers`. See:
 
-    Args:
-        video_args (`VideoArgs`): The video args
-        sampler_args (`SamplerArgs`): The sampler args. Can be TimeBasedSamplerArgs or IndexBasedSamplerArgs
-        decoder_args (`DecoderArgs`): Decoder args contain value needs for decoder, for example, thread count
-
-    Example:
-        >>> video_args = VideoArgs(desired_width=224, desired_height=224)
-        >>> time_based_sampler_args = TimeBasedSamplerArgs(sampler_type="random", clips_per_video=1, frames_per_clip=4)
-        >>> video_decoder_args = DecoderArgs(num_threads=1)
-        >>> video_clip_sampler = VideoClipSampler(video_args, time_based_sampler_args, decoder_args)
-        >>> clips = video_clip_sampler(video_data)
-        clips now contains a list of clip, where clip is a list of frame tensors, each tensor represents a frame image.
+      * https://docs.pytorch.org/torchcodec/stable/api_ref_torchcodec.html
+      * https://docs.pytorch.org/torchcodec/stable/generated_examples/decoding/sampling.html
     """
 
     def __init__(
