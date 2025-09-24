@@ -254,7 +254,7 @@ UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
         "That's unexpected, please report this to the TorchCodec repo.");
 
     */
-    filters << "hwdownload,format=rgb24";
+    filters << "hwupload,format=nv12";
   } else {
     // Actual output color format will be set via filter options
     outputFormat = AV_PIX_FMT_CUDA;
