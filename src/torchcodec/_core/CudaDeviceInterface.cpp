@@ -244,7 +244,8 @@ UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
     // n5.0. With the earlier version of ffmpeg we have no choice but use CPU
     // filters. See:
     // https://github.com/FFmpeg/FFmpeg/commit/62dc5df941f5e196164c151691e4274195523e95
-    outputFormat = AV_PIX_FMT_RGB24;
+    //outputFormat = AV_PIX_FMT_RGB24;
+    outputFormat = AV_PIX_FMT_CUDA;
 
     /*
     auto actualFormatName = av_get_pix_fmt_name(actualFormat);
