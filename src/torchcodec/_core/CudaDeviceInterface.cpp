@@ -291,8 +291,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // Finally, we want to reuse the filter graph as much as possible for
     // performance reasons.
     if (!filterGraph_ || *filtersContext_ != *newFiltersContext) {
-      filterGraph_ =
-          std::make_unique<FilterGraph>(*newFiltersContext, videoStreamOptions_);
+      filterGraph_ = std::make_unique<FilterGraph>(
+          *newFiltersContext, videoStreamOptions_);
       filtersContext_ = std::move(newFiltersContext);
     }
     avFilteredFrame = filterGraph_->convert(avInputFrame);

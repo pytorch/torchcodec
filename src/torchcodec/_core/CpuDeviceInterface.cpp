@@ -157,8 +157,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
   // This is an early-return optimization: if the format is already what we
   // need, and the dimensions are also what we need, we don't need to call
   // swscale or filtergraph. We can just convert the AVFrame to a tensor.
-  if (frameFormat == AV_PIX_FMT_RGB24 &&
-      avFrame->width == outputDims_.width &&
+  if (frameFormat == AV_PIX_FMT_RGB24 && avFrame->width == outputDims_.width &&
       avFrame->height == outputDims_.height) {
     outputTensor = toTensor(avFrame);
     if (preAllocatedOutputTensor.has_value()) {
