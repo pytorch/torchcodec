@@ -208,19 +208,17 @@ void CudaDeviceInterface::initialize(
   codecContext->hw_device_ctx = av_buffer_ref(ctx_.get());
 }
 
-std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
-    const UniqueAVFrame& avFrame) {
+UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
+    UniqueAVFrame& avFrame) {
   // We need FFmpeg filters to handle those conversion cases which are not
   // directly implemented in CUDA or CPU device interface (in case of a
   // fallback).
-  enum AVPixelFormat frameFormat =
-      static_cast<enum AVPixelFormat>(avFrame->format);
 
   // Input frame is on CPU, we will just pass it to CPU device interface, so
   // skipping filters context as CPU device interface will handle everything for
   // us.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
-    return nullptr;
+    return std::move(avFrame);
   }
 
   TORCH_CHECK(
@@ -234,7 +232,7 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
 
   // NV12 conversion is implemented directly with NPP, no need for filters.
   if (actualFormat == AV_PIX_FMT_NV12) {
-    return nullptr;
+    return std::move(avFrame);
   }
 
   AVPixelFormat outputFormat;
@@ -248,13 +246,15 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
     // https://github.com/FFmpeg/FFmpeg/commit/62dc5df941f5e196164c151691e4274195523e95
     outputFormat = AV_PIX_FMT_RGB24;
 
+    /*
     auto actualFormatName = av_get_pix_fmt_name(actualFormat);
     TORCH_CHECK(
         actualFormatName != nullptr,
         "The actual format of a frame is unknown to FFmpeg. "
         "That's unexpected, please report this to the TorchCodec repo.");
 
-    filters << "hwdownload,format=" << actualFormatName;
+    */
+    filters << "hwdownload";
   } else {
     // Actual output color format will be set via filter options
     outputFormat = AV_PIX_FMT_CUDA;
@@ -262,7 +262,10 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
     filters << "scale_cuda=format=nv12:interp_algo=bilinear";
   }
 
-  return std::make_unique<FiltersContext>(
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(avFrame->format);
+
+  auto newContext = std::make_unique<FiltersContext>(
       avFrame->width,
       avFrame->height,
       frameFormat,
@@ -273,46 +276,43 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
       filters.str(),
       timeBase_,
       av_buffer_ref(avFrame->hw_frames_ctx));
+
+  // We need to compare the current filter context with our previous filter
+  // context. If they are different, then we need to re-create a filter
+  // graph. We create a filter graph late so that we don't have to depend
+  // on the unreliable metadata in the header. And we sometimes re-create
+  // it because it's possible for frame resolution to change mid-stream.
+  // Finally, we want to reuse the filter graph as much as possible for
+  // performance reasons.
+  if (!nv12Conversion_ || *nv12ConversionContext_ != *newContext) {
+    nv12Conversion_ =
+        std::make_unique<FilterGraph>(*newContext, videoStreamOptions_);
+    nv12ConversionContext_ = std::move(newContext);
+  }
+  auto filteredAVFrame = nv12Conversion_->convert(avFrame);
+
+  // If this check fails it means the frame wasn't
+  // reshaped to its expected dimensions by filtergraph.
+  TORCH_CHECK(
+      (filteredAVFrame->width == nv12ConversionContext_->outputWidth) &&
+          (filteredAVFrame->height == nv12ConversionContext_->outputHeight),
+      "Expected frame from filter graph of ",
+      nv12ConversionContext_->outputWidth,
+      "x",
+      nv12ConversionContext_->outputHeight,
+      ", got ",
+      filteredAVFrame->width,
+      "x",
+      filteredAVFrame->height);
+
+  return filteredAVFrame;
 }
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
-    UniqueAVFrame& avInputFrame,
+    UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  std::unique_ptr<FiltersContext> newFiltersContext =
-      initializeFiltersContext(avInputFrame);
-  UniqueAVFrame avFilteredFrame;
-  if (newFiltersContext) {
-    // We need to compare the current filter context with our previous filter
-    // context. If they are different, then we need to re-create a filter
-    // graph. We create a filter graph late so that we don't have to depend
-    // on the unreliable metadata in the header. And we sometimes re-create
-    // it because it's possible for frame resolution to change mid-stream.
-    // Finally, we want to reuse the filter graph as much as possible for
-    // performance reasons.
-    if (!filterGraph_ || *filtersContext_ != *newFiltersContext) {
-      filterGraph_ = std::make_unique<FilterGraph>(
-          *newFiltersContext, videoStreamOptions_);
-      filtersContext_ = std::move(newFiltersContext);
-    }
-    avFilteredFrame = filterGraph_->convert(avInputFrame);
-
-    // If this check fails it means the frame wasn't
-    // reshaped to its expected dimensions by filtergraph.
-    TORCH_CHECK(
-        (avFilteredFrame->width == filtersContext_->outputWidth) &&
-            (avFilteredFrame->height == filtersContext_->outputHeight),
-        "Expected frame from filter graph of ",
-        filtersContext_->outputWidth,
-        "x",
-        filtersContext_->outputHeight,
-        ", got ",
-        avFilteredFrame->width,
-        "x",
-        avFilteredFrame->height);
-  }
-
-  UniqueAVFrame& avFrame = (avFilteredFrame) ? avFilteredFrame : avInputFrame;
+  avFrame = maybeConvertAVFrameToNV12(avFrame);
 
   // The filtered frame might be on CPU if CPU fallback has happenned on filter
   // graph level. For example, that's how we handle color format conversion

@@ -35,8 +35,10 @@ class CudaDeviceInterface : public DeviceInterface {
           std::nullopt) override;
 
  private:
-  std::unique_ptr<FiltersContext> initializeFiltersContext(
-      const UniqueAVFrame& avFrame);
+  // Our CUDA decoding code assumes NV12 format. In order to handle other
+  // kindsof input, we need to convert them to NV12. Our current implementation
+  // does this using filtergraph.
+  UniqueAVFrame maybeConvertAVFrameToNV12(UniqueAVFrame& avFrame);
 
   VideoStreamOptions videoStreamOptions_;
   AVRational timeBase_;
@@ -44,10 +46,11 @@ class CudaDeviceInterface : public DeviceInterface {
 
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;
-  // Current filter context. Used to know whether a new FilterGraph
-  // should be created to process the next frame.
-  std::unique_ptr<FiltersContext> filtersContext_;
-  std::unique_ptr<FilterGraph> filterGraph_;
+
+  // This filtergraph instance is only used for NV12 format conversion in
+  // maybeConvertAVFrameToNV12().
+  std::unique_ptr<FiltersContext> nv12ConversionContext_;
+  std::unique_ptr<FilterGraph> nv12Conversion_;
 };
 
 } // namespace facebook::torchcodec
