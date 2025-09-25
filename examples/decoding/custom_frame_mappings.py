@@ -211,12 +211,11 @@ print("Frame seeking is the same for this video!")
 # ------------------------
 #
 # - For fastest decoding when speed is more important than exact seeking accuracy,
-# "approximate" mode is recommended.
+#   "approximate" mode is recommended.
 #
 # - For exact frame seeking, custom frame mappings will benefit workflows where the
 #   same videos are decoded repeatedly, and some preprocessing work can be done.
 #
 # - For exact frame seeking without preprocessing, use "exact" mode.
-#
 
 # %%
