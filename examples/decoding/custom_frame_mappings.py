@@ -25,14 +25,14 @@ This makes it ideal for workflows where:
 # First, some boilerplate: we'll download a short video from the web, and
 # use ffmpeg to create a longer version by repeating it multiple times. We'll end up
 # with two videos: a short one of approximately 3 minutes and a long one of about 13 minutes.
-# You can ignore that part and jump right below to :ref:`frame_mappings_creation`.
+# You can ignore this part and skip below to :ref:`frame_mappings_creation`.
 
 import tempfile
 from pathlib import Path
 import subprocess
 import requests
 
-url = "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4.mp4"
+url = "https://download.pytorch.org/torchaudio/tutorial-assets/stream-api/NASAs_Most_Scientifically_Complex_Space_Observatory_Requires_Precision-MP4_small.mp4"
 response = requests.get(url, headers={"User-Agent": ""})
 if response.status_code != 200:
     raise RuntimeError(f"Failed to download video. {response.status_code = }.")
@@ -63,17 +63,21 @@ print(f"Long video duration: {VideoDecoder(long_video_path).metadata.duration_se
 # Creating custom frame mappings with ffprobe
 # -------------------------------------------
 #
-# The key to using custom frame mappings is preprocessing your videos to extract
-# frame timing information and keyframe indicators. We use ffprobe to generate
-# JSON files containing this metadata.
+# To generate JSON files containing the required video metadata, we recommend using ffprobe.
+# The following frame metadata fields are needed
+# (the ``pkt_`` prefix is needed for older versions of FFmpeg):
+#
+# - ``pts`` / ``pkt_pts``:  Presentation timestamps for each frame
+# - ``duration`` / ``pkt_duration``: Duration of each frame
+# - ``key_frame``: Boolean indicating which frames are key frames
 
 from pathlib import Path
 import subprocess
 import tempfile
 from time import perf_counter_ns
+import json
 
 stream_index = 0
-
 long_json_path = Path(temp_dir) / "long_custom_frame_mappings.json"
 short_json_path = Path(temp_dir) / "short_custom_frame_mappings.json"
 
@@ -81,27 +85,26 @@ ffprobe_cmd = ["ffprobe", "-i", f"{long_video_path}", "-select_streams", f"{stre
 ffprobe_result = subprocess.run(ffprobe_cmd, check=True, capture_output=True, text=True)
 with open(long_json_path, "w") as f:
     f.write(ffprobe_result.stdout)
-    print(f"Wrote {len(ffprobe_result.stdout)} characters to {long_json_path}")
 
 ffprobe_cmd = ["ffprobe", "-i", f"{short_video_path}", "-select_streams", f"{stream_index}", "-show_frames", "-show_entries", "frame=pkt_pts,pkt_duration,key_frame", "-of", "json"]
 ffprobe_result = subprocess.run(ffprobe_cmd, check=True, capture_output=True, text=True)
 with open(short_json_path, "w") as f:
     f.write(ffprobe_result.stdout)
-    print(f"Wrote {len(ffprobe_result.stdout)} characters to {short_json_path}")
+
+sample_data = json.loads(ffprobe_result.stdout)
+print("Data structure of custom frame mappings:")
+for frame in sample_data["frames"][:3]:
+    print(f"{frame}")
 
 # %%
-# .. _perf_creation:
+# .. _custom_frame_mappings_perf_creation:
 #
 # Performance: ``VideoDecoder`` creation
 # --------------------------------------
 #
-# In terms of performance, custom frame mappings ultimately affect the
-# **creation** of a :class:`~torchcodec.decoders.VideoDecoder` object. The
-# longer the video, the higher the performance gain.
-# Let's define a benchmarking function to measure performance.
-# Note that when using file-like objects for custom_frame_mappings, we need to
-# seek back to the beginning between iterations since the JSON data is consumed
-# during VideoDecoder creation.
+# Custom frame mappings affect the **creation** of a :class:`~torchcodec.decoders.VideoDecoder`
+# object. As video length increases, the performance gain compared to exact mode increases.
+#
 
 import torch
 
@@ -126,20 +129,15 @@ def bench(f, file_like=False, average_over=50, warmup=2, **f_kwargs):
     med = times.median().item()
     print(f"{med = :.2f}ms +- {std:.2f}")
 
-# %%
-# Now let's compare the performance of creating VideoDecoder objects with custom
-# frame mappings versus the exact seek mode. You'll see that custom
-# frame mappings provide significant speedups, especially for longer videos.
-
 
 for video_path, json_path in ((short_video_path, short_json_path), (long_video_path, long_json_path)):
-    print(f"Running benchmarks on {Path(video_path).name}")
+    print(f"\nRunning benchmarks on {Path(video_path).name}")
 
     print("Creating a VideoDecoder object with custom_frame_mappings:")
     with open(json_path, "r") as f:
         bench(VideoDecoder, file_like=True, source=video_path, stream_index=stream_index, custom_frame_mappings=f)
 
-    # Compare against seek_modes
+    # Compare against exact seek_mode
     print("Creating a VideoDecoder object with seek_mode='exact':")
     bench(VideoDecoder, source=video_path, stream_index=stream_index, seek_mode="exact")
 
@@ -147,10 +145,10 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
 # Performance: Frame decoding with custom frame mappings
 # ------------------------------------------------------
 #
-# Although the custom_frame_mappings parameter only affects the performance of
-# the :class:`~torchcodec.decoders.VideoDecoder` creation, decoding workflows
-# typically involve creating a :class:`~torchcodec.decoders.VideoDecoder` instance.
-# As a result, the performance benefits of custom_frame_mappings can be seen.
+# Although using custom_frame_mappings only impacts the initialization speed of
+# :class:`~torchcodec.decoders.VideoDecoder`, decoding workflows
+# usually involve creating a :class:`~torchcodec.decoders.VideoDecoder` instance,
+# so the performance benefits are realized.
 
 
 def decode_frames(video_path, seek_mode = "exact", custom_frame_mappings = None):
@@ -163,8 +161,8 @@ def decode_frames(video_path, seek_mode = "exact", custom_frame_mappings = None)
 
 
 for video_path, json_path in ((short_video_path, short_json_path), (long_video_path, long_json_path)):
-    print(f"Running benchmarks on {Path(video_path).name}")
-    print("Decoding frames with custom_frame_mappings JSON str from file:")
+    print(f"\nRunning benchmarks on {Path(video_path).name}")
+    print("Decoding frames with custom_frame_mappings:")
     with open(json_path, "r") as f:
         bench(decode_frames, file_like=True, video_path=video_path, custom_frame_mappings=f)
 
@@ -175,9 +173,9 @@ for video_path, json_path in ((short_video_path, short_json_path), (long_video_p
 # Accuracy: Metadata and frame retrieval
 # --------------------------------------
 #
-# We've seen that using custom frame mappings can significantly speed up
-# the :class:`~torchcodec.decoders.VideoDecoder` creation. The advantage is that
-# seeking is still as accurate as with ``seek_mode="exact"``.
+# In addition to the instantiation speed up compared to ``seek_mode="exact"``, using custom frame mappings
+# also retains the benefit of exact metadata and frame seeking.
+#
 
 print("Metadata of short video with custom_frame_mappings:")
 with open(short_json_path, "r") as f:
@@ -202,9 +200,8 @@ print("Frame seeking is the same for this video!")
 #
 # Custom frame mappings contain the same frame index information
 # that would normally be computed during the :term:`scan` operation in exact mode.
-# (frame presentation timestamps (PTS), durations, and keyframe indicators)
 # By providing this information to the :class:`~torchcodec.decoders.VideoDecoder`
-# as a JSON, it eliminates the need for the expensive scan while preserving all the
+# as a JSON, it eliminates the need for the expensive scan while preserving the
 # accuracy benefits.
 #
 # Which mode should I use?
