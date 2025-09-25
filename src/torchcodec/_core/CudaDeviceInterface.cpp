@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "src/torchcodec/_core/Cache.h"
+#include "src/torchcodec/_core/CpuDeviceInterface.h"
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
@@ -230,7 +231,7 @@ UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
       reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
   AVPixelFormat actualFormat = hwFramesCtx->sw_format;
 
-  // NV12 conversion is implemented directly with NPP, no need for filters.
+  // If the frame is already in NV12 format, we don't need to do anything.
   if (actualFormat == AV_PIX_FMT_NV12) {
     return std::move(avFrame);
   }
@@ -310,35 +311,64 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  if (preAllocatedOutputTensor.has_value()) {
+    auto shape = preAllocatedOutputTensor.value().sizes();
+    TORCH_CHECK(
+        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
+            (shape[1] == outputDims_.width) && (shape[2] == 3),
+        "Expected tensor of shape ",
+        outputDims_.height,
+        "x",
+        outputDims_.width,
+        "x3, got ",
+        shape);
+  }
+
+  // All of our CUDA decoding assumes NV12 format. We handle non-NV12 formats by
+  // converting them to NV12.
   avFrame = maybeConvertAVFrameToNV12(avFrame);
 
-  // The filtered frame might be on CPU if CPU fallback has happenned on filter
-  // graph level. For example, that's how we handle color format conversion
-  // on FFmpeg 4.4 where scale_cuda did not have this supported implemented yet.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
-    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
-    // gives us if it wasn't able to decode a frame, for whatever reason.
-    // Typically that happens if the video's encoder isn't supported by NVDEC.
-    // Below, we choose to convert the frame's color-space using the CPU
-    // codepath, and send it back to the GPU at the very end.
+    // the GPU. In this branch, the frame is on the CPU. There are two possible
+    // reasons:
     //
-    // TODO: A possibly better solution would be to send the frame to the GPU
-    // first, and do the color conversion there.
+    //   1. During maybeConvertAVFrameToNV12(), we had a non-NV12 format frame
+    //      and we're on FFmpeg 4.4 or earlier. In such cases, we had to use CPU
+    //      filters and we just converted the frame to RGB24.
+    //   2. This is what NVDEC gave us if it wasn't able to decode a frame, for
+    //      whatever reason. Typically that happens if the video's encoder isn't
+    //      supported by NVDEC.
     //
-    // TODO: If we're going to keep this around, we should probably cache it?
-    auto cpuInterface = createDeviceInterface(torch::Device(torch::kCPU));
+    // In both cases, we have a frame on the CPU, and we need a CPU device to
+    // handle it. We send the frame back to the CUDA device when we're done.
+    //
+    // TODO: Perhaps we should cache cpuInterface?
+    auto cpuInterface = std::make_unique<CpuDeviceInterface>(torch::kCPU);
     TORCH_CHECK(
         cpuInterface != nullptr, "Failed to create CPU device interface");
     cpuInterface->initialize(
         nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
 
-    FrameOutput cpuFrameOutput;
-    cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);
+    enum AVPixelFormat frameFormat =
+        static_cast<enum AVPixelFormat>(avFrame->format);
 
-    // TODO: explain that the pre-allocated tensor is on the GPU, but we need
-    // to do the decoding on the CPU, and we can't pass the pre-allocated tensor
-    // to do it. BUT WHY did it work before?
+    FrameOutput cpuFrameOutput;
+
+    if (frameFormat == AV_PIX_FMT_RGB24 &&
+        avFrame->width == outputDims_.width &&
+        avFrame->height == outputDims_.height) {
+      // Reason 1 above. The frame is already in the format and dimensions that
+      // we need, we just need to convert it to a tensor.
+      cpuFrameOutput.data = cpuInterface->toTensor(avFrame);
+    } else {
+      // Reason 2 above. We need to do a full conversion.
+      cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);
+    }
+
+    // Finally, we need to send the frame back to the GPU. Note that the
+    // pre-allocated tensor is on the GPU, so we can't send that to the CPU
+    // device interface. We copy it over here.
     if (preAllocatedOutputTensor.has_value()) {
       preAllocatedOutputTensor.value().copy_(cpuFrameOutput.data);
       frameOutput.data = preAllocatedOutputTensor.value();
@@ -372,16 +402,6 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   torch::Tensor& dst = frameOutput.data;
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
-    auto shape = dst.sizes();
-    TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
-            (shape[1] == outputDims_.width) && (shape[2] == 3),
-        "Expected tensor of shape ",
-        outputDims_.height,
-        "x",
-        outputDims_.width,
-        "x3, got ",
-        shape);
   } else {
     dst = allocateEmptyHWCTensor(outputDims_, device_);
   }
