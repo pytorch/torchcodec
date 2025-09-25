@@ -12,6 +12,7 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavcodec/bsf.h>
 #include <libavfilter/avfilter.h>
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
@@ -86,6 +87,8 @@ using UniqueSwrContext =
     std::unique_ptr<SwrContext, Deleterp<SwrContext, void, swr_free>>;
 using UniqueAVAudioFifo = std::
     unique_ptr<AVAudioFifo, Deleter<AVAudioFifo, void, av_audio_fifo_free>>;
+using UniqueAVBSFContext =
+    std::unique_ptr<AVBSFContext, Deleterp<AVBSFContext, void, av_bsf_free>>;
 using UniqueAVBufferRef =
     std::unique_ptr<AVBufferRef, Deleterp<AVBufferRef, void, av_buffer_unref>>;
 using UniqueAVBufferSrcParameters = std::unique_ptr<
@@ -161,6 +164,7 @@ std::string getFFMPEGErrorStringFromErrorCode(int errorCode);
 // struct member representing duration has changed across the versions we
 // support.
 int64_t getDuration(const UniqueAVFrame& frame);
+void setDuration(const UniqueAVFrame& frame, int64_t duration);
 
 const int* getSupportedSampleRates(const AVCodec& avCodec);
 const AVSampleFormat* getSupportedOutputSampleFormats(const AVCodec& avCodec);

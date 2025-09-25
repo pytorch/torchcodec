@@ -384,6 +384,7 @@ void SingleStreamDecoder::addStream(
     int streamIndex,
     AVMediaType mediaType,
     const torch::Device& device,
+    const std::string_view deviceVariant,
     std::optional<int> ffmpegThreadCount) {
   TORCH_CHECK(
       activeStreamIndex_ == NO_ACTIVE_STREAM,
@@ -412,7 +413,7 @@ void SingleStreamDecoder::addStream(
   streamInfo.stream = formatContext_->streams[activeStreamIndex_];
   streamInfo.avMediaType = mediaType;
 
-  deviceInterface_ = createDeviceInterface(device);
+  deviceInterface_ = createDeviceInterface(device, deviceVariant);
 
   // This should never happen, checking just to be safe.
   TORCH_CHECK(
@@ -446,6 +447,7 @@ void SingleStreamDecoder::addStream(
   if (mediaType == AVMEDIA_TYPE_VIDEO) {
     if (deviceInterface_) {
       deviceInterface_->initializeContext(codecContext);
+      deviceInterface_->initializeInterface(streamInfo.stream);
     }
   }
 
@@ -453,6 +455,7 @@ void SingleStreamDecoder::addStream(
   TORCH_CHECK(retVal >= AVSUCCESS, getFFMPEGErrorStringFromErrorCode(retVal));
 
   codecContext->time_base = streamInfo.stream->time_base;
+
   containerMetadata_.allStreamMetadata[activeStreamIndex_].codecName =
       std::string(avcodec_get_name(codecContext->codec_id));
 
@@ -475,6 +478,7 @@ void SingleStreamDecoder::addVideoStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
       videoStreamOptions.device,
+      videoStreamOptions.deviceVariant,
       videoStreamOptions.ffmpegThreadCount);
 
   auto& streamMetadata =
@@ -1105,6 +1109,10 @@ void SingleStreamDecoder::maybeSeekToBeforeDesiredPts() {
 
   decodeStats_.numFlushes++;
   avcodec_flush_buffers(streamInfo.codecContext.get());
+
+  if (deviceInterface_) {
+    deviceInterface_->flush();
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -1123,15 +1131,26 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
   }
 
   StreamInfo& streamInfo = streamInfos_[activeStreamIndex_];
-
-  // Need to get the next frame or error from PopFrame.
   UniqueAVFrame avFrame(av_frame_alloc());
   AutoAVPacket autoAVPacket;
   int status = AVSUCCESS;
   bool reachedEOF = false;
+
+  // TODONVDEC P2: Instead of defining useCustomInterface and rely on if/else
+  // blocks to dispatch to the interface or to FFmpeg, consider *always*
+  // dispatching to the interface. The default implementation of the interface's
+  // receiveFrame and sendPacket could just be calling avcodec_receive_frame and
+  // avcodec_send_packet. This would make the decoding loop even more generic.
+  bool useCustomInterface =
+      deviceInterface_ && deviceInterface_->canDecodePacketDirectly();
+
   while (true) {
-    status =
-        avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
+    if (useCustomInterface) {
+      status = deviceInterface_->receiveFrame(avFrame, cursor_);
+    } else {
+      status =
+          avcodec_receive_frame(streamInfo.codecContext.get(), avFrame.get());
+    }
 
     if (status != AVSUCCESS && status != AVERROR(EAGAIN)) {
       // Non-retriable error
@@ -1154,7 +1173,7 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
 
     if (reachedEOF) {
       // We don't have any more packets to receive. So keep on pulling frames
-      // from its internal buffers.
+      // from decoder's internal buffers.
       continue;
     }
 
@@ -1166,11 +1185,18 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
       decodeStats_.numPacketsRead++;
 
       if (status == AVERROR_EOF) {
-        // End of file reached. We must drain the codec by sending a nullptr
-        // packet.
-        status = avcodec_send_packet(
-            streamInfo.codecContext.get(),
-            /*avpkt=*/nullptr);
+        // End of file reached. We must drain the decoder
+        if (useCustomInterface) {
+          AutoAVPacket eofAutoPacket;
+          ReferenceAVPacket eofPacket(eofAutoPacket);
+          eofPacket->data = nullptr;
+          eofPacket->size = 0;
+          status = deviceInterface_->sendPacket(eofPacket);
+        } else {
+          status = avcodec_send_packet(
+              streamInfo.codecContext.get(),
+              /*avpkt=*/nullptr);
+        }
         TORCH_CHECK(
             status >= AVSUCCESS,
             "Could not flush decoder: ",
@@ -1195,7 +1221,19 @@ UniqueAVFrame SingleStreamDecoder::decodeAVFrame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
-    status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+    if (useCustomInterface) {
+      // TODONVDEC P0:
+      // - cleanup this raw pointer / reference monstruosity.
+      // - don't even expose applyBSF in the interface. This should just be part
+      //   of sendPacket().
+      AutoAVPacket filteredAutoPacket;
+      ReferenceAVPacket filteredPacket(filteredAutoPacket);
+      ReferenceAVPacket* packetToSend = deviceInterface_->applyBSF(
+          packet, filteredAutoPacket, filteredPacket);
+      status = deviceInterface_->sendPacket(*packetToSend);
+    } else {
+      status = avcodec_send_packet(streamInfo.codecContext.get(), packet.get());
+    }
     TORCH_CHECK(
         status >= AVSUCCESS,
         "Could not push packet to decoder: ",
