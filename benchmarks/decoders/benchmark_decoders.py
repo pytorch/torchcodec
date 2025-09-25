@@ -6,6 +6,7 @@
 
 import argparse
 import importlib.resources
+import json
 import os
 import platform
 from pathlib import Path
@@ -106,6 +107,12 @@ def main() -> None:
         default=False,
         action=argparse.BooleanOptionalAction,
     )
+    parser.add_argument(
+        "--output-json",
+        help="Output the results to a JSON file",
+        type=str,
+        default="",
+    )
 
     args = parser.parse_args()
     specified_decoders = set(args.decoders.split(","))
@@ -146,6 +153,10 @@ def main() -> None:
             min_runtime_seconds=args.min_run_seconds,
             benchmark_video_creation=args.bm_video_creation,
         )
+        if args.output_json:
+            with open(args.output_json, "w") as f:
+                json.dump(results, f, indent=2)
+
         data = {
             "experiments": results,
             "system_metadata": {
