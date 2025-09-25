@@ -466,6 +466,10 @@ void SingleStreamDecoder::addVideoStream(
     std::vector<Transform*>& transforms,
     const VideoStreamOptions& videoStreamOptions,
     std::optional<FrameMappings> customFrameMappings) {
+  TORCH_CHECK(
+      transforms.empty() || videoStreamOptions.device == torch::kCPU,
+      "Transforms are only supported for CPU devices.");
+
   addStream(
       streamIndex,
       AVMEDIA_TYPE_VIDEO,
