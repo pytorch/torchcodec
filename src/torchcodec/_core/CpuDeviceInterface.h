@@ -72,7 +72,8 @@ class CpuDeviceInterface : public DeviceInterface {
   std::optional<FrameDims> resizedOutputDims_;
 
   // Color-conversion objects. Only one of filterGraph_ and swsContext_ should
-  // be non-null. Which one we use is controlled by colorConversionLibrary_.
+  // be non-null. Which one we use is determined dynamically in
+  // getColorConversionLibrary() each time we decode a frame.
   //
   // Creating both filterGraph_ and swsContext_ is relatively expensive, so we
   // reuse them across frames. However, it is possbile that subsequent frames
