@@ -5,7 +5,6 @@
 #include <mutex>
 
 #include "src/torchcodec/_core/Cache.h"
-#include "src/torchcodec/_core/CpuDeviceInterface.h"
 #include "src/torchcodec/_core/CudaDeviceInterface.h"
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 
@@ -344,7 +343,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     // handle it. We send the frame back to the CUDA device when we're done.
     //
     // TODO: Perhaps we should cache cpuInterface?
-    auto cpuInterface = std::make_unique<CpuDeviceInterface>(torch::kCPU);
+    auto cpuInterface = createDeviceInterface(torch::kCPU);
     TORCH_CHECK(
         cpuInterface != nullptr, "Failed to create CPU device interface");
     cpuInterface->initialize(
@@ -360,7 +359,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
         avFrame->height == outputDims_.height) {
       // Reason 1 above. The frame is already in the format and dimensions that
       // we need, we just need to convert it to a tensor.
-      cpuFrameOutput.data = cpuInterface->toTensor(avFrame);
+      cpuFrameOutput.data = rgbAVFrameToTensor(avFrame);
     } else {
       // Reason 2 above. We need to do a full conversion.
       cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);

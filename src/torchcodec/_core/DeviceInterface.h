@@ -60,4 +60,6 @@ torch::Device createTorchDevice(const std::string device);
 std::unique_ptr<DeviceInterface> createDeviceInterface(
     const torch::Device& device);
 
+torch::Tensor rgbAVFrameToTensor(const UniqueAVFrame& avFrame);
+
 } // namespace facebook::torchcodec

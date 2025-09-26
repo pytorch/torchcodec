@@ -56,14 +56,9 @@ void CpuDeviceInterface::initialize(
   timeBase_ = timeBase;
   outputDims_ = outputDims;
 
-  // TODO: rationalize comment below with new stuff.
-  // By default, we want to use swscale for color conversion because it is
-  // faster. However, it has width requirements, so we may need to fall back
-  // to filtergraph. We also need to respect what was requested from the
-  // options; we respect the options unconditionally, so it's possible for
-  // swscale's width requirements to be violated. We don't expose the ability to
-  // choose color conversion library publicly; we only use this ability
-  // internally.
+  // We want to use swscale for color conversion if possible because it is
+  // faster than filtergraph. The following are the conditions we need to meet
+  // to use it.
 
   // We can only use swscale when we have a single resize transform. Note that
   // this means swscale will not support the case of having several,
@@ -76,12 +71,14 @@ void CpuDeviceInterface::initialize(
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   bool isWidthSwScaleCompatible = (outputDims_.width % 32) == 0;
 
+  // Note that we do not expose this capability in the public API, only through
+  // the core API.
   bool userRequestedSwScale = videoStreamOptions_.colorConversionLibrary ==
       ColorConversionLibrary::SWSCALE;
 
   // Note that we treat the transform limitation differently from the width
   // limitation. That is, we consider the transforms being compatible with
-  // sws_scale as a hard requirement. If the transforms are not compatiable,
+  // swscale as a hard requirement. If the transforms are not compatiable,
   // then we will end up not applying the transforms, and that is wrong.
   //
   // The width requirement, however, is a soft requirement. Even if we don't
@@ -94,7 +91,7 @@ void CpuDeviceInterface::initialize(
     colorConversionLibrary_ = ColorConversionLibrary::SWSCALE;
 
     // We established above that if the transforms are swscale compatible and
-    // non-empty, then they must have only one transforms, and that transform is
+    // non-empty, then they must have only one transform, and that transform is
     // ResizeTransform.
     if (!transforms.empty()) {
       auto resize = dynamic_cast<ResizeTransform*>(transforms[0].get());
@@ -207,7 +204,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
           std::make_unique<FilterGraph>(filtersContext, videoStreamOptions_);
       prevFiltersContext_ = std::move(filtersContext);
     }
-    outputTensor = toTensor(filterGraphContext_->convert(avFrame));
+    outputTensor = rgbAVFrameToTensor(filterGraphContext_->convert(avFrame));
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
@@ -254,21 +251,6 @@ int CpuDeviceInterface::convertAVFrameToTensorUsingSwScale(
       pointers,
       linesizes);
   return resultHeight;
-}
-
-torch::Tensor CpuDeviceInterface::toTensor(const UniqueAVFrame& avFrame) {
-  TORCH_CHECK_EQ(avFrame->format, AV_PIX_FMT_RGB24);
-
-  int height = avFrame->height;
-  int width = avFrame->width;
-  std::vector<int64_t> shape = {height, width, 3};
-  std::vector<int64_t> strides = {avFrame->linesize[0], 3, 1};
-  AVFrame* avFrameClone = av_frame_clone(avFrame.get());
-  auto deleter = [avFrameClone](void*) {
-    UniqueAVFrame avFrameToDelete(avFrameClone);
-  };
-  return torch::from_blob(
-      avFrameClone->data[0], shape, strides, deleter, {torch::kUInt8});
 }
 
 void CpuDeviceInterface::createSwsContext(
