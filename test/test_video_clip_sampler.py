@@ -4,10 +4,10 @@
 import pytest
 import torch
 from torchcodec._samplers import (
+    DEPRECATED_VideoClipSampler,
     IndexBasedSamplerArgs,
     TimeBasedSamplerArgs,
     VideoArgs,
-    VideoClipSampler,
 )
 
 from .utils import NASA_VIDEO
@@ -34,7 +34,7 @@ def test_sampler(sampler_args):
     torch.manual_seed(0)
     desired_width, desired_height = 320, 240
     video_args = VideoArgs(desired_width=desired_width, desired_height=desired_height)
-    sampler = VideoClipSampler(video_args, sampler_args)
+    sampler = DEPRECATED_VideoClipSampler(video_args, sampler_args)
     clips = sampler(NASA_VIDEO.to_tensor())
     assert len(clips) == sampler_args.clips_per_video
     clip = clips[0]
