@@ -106,15 +106,13 @@ class TestVideoDecoderOps:
         frame6, _, _ = get_frame_at_pts(decoder, 6.02)
         assert_frames_equal(frame6, reference_frame6.to(device))
         frame6, _, _ = get_frame_at_pts(decoder, 6.039366)
-        assert_frames_equal(frame6, reference_frame6.to(device))
+        prev_frame_psnr = assert_frames_equal(frame6, reference_frame6.to(device))
         # Note that this timestamp is exactly on a frame boundary, so it should
         # return the next frame since the right boundary of the interval is
         # open.
         next_frame, _, _ = get_frame_at_pts(decoder, 6.039367)
-        if device == "cpu":
-            # We can only compare exact equality on CPU.
-            with pytest.raises(AssertionError):
-                assert_frames_equal(next_frame, reference_frame6.to(device))
+        with pytest.raises(AssertionError):
+            assert_frames_equal(next_frame, reference_frame6.to(device), psnr=prev_frame_psnr)
 
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_get_frame_at_index(self, device):

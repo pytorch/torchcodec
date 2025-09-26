@@ -65,25 +65,23 @@ def psnr(a, b, max_val=255) -> float:
     return 20 * torch.log10(max_val / torch.sqrt(mse)).item()
 
 
-# For use with decoded data frames. On CPU Linux, we expect exact, bit-for-bit
-# equality. On CUDA Linux, we expect a small tolerance.
-# On other platforms (e.g. MacOS), we also allow a small tolerance. FFmpeg does
-# not guarantee bit-for-bit equality across systems and architectures, so we
-# also cannot. We currently use Linux on x86_64 as our reference system.
-def assert_frames_equal(*args, **kwargs):
-    if sys.platform == "linux":
-        if args[0].device.type == "cuda":
-            atol = 2
-            if get_ffmpeg_major_version() == 4:
-                assert_tensor_close_on_at_least(
-                    args[0], args[1], percentage=95, atol=atol
-                )
-            else:
-                torch.testing.assert_close(*args, **kwargs, atol=atol, rtol=0)
-        else:
-            torch.testing.assert_close(*args, **kwargs, atol=0, rtol=0)
+# For use with decoded data frames. `psnr` sets the PSNR threshold when
+# frames are considered equal. `float("inf")` correspond to bit-to-bit
+# identical frames. Function returns calculated psnr value.
+def assert_frames_equal(input, other, psnr=40, msg=None):
+    if torch.allclose(input, other, atol=0, rtol=0):
+        return float("inf")
     else:
-        torch.testing.assert_close(*args, **kwargs, atol=3, rtol=0)
+        from torcheval.metrics import PeakSignalNoiseRatio
+
+        metric = PeakSignalNoiseRatio()
+        metric.update(input, other)
+        m = metric.compute()
+        message = f"low psnr: {m} < {psnr}"
+        if (msg):
+            message += f" ({msg})"
+        assert m >= psnr, message
+        return m
 
 
 # Asserts that at least `percentage`% of the values are within the absolute tolerance.
