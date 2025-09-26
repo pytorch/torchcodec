@@ -190,13 +190,14 @@ void CudaDeviceInterface::initialize(
     const VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>& transforms,
     const AVRational& timeBase,
-    const FrameDims& outputDims) {
+    const FrameDims& metadataDims,
+    [[maybe_unused]] const std::optional<FrameDims>& resizedOutputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
   TORCH_CHECK(codecContext != nullptr, "codecContext is null");
 
   videoStreamOptions_ = videoStreamOptions;
   timeBase_ = timeBase;
-  outputDims_ = outputDims;
+  metadataDims_ = metadataDims;
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
@@ -268,20 +269,13 @@ UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
       avFrame->height,
       frameFormat,
       avFrame->sample_aspect_ratio,
-      outputDims_.width,
-      outputDims_.height,
+      metadataDims_.width,
+      metadataDims_.height,
       outputFormat,
       filters.str(),
       timeBase_,
       av_buffer_ref(avFrame->hw_frames_ctx));
 
-  // We need to compare the current filter context with our previous filter
-  // context. If they are different, then we need to re-create a filter
-  // graph. We create a filter graph late so that we don't have to depend
-  // on the unreliable metadata in the header. And we sometimes re-create
-  // it because it's possible for frame resolution to change mid-stream.
-  // Finally, we want to reuse the filter graph as much as possible for
-  // performance reasons.
   if (!nv12Conversion_ || *nv12ConversionContext_ != *newContext) {
     nv12Conversion_ =
         std::make_unique<FilterGraph>(*newContext, videoStreamOptions_);
@@ -313,12 +307,12 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   if (preAllocatedOutputTensor.has_value()) {
     auto shape = preAllocatedOutputTensor.value().sizes();
     TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
-            (shape[1] == outputDims_.width) && (shape[2] == 3),
+        (shape.size() == 3) && (shape[0] == metadataDims_.height) &&
+            (shape[1] == metadataDims_.width) && (shape[2] == 3),
         "Expected tensor of shape ",
-        outputDims_.height,
+        metadataDims_.height,
         "x",
-        outputDims_.width,
+        metadataDims_.width,
         "x3, got ",
         shape);
   }
@@ -347,7 +341,12 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     TORCH_CHECK(
         cpuInterface != nullptr, "Failed to create CPU device interface");
     cpuInterface->initialize(
-        nullptr, VideoStreamOptions(), {}, timeBase_, outputDims_);
+        nullptr,
+        VideoStreamOptions(),
+        {},
+        timeBase_,
+        metadataDims_,
+        std::nullopt);
 
     enum AVPixelFormat frameFormat =
         static_cast<enum AVPixelFormat>(avFrame->format);
@@ -355,8 +354,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     FrameOutput cpuFrameOutput;
 
     if (frameFormat == AV_PIX_FMT_RGB24 &&
-        avFrame->width == outputDims_.width &&
-        avFrame->height == outputDims_.height) {
+        avFrame->width == metadataDims_.width &&
+        avFrame->height == metadataDims_.height) {
       // Reason 1 above. The frame is already in the format and dimensions that
       // we need, we just need to convert it to a tensor.
       cpuFrameOutput.data = rgbAVFrameToTensor(avFrame);
@@ -402,7 +401,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
   } else {
-    dst = allocateEmptyHWCTensor(outputDims_, device_);
+    dst = allocateEmptyHWCTensor(metadataDims_, device_);
   }
 
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
@@ -441,7 +440,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "cudaStreamGetFlags failed: ",
       cudaGetErrorString(err));
 
-  NppiSize oSizeROI = {outputDims_.width, outputDims_.height};
+  NppiSize oSizeROI = {metadataDims_.width, metadataDims_.height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;

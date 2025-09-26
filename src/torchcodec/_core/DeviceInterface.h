@@ -37,7 +37,8 @@ class DeviceInterface {
       const VideoStreamOptions& videoStreamOptions,
       const std::vector<std::unique_ptr<Transform>>& transforms,
       const AVRational& timeBase,
-      const FrameDims& outputDims) = 0;
+      const FrameDims& metadataDims,
+      const std::optional<FrameDims>& resizedOutputDims) = 0;
 
   virtual void convertAVFrameToFrameOutput(
       UniqueAVFrame& avFrame,

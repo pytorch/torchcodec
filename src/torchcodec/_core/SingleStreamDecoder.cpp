@@ -468,7 +468,7 @@ void SingleStreamDecoder::addVideoStream(
     std::optional<FrameMappings> customFrameMappings) {
   TORCH_CHECK(
       transforms.empty() || videoStreamOptions.device == torch::kCPU,
-      "Transforms are only supported for CPU devices.");
+      " Transforms are only supported for CPU devices.");
 
   addStream(
       streamIndex,
@@ -503,12 +503,12 @@ void SingleStreamDecoder::addVideoStream(
         streamIndex, customFrameMappings.value());
   }
 
-  outputDims_ =
+  metadataDims_ =
       FrameDims(streamMetadata.width.value(), streamMetadata.height.value());
   for (auto& transform : transforms) {
     TORCH_CHECK(transform != nullptr, "Transforms should never be nullptr!");
     if (transform->getOutputFrameDims().has_value()) {
-      outputDims_ = transform->getOutputFrameDims().value();
+      resizedOutputDims_ = transform->getOutputFrameDims().value();
     }
     transforms_.push_back(std::unique_ptr<Transform>(transform));
   }
@@ -521,7 +521,8 @@ void SingleStreamDecoder::addVideoStream(
       videoStreamOptions,
       transforms_,
       streamInfo.timeBase,
-      outputDims_);
+      metadataDims_,
+      resizedOutputDims_);
 }
 
 void SingleStreamDecoder::addAudioStream(
@@ -632,7 +633,9 @@ FrameBatchOutput SingleStreamDecoder::getFramesAtIndices(
   const auto& streamInfo = streamInfos_[activeStreamIndex_];
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
   FrameBatchOutput frameBatchOutput(
-      frameIndices.size(), outputDims_, videoStreamOptions.device);
+      frameIndices.size(),
+      resizedOutputDims_.value_or(metadataDims_),
+      videoStreamOptions.device);
 
   auto previousIndexInVideo = -1;
   for (size_t f = 0; f < frameIndices.size(); ++f) {
@@ -689,7 +692,9 @@ FrameBatchOutput SingleStreamDecoder::getFramesInRange(
   int64_t numOutputFrames = std::ceil((stop - start) / double(step));
   const auto& videoStreamOptions = streamInfo.videoStreamOptions;
   FrameBatchOutput frameBatchOutput(
-      numOutputFrames, outputDims_, videoStreamOptions.device);
+      numOutputFrames,
+      resizedOutputDims_.value_or(metadataDims_),
+      videoStreamOptions.device);
 
   for (int64_t i = start, f = 0; i < stop; i += step, ++f) {
     FrameOutput frameOutput =
@@ -816,7 +821,9 @@ FrameBatchOutput SingleStreamDecoder::getFramesPlayedInRange(
   // below. Hence, we need this special case below.
   if (startSeconds == stopSeconds) {
     FrameBatchOutput frameBatchOutput(
-        0, outputDims_, videoStreamOptions.device);
+        0,
+        resizedOutputDims_.value_or(metadataDims_),
+        videoStreamOptions.device);
     frameBatchOutput.data = maybePermuteHWC2CHW(frameBatchOutput.data);
     return frameBatchOutput;
   }
@@ -861,7 +868,9 @@ FrameBatchOutput SingleStreamDecoder::getFramesPlayedInRange(
   int64_t numFrames = stopFrameIndex - startFrameIndex;
 
   FrameBatchOutput frameBatchOutput(
-      numFrames, outputDims_, videoStreamOptions.device);
+      numFrames,
+      resizedOutputDims_.value_or(metadataDims_),
+      videoStreamOptions.device);
   for (int64_t i = startFrameIndex, f = 0; i < stopFrameIndex; ++i, ++f) {
     FrameOutput frameOutput =
         getFrameAtIndexInternal(i, frameBatchOutput.data[f]);

@@ -26,7 +26,9 @@ class CudaDeviceInterface : public DeviceInterface {
       [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>&
           transforms,
       const AVRational& timeBase,
-      const FrameDims& outputDims) override;
+      const FrameDims& metadataOutputDims,
+      [[maybe_unused]] const std::optional<FrameDims>& resizedOutputDims)
+      override;
 
   void convertAVFrameToFrameOutput(
       UniqueAVFrame& avFrame,
@@ -36,13 +38,13 @@ class CudaDeviceInterface : public DeviceInterface {
 
  private:
   // Our CUDA decoding code assumes NV12 format. In order to handle other
-  // kindsof input, we need to convert them to NV12. Our current implementation
+  // kinds of input, we need to convert them to NV12. Our current implementation
   // does this using filtergraph.
   UniqueAVFrame maybeConvertAVFrameToNV12(UniqueAVFrame& avFrame);
 
   VideoStreamOptions videoStreamOptions_;
   AVRational timeBase_;
-  FrameDims outputDims_;
+  FrameDims metadataDims_;
 
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;

@@ -51,31 +51,70 @@ void CpuDeviceInterface::initialize(
     const VideoStreamOptions& videoStreamOptions,
     const std::vector<std::unique_ptr<Transform>>& transforms,
     const AVRational& timeBase,
-    const FrameDims& outputDims) {
+    [[maybe_unused]] const FrameDims& metadataDims,
+    const std::optional<FrameDims>& resizedOutputDims) {
   videoStreamOptions_ = videoStreamOptions;
   timeBase_ = timeBase;
-  outputDims_ = outputDims;
-
-  // We want to use swscale for color conversion if possible because it is
-  // faster than filtergraph. The following are the conditions we need to meet
-  // to use it.
+  resizedOutputDims_ = resizedOutputDims;
 
   // We can only use swscale when we have a single resize transform. Note that
   // this means swscale will not support the case of having several,
   // back-to-base resizes. There's no strong reason to even do that, but if
   // someone does, it's more correct to implement that with filtergraph.
-  bool areTransformsSwScaleCompatible = transforms.empty() ||
+  //
+  // We calculate this value during initilization but we don't refer to it until
+  // getColorConversionLibrary() is called. Calculating this value during
+  // initialization saves us from having to save all of the transforms.
+  areTransformsSwScaleCompatible_ = transforms.empty() ||
       (transforms.size() == 1 && transforms[0]->isResize());
-
-  // swscale requires widths to be multiples of 32:
-  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
-  bool isWidthSwScaleCompatible = (outputDims_.width % 32) == 0;
 
   // Note that we do not expose this capability in the public API, only through
   // the core API.
-  bool userRequestedSwScale = videoStreamOptions_.colorConversionLibrary ==
+  //
+  // Same as above, we calculate this value during initialization and refer to
+  // it in getColorConversionLibrary().
+  userRequestedSwScale_ = videoStreamOptions_.colorConversionLibrary ==
       ColorConversionLibrary::SWSCALE;
 
+  // We can only use swscale when we have a single resize transform. Note that
+  // we actually decide on whether or not to actually use swscale at the last
+  // possible moment, when we actually convert the frame. This is because we
+  // need to know the actual frame dimensions.
+  if (transforms.size() == 1 && transforms[0]->isResize()) {
+    auto resize = dynamic_cast<ResizeTransform*>(transforms[0].get());
+    TORCH_CHECK(resize != nullptr, "ResizeTransform expected but not found!")
+    swsFlags_ = resize->getSwsFlags();
+  }
+
+  // If we have any transforms, replace filters_ with the filter strings from
+  // the transforms. As noted above, we decide between swscale and filtergraph
+  // when we actually decode a frame.
+  std::stringstream filters;
+  bool first = true;
+  for (const auto& transform : transforms) {
+    if (!first) {
+      filters << ",";
+    }
+    filters << transform->getFilterGraphCpu();
+    first = false;
+  }
+  if (!transforms.empty()) {
+    filters_ = filters.str();
+  }
+
+  initialized_ = true;
+}
+
+ColorConversionLibrary CpuDeviceInterface::getColorConversionLibrary(
+    const FrameDims& outputDims) {
+  // swscale requires widths to be multiples of 32:
+  // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
+  bool isWidthSwScaleCompatible = (outputDims.width % 32) == 0;
+
+  // We want to use swscale for color conversion if possible because it is
+  // faster than filtergraph. The following are the conditions we need to meet
+  // to use it.
+  //
   // Note that we treat the transform limitation differently from the width
   // limitation. That is, we consider the transforms being compatible with
   // swscale as a hard requirement. If the transforms are not compatiable,
@@ -86,38 +125,12 @@ void CpuDeviceInterface::initialize(
   // behavior. Since we don't expose the ability to choose swscale or
   // filtergraph in our public API, this is probably okay. It's also the only
   // way that we can be certain we are testing one versus the other.
-  if (areTransformsSwScaleCompatible &&
-      (userRequestedSwScale || isWidthSwScaleCompatible)) {
-    colorConversionLibrary_ = ColorConversionLibrary::SWSCALE;
-
-    // We established above that if the transforms are swscale compatible and
-    // non-empty, then they must have only one transform, and that transform is
-    // ResizeTransform.
-    if (!transforms.empty()) {
-      auto resize = dynamic_cast<ResizeTransform*>(transforms[0].get());
-      TORCH_CHECK(resize != nullptr, "ResizeTransform expected but not found!")
-      swsFlags_ = resize->getSwsFlags();
-    }
+  if (areTransformsSwScaleCompatible_ &&
+      (userRequestedSwScale_ || isWidthSwScaleCompatible)) {
+    return ColorConversionLibrary::SWSCALE;
   } else {
-    colorConversionLibrary_ = ColorConversionLibrary::FILTERGRAPH;
-
-    // If we have any transforms, replace filters_ with the filter strings from
-    // the transforms.
-    std::stringstream filters;
-    bool first = true;
-    for (const auto& transform : transforms) {
-      if (!first) {
-        filters << ",";
-      }
-      filters << transform->getFilterGraphCpu();
-      first = false;
-    }
-    if (!transforms.empty()) {
-      filters_ = filters.str();
-    }
+    return ColorConversionLibrary::FILTERGRAPH;
   }
-
-  initialized_ = true;
 }
 
 // Note [preAllocatedOutputTensor with swscale and filtergraph]:
@@ -134,24 +147,42 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
   TORCH_CHECK(initialized_, "CpuDeviceInterface was not initialized.");
+
+  // Note that we ignore the dimensions from the metadata; we don't even bother
+  // storing them. The resized dimensions take priority. If we don't have any,
+  // then we use the dimensions from the actual decoded frame. We use the actual
+  // decoded frame and not the metadata for two reasons:
+  //
+  //   1. Metadata may be wrong. If we access to more accurate information, we
+  //      should use it.
+  //   2. Video streams can have variable resolution. This fact is not captured
+  //      in the stream  metadata.
+  //
+  // Both cases cause problems for our batch APIs, as we allocate
+  // FrameBatchOutputs based on the the stream metadata. But single-frame APIs
+  // can still work in such situations, so they should.
+  auto outputDims =
+      resizedOutputDims_.value_or(FrameDims(avFrame->width, avFrame->height));
+
   if (preAllocatedOutputTensor.has_value()) {
     auto shape = preAllocatedOutputTensor.value().sizes();
     TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
-            (shape[1] == outputDims_.width) && (shape[2] == 3),
+        (shape.size() == 3) && (shape[0] == outputDims.height) &&
+            (shape[1] == outputDims.width) && (shape[2] == 3),
         "Expected pre-allocated tensor of shape ",
-        outputDims_.height,
+        outputDims.height,
         "x",
-        outputDims_.width,
+        outputDims.width,
         "x3, got ",
         shape);
   }
 
+  auto colorConversionLibrary = getColorConversionLibrary(outputDims);
   torch::Tensor outputTensor;
   enum AVPixelFormat frameFormat =
       static_cast<enum AVPixelFormat>(avFrame->format);
 
-  if (colorConversionLibrary_ == ColorConversionLibrary::SWSCALE) {
+  if (colorConversionLibrary == ColorConversionLibrary::SWSCALE) {
     // We need to compare the current frame context with our previous frame
     // context. If they are different, then we need to re-create our colorspace
     // conversion objects. We create our colorspace conversion objects late so
@@ -163,11 +194,11 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
         avFrame->width,
         avFrame->height,
         frameFormat,
-        outputDims_.width,
-        outputDims_.height);
+        outputDims.width,
+        outputDims.height);
 
     outputTensor = preAllocatedOutputTensor.value_or(
-        allocateEmptyHWCTensor(outputDims_, torch::kCPU));
+        allocateEmptyHWCTensor(outputDims, torch::kCPU));
 
     if (!swsContext_ || prevSwsFrameContext_ != swsFrameContext) {
       createSwsContext(swsFrameContext, avFrame->colorspace);
@@ -180,42 +211,42 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     // the expected height.
     // TODO: Can we do the same check for width?
     TORCH_CHECK(
-        resultHeight == outputDims_.height,
-        "resultHeight != outputDims_.height: ",
+        resultHeight == outputDims.height,
+        "resultHeight != outputDims.height: ",
         resultHeight,
         " != ",
-        outputDims_.height);
+        outputDims.height);
 
     frameOutput.data = outputTensor;
-  } else if (colorConversionLibrary_ == ColorConversionLibrary::FILTERGRAPH) {
+  } else if (colorConversionLibrary == ColorConversionLibrary::FILTERGRAPH) {
     FiltersContext filtersContext(
         avFrame->width,
         avFrame->height,
         frameFormat,
         avFrame->sample_aspect_ratio,
-        outputDims_.width,
-        outputDims_.height,
+        outputDims.width,
+        outputDims.height,
         AV_PIX_FMT_RGB24,
         filters_,
         timeBase_);
 
-    if (!filterGraphContext_ || prevFiltersContext_ != filtersContext) {
-      filterGraphContext_ =
+    if (!filterGraph_ || prevFiltersContext_ != filtersContext) {
+      filterGraph_ =
           std::make_unique<FilterGraph>(filtersContext, videoStreamOptions_);
       prevFiltersContext_ = std::move(filtersContext);
     }
-    outputTensor = rgbAVFrameToTensor(filterGraphContext_->convert(avFrame));
+    outputTensor = rgbAVFrameToTensor(filterGraph_->convert(avFrame));
 
     // Similarly to above, if this check fails it means the frame wasn't
     // reshaped to its expected dimensions by filtergraph.
     auto shape = outputTensor.sizes();
     TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == outputDims_.height) &&
-            (shape[1] == outputDims_.width) && (shape[2] == 3),
+        (shape.size() == 3) && (shape[0] == outputDims.height) &&
+            (shape[1] == outputDims.width) && (shape[2] == 3),
         "Expected output tensor of shape ",
-        outputDims_.height,
+        outputDims.height,
         "x",
-        outputDims_.width,
+        outputDims.width,
         "x3, got ",
         shape);
 
@@ -231,7 +262,7 @@ void CpuDeviceInterface::convertAVFrameToFrameOutput(
     TORCH_CHECK(
         false,
         "Invalid color conversion library: ",
-        static_cast<int>(colorConversionLibrary_));
+        static_cast<int>(colorConversionLibrary));
   }
 }
 

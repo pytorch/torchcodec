@@ -373,12 +373,21 @@ class SingleStreamDecoder {
   // the final dimensions of the output frame after ALL transformations. We
   // figure this out as soon as we receive the transforms. If any of the
   // transforms change the final output frame dimensions, we store that in
-  // finalDims_.
+  // resizedOutputDims_. If resizedOutputDims_ has no value, that means there
+  // are no transforms that change the output frame dimensions.
   //
-  // By default, we set outputDims_ to the dimensions from the metadata from the
-  // stream.
-  FrameDims outputDims_;
+  // The priority order for output frame dimension is:
+  //
+  // 1. resizedOutputDims_; the resize requested by the user always takes
+  //    priority.
+  // 2. The dimemnsions of the actual decoded AVFrame. This can change
+  //    per-decoded frame, and is unknown in SingleStreamDecoder. Only the
+  //    DeviceInterface learns it immediately after decoding a raw frame but
+  //    before the color transformation.
+  // 3. metdataDims_; the dimensions we learned from the metadata.
   std::vector<std::unique_ptr<Transform>> transforms_;
+  std::optional<FrameDims> resizedOutputDims_;
+  FrameDims metadataDims_;
 
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
