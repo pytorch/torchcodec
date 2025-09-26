@@ -574,8 +574,6 @@ VideoEncoder::VideoEncoder(
       fileName,
       ", make sure it's a valid path? ",
       getFFMPEGErrorStringFromErrorCode(status));
-  // TODO-VideoEncoder: Add tests for above fileName related checks
-
   initializeEncoder(videoStreamOptions);
 }
 
