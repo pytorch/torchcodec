@@ -1268,6 +1268,26 @@ class TestVideoEncoderOps:
                 filename=output_file,
             )
 
+        with pytest.raises(
+            RuntimeError,
+            match=r"Couldn't allocate AVFormatContext. The destination file is ./file.bad_extension, check the desired extension\?",
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=255, size=(10, 3, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename="./file.bad_extension",
+            )
+
+        with pytest.raises(
+            RuntimeError,
+            match=r"avio_open failed. The destination file is ./bad/path.mp3, make sure it's a valid path\?",
+        ):
+            encode_video_to_file(
+                frames=torch.randint(high=255, size=(10, 3, 60, 60), dtype=torch.uint8),
+                frame_rate=10,
+                filename="./bad/path.mp3",
+            )
+
     def decode(self, file_path) -> torch.Tensor:
         decoder = create_from_file(str(file_path), seek_mode="approximate")
         add_video_stream(decoder)
