@@ -81,12 +81,12 @@ stream_index = 0
 long_json_path = Path(temp_dir) / "long_custom_frame_mappings.json"
 short_json_path = Path(temp_dir) / "short_custom_frame_mappings.json"
 
-ffprobe_cmd = ["ffprobe", "-i", f"{long_video_path}", "-select_streams", f"{stream_index}", "-show_frames", "-show_entries", "frame=pkt_pts,pkt_duration,key_frame", "-of", "json"]
+ffprobe_cmd = ["ffprobe", "-i", f"{long_video_path}", "-select_streams", f"v:{stream_index}", "-show_frames", "-show_entries", "frame=pkt_pts,pkt_duration,key_frame", "-of", "json"]
 ffprobe_result = subprocess.run(ffprobe_cmd, check=True, capture_output=True, text=True)
 with open(long_json_path, "w") as f:
     f.write(ffprobe_result.stdout)
 
-ffprobe_cmd = ["ffprobe", "-i", f"{short_video_path}", "-select_streams", f"{stream_index}", "-show_frames", "-show_entries", "frame=pkt_pts,pkt_duration,key_frame", "-of", "json"]
+ffprobe_cmd = ["ffprobe", "-i", f"{short_video_path}", "-select_streams", f"v:{stream_index}", "-show_frames", "-show_entries", "frame=pkt_pts,pkt_duration,key_frame", "-of", "json"]
 ffprobe_result = subprocess.run(ffprobe_cmd, check=True, capture_output=True, text=True)
 with open(short_json_path, "w") as f:
     f.write(ffprobe_result.stdout)
