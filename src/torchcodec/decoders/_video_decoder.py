@@ -146,12 +146,12 @@ class VideoDecoder:
         # TODONVDEC P2 Consider alternative ways of exposing custom device
         # variants, and if we want this new decoder backend to be a "device
         # variant" at all.
-        device_split = device.split(":")
-        if len(device_split) == 3:
-            device_variant = device_split[2]
-            device = ":".join(device_split[0:2])
-        else:
-            device_variant = "default"
+        device_variant = "default"
+        if device is not None:
+            device_split = device.split(":")
+            if len(device_split) == 3:
+                device_variant = device_split[2]
+                device = ":".join(device_split[0:2])
 
         # TODONVDEC P0 Support approximate mode. Not ideal to validate that here
         # either, but validating this at a lower level forces to add yet another
