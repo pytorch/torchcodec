@@ -41,7 +41,14 @@ class StreamMetadata:
     def __repr__(self):
         s = self.__class__.__name__ + ":\n"
         for field in dataclasses.fields(self):
-            s += f"{SPACES}{field.name}: {getattr(self, field.name)}\n"
+            attr = getattr(self, field.name)
+            if isinstance(attr, Fraction):
+                # Fractions are displayed as integers when possible,
+                # but we want to always display num/den.  Once we
+                # require Python >=3.13 we can use format(.., "#").
+                s += f"{SPACES}{field.name}: {attr.numerator}/{attr.denominator}\n"
+            else:
+                s += f"{SPACES}{field.name}: {attr}\n"
         return s
 
 
