@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '5.1.2', '6.1.1', '7.1']
     steps:
       - name: Check out repo
         uses: actions/checkout@v3

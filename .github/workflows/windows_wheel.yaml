@@ -71,7 +71,7 @@ jobs:
         # TODO: FFmpeg 5 on Windows segfaults in avcodec_open2() when passing
         # bad parameters.
         # See https://github.com/pytorch/torchcodec/pull/806
-        ffmpeg-version-for-tests: ['4.4.2', '6.1.1', '7.0.1']
+        ffmpeg-version-for-tests: ['4.4.2', '6.1.1', '7.1']
     needs: build
     steps:
       - uses: actions/download-artifact@v4
