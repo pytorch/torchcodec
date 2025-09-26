@@ -98,7 +98,7 @@ function(make_torchcodec_libraries
     )
 
     if(ENABLE_CUDA)
-	    list(APPEND core_sources CudaDeviceInterface.cpp)
+	    list(APPEND core_sources CudaDeviceInterface.cpp BetaCudaDeviceInterface.cpp NVDECCache.cpp)
     endif()
 
     set(core_library_dependencies
@@ -111,6 +111,29 @@ function(make_torchcodec_libraries
             ${CUDA_nppi_LIBRARY}
             ${CUDA_nppicc_LIBRARY}
         )
+
+        # Try to find NVCUVID. Try the normal way first. This should work locally.
+        find_library(NVCUVID_LIBRARY NAMES nvcuvid)
+        # If not found, try with version suffix, or hardcoded path. Appears
+        # to be necessary on the CI.
+        if(NOT NVCUVID_LIBRARY)
+            find_library(NVCUVID_LIBRARY NAMES nvcuvid.1 PATHS /usr/lib64 /usr/lib)
+        endif()
+        if(NOT NVCUVID_LIBRARY)
+            set(NVCUVID_LIBRARY "/usr/lib64/libnvcuvid.so.1")
+        endif()
+
+        if(NVCUVID_LIBRARY)
+            message(STATUS "Found NVCUVID: ${NVCUVID_LIBRARY}")
+        else()
+            message(FATAL_ERROR "Could not find NVCUVID library")
+        endif()
+
+        # Add CUDA Driver library (needed for cuCtxGetCurrent, etc.)
+        find_library(CUDA_DRIVER_LIBRARY NAMES cuda REQUIRED)
+        message(STATUS "Found CUDA Driver library: ${CUDA_DRIVER_LIBRARY}")
+
+        list(APPEND core_library_dependencies ${NVCUVID_LIBRARY} ${CUDA_DRIVER_LIBRARY})
     endif()
 
     make_torchcodec_sublibrary(

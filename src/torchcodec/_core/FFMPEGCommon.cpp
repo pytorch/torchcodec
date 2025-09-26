@@ -56,6 +56,14 @@ int64_t getDuration(const UniqueAVFrame& avFrame) {
 #endif
 }
 
+void setDuration(const UniqueAVFrame& avFrame, int64_t duration) {
+#if LIBAVUTIL_VERSION_MAJOR < 58
+  avFrame->pkt_duration = duration;
+#else
+  avFrame->duration = duration;
+#endif
+}
+
 const int* getSupportedSampleRates(const AVCodec& avCodec) {
   const int* supportedSampleRates = nullptr;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100) // FFmpeg >= 7.1
