@@ -476,10 +476,12 @@ def _read_custom_frame_mappings(
         )
 
     frame_data = [
-        (float(frame[pts_key]), frame["key_frame"], float(frame[duration_key]))
+        (int(frame[pts_key]), frame["key_frame"], int(frame[duration_key]))
         for frame in input_data["frames"]
     ]
-    all_frames, is_key_frame, duration = map(torch.tensor, zip(*frame_data))
+    all_frames = torch.tensor([x[0] for x in frame_data], dtype=torch.int64)
+    is_key_frame = torch.tensor([x[1] for x in frame_data], dtype=torch.bool)
+    duration = torch.tensor([x[2] for x in frame_data], dtype=torch.int64)
     if not (len(all_frames) == len(is_key_frame) == len(duration)):
         raise ValueError("Mismatched lengths in frame index data")
     return all_frames, is_key_frame, duration
