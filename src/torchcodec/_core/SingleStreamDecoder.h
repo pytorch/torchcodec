@@ -17,6 +17,7 @@
 #include "src/torchcodec/_core/FFMPEGCommon.h"
 #include "src/torchcodec/_core/Frame.h"
 #include "src/torchcodec/_core/StreamOptions.h"
+#include "src/torchcodec/_core/Transform.h"
 
 namespace facebook::torchcodec {
 
@@ -83,6 +84,7 @@ class SingleStreamDecoder {
 
   void addVideoStream(
       int streamIndex,
+      std::vector<Transform*>& transforms,
       const VideoStreamOptions& videoStreamOptions = VideoStreamOptions(),
       std::optional<FrameMappings> customFrameMappings = std::nullopt);
   void addAudioStream(
@@ -226,17 +228,8 @@ class SingleStreamDecoder {
     std::vector<FrameInfo> keyFrames;
     std::vector<FrameInfo> allFrames;
 
-    // TODO since the decoder is single-stream, these should be decoder fields,
-    // not streamInfo fields. And they should be defined right next to
-    // `cursor_`, with joint documentation.
-    int64_t lastDecodedAvFramePts = 0;
-    int64_t lastDecodedAvFrameDuration = 0;
     VideoStreamOptions videoStreamOptions;
     AudioStreamOptions audioStreamOptions;
-
-    // color-conversion fields. Only one of FilterGraphContext and
-    // UniqueSwsContext should be non-null.
-    UniqueSwrContext swrContext;
   };
 
   // --------------------------------------------------------------------------
@@ -356,16 +349,49 @@ class SingleStreamDecoder {
   const int NO_ACTIVE_STREAM = -2;
   int activeStreamIndex_ = NO_ACTIVE_STREAM;
 
-  bool cursorWasJustSet_ = false;
   // The desired position of the cursor in the stream. We send frames >= this
   // pts to the user when they request a frame.
   int64_t cursor_ = INT64_MIN;
+  bool cursorWasJustSet_ = false;
+  int64_t lastDecodedAvFramePts_ = 0;
+  int64_t lastDecodedAvFrameDuration_ = 0;
+
+  // Audio only. We cache it for performance. The video equivalents live in
+  // deviceInterface_. We store swrContext_ here because we only handle audio
+  // on the CPU.
+  UniqueSwrContext swrContext_;
+
   // Stores various internal decoding stats.
   DecodeStats decodeStats_;
+
   // Stores the AVIOContext for the input buffer.
   std::unique_ptr<AVIOContextHolder> avioContextHolder_;
+
+  // We will receive a vector of transforms upon adding a stream and store it
+  // here. However, we need to know if any of those operations change the
+  // dimensions of the output frame. If they do, we need to figure out what are
+  // the final dimensions of the output frame after ALL transformations. We
+  // figure this out as soon as we receive the transforms. If any of the
+  // transforms change the final output frame dimensions, we store that in
+  // resizedOutputDims_. If resizedOutputDims_ has no value, that means there
+  // are no transforms that change the output frame dimensions.
+  //
+  // The priority order for output frame dimension is:
+  //
+  // 1. resizedOutputDims_; the resize requested by the user always takes
+  //    priority.
+  // 2. The dimemnsions of the actual decoded AVFrame. This can change
+  //    per-decoded frame, and is unknown in SingleStreamDecoder. Only the
+  //    DeviceInterface learns it immediately after decoding a raw frame but
+  //    before the color transformation.
+  // 3. metdataDims_; the dimensions we learned from the metadata.
+  std::vector<std::unique_ptr<Transform>> transforms_;
+  std::optional<FrameDims> resizedOutputDims_;
+  FrameDims metadataDims_;
+
   // Whether or not we have already scanned all streams to update the metadata.
   bool scannedAllStreams_ = false;
+
   // Tracks that we've already been initialized.
   bool initialized_ = false;
 };

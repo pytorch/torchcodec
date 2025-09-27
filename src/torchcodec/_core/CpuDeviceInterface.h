@@ -23,23 +23,26 @@ class CpuDeviceInterface : public DeviceInterface {
     return std::nullopt;
   }
 
-  void initializeContext(
-      [[maybe_unused]] AVCodecContext* codecContext) override {}
+  virtual void initialize(
+      [[maybe_unused]] AVCodecContext* codecContext,
+      const VideoStreamOptions& videoStreamOptions,
+      const std::vector<std::unique_ptr<Transform>>& transforms,
+      const AVRational& timeBase,
+      const std::optional<FrameDims>& resizedOutputDims) override;
 
   void convertAVFrameToFrameOutput(
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor =
           std::nullopt) override;
 
  private:
-  int convertAVFrameToTensorUsingSwsScale(
+  int convertAVFrameToTensorUsingSwScale(
       const UniqueAVFrame& avFrame,
       torch::Tensor& outputTensor);
 
-  torch::Tensor toTensor(const UniqueAVFrame& avFrame);
+  ColorConversionLibrary getColorConversionLibrary(
+      const FrameDims& inputFrameDims) const;
 
   struct SwsFrameContext {
     int inputWidth = 0;
@@ -63,15 +66,48 @@ class CpuDeviceInterface : public DeviceInterface {
       const SwsFrameContext& swsFrameContext,
       const enum AVColorSpace colorspace);
 
-  // color-conversion fields. Only one of FilterGraphContext and
-  // UniqueSwsContext should be non-null.
-  std::unique_ptr<FilterGraph> filterGraphContext_;
-  UniqueSwsContext swsContext_;
+  VideoStreamOptions videoStreamOptions_;
+  AVRational timeBase_;
+  std::optional<FrameDims> resizedOutputDims_;
 
-  // Used to know whether a new FilterGraphContext or UniqueSwsContext should
-  // be created before decoding a new frame.
-  SwsFrameContext prevSwsFrameContext_;
+  // Color-conversion objects. Only one of filterGraph_ and swsContext_ should
+  // be non-null. Which one we use is determined dynamically in
+  // getColorConversionLibrary() each time we decode a frame.
+  //
+  // Creating both filterGraph_ and swsContext_ is relatively expensive, so we
+  // reuse them across frames. However, it is possbile that subsequent frames
+  // are different enough (change in dimensions) that we can't reuse the color
+  // conversion object. We store the relevant frame context from the frame used
+  // to create the object last time. We always compare the current frame's info
+  // against the previous one to determine if we need to recreate the color
+  // conversion object.
+  //
+  // TODO: The names of these fields is confusing, as the actual color
+  //       conversion object for Sws has "context" in the name,  and we use
+  //       "context" for the structs we store to know if we need to recreate a
+  //       color conversion object. We should clean that up.
+  std::unique_ptr<FilterGraph> filterGraph_;
   FiltersContext prevFiltersContext_;
+  UniqueSwsContext swsContext_;
+  SwsFrameContext prevSwsFrameContext_;
+
+  // The filter we supply to filterGraph_, if it is used. The copy filter just
+  // copies the input to the output. Computationally, it should be a no-op. If
+  // we get no user-provided transforms, we will use the copy filter. Otherwise,
+  // we will construct the string from the transforms.
+  std::string filters_ = "copy";
+
+  // The flags we supply to swsContext_, if it used. The flags control the
+  // resizing algorithm. We default to bilinear. Users can override this with a
+  // ResizeTransform.
+  int swsFlags_ = SWS_BILINEAR;
+
+  // Values set during initialization and referred to in
+  // getColorConversionLibrary().
+  bool areTransformsSwScaleCompatible_;
+  bool userRequestedSwScale_;
+
+  bool initialized_ = false;
 };
 
 } // namespace facebook::torchcodec

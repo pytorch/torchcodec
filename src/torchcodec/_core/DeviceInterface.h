@@ -14,6 +14,7 @@
 #include "FFMPEGCommon.h"
 #include "src/torchcodec/_core/Frame.h"
 #include "src/torchcodec/_core/StreamOptions.h"
+#include "src/torchcodec/_core/Transform.h"
 
 namespace facebook::torchcodec {
 
@@ -31,11 +32,14 @@ class DeviceInterface {
 
   // Initialize the hardware device that is specified in `device`. Some builds
   // support CUDA and others only support CPU.
-  virtual void initializeContext(AVCodecContext* codecContext) = 0;
+  virtual void initialize(
+      AVCodecContext* codecContext,
+      const VideoStreamOptions& videoStreamOptions,
+      const std::vector<std::unique_ptr<Transform>>& transforms,
+      const AVRational& timeBase,
+      const std::optional<FrameDims>& resizedOutputDims) = 0;
 
   virtual void convertAVFrameToFrameOutput(
-      const VideoStreamOptions& videoStreamOptions,
-      const AVRational& timeBase,
       UniqueAVFrame& avFrame,
       FrameOutput& frameOutput,
       std::optional<torch::Tensor> preAllocatedOutputTensor = std::nullopt) = 0;
@@ -55,5 +59,7 @@ torch::Device createTorchDevice(const std::string device);
 
 std::unique_ptr<DeviceInterface> createDeviceInterface(
     const torch::Device& device);
+
+torch::Tensor rgbAVFrameToTensor(const UniqueAVFrame& avFrame);
 
 } // namespace facebook::torchcodec

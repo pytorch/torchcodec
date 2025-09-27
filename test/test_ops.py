@@ -612,6 +612,16 @@ class TestVideoDecoderOps:
         )
         swscale_frame0, _, _ = get_next_frame(swscale_decoder)
         assert_frames_equal(filtergraph_frame0, swscale_frame0)
+        assert filtergraph_frame0.shape == (3, target_height, target_width)
+
+    @needs_cuda
+    def test_scaling_on_cuda_fails(self):
+        decoder = create_from_file(str(NASA_VIDEO.path))
+        with pytest.raises(
+            RuntimeError,
+            match="Transforms are only supported for CPU devices.",
+        ):
+            add_video_stream(decoder, device="cuda", width=100, height=100)
 
     @pytest.mark.parametrize("dimension_order", ("NHWC", "NCHW"))
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))

@@ -76,4 +76,19 @@ std::unique_ptr<DeviceInterface> createDeviceInterface(
   return std::unique_ptr<DeviceInterface>(deviceMap[deviceType](device));
 }
 
+torch::Tensor rgbAVFrameToTensor(const UniqueAVFrame& avFrame) {
+  TORCH_CHECK_EQ(avFrame->format, AV_PIX_FMT_RGB24);
+
+  int height = avFrame->height;
+  int width = avFrame->width;
+  std::vector<int64_t> shape = {height, width, 3};
+  std::vector<int64_t> strides = {avFrame->linesize[0], 3, 1};
+  AVFrame* avFrameClone = av_frame_clone(avFrame.get());
+  auto deleter = [avFrameClone](void*) {
+    UniqueAVFrame avFrameToDelete(avFrameClone);
+  };
+  return torch::from_blob(
+      avFrameClone->data[0], shape, strides, deleter, {torch::kUInt8});
+}
+
 } // namespace facebook::torchcodec

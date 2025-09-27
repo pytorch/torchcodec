@@ -605,8 +605,8 @@ void VideoEncoder::initializeEncoder(
 
   // Use specified dimensions or input dimensions
   // TODO-VideoEncoder: Allow height and width to be set
-  outWidth_ = videoStreamOptions.width.value_or(inWidth_);
-  outHeight_ = videoStreamOptions.height.value_or(inHeight_);
+  outWidth_ = inWidth_;
+  outHeight_ = inHeight_;
 
   // Use YUV420P as default output format
   // TODO-VideoEncoder: Enable other pixel formats

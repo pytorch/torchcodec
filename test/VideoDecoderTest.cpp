@@ -146,33 +146,14 @@ double computeAverageCosineSimilarity(
   return averageCosineSimilarity;
 }
 
-// TEST(DecoderOptionsTest, ConvertsFromStringToOptions) {
-//   std::string optionsString =
-//       "ffmpeg_thread_count=3,dimension_order=NCHW,width=100,height=120";
-//   SingleStreamDecoder::DecoderOptions options =
-//       SingleStreamDecoder::DecoderOptions(optionsString);
-//   EXPECT_EQ(options.ffmpegThreadCount, 3);
-// }
-
-TEST(SingleStreamDecoderTest, RespectsWidthAndHeightFromOptions) {
-  std::string path = getResourcePath("nasa_13013.mp4");
-  std::unique_ptr<SingleStreamDecoder> decoder =
-      std::make_unique<SingleStreamDecoder>(path);
-  VideoStreamOptions videoStreamOptions;
-  videoStreamOptions.width = 100;
-  videoStreamOptions.height = 120;
-  decoder->addVideoStream(-1, videoStreamOptions);
-  torch::Tensor tensor = decoder->getNextFrame().data;
-  EXPECT_EQ(tensor.sizes(), std::vector<long>({3, 120, 100}));
-}
-
 TEST(SingleStreamDecoderTest, RespectsOutputTensorDimensionOrderFromOptions) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> decoder =
       std::make_unique<SingleStreamDecoder>(path);
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
-  decoder->addVideoStream(-1, videoStreamOptions);
+  std::vector<Transform*> transforms;
+  decoder->addVideoStream(-1, transforms, videoStreamOptions);
   torch::Tensor tensor = decoder->getNextFrame().data;
   EXPECT_EQ(tensor.sizes(), std::vector<long>({270, 480, 3}));
 }
@@ -181,7 +162,8 @@ TEST_P(SingleStreamDecoderTest, ReturnsFirstTwoFramesOfVideo) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStream(-1);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(-1, transforms);
   auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor0FromOurDecoder = output.data;
   EXPECT_EQ(tensor0FromOurDecoder.sizes(), std::vector<long>({3, 270, 480}));
@@ -220,7 +202,8 @@ TEST_P(SingleStreamDecoderTest, DecodesFramesInABatchInNCHW) {
   ourDecoder->scanFileAndUpdateMetadataAndIndex();
   int bestVideoStreamIndex =
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
-  ourDecoder->addVideoStream(bestVideoStreamIndex);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(bestVideoStreamIndex, transforms);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
@@ -244,7 +227,9 @@ TEST_P(SingleStreamDecoderTest, DecodesFramesInABatchInNHWC) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.dimensionOrder = "NHWC";
-  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(
+      bestVideoStreamIndex, transforms, videoStreamOptions);
   // Frame with index 180 corresponds to timestamp 6.006.
   auto output = ourDecoder->getFramesAtIndices({0, 180});
   auto tensor = output.data;
@@ -264,7 +249,8 @@ TEST_P(SingleStreamDecoderTest, SeeksCloseToEof) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStream(-1);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(-1, transforms);
   ourDecoder->setCursorPtsInSeconds(388388. / 30'000);
   auto output = ourDecoder->getNextFrame();
   EXPECT_EQ(output.ptsSeconds, 388'388. / 30'000);
@@ -277,7 +263,8 @@ TEST_P(SingleStreamDecoderTest, GetsFramePlayedAtTimestamp) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStream(-1);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(-1, transforms);
   auto output = ourDecoder->getFramePlayedAt(6.006);
   EXPECT_EQ(output.ptsSeconds, 6.006);
   // The frame's duration is 0.033367 according to ffprobe,
@@ -307,7 +294,8 @@ TEST_P(SingleStreamDecoderTest, SeeksToFrameWithSpecificPts) {
   std::string path = getResourcePath("nasa_13013.mp4");
   std::unique_ptr<SingleStreamDecoder> ourDecoder =
       createDecoderFromPath(path, GetParam());
-  ourDecoder->addVideoStream(-1);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(-1, transforms);
   ourDecoder->setCursorPtsInSeconds(6.0);
   auto output = ourDecoder->getNextFrame();
   torch::Tensor tensor6FromOurDecoder = output.data;
@@ -410,7 +398,9 @@ TEST_P(SingleStreamDecoderTest, PreAllocatedTensorFilterGraph) {
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.colorConversionLibrary =
       ColorConversionLibrary::FILTERGRAPH;
-  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(
+      bestVideoStreamIndex, transforms, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());
@@ -427,7 +417,9 @@ TEST_P(SingleStreamDecoderTest, PreAllocatedTensorSwscale) {
       *ourDecoder->getContainerMetadata().bestVideoStreamIndex;
   VideoStreamOptions videoStreamOptions;
   videoStreamOptions.colorConversionLibrary = ColorConversionLibrary::SWSCALE;
-  ourDecoder->addVideoStream(bestVideoStreamIndex, videoStreamOptions);
+  std::vector<Transform*> transforms;
+  ourDecoder->addVideoStream(
+      bestVideoStreamIndex, transforms, videoStreamOptions);
   auto output =
       ourDecoder->getFrameAtIndexInternal(0, preAllocatedOutputTensor);
   EXPECT_EQ(output.data.data_ptr(), preAllocatedOutputTensor.data_ptr());

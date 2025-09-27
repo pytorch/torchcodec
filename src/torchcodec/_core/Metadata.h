@@ -44,8 +44,8 @@ struct StreamMetadata {
   std::optional<int64_t> numFramesFromContent;
 
   // Video-only fields derived from the AVCodecContext.
-  std::optional<int64_t> width;
-  std::optional<int64_t> height;
+  std::optional<int> width;
+  std::optional<int> height;
   std::optional<AVRational> sampleAspectRatio;
 
   // Audio-only fields

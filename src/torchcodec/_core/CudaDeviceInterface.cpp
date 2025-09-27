@@ -185,8 +185,17 @@ CudaDeviceInterface::~CudaDeviceInterface() {
   }
 }
 
-void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
+void CudaDeviceInterface::initialize(
+    AVCodecContext* codecContext,
+    const VideoStreamOptions& videoStreamOptions,
+    [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>& transforms,
+    const AVRational& timeBase,
+    [[maybe_unused]] const std::optional<FrameDims>& resizedOutputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
+  TORCH_CHECK(codecContext != nullptr, "codecContext is null");
+
+  videoStreamOptions_ = videoStreamOptions;
+  timeBase_ = timeBase;
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
@@ -196,24 +205,19 @@ void CudaDeviceInterface::initializeContext(AVCodecContext* codecContext) {
   ctx_ = getCudaContext(device_);
   nppCtx_ = getNppStreamContext(device_);
   codecContext->hw_device_ctx = av_buffer_ref(ctx_.get());
-  return;
 }
 
-std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
-    const VideoStreamOptions& videoStreamOptions,
-    const UniqueAVFrame& avFrame,
-    const AVRational& timeBase) {
+UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
+    UniqueAVFrame& avFrame) {
   // We need FFmpeg filters to handle those conversion cases which are not
   // directly implemented in CUDA or CPU device interface (in case of a
   // fallback).
-  enum AVPixelFormat frameFormat =
-      static_cast<enum AVPixelFormat>(avFrame->format);
 
   // Input frame is on CPU, we will just pass it to CPU device interface, so
-  // skipping filters context as CPU device interface will handle everythong for
+  // skipping filters context as CPU device interface will handle everything for
   // us.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
-    return nullptr;
+    return std::move(avFrame);
   }
 
   TORCH_CHECK(
@@ -225,15 +229,10 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
       reinterpret_cast<AVHWFramesContext*>(avFrame->hw_frames_ctx->data);
   AVPixelFormat actualFormat = hwFramesCtx->sw_format;
 
-  // NV12 conversion is implemented directly with NPP, no need for filters.
+  // If the frame is already in NV12 format, we don't need to do anything.
   if (actualFormat == AV_PIX_FMT_NV12) {
-    return nullptr;
+    return std::move(avFrame);
   }
-
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
-  int height = frameDims.height;
-  int width = frameDims.width;
 
   AVPixelFormat outputFormat;
   std::stringstream filters;
@@ -253,94 +252,128 @@ std::unique_ptr<FiltersContext> CudaDeviceInterface::initializeFiltersContext(
         "That's unexpected, please report this to the TorchCodec repo.");
 
     filters << "hwdownload,format=" << actualFormatName;
-    filters << ",scale=" << width << ":" << height;
-    filters << ":sws_flags=bilinear";
   } else {
     // Actual output color format will be set via filter options
     outputFormat = AV_PIX_FMT_CUDA;
 
-    filters << "scale_cuda=" << width << ":" << height;
-    filters << ":format=nv12:interp_algo=bilinear";
+    filters << "scale_cuda=format=nv12:interp_algo=bilinear";
   }
 
-  return std::make_unique<FiltersContext>(
+  enum AVPixelFormat frameFormat =
+      static_cast<enum AVPixelFormat>(avFrame->format);
+
+  auto newContext = std::make_unique<FiltersContext>(
       avFrame->width,
       avFrame->height,
       frameFormat,
       avFrame->sample_aspect_ratio,
-      width,
-      height,
+      avFrame->width,
+      avFrame->height,
       outputFormat,
       filters.str(),
-      timeBase,
+      timeBase_,
       av_buffer_ref(avFrame->hw_frames_ctx));
+
+  if (!nv12Conversion_ || *nv12ConversionContext_ != *newContext) {
+    nv12Conversion_ =
+        std::make_unique<FilterGraph>(*newContext, videoStreamOptions_);
+    nv12ConversionContext_ = std::move(newContext);
+  }
+  auto filteredAVFrame = nv12Conversion_->convert(avFrame);
+
+  // If this check fails it means the frame wasn't
+  // reshaped to its expected dimensions by filtergraph.
+  TORCH_CHECK(
+      (filteredAVFrame->width == nv12ConversionContext_->outputWidth) &&
+          (filteredAVFrame->height == nv12ConversionContext_->outputHeight),
+      "Expected frame from filter graph of ",
+      nv12ConversionContext_->outputWidth,
+      "x",
+      nv12ConversionContext_->outputHeight,
+      ", got ",
+      filteredAVFrame->width,
+      "x",
+      filteredAVFrame->height);
+
+  return filteredAVFrame;
 }
 
 void CudaDeviceInterface::convertAVFrameToFrameOutput(
-    const VideoStreamOptions& videoStreamOptions,
-    [[maybe_unused]] const AVRational& timeBase,
-    UniqueAVFrame& avInputFrame,
+    UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
-  std::unique_ptr<FiltersContext> newFiltersContext =
-      initializeFiltersContext(videoStreamOptions, avInputFrame, timeBase);
-  UniqueAVFrame avFilteredFrame;
-  if (newFiltersContext) {
-    // We need to compare the current filter context with our previous filter
-    // context. If they are different, then we need to re-create a filter
-    // graph. We create a filter graph late so that we don't have to depend
-    // on the unreliable metadata in the header. And we sometimes re-create
-    // it because it's possible for frame resolution to change mid-stream.
-    // Finally, we want to reuse the filter graph as much as possible for
-    // performance reasons.
-    if (!filterGraph_ || *filtersContext_ != *newFiltersContext) {
-      filterGraph_ =
-          std::make_unique<FilterGraph>(*newFiltersContext, videoStreamOptions);
-      filtersContext_ = std::move(newFiltersContext);
-    }
-    avFilteredFrame = filterGraph_->convert(avInputFrame);
+  // Note that CUDA does not yet support transforms, so the only possible
+  // frame dimensions are the raw decoded frame's dimensions.
+  auto frameDims = FrameDims(avFrame->width, avFrame->height);
 
-    // If this check fails it means the frame wasn't
-    // reshaped to its expected dimensions by filtergraph.
+  if (preAllocatedOutputTensor.has_value()) {
+    auto shape = preAllocatedOutputTensor.value().sizes();
     TORCH_CHECK(
-        (avFilteredFrame->width == filtersContext_->outputWidth) &&
-            (avFilteredFrame->height == filtersContext_->outputHeight),
-        "Expected frame from filter graph of ",
-        filtersContext_->outputWidth,
+        (shape.size() == 3) && (shape[0] == frameDims.height) &&
+            (shape[1] == frameDims.width) && (shape[2] == 3),
+        "Expected tensor of shape ",
+        frameDims.height,
         "x",
-        filtersContext_->outputHeight,
-        ", got ",
-        avFilteredFrame->width,
-        "x",
-        avFilteredFrame->height);
+        frameDims.width,
+        "x3, got ",
+        shape);
   }
 
-  UniqueAVFrame& avFrame = (avFilteredFrame) ? avFilteredFrame : avInputFrame;
+  // All of our CUDA decoding assumes NV12 format. We handle non-NV12 formats by
+  // converting them to NV12.
+  avFrame = maybeConvertAVFrameToNV12(avFrame);
 
-  // The filtered frame might be on CPU if CPU fallback has happenned on filter
-  // graph level. For example, that's how we handle color format conversion
-  // on FFmpeg 4.4 where scale_cuda did not have this supported implemented yet.
   if (avFrame->format != AV_PIX_FMT_CUDA) {
     // The frame's format is AV_PIX_FMT_CUDA if and only if its content is on
-    // the GPU. In this branch, the frame is on the CPU: this is what NVDEC
-    // gives us if it wasn't able to decode a frame, for whatever reason.
-    // Typically that happens if the video's encoder isn't supported by NVDEC.
-    // Below, we choose to convert the frame's color-space using the CPU
-    // codepath, and send it back to the GPU at the very end.
-    // TODO: A possibly better solution would be to send the frame to the GPU
-    // first, and do the color conversion there.
-    auto cpuDevice = torch::Device(torch::kCPU);
-    auto cpuInterface = createDeviceInterface(cpuDevice);
+    // the GPU. In this branch, the frame is on the CPU. There are two possible
+    // reasons:
+    //
+    //   1. During maybeConvertAVFrameToNV12(), we had a non-NV12 format frame
+    //      and we're on FFmpeg 4.4 or earlier. In such cases, we had to use CPU
+    //      filters and we just converted the frame to RGB24.
+    //   2. This is what NVDEC gave us if it wasn't able to decode a frame, for
+    //      whatever reason. Typically that happens if the video's encoder isn't
+    //      supported by NVDEC.
+    //
+    // In both cases, we have a frame on the CPU. We send the frame back to the
+    // CUDA device when we're done.
+
+    enum AVPixelFormat frameFormat =
+        static_cast<enum AVPixelFormat>(avFrame->format);
 
     FrameOutput cpuFrameOutput;
-    cpuInterface->convertAVFrameToFrameOutput(
-        videoStreamOptions,
-        timeBase,
-        avFrame,
-        cpuFrameOutput,
-        preAllocatedOutputTensor);
+    if (frameFormat == AV_PIX_FMT_RGB24) {
+      // Reason 1 above. The frame is already in RGB24, we just need to convert
+      // it to a tensor.
+      cpuFrameOutput.data = rgbAVFrameToTensor(avFrame);
+    } else {
+      // Reason 2 above. We need to do a full conversion which requires an
+      // actual CPU device.
+      //
+      // TODO: Perhaps we should cache cpuInterface?
+      auto cpuInterface = createDeviceInterface(torch::kCPU);
+      TORCH_CHECK(
+          cpuInterface != nullptr, "Failed to create CPU device interface");
+      cpuInterface->initialize(
+          nullptr,
+          VideoStreamOptions(),
+          {},
+          timeBase_,
+          /*resizedOutputDims=*/std::nullopt);
 
-    frameOutput.data = cpuFrameOutput.data.to(device_);
+      cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);
+    }
+
+    // Finally, we need to send the frame back to the GPU. Note that the
+    // pre-allocated tensor is on the GPU, so we can't send that to the CPU
+    // device interface. We copy it over here.
+    if (preAllocatedOutputTensor.has_value()) {
+      preAllocatedOutputTensor.value().copy_(cpuFrameOutput.data);
+      frameOutput.data = preAllocatedOutputTensor.value();
+    } else {
+      frameOutput.data = cpuFrameOutput.data.to(device_);
+    }
+
     return;
   }
 
@@ -364,25 +397,11 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       ", but we expected AV_PIX_FMT_NV12. "
       "That's unexpected, please report this to the TorchCodec repo.");
 
-  auto frameDims =
-      getHeightAndWidthFromOptionsOrAVFrame(videoStreamOptions, avFrame);
-  int height = frameDims.height;
-  int width = frameDims.width;
   torch::Tensor& dst = frameOutput.data;
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
-    auto shape = dst.sizes();
-    TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == height) && (shape[1] == width) &&
-            (shape[2] == 3),
-        "Expected tensor of shape ",
-        height,
-        "x",
-        width,
-        "x3, got ",
-        shape);
   } else {
-    dst = allocateEmptyHWCTensor(height, width, device_);
+    dst = allocateEmptyHWCTensor(frameDims, device_);
   }
 
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
@@ -401,6 +420,8 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "The AVFrame's hw_frames_ctx does not have a device_ctx. ");
   auto cudaDeviceCtx =
       static_cast<AVCUDADeviceContext*>(hwFramesCtx->device_ctx->hwctx);
+  TORCH_CHECK(cudaDeviceCtx != nullptr, "The hardware context is null");
+
   at::cuda::CUDAEvent nvdecDoneEvent;
   at::cuda::CUDAStream nvdecStream = // That's always the default stream. Sad.
       c10::cuda::getStreamFromExternal(cudaDeviceCtx->stream, deviceIndex);
@@ -419,7 +440,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "cudaStreamGetFlags failed: ",
       cudaGetErrorString(err));
 
-  NppiSize oSizeROI = {width, height};
+  NppiSize oSizeROI = {frameDims.width, frameDims.height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;
