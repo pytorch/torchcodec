@@ -190,14 +190,12 @@ void CudaDeviceInterface::initialize(
     const VideoStreamOptions& videoStreamOptions,
     [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>& transforms,
     const AVRational& timeBase,
-    const FrameDims& metadataDims,
     [[maybe_unused]] const std::optional<FrameDims>& resizedOutputDims) {
   TORCH_CHECK(!ctx_, "FFmpeg HW device context already initialized");
   TORCH_CHECK(codecContext != nullptr, "codecContext is null");
 
   videoStreamOptions_ = videoStreamOptions;
   timeBase_ = timeBase;
-  metadataDims_ = metadataDims;
 
   // It is important for pytorch itself to create the cuda context. If ffmpeg
   // creates the context it may not be compatible with pytorch.
@@ -269,8 +267,8 @@ UniqueAVFrame CudaDeviceInterface::maybeConvertAVFrameToNV12(
       avFrame->height,
       frameFormat,
       avFrame->sample_aspect_ratio,
-      metadataDims_.width,
-      metadataDims_.height,
+      avFrame->width,
+      avFrame->height,
       outputFormat,
       filters.str(),
       timeBase_,
@@ -304,15 +302,19 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     UniqueAVFrame& avFrame,
     FrameOutput& frameOutput,
     std::optional<torch::Tensor> preAllocatedOutputTensor) {
+  // Note that CUDA does not yet support transforms, so the only possible
+  // frame dimensions are the raw decoded frame's dimensions.
+  auto frameDims = FrameDims(avFrame->width, avFrame->height);
+
   if (preAllocatedOutputTensor.has_value()) {
     auto shape = preAllocatedOutputTensor.value().sizes();
     TORCH_CHECK(
-        (shape.size() == 3) && (shape[0] == metadataDims_.height) &&
-            (shape[1] == metadataDims_.width) && (shape[2] == 3),
+        (shape.size() == 3) && (shape[0] == frameDims.height) &&
+            (shape[1] == frameDims.width) && (shape[2] == 3),
         "Expected tensor of shape ",
-        metadataDims_.height,
+        frameDims.height,
         "x",
-        metadataDims_.width,
+        frameDims.width,
         "x3, got ",
         shape);
   }
@@ -333,34 +335,32 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
     //      whatever reason. Typically that happens if the video's encoder isn't
     //      supported by NVDEC.
     //
-    // In both cases, we have a frame on the CPU, and we need a CPU device to
-    // handle it. We send the frame back to the CUDA device when we're done.
-    //
-    // TODO: Perhaps we should cache cpuInterface?
-    auto cpuInterface = createDeviceInterface(torch::kCPU);
-    TORCH_CHECK(
-        cpuInterface != nullptr, "Failed to create CPU device interface");
-    cpuInterface->initialize(
-        nullptr,
-        VideoStreamOptions(),
-        {},
-        timeBase_,
-        metadataDims_,
-        std::nullopt);
+    // In both cases, we have a frame on the CPU. We send the frame back to the
+    // CUDA device when we're done.
 
     enum AVPixelFormat frameFormat =
         static_cast<enum AVPixelFormat>(avFrame->format);
 
     FrameOutput cpuFrameOutput;
-
-    if (frameFormat == AV_PIX_FMT_RGB24 &&
-        avFrame->width == metadataDims_.width &&
-        avFrame->height == metadataDims_.height) {
-      // Reason 1 above. The frame is already in the format and dimensions that
-      // we need, we just need to convert it to a tensor.
+    if (frameFormat == AV_PIX_FMT_RGB24) {
+      // Reason 1 above. The frame is already in RGB24, we just need to convert
+      // it to a tensor.
       cpuFrameOutput.data = rgbAVFrameToTensor(avFrame);
     } else {
-      // Reason 2 above. We need to do a full conversion.
+      // Reason 2 above. We need to do a full conversion which requires an
+      // actual CPU device.
+      //
+      // TODO: Perhaps we should cache cpuInterface?
+      auto cpuInterface = createDeviceInterface(torch::kCPU);
+      TORCH_CHECK(
+          cpuInterface != nullptr, "Failed to create CPU device interface");
+      cpuInterface->initialize(
+          nullptr,
+          VideoStreamOptions(),
+          {},
+          timeBase_,
+          /*resizedOutputDims=*/std::nullopt);
+
       cpuInterface->convertAVFrameToFrameOutput(avFrame, cpuFrameOutput);
     }
 
@@ -401,7 +401,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
   if (preAllocatedOutputTensor.has_value()) {
     dst = preAllocatedOutputTensor.value();
   } else {
-    dst = allocateEmptyHWCTensor(metadataDims_, device_);
+    dst = allocateEmptyHWCTensor(frameDims, device_);
   }
 
   torch::DeviceIndex deviceIndex = getNonNegativeDeviceIndex(device_);
@@ -440,7 +440,7 @@ void CudaDeviceInterface::convertAVFrameToFrameOutput(
       "cudaStreamGetFlags failed: ",
       cudaGetErrorString(err));
 
-  NppiSize oSizeROI = {metadataDims_.width, metadataDims_.height};
+  NppiSize oSizeROI = {frameDims.width, frameDims.height};
   Npp8u* yuvData[2] = {avFrame->data[0], avFrame->data[1]};
 
   NppStatus status;

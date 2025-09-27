@@ -26,7 +26,6 @@ class CudaDeviceInterface : public DeviceInterface {
       [[maybe_unused]] const std::vector<std::unique_ptr<Transform>>&
           transforms,
       const AVRational& timeBase,
-      const FrameDims& metadataOutputDims,
       [[maybe_unused]] const std::optional<FrameDims>& resizedOutputDims)
       override;
 
@@ -44,7 +43,6 @@ class CudaDeviceInterface : public DeviceInterface {
 
   VideoStreamOptions videoStreamOptions_;
   AVRational timeBase_;
-  FrameDims metadataDims_;
 
   UniqueAVBufferRef ctx_;
   std::unique_ptr<NppStreamContext> nppCtx_;

@@ -521,7 +521,6 @@ void SingleStreamDecoder::addVideoStream(
       videoStreamOptions,
       transforms_,
       streamInfo.timeBase,
-      metadataDims_,
       resizedOutputDims_);
 }
 

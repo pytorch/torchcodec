@@ -28,7 +28,6 @@ class CpuDeviceInterface : public DeviceInterface {
       const VideoStreamOptions& videoStreamOptions,
       const std::vector<std::unique_ptr<Transform>>& transforms,
       const AVRational& timeBase,
-      [[maybe_unused]] const FrameDims& metadataDims,
       const std::optional<FrameDims>& resizedOutputDims) override;
 
   void convertAVFrameToFrameOutput(
@@ -43,7 +42,7 @@ class CpuDeviceInterface : public DeviceInterface {
       torch::Tensor& outputTensor);
 
   ColorConversionLibrary getColorConversionLibrary(
-      const FrameDims& inputFrameDims);
+      const FrameDims& inputFrameDims) const;
 
   struct SwsFrameContext {
     int inputWidth = 0;

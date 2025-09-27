@@ -51,7 +51,6 @@ void CpuDeviceInterface::initialize(
     const VideoStreamOptions& videoStreamOptions,
     const std::vector<std::unique_ptr<Transform>>& transforms,
     const AVRational& timeBase,
-    [[maybe_unused]] const FrameDims& metadataDims,
     const std::optional<FrameDims>& resizedOutputDims) {
   videoStreamOptions_ = videoStreamOptions;
   timeBase_ = timeBase;
@@ -106,7 +105,7 @@ void CpuDeviceInterface::initialize(
 }
 
 ColorConversionLibrary CpuDeviceInterface::getColorConversionLibrary(
-    const FrameDims& outputDims) {
+    const FrameDims& outputDims) const {
   // swscale requires widths to be multiples of 32:
   // https://stackoverflow.com/questions/74351955/turn-off-sw-scale-conversion-to-planar-yuv-32-byte-alignment-requirements
   bool isWidthSwScaleCompatible = (outputDims.width % 32) == 0;
