@@ -144,6 +144,8 @@ from .utils import (
     TESTSRC2_444_12BIT_HEVC,
     TESTSRC2_444_8BIT_HEVC,
     TESTSRC2_AV1_10BIT,
+    TESTSRC2_GBRP_HEVC,
+    TESTSRC2_GRAY_HEVC,
     TESTSRC2_ODD_HEIGHT_444,
     TESTSRC2_ODD_HEIGHT_AND_WIDTH_444,
     TESTSRC2_ODD_HEIGHT_AND_WIDTH_444_10BIT,
@@ -156,6 +158,7 @@ from .utils import (
     TESTSRC2_ODD_WIDTH_MPEG2,
     TESTSRC2_ODD_WIDTH_VP9,
     TESTSRC2_ODD_WIDTH_VP9_10BIT,
+    TESTSRC2_YUVA420P_FFV1,
     TRANSPARENT_GIF,
     UNSEEKABLE_SWF,
     WAV_ODD_DATA_TRAILING_CHUNK,
@@ -3552,6 +3555,10 @@ class _PlanesCase(NamedTuple):
     bit_depth: int
     cpu_pix_fmt: str
     cuda_pix_fmt: str
+    # One per component of the pixel format, so three for YUV and RGB, one for
+    # grayscale, and one more when the format has an alpha component.
+    cpu_num_planes: int = 3
+    cuda_num_planes: int = 3
     # FFmpeg 6 added P012. Before that, NVDEC's 12-bit surface can only be
     # described as p016le, which claims 16 bits instead of 12. Set this for the
     # sources that hit it: same samples either way (they're msb-aligned, so
@@ -3561,6 +3568,9 @@ class _PlanesCase(NamedTuple):
 
     def pix_fmt(self, device):
         return self.cuda_pix_fmt if device == "cuda" else self.cpu_pix_fmt
+
+    def num_planes(self, device):
+        return self.cuda_num_planes if device == "cuda" else self.cpu_num_planes
 
 
 # Sources with more than 8 bits per sample.
@@ -3577,7 +3587,8 @@ _HDR_VIDEOS = (
 
 # Videos spanning the pixel-format axes RawFrame.planes has to handle: 4:2:0 vs
 # 4:4:4 chroma, even vs odd dims (chroma rounds up), and 8- vs 10-/12-bit
-# (uint8 vs uint16 planes). All are YUV, so planes are (Y, U, V).
+# (uint8 vs uint16 planes). All are YUV, so planes are (Y, U, V) - the sources
+# whose frames aren't three YUV planes are in _NON_YUV_PLANES_VIDEOS below.
 _PLANES_VIDEOS = (
     _PlanesCase(NASA_VIDEO, 8, "yuv420p", "nv12"),  # even dims
     _PlanesCase(TESTSRC2_ODD_HEIGHT_AND_WIDTH_VP9, 8, "yuv420p", "nv12"),  # odd
@@ -3601,6 +3612,23 @@ _PLANES_VIDEOS = (
         "p012le",
         needs_p016_before_ffmpeg6=True,
     ),
+)
+
+
+# Sources whose frames aren't three YUV planes on the CPU. NVDEC decodes none of
+# them - monochrome, planar RGB and FFV1 all send it to the CPU fallback - and
+# the fallback converts to an NVDEC surface format before uploading, so on CUDA
+# they are three YUV planes like everything else. That conversion is what
+# RawFrame.pix_fmt promises ("on CUDA it is always an NVDEC surface format"),
+# and it is lossy for the two formats that carry something YUV can't: grayscale
+# gains neutral chroma, and alpha is dropped outright.
+_NON_YUV_PLANES_VIDEOS = (
+    _PlanesCase(TESTSRC2_GRAY_HEVC, 8, "gray", "nv12", cpu_num_planes=1),
+    # Planar RGB. The planes come out (R, G, B), which is *not* the order the
+    # format stores them in: FFmpeg's gbrp is green, blue, red.
+    _PlanesCase(TESTSRC2_GBRP_HEVC, 8, "gbrp", "yuv444p"),
+    # Alpha, which is full size like luma rather than subsampled like chroma.
+    _PlanesCase(TESTSRC2_YUVA420P_FFV1, 8, "yuva420p", "nv12", cpu_num_planes=4),
 )
 
 
@@ -4211,7 +4239,9 @@ class TestBlocks:
         assert frame.planes[0].device.type == device
         assert converter.convert(frame).data.device.type == device
 
-    @pytest.mark.parametrize("case", _PLANES_VIDEOS, ids=_planes_ids)
+    @pytest.mark.parametrize(
+        "case", _PLANES_VIDEOS + _NON_YUV_PLANES_VIDEOS, ids=_planes_ids
+    )
     @pytest.mark.parametrize("device", _block_devices())
     def test_planes_structure(self, case, device):
         # planes shape/dtype/device and the accompanying metadata.
@@ -4233,12 +4263,13 @@ class TestBlocks:
         )
 
         assert pix_fmt == expected_pix_fmt
-        assert frame.colorspace in ("bt709", "bt2020nc", "smpte170m", "unknown")
+        # "gbr" is what a planar RGB frame reports: its samples are already RGB,
+        # so there is no YUV matrix to name.
+        assert frame.colorspace in ("bt709", "bt2020nc", "smpte170m", "gbr", "unknown")
         assert frame.color_range in ("tv", "pc", "unknown")  # FFmpeg has only these
 
         # All planes are 2D views living on the frame's own device.
-        # TODO_API_BREAKDOWN DESIGN P1: Can there be more planes? Should test?
-        assert len(planes) == 3
+        assert len(planes) == case.num_planes(device)
         for plane in planes:
             assert plane.ndim == 2
             assert plane.device.type == device
@@ -4257,18 +4288,25 @@ class TestBlocks:
             for plane in planes:
                 assert (plane.to(torch.int32) & unused_low_bits).count_nonzero() == 0
 
-        Y, U, V = planes
         height, width = converter.convert(frame).data.shape[1:]
-        assert Y.shape == (height, width) == (frame.height, frame.width)
+        # The first plane is always full size: luma, or red for a planar RGB
+        # format. So is a trailing alpha one, when the format has it.
+        assert planes[0].shape == (height, width) == (frame.height, frame.width)
+        if len(planes) == 4:
+            assert planes[3].shape == (height, width)
 
         # Below is just a fancy way to divide by 2 accounting for odd sizes,
         # matching the FFmpeg logic
-        log2_h, log2_w = (0, 0) if "444" in pix_fmt else (1, 1)
+        subsampled = not (pix_fmt.startswith("gbr") or "444" in pix_fmt)
+        log2_h, log2_w = (1, 1) if subsampled else (0, 0)
         expected_chroma_shape = (
             (height + (1 << log2_h) - 1) >> log2_h,
             (width + (1 << log2_w) - 1) >> log2_w,
         )
-        assert U.shape == V.shape == expected_chroma_shape
+        # Planes 1 and 2 are the subsampled ones for YUV, and full-size green
+        # and blue for planar RGB. Grayscale has neither.
+        for plane in planes[1:3]:
+            assert plane.shape == expected_chroma_shape
 
     @pytest.mark.parametrize("device", _block_devices())
     def test_planes_are_not_rotated_but_color_conversion_rotates(self, device):

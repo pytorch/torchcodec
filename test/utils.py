@@ -1274,6 +1274,45 @@ TESTSRC2_444_12BIT_HEVC = TestVideo(
     frames={0: {}},
 )
 
+# The sources whose frames don't come out as three YUV planes. libx264 accepts
+# -pix_fmt gray but silently encodes 4:2:0 anyway, hence libx265 here. Even
+# dimensions, because both encoders below round odd ones down.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=1" \
+#  -vf format=gray -c:v libx265 -tag:v hvc1 testsrc2_gray_hevc.mp4
+TESTSRC2_GRAY_HEVC = TestVideo(
+    filename="testsrc2_gray_hevc.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# ffmpeg -f lavfi -i "testsrc2=size=321x241:rate=25:duration=1,format=rgb24" \
+#  -vf format=gbrp -c:v libx265 -tag:v hvc1 testsrc2_gbrp_hevc.mp4
+TESTSRC2_GBRP_HEVC = TestVideo(
+    filename="testsrc2_gbrp_hevc.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=321, height=241, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# FFV1 is lossless, so this one is a fifth of a second rather than a full one.
+# VP9's alpha is not an option: it rides in a separate layer, and the frames the
+# decoder produces are plain yuv420p.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=0.2" \
+#  -vf format=yuva420p -c:v ffv1 testsrc2_yuva420p_ffv1.mkv
+TESTSRC2_YUVA420P_FFV1 = TestVideo(
+    filename="testsrc2_yuva420p_ffv1.mkv",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
 # ffmpeg -f lavfi -i "testsrc2=size=321x240:rate=25:duration=1,format=rgb24" \
 #  -c:v libvpx-vp9 -pix_fmt yuv420p -b:v 1M testsrc2_odd_width_vp9.mp4
 TESTSRC2_ODD_WIDTH_VP9 = TestVideo(

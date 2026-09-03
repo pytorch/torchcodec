@@ -4,6 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <limits>
 #include <map>
 #include <mutex>
 #include <vector>
@@ -343,7 +344,7 @@ std::optional<cudaVideoSurfaceFormat> get_nvdec_surface_format(
 void standalone_frame_free_callback(
     [[maybe_unused]] void* opaque,
     uint8_t* data) {
-  delete reinterpret_cast<StandAloneFrameAttachedData*>(data);
+  delete reinterpret_cast<OwnedFrameStorage*>(data);
 }
 
 class CudaContextGuard {
@@ -964,7 +965,12 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
   av_frame->data[1] = plane(1);
   av_frame->data[2] = is_444 ? plane(2) : nullptr;
   av_frame->data[3] = nullptr;
-  // TODO_API_BREAKDOWN CC P2: Check range before cast?
+  STD_TORCH_CHECK(
+      pitch <= static_cast<unsigned int>(std::numeric_limits<int>::max()),
+      "NVDEC returned a pitch of ",
+      pitch,
+      " bytes, which doesn't fit in an AVFrame line size. This should never "
+      "happen, please report.");
   av_frame->linesize[0] = static_cast<int>(pitch);
   av_frame->linesize[1] = static_cast<int>(pitch);
   av_frame->linesize[2] = is_444 ? static_cast<int>(pitch) : 0;
@@ -1000,12 +1006,12 @@ void BetaCudaDeviceInterface::make_frame_standalone(UniqueAVFrame& av_frame) {
     storage = copy_nvdec_surface(av_frame, current_stream);
   }
 
-  auto attached_data = new StandAloneFrameAttachedData();
+  auto attached_data = new OwnedFrameStorage();
   attached_data->frame_ready.record(current_stream);
   attached_data->storage = std::move(storage);
   av_frame->opaque_ref = av_buffer_create(
       reinterpret_cast<uint8_t*>(attached_data),
-      sizeof(StandAloneFrameAttachedData),
+      sizeof(OwnedFrameStorage),
       standalone_frame_free_callback,
       nullptr,
       0);
@@ -1065,8 +1071,7 @@ std::optional<torch::stable::Tensor> BetaCudaDeviceInterface::get_frame_storage(
   // for those users who would like to consume the frame with their own
   // consumer, i.e. not using the ColorConverter: they need to call
   // frame.storage.record_stream(color_conversion_stream) themselves.
-  return reinterpret_cast<StandAloneFrameAttachedData*>(
-             av_frame.opaque_ref->data)
+  return reinterpret_cast<OwnedFrameStorage*>(av_frame.opaque_ref->data)
       ->storage;
 }
 
@@ -1369,8 +1374,8 @@ void BetaCudaDeviceInterface::convert_av_frame_to_frame_output(
         gpu_frame.opaque_ref != nullptr,
         "ColorConverter received a non-standalone frame; frames fed to a "
         "standalone ColorConverter must come from a PacketDecoder.");
-    auto attached_data = reinterpret_cast<StandAloneFrameAttachedData*>(
-        gpu_frame.opaque_ref->data);
+    auto attached_data =
+        reinterpret_cast<OwnedFrameStorage*>(gpu_frame.opaque_ref->data);
     attached_data->frame_ready.make_stream_wait(current_stream);
   } else {
     STD_TORCH_CHECK(
