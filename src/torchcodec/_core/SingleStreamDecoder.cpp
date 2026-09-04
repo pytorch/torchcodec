@@ -1479,7 +1479,7 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
 
     // We got a valid packet. Send it to the decoder, and we'll receive it in
     // the next iteration.
-    status = device_interface_->send_packet(packet);
+    status = device_interface_->send_packet(*packet);
 
     if (status == AVERROR_INVALIDDATA && packet_data_may_be_misaligned) {
       // The MPEG-PS demuxer doesn't return proper packets just after a seek, so

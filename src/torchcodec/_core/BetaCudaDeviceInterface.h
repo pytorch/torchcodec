@@ -73,7 +73,7 @@ class BetaCudaDeviceInterface : public DeviceInterface {
       std::optional<torch::stable::Tensor> pre_allocated_output_tensor)
       override;
 
-  int send_packet(ReferenceAVPacket& packet) override;
+  int send_packet(const AVPacket& packet) override;
   int send_eof_packet() override;
   int receive_frame(UniqueAVFrame& av_frame) override;
   void flush() override;
@@ -98,8 +98,8 @@ class BetaCudaDeviceInterface : public DeviceInterface {
       const UniqueDecodingAVFormatContext& av_format_ctx);
   // Apply bitstream filter, returns filtered packet or original if no filter
   // needed.
-  ReferenceAVPacket& apply_bsf(
-      ReferenceAVPacket& packet,
+  const AVPacket& apply_bsf(
+      const AVPacket& packet,
       ReferenceAVPacket& filtered_packet);
 
   CUdeviceptr previously_mapped_frame_ = 0;

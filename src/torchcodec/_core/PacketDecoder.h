@@ -41,7 +41,7 @@ class FORCE_PUBLIC_VISIBILITY PacketDecoder {
       std::optional<int> ffmpeg_thread_count = std::nullopt);
 
   // Feed one packet to the decoder. Borrows `packet` (does not take ownership).
-  int send_packet(AVPacket* packet);
+  int send_packet(const AVPacket& packet);
   // Signal end-of-stream so the decoder flushes its remaining frames.
   int send_eof();
   // Pull one frame. Returns AVSUCCESS with `av_frame` filled, AVERROR(EAGAIN)
