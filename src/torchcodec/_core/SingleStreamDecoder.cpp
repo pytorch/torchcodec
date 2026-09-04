@@ -1452,7 +1452,7 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
     // the Demuxer building block.)
     ReferenceAVPacket packet(auto_av_packet);
     status =
-        read_next_packet(format_context_.get(), active_stream_index_, packet);
+        read_next_packet(format_context_.get(), active_stream_index_, *packet);
     decode_stats_.num_packets_read++;
 
     if (status == AVERROR_EOF) {

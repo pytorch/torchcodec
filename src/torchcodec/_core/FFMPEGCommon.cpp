@@ -91,6 +91,10 @@ AVPacket* ReferenceAVPacket::get() {
   return av_packet_;
 }
 
+AVPacket& ReferenceAVPacket::operator*() {
+  return *av_packet_;
+}
+
 AVPacket* ReferenceAVPacket::operator->() {
   return av_packet_;
 }

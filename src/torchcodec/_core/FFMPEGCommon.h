@@ -235,6 +235,7 @@ class ReferenceAVPacket {
   ReferenceAVPacket& operator=(const ReferenceAVPacket& other) = delete;
   ~ReferenceAVPacket();
   AVPacket* get();
+  AVPacket& operator*();
   AVPacket* operator->();
 };
 
