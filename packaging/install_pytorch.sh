@@ -32,24 +32,6 @@ else
   CHANNEL=nightly
 fi
 
-# TEMPORARY, TO BE DELETED once pytorch stops swallowing our IndexErrors.
-# https://github.com/pytorch/pytorch/pull/193451 routes torch.ops.* calls
-# through torch's own exception translation, which turns the std::out_of_range
-# we raise in C++ into a RuntimeError instead of the IndexError that pybind11's
-# default translator produced. Pin to the last nightly before that landed.
-NIGHTLY_PIN=dev20260826
-if [[ $CHANNEL = nightly ]]; then
-  PINNED_PACKAGES=""
-  for package in $PACKAGES; do
-    case "$package" in
-      torch) package="torch==2.15.0.${NIGHTLY_PIN}" ;;
-      torchvision) package="torchvision==0.30.0.${NIGHTLY_PIN}" ;;
-    esac
-    PINNED_PACKAGES="${PINNED_PACKAGES} ${package}"
-  done
-  PACKAGES="$PINNED_PACKAGES"
-fi
-
 echo "Installing PyTorch packages: $PACKAGES"
 echo "Compute platform: $COMPUTE_PLATFORM"
 echo "Channel: $CHANNEL"
