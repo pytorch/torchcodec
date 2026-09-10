@@ -905,7 +905,6 @@ SwsConfig::SwsConfig(
     int output_width,
     int output_height,
     AVPixelFormat output_format,
-    AVColorRange input_color_range,
     AVColorRange output_color_range)
     : input_width(input_width),
       input_height(input_height),
@@ -914,7 +913,6 @@ SwsConfig::SwsConfig(
       output_width(output_width),
       output_height(output_height),
       output_format(output_format),
-      input_color_range(input_color_range),
       output_color_range(output_color_range) {}
 
 bool SwsConfig::operator==(const SwsConfig& other) const {
@@ -925,7 +923,6 @@ bool SwsConfig::operator==(const SwsConfig& other) const {
       output_width == other.output_width &&
       output_height == other.output_height &&
       output_format == other.output_format &&
-      input_color_range == other.input_color_range &&
       output_color_range == other.output_color_range;
 }
 
@@ -963,11 +960,11 @@ UniqueSwsContext create_sws_context(
       &saturation);
   STD_TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
 
-  if (sws_config.input_color_range != AVCOL_RANGE_UNSPECIFIED) {
-    src_range = (sws_config.input_color_range == AVCOL_RANGE_JPEG) ? 1 : 0;
-  }
+  // swscale spells a range as an int: 1 is full, 0 is limited. FFmpeg names
+  // those AVCOL_RANGE_JPEG and AVCOL_RANGE_MPEG, after the two worlds they come
+  // from - JPEG is the full one.
   if (sws_config.output_color_range != AVCOL_RANGE_UNSPECIFIED) {
-    dst_range = (sws_config.output_color_range == AVCOL_RANGE_JPEG) ? 1 : 0;
+    dst_range = sws_config.output_color_range == AVCOL_RANGE_JPEG;
   }
 
   const int* colorspace_table =
