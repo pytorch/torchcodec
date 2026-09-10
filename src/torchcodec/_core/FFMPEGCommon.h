@@ -406,6 +406,11 @@ struct SwsConfig {
   int output_width = 0;
   int output_height = 0;
   AVPixelFormat output_format = AV_PIX_FMT_NONE;
+  // swscale derives the range of either end from its pixel format alone, never
+  // from the frame's own tag, and a YUV destination defaults to limited range.
+  // AVCOL_RANGE_UNSPECIFIED keeps that default; anything else overrides it.
+  AVColorRange input_color_range = AVCOL_RANGE_UNSPECIFIED;
+  AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED;
 
   SwsConfig() = default;
   SwsConfig(
@@ -415,7 +420,9 @@ struct SwsConfig {
       AVColorSpace input_colorspace,
       int output_width,
       int output_height,
-      AVPixelFormat output_format);
+      AVPixelFormat output_format,
+      AVColorRange input_color_range = AVCOL_RANGE_UNSPECIFIED,
+      AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED);
 
   bool operator==(const SwsConfig& other) const;
   bool operator!=(const SwsConfig& other) const;

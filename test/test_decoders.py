@@ -144,6 +144,7 @@ from .utils import (
     TESTSRC2_444_12BIT_HEVC,
     TESTSRC2_444_8BIT_HEVC,
     TESTSRC2_AV1_10BIT,
+    TESTSRC2_FULL_RANGE_422,
     TESTSRC2_GBRP_HEVC,
     TESTSRC2_GRAY_HEVC,
     TESTSRC2_ODD_HEIGHT_444,
@@ -2369,6 +2370,36 @@ class TestVideoDecoder:
         torch.testing.assert_close(cpu_frames, cuda_frames.cpu(), rtol=0, atol=1)
 
     @needs_cuda
+    @pytest.mark.parametrize(
+        "video",
+        (
+            TESTSRC2_GRAY_HEVC,
+            TESTSRC2_GBRP_HEVC,
+            TESTSRC2_YUVA420P_FFV1,
+            TESTSRC2_FULL_RANGE_422,
+        ),
+        ids=lambda video: video.path.stem,
+    )
+    def test_cpu_fallback_matches_cpu(self, video):
+        # NVDEC decodes none of these, so CUDA decodes them on the CPU and
+        # uploads them in an NVDEC surface format. Monochrome, planar RGB, alpha
+        # and 4:2:2 all convert to something those formats hold, and all but the
+        # FFV1 one are full range, which is what a conversion that quietly
+        # narrowed them to limited range would squash.
+        num_frames = 5
+        cpu_decoder = VideoDecoder(video.path, device="cpu")
+        cuda_decoder = VideoDecoder(video.path, device="cuda")
+        assert cuda_decoder.cpu_fallback
+
+        cpu_frames = cpu_decoder[:num_frames]
+        cuda_frames = cuda_decoder[:num_frames].cpu()
+
+        # A couple of levels for the color-conversion kernel, and a couple more
+        # for the planar RGB source, whose samples make a round trip through
+        # 8-bit YUV that the CPU never puts them through.
+        torch.testing.assert_close(cuda_frames, cpu_frames, atol=3, rtol=0)
+
+    @needs_cuda
     def test_nvdec_cuda_interface_error(self):
         with pytest.raises(RuntimeError, match="torch_parse_device_string"):
             VideoDecoder(NASA_VIDEO.path, device="cuda:0:bad_variant")
@@ -3619,9 +3650,10 @@ _PLANES_VIDEOS = (
 # them - monochrome, planar RGB and FFV1 all send it to the CPU fallback - and
 # the fallback converts to an NVDEC surface format before uploading, so on CUDA
 # they are three YUV planes like everything else. That conversion is what
-# RawFrame.pix_fmt promises ("on CUDA it is always an NVDEC surface format"),
-# and it is lossy for the two formats that carry something YUV can't: grayscale
-# gains neutral chroma, and alpha is dropped outright.
+# RawFrame.pix_fmt promises ("on CUDA it is always an NVDEC surface format"). It
+# keeps the pixels where they were - see test_cpu_fallback_matches_cpu - but not
+# what YUV has no room for: grayscale gains neutral chroma, and alpha is dropped
+# outright.
 _NON_YUV_PLANES_VIDEOS = (
     _PlanesCase(TESTSRC2_GRAY_HEVC, 8, "gray", "nv12", cpu_num_planes=1),
     # Planar RGB. The planes come out (R, G, B), which is *not* the order the
@@ -4541,6 +4573,50 @@ class TestBlocks:
         frame, _ = self._first_frame(video.path, "cuda")
         assert frame.pix_fmt == expected_pix_fmt
         assert all(plane.device.type == "cuda" for plane in frame.planes)
+
+    @pytest.mark.needs_cuda
+    @pytest.mark.parametrize(
+        "video, expected_colorspace, has_luma",
+        (
+            pytest.param(TESTSRC2_GRAY_HEVC, "unknown", True, id="gray"),
+            # "gbr" describes RGB planes, which the uploaded frame doesn't have.
+            # It names the YUV matrix its planes were encoded with instead.
+            pytest.param(TESTSRC2_GBRP_HEVC, "smpte170m", False, id="gbrp"),
+            pytest.param(TESTSRC2_FULL_RANGE_422, "unknown", True, id="422"),
+        ),
+    )
+    def test_cpu_fallback_upload_keeps_full_range(
+        self, video, expected_colorspace, has_luma
+    ):
+        # Full-range sources NVDEC can't decode, so they go through the CPU
+        # fallback and its conversion to an NVDEC surface format. The samples
+        # stay full range across that conversion: narrowing them to limited
+        # range while the frame still says "pc" would have the color conversion
+        # stretch them a second time.
+        cpu_frame, cpu_converter = self._first_frame(video.path, "cpu")
+        cuda_frame, cuda_converter = self._first_frame(video.path, "cuda")
+
+        assert cpu_frame.color_range == "pc"
+        assert cuda_frame.color_range == "pc"
+        assert cuda_frame.colorspace == expected_colorspace
+
+        if has_luma:
+            # A source that already has luma keeps it sample for sample: only
+            # its chroma is touched.
+            height, width = cpu_frame.planes[0].shape
+            torch.testing.assert_close(
+                cuda_frame.planes[0][:height, :width].cpu(),
+                cpu_frame.planes[0],
+                atol=0,
+                rtol=0,
+            )
+
+        torch.testing.assert_close(
+            cuda_converter.convert(cuda_frame).data.cpu(),
+            cpu_converter.convert(cpu_frame).data,
+            atol=3,
+            rtol=0,
+        )
 
     @pytest.mark.parametrize(
         "pix_fmt, codec, container",

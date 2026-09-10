@@ -1228,6 +1228,22 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       "Failed to allocate intermediate CPU frame buffer: ",
       get_ffmpeg_error_string_from_error_code(ret));
 
+  // Left to its defaults, swscale would write limited-range samples into the
+  // YUV target while the frame keeps the source's range tag, and the color
+  // conversion would then expand a full-range source a second time. Pinning
+  // both ends to the source's own range keeps the samples where the tag says
+  // they are, and costs nothing: an NVDEC surface format is a layout, it holds
+  // full-range samples just as well as limited-range ones.
+  AVColorRange source_color_range = cpu_frame.color_range;
+  if (source_color_range == AVCOL_RANGE_UNSPECIFIED) {
+    // Untagged, so the range is whatever the format implies - and that's what
+    // swscale assumes when converting the same frame to RGB on the CPU.
+    bool is_rgb = (source_desc->flags & AV_PIX_FMT_FLAG_RGB) != 0;
+    bool is_gray = source_desc->nb_components == 1;
+    source_color_range =
+        (is_rgb || is_gray) ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
+  }
+
   // Source and destination dimensions are the same: this is a pixel format
   // conversion, not a rescale. sws_scale() writes into the even-sized buffer
   // allocated above but only fills the real width and height.
@@ -1238,10 +1254,18 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       cpu_frame.colorspace,
       width,
       height,
-      target_pix_fmt);
+      target_pix_fmt,
+      source_color_range,
+      source_color_range);
 
   if (!sws_context_ || prev_sws_config_ != sws_config) {
-    sws_context_ = create_sws_context(sws_config, SWS_BILINEAR);
+    // Nothing is rescaled here, so the flags only pick how chroma is
+    // resampled, which happens when the source is subsampled more finely than
+    // the target surface (4:2:2 into 4:4:4, say). SWS_POINT replicates it,
+    // which is what the CPU converter does on its way to RGB - interpolating
+    // instead would invent chroma the CPU never sees, and show up as colored
+    // fringes along sharp edges.
+    sws_context_ = create_sws_context(sws_config, SWS_POINT);
     prev_sws_config_ = sws_config;
   }
 
@@ -1327,6 +1351,18 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       ret >= 0,
       "Failed to copy frame properties: ",
       get_ffmpeg_error_string_from_error_code(ret));
+
+  // The properties above describe the source frame, and two of them no longer
+  // describe the one we just built. The range is the one we asked swscale for,
+  // which is worth stating even when the source didn't state it: color
+  // conversion reads an unspecified range as limited, and we may have written
+  // full-range samples. And a source that was RGB has no YUV matrix to hand
+  // down, so we name the one swscale encoded with: sws_getCoefficients() maps
+  // AVCOL_SPC_RGB, like anything it doesn't know, to its BT.601 default.
+  gpu_frame->color_range = source_color_range;
+  if (cpu_frame.colorspace == AVCOL_SPC_RGB) {
+    gpu_frame->colorspace = AVCOL_SPC_SMPTE170M;
+  }
 
   return {std::move(gpu_frame), std::move(storage)};
 }

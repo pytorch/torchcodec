@@ -1313,6 +1313,20 @@ TESTSRC2_YUVA420P_FFV1 = TestVideo(
     frames={0: {}},
 )
 
+# Full range (pc) 4:2:2, i.e. neither the range nor the chroma layout that NVDEC
+# surfaces come in. yuvj422p is what -pix_fmt yuvj422p and -pix_fmt yuv422p
+# -color_range pc both produce.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=1" \
+#  -c:v libx264 -pix_fmt yuvj422p testsrc2_full_range_422.mp4
+TESTSRC2_FULL_RANGE_422 = TestVideo(
+    filename="testsrc2_full_range_422.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
 # ffmpeg -f lavfi -i "testsrc2=size=321x240:rate=25:duration=1,format=rgb24" \
 #  -c:v libvpx-vp9 -pix_fmt yuv420p -b:v 1M testsrc2_odd_width_vp9.mp4
 TESTSRC2_ODD_WIDTH_VP9 = TestVideo(
