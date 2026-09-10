@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.transforms._decoder_transforms &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.transforms._decoder_transforms &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1468,7 +1468,7 @@ document.write(`
 <div class="viewcode-block" id="DecoderTransform">
 <a class="viewcode-back" href="../../../generated/torchcodec.transforms.DecoderTransform.html#torchcodec.transforms.DecoderTransform">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DecoderTransform</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Base class for all decoder transforms.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for all decoder transforms.</span>
 
 <span class="sd">    A *decoder transform* is a transform that is applied by the decoder before</span>
 <span class="sd">    returning the decoded frame.  Applying decoder transforms to frames</span>
@@ -1488,47 +1488,47 @@ document.write(`
 <span class="sd">      5. The difference between the frames returned by a decoder transform and</span>
 <span class="sd">         the complementary TorchVision transform are such that a model should</span>
 <span class="sd">         not be able to tell the difference.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_make_transform_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Makes the transform spec that is used by the `VideoDecoder`.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Makes the transform spec that is used by the `VideoDecoder`.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            input_dims (tuple[int | None, int | None]): The dimensions of</span>
 <span class="sd">                the input frame in the form (height, width). We cannot know the</span>
-<span class="sd">                dimensions at object construction time because it's dependent on</span>
+<span class="sd">                dimensions at object construction time because it&#39;s dependent on</span>
 <span class="sd">                the video being decoded and upstream transforms in the same</span>
 <span class="sd">                transform pipeline. Not all transforms need to know this; those</span>
-<span class="sd">                that don't will ignore it. The individual values in the tuple are</span>
+<span class="sd">                that don&#39;t will ignore it. The individual values in the tuple are</span>
 <span class="sd">                optional because the original values come from file metadata which</span>
 <span class="sd">                may be missing. We maintain the optionality throughout the APIs so</span>
-<span class="sd">                that we can decide as late as possible that it's necessary for the</span>
+<span class="sd">                that we can decide as late as possible that it&#39;s necessary for the</span>
 <span class="sd">                values to exist. That is, if the values are missing from the</span>
 <span class="sd">                metadata and we have transforms which ignore the input dimensions,</span>
 <span class="sd">                we want that to still work.</span>
 
-<span class="sd">                Note: This method is the moral equivalent of TorchVision's</span>
+<span class="sd">                Note: This method is the moral equivalent of TorchVision&#39;s</span>
 <span class="sd">                `Transform.make_params()`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            str: A string which contains the spec for the transform that the</span>
 <span class="sd">                `VideoDecoder` knows what to do with.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_output_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Get the dimensions of the output frame.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the dimensions of the output frame.</span>
 
 <span class="sd">        Transforms that change the frame dimensions need to override this</span>
-<span class="sd">        method. Transforms that don't change the frame dimensions can rely on</span>
+<span class="sd">        method. Transforms that don&#39;t change the frame dimensions can rely on</span>
 <span class="sd">        this default implementation.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[int | None, int | None] | None: The output dimensions.</span>
 <span class="sd">                - None: The output dimensions are the same as the input dimensions.</span>
 <span class="sd">                - (int, int): The (height, width) of the output frame.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
@@ -1538,7 +1538,7 @@ document.write(`
         <span class="kn">from</span><span class="w"> </span><span class="nn">torchvision.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">v2</span>
     <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"Cannot import TorchVision; this should never happen, please report a bug."</span>
+            <span class="s2">&quot;Cannot import TorchVision; this should never happen, please report a bug.&quot;</span>
         <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
     <span class="k">return</span> <span class="n">v2</span>
 
@@ -1546,7 +1546,7 @@ document.write(`
 <div class="viewcode-block" id="Resize">
 <a class="viewcode-back" href="../../../generated/torchcodec.transforms.Resize.html#torchcodec.transforms.Resize">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Resize</span><span class="p">(</span><span class="n">DecoderTransform</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Resize the decoded frame to a given size.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resize the decoded frame to a given size.</span>
 
 <span class="sd">    Complementary TorchVision transform: :class:`~torchvision.transforms.v2.Resize`.</span>
 <span class="sd">    Interpolation is always bilinear. Anti-aliasing is always on.</span>
@@ -1554,18 +1554,18 @@ document.write(`
 <span class="sd">    Args:</span>
 <span class="sd">        size (Sequence[int]): Desired output size. Must be a sequence of</span>
 <span class="sd">            the form (height, width).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Resize transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;Resize transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_make_transform_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"resize, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;resize, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_output_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -1576,20 +1576,20 @@ document.write(`
 
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tv_resize</span><span class="p">,</span> <span class="n">v2</span><span class="o">.</span><span class="n">Resize</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">tv_resize</span><span class="o">.</span><span class="n">interpolation</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">v2</span><span class="o">.</span><span class="n">InterpolationMode</span><span class="o">.</span><span class="n">BILINEAR</span><span class="p">,</span> <span class="s2">"bilinear"</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">tv_resize</span><span class="o">.</span><span class="n">interpolation</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">v2</span><span class="o">.</span><span class="n">InterpolationMode</span><span class="o">.</span><span class="n">BILINEAR</span><span class="p">,</span> <span class="s2">&quot;bilinear&quot;</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision Resize transform must use bilinear interpolation."</span>
+                <span class="s2">&quot;TorchVision Resize transform must use bilinear interpolation.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">tv_resize</span><span class="o">.</span><span class="n">antialias</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision Resize transform must have antialias enabled."</span>
+                <span class="s2">&quot;TorchVision Resize transform must have antialias enabled.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">tv_resize</span><span class="o">.</span><span class="n">size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"TorchVision Resize transform must have a size specified."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TorchVision Resize transform must have a size specified.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tv_resize</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision Resize transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">tv_resize</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;TorchVision Resize transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">tv_resize</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">tv_resize</span><span class="o">.</span><span class="n">size</span><span class="p">)</span></div>
 
@@ -1598,25 +1598,25 @@ document.write(`
 <div class="viewcode-block" id="CenterCrop">
 <a class="viewcode-back" href="../../../generated/torchcodec.transforms.CenterCrop.html#torchcodec.transforms.CenterCrop">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CenterCrop</span><span class="p">(</span><span class="n">DecoderTransform</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Crop the decoded frame to a given size in the center of the frame.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Crop the decoded frame to a given size in the center of the frame.</span>
 
 <span class="sd">    Complementary TorchVision transform: :class:`~torchvision.transforms.v2.CenterCrop`.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        size (Sequence[int]): Desired output size. Must be a sequence of</span>
 <span class="sd">            the form (height, width).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"CenterCrop transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;CenterCrop transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_make_transform_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"center_crop, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;center_crop, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_output_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -1630,15 +1630,15 @@ document.write(`
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tv_center_crop</span><span class="p">,</span> <span class="n">v2</span><span class="o">.</span><span class="n">CenterCrop</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Transform must be TorchVision's CenterCrop, "</span>
-                <span class="sa">f</span><span class="s2">"it is instead </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tv_center_crop</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="s2">"This should never happen, please report a bug."</span>
+                <span class="s2">&quot;Transform must be TorchVision&#39;s CenterCrop, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;it is instead </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tv_center_crop</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;This should never happen, please report a bug.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tv_center_crop</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision CenterCrop transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">tv_center_crop</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;TorchVision CenterCrop transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">tv_center_crop</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">tv_center_crop</span><span class="o">.</span><span class="n">size</span><span class="p">)</span></div>
@@ -1648,7 +1648,7 @@ document.write(`
 <div class="viewcode-block" id="RandomCrop">
 <a class="viewcode-back" href="../../../generated/torchcodec.transforms.RandomCrop.html#torchcodec.transforms.RandomCrop">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RandomCrop</span><span class="p">(</span><span class="n">DecoderTransform</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Crop the decoded frame to a given size at a random location in the frame.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Crop the decoded frame to a given size at a random location in the frame.</span>
 
 <span class="sd">    Complementary TorchVision transform: :class:`~torchvision.transforms.v2.RandomCrop`.</span>
 <span class="sd">    Padding of all kinds is disabled. The random location within the frame is</span>
@@ -1661,13 +1661,13 @@ document.write(`
 <span class="sd">    Args:</span>
 <span class="sd">        size (Sequence[int]): Desired output size. Must be a sequence of</span>
 <span class="sd">            the form (height, width).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"RandomCrop transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;RandomCrop transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
 
@@ -1675,13 +1675,13 @@ document.write(`
         <span class="n">height</span><span class="p">,</span> <span class="n">width</span> <span class="o">=</span> <span class="n">input_dims</span>
         <span class="k">if</span> <span class="n">height</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Video metadata has no height. "</span>
-                <span class="s2">"RandomCrop can only be used when input frame dimensions are known."</span>
+                <span class="s2">&quot;Video metadata has no height. &quot;</span>
+                <span class="s2">&quot;RandomCrop can only be used when input frame dimensions are known.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Video metadata has no width. "</span>
-                <span class="s2">"RandomCrop can only be used when input frame dimensions are known."</span>
+                <span class="s2">&quot;Video metadata has no width. &quot;</span>
+                <span class="s2">&quot;RandomCrop can only be used when input frame dimensions are known.&quot;</span>
             <span class="p">)</span>
 
         <span class="c1"># Note: This logic below must match the logic in</span>
@@ -1690,13 +1690,13 @@ document.write(`
         <span class="c1">#       API guarantee with our users.</span>
         <span class="k">if</span> <span class="n">height</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="n">width</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Input dimensions </span><span class="si">{</span><span class="n">input_dims</span><span class="si">}</span><span class="s2"> are smaller than the crop size </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Input dimensions </span><span class="si">{</span><span class="n">input_dims</span><span class="si">}</span><span class="s2"> are smaller than the crop size </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
         <span class="n">top</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">height</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">())</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
         <span class="n">left</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">width</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">())</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
 
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"crop, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">left</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">top</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;crop, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">left</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">top</span><span class="si">}</span><span class="s2">&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_output_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -1710,31 +1710,31 @@ document.write(`
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tv_random_crop</span><span class="p">,</span> <span class="n">v2</span><span class="o">.</span><span class="n">RandomCrop</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Transform must be TorchVision's RandomCrop, "</span>
-                <span class="sa">f</span><span class="s2">"it is instead </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tv_random_crop</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="s2">"This should never happen, please report a bug."</span>
+                <span class="s2">&quot;Transform must be TorchVision&#39;s RandomCrop, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;it is instead </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tv_random_crop</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;This should never happen, please report a bug.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">tv_random_crop</span><span class="o">.</span><span class="n">padding</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision RandomCrop transform must not specify padding."</span>
+                <span class="s2">&quot;TorchVision RandomCrop transform must not specify padding.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">tv_random_crop</span><span class="o">.</span><span class="n">pad_if_needed</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision RandomCrop transform must not specify pad_if_needed."</span>
+                <span class="s2">&quot;TorchVision RandomCrop transform must not specify pad_if_needed.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">tv_random_crop</span><span class="o">.</span><span class="n">fill</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"TorchVision RandomCrop fill must be 0."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TorchVision RandomCrop fill must be 0.&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">tv_random_crop</span><span class="o">.</span><span class="n">padding_mode</span> <span class="o">!=</span> <span class="s2">"constant"</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"TorchVision RandomCrop padding_mode must be constant."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">tv_random_crop</span><span class="o">.</span><span class="n">padding_mode</span> <span class="o">!=</span> <span class="s2">&quot;constant&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TorchVision RandomCrop padding_mode must be constant.&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tv_random_crop</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"TorchVision RandcomCrop transform must have a (height, width) "</span>
-                <span class="sa">f</span><span class="s2">"pair for the size, got </span><span class="si">{</span><span class="n">tv_random_crop</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">."</span>
+                <span class="s2">&quot;TorchVision RandcomCrop transform must have a (height, width) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;pair for the size, got </span><span class="si">{</span><span class="n">tv_random_crop</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">tv_random_crop</span><span class="o">.</span><span class="n">size</span><span class="p">)</span></div>
@@ -1745,7 +1745,7 @@ document.write(`
     <span class="n">transforms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">DecoderTransform</span> <span class="o">|</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">input_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Given a sequence of transforms, turn those into the specification string</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Given a sequence of transforms, turn those into the specification string</span>
 <span class="sd">       the core API expects.</span>
 
 <span class="sd">    Args:</span>
@@ -1753,20 +1753,20 @@ document.write(`
 <span class="sd">            one of two types:</span>
 <span class="sd">                1. torchcodec.transforms.DecoderTransform</span>
 <span class="sd">                2. torchvision.transforms.v2.Transform, but our type annotation</span>
-<span class="sd">                   only mentions its base, nn.Module. We don't want to take a</span>
+<span class="sd">                   only mentions its base, nn.Module. We don&#39;t want to take a</span>
 <span class="sd">                   hard dependency on TorchVision.</span>
 <span class="sd">        input_dims: Optional (height, width) pair. Note that only some</span>
 <span class="sd">            transforms need to know the dimensions. If the user provides</span>
-<span class="sd">            transforms that don't need to know the dimensions, and that metadata</span>
+<span class="sd">            transforms that don&#39;t need to know the dimensions, and that metadata</span>
 <span class="sd">            is missing, everything should still work. That means we assert their</span>
 <span class="sd">            existence as late as possible.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        String of transforms in the format the core API expects: transform</span>
 <span class="sd">        specifications separate by semicolons.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">transforms</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">""</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torchvision.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">v2</span>
@@ -1794,12 +1794,12 @@ document.write(`
     <span class="c1"># Transforms can both:</span>
     <span class="c1">#</span>
     <span class="c1">#     1. Produce frames with arbitrary dimensions.</span>
-    <span class="c1">#     2. Rely on their input frame's dimensions to calculate ahead-of-time</span>
+    <span class="c1">#     2. Rely on their input frame&#39;s dimensions to calculate ahead-of-time</span>
     <span class="c1">#        what their runtime behavior will be.</span>
     <span class="c1">#</span>
     <span class="c1"># The consequence of the above facts is that we need to statically track</span>
     <span class="c1"># frame dimensions in the pipeline while we pre-process it. The input</span>
-    <span class="c1"># frame's dimensions to A, our first transform, is always what we know from</span>
+    <span class="c1"># frame&#39;s dimensions to A, our first transform, is always what we know from</span>
     <span class="c1"># our metadata. For each transform, we always calculate its output</span>
     <span class="c1"># dimensions from its input dimensions. We store these with the converted</span>
     <span class="c1"># transform, to be all used together when we generate the specs.</span>
@@ -1815,9 +1815,9 @@ document.write(`
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">DecoderTransform</span><span class="p">):</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">tv_available</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"The supplied transform, </span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s2">, is not a TorchCodec "</span>
-                    <span class="s2">" DecoderTransform. TorchCodec also accepts TorchVision "</span>
-                    <span class="s2">"v2 transforms, but TorchVision is not installed."</span>
+                    <span class="sa">f</span><span class="s2">&quot;The supplied transform, </span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s2">, is not a TorchCodec &quot;</span>
+                    <span class="s2">&quot; DecoderTransform. TorchCodec also accepts TorchVision &quot;</span>
+                    <span class="s2">&quot;v2 transforms, but TorchVision is not installed.&quot;</span>
                 <span class="p">)</span>
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">v2</span><span class="o">.</span><span class="n">Resize</span><span class="p">):</span>
                 <span class="n">transform</span> <span class="o">=</span> <span class="n">Resize</span><span class="o">.</span><span class="n">_from_torchvision</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
@@ -1827,16 +1827,16 @@ document.write(`
                 <span class="n">transform</span> <span class="o">=</span> <span class="n">RandomCrop</span><span class="o">.</span><span class="n">_from_torchvision</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"Unsupported transform: </span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s2">. Transforms must be "</span>
-                    <span class="s2">"either a TorchCodec DecoderTransform or a TorchVision "</span>
-                    <span class="s2">"v2 transform."</span>
+                    <span class="sa">f</span><span class="s2">&quot;Unsupported transform: </span><span class="si">{</span><span class="n">transform</span><span class="si">}</span><span class="s2">. Transforms must be &quot;</span>
+                    <span class="s2">&quot;either a TorchCodec DecoderTransform or a TorchVision &quot;</span>
+                    <span class="s2">&quot;v2 transform.&quot;</span>
                 <span class="p">)</span>
 
         <span class="n">converted_transforms</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">transform</span><span class="p">,</span> <span class="n">curr_input_dims</span><span class="p">))</span>
         <span class="n">output_dims</span> <span class="o">=</span> <span class="n">transform</span><span class="o">.</span><span class="n">_get_output_dims</span><span class="p">()</span>
         <span class="n">curr_input_dims</span> <span class="o">=</span> <span class="n">output_dims</span> <span class="k">if</span> <span class="n">output_dims</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">curr_input_dims</span>
 
-    <span class="k">return</span> <span class="s2">";"</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">_make_transform_spec</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">dims</span> <span class="ow">in</span> <span class="n">converted_transforms</span><span class="p">])</span>
+    <span class="k">return</span> <span class="s2">&quot;;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">_make_transform_spec</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">dims</span> <span class="ow">in</span> <span class="n">converted_transforms</span><span class="p">])</span>
 </pre></div>
 
                 </article>

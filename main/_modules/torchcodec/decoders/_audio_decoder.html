@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.decoders._audio_decoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.decoders._audio_decoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1471,7 +1471,7 @@ document.write(`
 <div class="viewcode-block" id="AudioDecoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.AudioDecoder.html#torchcodec.decoders.AudioDecoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AudioDecoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A single-stream audio decoder.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single-stream audio decoder.</span>
 
 <span class="sd">    This can be used to decode audio from pure audio files (e.g. mp3, wav,</span>
 <span class="sd">    etc.), or from videos that contain audio streams (e.g. mp4 videos).</span>
@@ -1508,7 +1508,7 @@ document.write(`
 <span class="sd">        stream_index (int): The stream index that this decoder is retrieving samples from. If a</span>
 <span class="sd">            stream index was provided at initialization, this is the same value. If it was left</span>
 <span class="sd">            unspecified, this is the :term:`best stream`.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1518,7 +1518,7 @@ document.write(`
         <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.decoders.AudioDecoder"</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.decoders.AudioDecoder&quot;</span><span class="p">)</span>
 
         <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span>
@@ -1526,7 +1526,7 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
         <span class="p">)</span> <span class="o">=</span> <span class="n">create_audio_decoder</span><span class="p">(</span>
             <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-            <span class="n">seek_mode</span><span class="o">=</span><span class="s2">"approximate"</span><span class="p">,</span>
+            <span class="n">seek_mode</span><span class="o">=</span><span class="s2">&quot;approximate&quot;</span><span class="p">,</span>
             <span class="n">stream_index</span><span class="o">=</span><span class="n">stream_index</span><span class="p">,</span>
             <span class="n">sample_rate</span><span class="o">=</span><span class="n">sample_rate</span><span class="p">,</span>
             <span class="n">num_channels</span><span class="o">=</span><span class="n">num_channels</span><span class="p">,</span>
@@ -1539,14 +1539,14 @@ document.write(`
 <div class="viewcode-block" id="AudioDecoder.get_all_samples">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.AudioDecoder.html#torchcodec.decoders.AudioDecoder.get_all_samples">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_all_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudioSamples</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns all the audio samples from the source.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns all the audio samples from the source.</span>
 
 <span class="sd">        To decode samples in a specific range, use</span>
 <span class="sd">        :meth:`~torchcodec.decoders.AudioDecoder.get_samples_played_in_range`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            AudioSamples: The samples within the file.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_samples_played_in_range</span><span class="p">()</span></div>
 
 
@@ -1555,7 +1555,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">get_samples_played_in_range</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">start_seconds</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">stop_seconds</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudioSamples</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns audio samples in the given range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns audio samples in the given range.</span>
 
 <span class="sd">        Samples are in the half open range [start_seconds, stop_seconds).</span>
 
@@ -1574,10 +1574,10 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            AudioSamples: The samples within the specified range.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">stop_seconds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">start_seconds</span> <span class="o">&lt;=</span> <span class="n">stop_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">)."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">).&quot;</span>
             <span class="p">)</span>
         <span class="n">frames</span><span class="p">,</span> <span class="n">first_pts</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_by_pts_in_range_audio</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span>
@@ -1598,10 +1598,10 @@ document.write(`
         <span class="c1"># because the core API is based on frames, the `frames` tensor contains</span>
         <span class="c1"># the samples in [first_pts, last_pts)</span>
         <span class="c1"># So we do some basic math to figure out the position of the view that</span>
-        <span class="c1"># we'll return.</span>
+        <span class="c1"># we&#39;ll return.</span>
 
         <span class="n">sample_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desired_sample_rate</span>
-        <span class="c1"># TODO: metadata's sample_rate should probably not be Optional</span>
+        <span class="c1"># TODO: metadata&#39;s sample_rate should probably not be Optional</span>
         <span class="k">assert</span> <span class="n">sample_rate</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># mypy.</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">offset_of</span><span class="p">(</span><span class="n">seconds</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -1618,9 +1618,9 @@ document.write(`
             <span class="n">offset_beginning</span> <span class="o">=</span> <span class="n">offset_of</span><span class="p">(</span><span class="n">start_seconds</span><span class="p">)</span>
             <span class="n">output_pts_seconds</span> <span class="o">=</span> <span class="n">start_seconds</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># In normal cases we'll have first_pts &lt;= start_pts, but in some</span>
-            <span class="c1"># edge cases it's possible to have first_pts &gt; start_seconds,</span>
-            <span class="c1"># typically if the stream's first frame's pts isn't exactly 0.</span>
+            <span class="c1"># In normal cases we&#39;ll have first_pts &lt;= start_pts, but in some</span>
+            <span class="c1"># edge cases it&#39;s possible to have first_pts &gt; start_seconds,</span>
+            <span class="c1"># typically if the stream&#39;s first frame&#39;s pts isn&#39;t exactly 0.</span>
             <span class="n">offset_beginning</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="n">output_pts_seconds</span> <span class="o">=</span> <span class="n">first_pts</span>
 

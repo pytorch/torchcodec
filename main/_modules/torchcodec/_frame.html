@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec._frame &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec._frame &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1468,15 +1468,15 @@ document.write(`
     <span class="c1"># Utility to replace __repr__ method of dataclasses below. This prints the</span>
     <span class="c1"># shape of the .data tensor rather than printing the (potentially very long)</span>
     <span class="c1"># data tensor itself.</span>
-    <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s2">":</span><span class="se">\n</span><span class="s2">"</span>
-    <span class="n">spaces</span> <span class="o">=</span> <span class="s2">"  "</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s2">&quot;:</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">spaces</span> <span class="o">=</span> <span class="s2">&quot;  &quot;</span>
     <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">field_name</span> <span class="o">=</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span>
         <span class="n">field_val</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">field_name</span> <span class="o">==</span> <span class="s2">"data"</span><span class="p">:</span>
-            <span class="n">field_name</span> <span class="o">=</span> <span class="s2">"data (shape)"</span>
+        <span class="k">if</span> <span class="n">field_name</span> <span class="o">==</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span>
+            <span class="n">field_name</span> <span class="o">=</span> <span class="s2">&quot;data (shape)&quot;</span>
             <span class="n">field_val</span> <span class="o">=</span> <span class="n">field_val</span><span class="o">.</span><span class="n">shape</span>
-        <span class="n">s</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">spaces</span><span class="si">}{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">field_val</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">s</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">spaces</span><span class="si">}{</span><span class="n">field_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">field_val</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
     <span class="k">return</span> <span class="n">s</span>
 
 
@@ -1484,20 +1484,20 @@ document.write(`
 <a class="viewcode-back" href="../../generated/torchcodec.Frame.html#torchcodec.Frame">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Frame</span><span class="p">(</span><span class="n">Iterable</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""A single video frame with associated metadata."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single video frame with associated metadata.&quot;&quot;&quot;</span>
 
     <span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span>
-<span class="w">    </span><span class="sd">"""The frame data as (3-D ``torch.Tensor``)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The frame data as (3-D ``torch.Tensor``).&quot;&quot;&quot;</span>
     <span class="n">pts_seconds</span><span class="p">:</span> <span class="nb">float</span>
-<span class="w">    </span><span class="sd">"""The :term:`pts` of the frame, in seconds (float)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The :term:`pts` of the frame, in seconds (float).&quot;&quot;&quot;</span>
     <span class="n">duration_seconds</span><span class="p">:</span> <span class="nb">float</span>
-<span class="w">    </span><span class="sd">"""The duration of the frame, in seconds (float)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The duration of the frame, in seconds (float).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># This is called after __init__() when a Frame is created. We can run</span>
         <span class="c1"># input validation checks here.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"data must be 3-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;data must be 3-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span><span class="p">)</span>
 
@@ -1514,7 +1514,7 @@ document.write(`
 <a class="viewcode-back" href="../../generated/torchcodec.FrameBatch.html#torchcodec.FrameBatch">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">FrameBatch</span><span class="p">(</span><span class="n">Iterable</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Multiple video frames with associated metadata.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multiple video frames with associated metadata.</span>
 
 <span class="sd">    The ``data`` tensor is typically 4D for sequences of frames (NHWC or NCHW),</span>
 <span class="sd">    or 5D for sequences of clips, as returned by the :ref:`samplers</span>
@@ -1524,33 +1524,33 @@ document.write(`
 <span class="sd">    .. note::</span>
 <span class="sd">        The ``pts_seconds`` and ``duration_seconds`` Tensors are always returned</span>
 <span class="sd">        on CPU, even if ``data`` is on GPU.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span>
-<span class="w">    </span><span class="sd">"""The frames data (``torch.Tensor`` of uint8 in [0, 255] or float in [0, 1])."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The frames data (``torch.Tensor`` of uint8 in [0, 255] or float in [0, 1]).&quot;&quot;&quot;</span>
     <span class="n">pts_seconds</span><span class="p">:</span> <span class="n">Tensor</span>
-<span class="w">    </span><span class="sd">"""The :term:`pts` of the frame, in seconds (``torch.Tensor`` of floats)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The :term:`pts` of the frame, in seconds (``torch.Tensor`` of floats).&quot;&quot;&quot;</span>
     <span class="n">duration_seconds</span><span class="p">:</span> <span class="n">Tensor</span>
-<span class="w">    </span><span class="sd">"""The duration of the frame, in seconds (``torch.Tensor`` of floats)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The duration of the frame, in seconds (``torch.Tensor`` of floats).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># This is called after __init__() when a FrameBatch is created. We can</span>
         <span class="c1"># run input validation checks here.</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"data must be at least 3-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">"</span>
+                <span class="sa">f</span><span class="s2">&quot;data must be at least 3-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">&quot;</span>
             <span class="p">)</span>
 
         <span class="n">leading_dims</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">leading_dims</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Tried to create a FrameBatch but the leading dimensions of the inputs do not match. "</span>
-                <span class="sa">f</span><span class="s2">"Got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2"> so we expected the shape of pts_seconds and "</span>
-                <span class="sa">f</span><span class="s2">"duration_seconds to be </span><span class="si">{</span><span class="n">leading_dims</span><span class="w"> </span><span class="si">= }</span><span class="s2">, but got "</span>
-                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2"> and </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span>
+                <span class="s2">&quot;Tried to create a FrameBatch but the leading dimensions of the inputs do not match. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2"> so we expected the shape of pts_seconds and &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;duration_seconds to be </span><span class="si">{</span><span class="n">leading_dims</span><span class="w"> </span><span class="si">= }</span><span class="s2">, but got &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2"> and </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="s2">"FrameBatch"</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="s2">&quot;FrameBatch&quot;</span><span class="p">]:</span>
         <span class="k">for</span> <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration_seconds</span>
         <span class="p">):</span>
@@ -1560,7 +1560,7 @@ document.write(`
                 <span class="n">duration_seconds</span><span class="o">=</span><span class="n">duration_seconds</span><span class="p">,</span>
             <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"FrameBatch"</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FrameBatch&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">FrameBatch</span><span class="p">(</span>
             <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">],</span>
             <span class="n">pts_seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="p">[</span><span class="n">key</span><span class="p">],</span>
@@ -1579,22 +1579,22 @@ document.write(`
 <a class="viewcode-back" href="../../generated/torchcodec.AudioSamples.html#torchcodec.AudioSamples">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">AudioSamples</span><span class="p">(</span><span class="n">Iterable</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Audio samples with associated metadata."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Audio samples with associated metadata.&quot;&quot;&quot;</span>
 
     <span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span>
-<span class="w">    </span><span class="sd">"""The sample data (``torch.Tensor`` of float in [-1, 1], shape is ``(num_channels, num_samples)``)."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The sample data (``torch.Tensor`` of float in [-1, 1], shape is ``(num_channels, num_samples)``).&quot;&quot;&quot;</span>
     <span class="n">pts_seconds</span><span class="p">:</span> <span class="nb">float</span>
-<span class="w">    </span><span class="sd">"""The :term:`pts` of the first sample, in seconds."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The :term:`pts` of the first sample, in seconds.&quot;&quot;&quot;</span>
     <span class="n">duration_seconds</span><span class="p">:</span> <span class="nb">float</span>
-<span class="w">    </span><span class="sd">"""The duration of the samples, in seconds."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The duration of the samples, in seconds.&quot;&quot;&quot;</span>
     <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span>
-<span class="w">    </span><span class="sd">"""The sample rate of the samples, in Hz."""</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The sample rate of the samples, in Hz.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># This is called after __init__() when a Frame is created. We can run</span>
         <span class="c1"># input validation checks here.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"data must be 2-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;data must be 2-dimensional, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pts_seconds</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
 

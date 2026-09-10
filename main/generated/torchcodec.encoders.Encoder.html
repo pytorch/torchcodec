@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Encoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>Encoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1186,7 +1186,7 @@ finally call <a class="reference internal" href="#torchcodec.encoders.Encoder.cl
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
 <span class="n">video_stream</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_video</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">frame_rate</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
 <span class="n">audio_stream</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_audio</span><span class="p">(</span><span class="n">sample_rate</span><span class="o">=</span><span class="mi">16000</span><span class="p">,</span> <span class="n">num_channels</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="k">with</span> <span class="n">encoder</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="s2">"output.mp4"</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">encoder</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="s2">&quot;output.mp4&quot;</span><span class="p">):</span>
     <span class="n">video_stream</span><span class="o">.</span><span class="n">add_frames</span><span class="p">(</span><span class="n">frames_tensor</span><span class="p">)</span>
     <span class="n">audio_stream</span><span class="o">.</span><span class="n">add_samples</span><span class="p">(</span><span class="n">samples_tensor</span><span class="p">)</span>
     <span class="c1"># Add more frames by calling video_stream.add_frames again</span>
@@ -1200,7 +1200,7 @@ finally call <a class="reference internal" href="#torchcodec.encoders.Encoder.cl
 <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
 <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
 <span class="n">video_stream</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_video</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">frame_rate</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
-<span class="k">with</span> <span class="n">encoder</span><span class="o">.</span><span class="n">open_file_like</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">"mp4"</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">encoder</span><span class="o">.</span><span class="n">open_file_like</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;mp4&quot;</span><span class="p">):</span>
     <span class="n">video_stream</span><span class="o">.</span><span class="n">add_frames</span><span class="p">(</span><span class="n">frames_tensor</span><span class="p">)</span>
 <span class="n">encoded_bytes</span> <span class="o">=</span> <span class="n">buf</span><span class="o">.</span><span class="n">getbuffer</span><span class="p">()</span>  <span class="c1"># or getvalue()</span>
 <span class="c1"># Optionally convert to a uint8 tensor of bytes with</span>

@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.decoders._video_decoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.decoders._video_decoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1482,7 +1482,7 @@ document.write(`
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.CpuFallbackStatus.html#torchcodec.decoders.CpuFallbackStatus">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">CpuFallbackStatus</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Information about CPU fallback status.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Information about CPU fallback status.</span>
 
 <span class="sd">    This class tracks whether the decoder fell back to CPU decoding.</span>
 <span class="sd">    Users should not instantiate this class directly; instead, access it</span>
@@ -1492,49 +1492,49 @@ document.write(`
 
 <span class="sd">    - Use ``str(cpu_fallback_status)`` or ``print(cpu_fallback_status)`` to see the cpu fallback status</span>
 <span class="sd">    - Use ``if cpu_fallback_status:`` to check if any fallback occurred</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">status_known</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="w">    </span><span class="sd">"""Whether the fallback status has been determined.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Whether the fallback status has been determined.</span>
 <span class="sd">    For the NVDEC CUDA backend (the default; see</span>
 <span class="sd">    :func:`~torchcodec.decoders.set_cuda_backend`), this is always ``True``</span>
 <span class="sd">    immediately after decoder creation. For the FFmpeg CUDA backend, this</span>
-<span class="sd">    becomes ``True`` after decoding the first frame."""</span>
+<span class="sd">    becomes ``True`` after decoding the first frame.&quot;&quot;&quot;</span>
     <span class="n">_nvcuvid_unavailable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">_video_not_supported</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">_is_fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="n">_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">_backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Returns True if fallback occurred."""</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns True if fallback occurred.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_known</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_fallback</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""Returns a human-readable string representation of the cpu fallback status."""</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a human-readable string representation of the cpu fallback status.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_known</span><span class="p">:</span>
-            <span class="k">return</span> <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: Unknown"</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: Unknown&quot;</span>
 
         <span class="n">reasons</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nvcuvid_unavailable</span><span class="p">:</span>
-            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"NVcuvid unavailable"</span><span class="p">)</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;NVcuvid unavailable&quot;</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_video_not_supported</span><span class="p">:</span>
-            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"Video not supported"</span><span class="p">)</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Video not supported&quot;</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_fallback</span><span class="p">:</span>
-            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"Unknown reason - try the 'nvdec' backend to know more!"</span><span class="p">)</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Unknown reason - try the &#39;nvdec&#39; backend to know more!&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">reasons</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: Falling back due to: "</span>
-                <span class="o">+</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">reasons</span><span class="p">)</span>
+                <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: Falling back due to: &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">reasons</span><span class="p">)</span>
             <span class="p">)</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: No fallback required"</span></div>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend</span><span class="si">}</span><span class="s2">] Fallback status: No fallback required&quot;</span></div>
 
 
 
 <div class="viewcode-block" id="VideoDecoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">VideoDecoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A single-stream video decoder.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single-stream video decoder.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``Pathlib.path``, bytes, ``torch.Tensor`` or file-like object): The source of the video:</span>
@@ -1550,7 +1550,7 @@ document.write(`
 <span class="sd">            Note that this index is absolute across all media types. If left unspecified, then</span>
 <span class="sd">            the :term:`best stream` is used.</span>
 <span class="sd">        dimension_order(str, optional): The dimension order of the decoded frames.</span>
-<span class="sd">            This can be either "NCHW" (default) or "NHWC", where N is the batch</span>
+<span class="sd">            This can be either &quot;NCHW&quot; (default) or &quot;NHWC&quot;, where N is the batch</span>
 <span class="sd">            size, C is the number of channels, H is the height, and W is the</span>
 <span class="sd">            width of the frames.</span>
 
@@ -1570,15 +1570,15 @@ document.write(`
 <span class="sd">            Default: 1.</span>
 <span class="sd">        device (str or torch.device, optional): The device to use for decoding.</span>
 <span class="sd">            If ``None`` (default), uses the current default device.</span>
-<span class="sd">            If you pass a CUDA device, decoding uses the ``"nvdec"`` backend by</span>
+<span class="sd">            If you pass a CUDA device, decoding uses the ``&quot;nvdec&quot;`` backend by</span>
 <span class="sd">            default. See :func:`~torchcodec.decoders.set_cuda_backend` to switch</span>
-<span class="sd">            to the ``"ffmpeg"`` CUDA backend.</span>
-<span class="sd">        seek_mode (str, optional): Determines if frame access will be "exact" or</span>
-<span class="sd">            "approximate". Exact guarantees that requesting frame i will always</span>
+<span class="sd">            to the ``&quot;ffmpeg&quot;`` CUDA backend.</span>
+<span class="sd">        seek_mode (str, optional): Determines if frame access will be &quot;exact&quot; or</span>
+<span class="sd">            &quot;approximate&quot;. Exact guarantees that requesting frame i will always</span>
 <span class="sd">            return frame i, but doing so requires an initial :term:`scan` of the</span>
 <span class="sd">            file. Approximate is faster as it avoids scanning the file, but less</span>
-<span class="sd">            accurate as it uses the file's metadata to calculate where i</span>
-<span class="sd">            probably is. Default: "exact".</span>
+<span class="sd">            accurate as it uses the file&#39;s metadata to calculate where i</span>
+<span class="sd">            probably is. Default: &quot;exact&quot;.</span>
 <span class="sd">            Read more about this parameter in:</span>
 <span class="sd">            :ref:`sphx_glr_generated_examples_decoding_approximate_mode.py`</span>
 <span class="sd">        transforms (sequence of transform objects, optional): Sequence of transforms to be</span>
@@ -1586,10 +1586,10 @@ document.write(`
 <span class="sd">            :class:`~torchcodec.transforms.DecoderTransform` and</span>
 <span class="sd">            :class:`~torchvision.transforms.v2.Transform`</span>
 <span class="sd">            objects. Read more about this parameter in :ref:`sphx_glr_generated_examples_decoding_transforms.py`.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): The dtype of the</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): The dtype of the</span>
 <span class="sd">            output frames. Supported values are ``torch.uint8`` with values in</span>
 <span class="sd">            [0, 255] (default), ``torch.float32`` with values in [0, 1], and</span>
-<span class="sd">            ``"auto"``. When ``"auto"`` is specified, the output dtype is</span>
+<span class="sd">            ``&quot;auto&quot;``. When ``&quot;auto&quot;`` is specified, the output dtype is</span>
 <span class="sd">            determined automatically based on the video content: uint8 for SDR</span>
 <span class="sd">            content, float32 for HDR content.</span>
 <span class="sd">            Read more about this parameter in:</span>
@@ -1599,7 +1599,7 @@ document.write(`
 <span class="sd">                The features associated with this parameter are in beta stage</span>
 <span class="sd">                and behavior may change in future versions. Specifically,</span>
 <span class="sd">                detecting whether a video is SDR or HDR is difficult, so the</span>
-<span class="sd">                "auto" heuristic is subject to change and improve.</span>
+<span class="sd">                &quot;auto&quot; heuristic is subject to change and improve.</span>
 
 <span class="sd">        custom_frame_mappings (str, bytes, or file-like object, optional):</span>
 <span class="sd">            Mapping of frames to their metadata, typically generated via ffprobe.</span>
@@ -1610,16 +1610,16 @@ document.write(`
 <span class="sd">            .. code-block:: json</span>
 
 <span class="sd">                {</span>
-<span class="sd">                    "frames": [</span>
+<span class="sd">                    &quot;frames&quot;: [</span>
 <span class="sd">                        {</span>
-<span class="sd">                            "pts": 0,</span>
-<span class="sd">                            "duration": 1001,</span>
-<span class="sd">                            "key_frame": 1</span>
+<span class="sd">                            &quot;pts&quot;: 0,</span>
+<span class="sd">                            &quot;duration&quot;: 1001,</span>
+<span class="sd">                            &quot;key_frame&quot;: 1</span>
 <span class="sd">                        }</span>
 <span class="sd">                    ]</span>
 <span class="sd">                }</span>
 
-<span class="sd">            Alternative field names "pkt_pts" and "pkt_duration" are also supported.</span>
+<span class="sd">            Alternative field names &quot;pkt_pts&quot; and &quot;pkt_duration&quot; are also supported.</span>
 <span class="sd">            Read more about this parameter in:</span>
 <span class="sd">            :ref:`sphx_glr_generated_examples_decoding_custom_frame_mappings.py`</span>
 
@@ -1632,55 +1632,55 @@ document.write(`
 <span class="sd">            decoding. Use ``bool(cpu_fallback)`` to check if fallback occurred, or</span>
 <span class="sd">            ``str(cpu_fallback)`` to get a human-readable status message. The status is only</span>
 <span class="sd">            determined after at least one frame has been decoded.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">Tensor</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">stream_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">dimension_order</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"NCHW"</span><span class="p">,</span> <span class="s2">"NHWC"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"NCHW"</span><span class="p">,</span>
+        <span class="n">dimension_order</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;NCHW&quot;</span><span class="p">,</span> <span class="s2">&quot;NHWC&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;NCHW&quot;</span><span class="p">,</span>
         <span class="n">num_ffmpeg_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">torch_device</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">seek_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"exact"</span><span class="p">,</span> <span class="s2">"approximate"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"exact"</span><span class="p">,</span>
+        <span class="n">seek_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span> <span class="s2">&quot;approximate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;exact&quot;</span><span class="p">,</span>
         <span class="n">transforms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">DecoderTransform</span> <span class="o">|</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
         <span class="n">custom_frame_mappings</span><span class="p">:</span> <span class="p">(</span>
             <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span> <span class="o">|</span> <span class="kc">None</span>
         <span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.decoders.VideoDecoder"</span><span class="p">)</span>
-        <span class="n">allowed_seek_modes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"exact"</span><span class="p">,</span> <span class="s2">"approximate"</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.decoders.VideoDecoder&quot;</span><span class="p">)</span>
+        <span class="n">allowed_seek_modes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;exact&quot;</span><span class="p">,</span> <span class="s2">&quot;approximate&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">seek_mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_seek_modes</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid seek mode (</span><span class="si">{</span><span class="n">seek_mode</span><span class="si">}</span><span class="s2">). "</span>
-                <span class="sa">f</span><span class="s2">"Supported values are </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">allowed_seek_modes</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid seek mode (</span><span class="si">{</span><span class="n">seek_mode</span><span class="si">}</span><span class="s2">). &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Supported values are </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">allowed_seek_modes</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
         <span class="c1"># Validate seek_mode and custom_frame_mappings are not mismatched</span>
-        <span class="k">if</span> <span class="n">custom_frame_mappings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">seek_mode</span> <span class="o">==</span> <span class="s2">"approximate"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">custom_frame_mappings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">seek_mode</span> <span class="o">==</span> <span class="s2">&quot;approximate&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"custom_frame_mappings is incompatible with seek_mode='approximate'. "</span>
-                <span class="s2">"Use seek_mode='custom_frame_mappings' or leave it unspecified to automatically use custom frame mappings."</span>
+                <span class="s2">&quot;custom_frame_mappings is incompatible with seek_mode=&#39;approximate&#39;. &quot;</span>
+                <span class="s2">&quot;Use seek_mode=&#39;custom_frame_mappings&#39; or leave it unspecified to automatically use custom frame mappings.&quot;</span>
             <span class="p">)</span>
 
         <span class="c1"># Auto-select custom_frame_mappings seek_mode and process data when mappings are provided</span>
         <span class="n">custom_frame_mappings_data</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">custom_frame_mappings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">seek_mode</span> <span class="o">=</span> <span class="s2">"custom_frame_mappings"</span>  <span class="c1"># type: ignore[assignment]</span>
+            <span class="n">seek_mode</span> <span class="o">=</span> <span class="s2">&quot;custom_frame_mappings&quot;</span>  <span class="c1"># type: ignore[assignment]</span>
             <span class="n">custom_frame_mappings_data</span> <span class="o">=</span> <span class="n">_read_custom_frame_mappings</span><span class="p">(</span>
                 <span class="n">custom_frame_mappings</span>
             <span class="p">)</span>
 
-        <span class="n">allowed_dimension_orders</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"NCHW"</span><span class="p">,</span> <span class="s2">"NHWC"</span><span class="p">)</span>
+        <span class="n">allowed_dimension_orders</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;NCHW&quot;</span><span class="p">,</span> <span class="s2">&quot;NHWC&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">dimension_order</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_dimension_orders</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid dimension order (</span><span class="si">{</span><span class="n">dimension_order</span><span class="si">}</span><span class="s2">). "</span>
-                <span class="sa">f</span><span class="s2">"Supported values are </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">allowed_dimension_orders</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid dimension order (</span><span class="si">{</span><span class="n">dimension_order</span><span class="si">}</span><span class="s2">). &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Supported values are </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">allowed_dimension_orders</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">num_ffmpeg_threads</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">num_ffmpeg_threads</span><span class="w"> </span><span class="si">= }</span><span class="s2"> should be an int."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">num_ffmpeg_threads</span><span class="w"> </span><span class="si">= }</span><span class="s2"> should be an int.&quot;</span><span class="p">)</span>
 
         <span class="n">output_dtype</span> <span class="o">=</span> <span class="n">convert_output_dtype_to_str</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
 
@@ -1688,14 +1688,14 @@ document.write(`
         <span class="n">device</span> <span class="o">=</span> <span class="n">convert_device_to_str</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="p">(</span>
-            <span class="n">device</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="n">device_variant</span> <span class="o">==</span> <span class="s2">"ffmpeg"</span>
-            <span class="ow">and</span> <span class="n">output_dtype</span> <span class="o">!=</span> <span class="s2">"uint8"</span>
+            <span class="n">device</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">device_variant</span> <span class="o">==</span> <span class="s2">&quot;ffmpeg&quot;</span>
+            <span class="ow">and</span> <span class="n">output_dtype</span> <span class="o">!=</span> <span class="s2">&quot;uint8&quot;</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"output_dtype=</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2"> is not supported with the 'ffmpeg' "</span>
-                <span class="sa">f</span><span class="s2">"CUDA backend. Only torch.uint8 is supported. Use the default "</span>
-                <span class="sa">f</span><span class="s2">"'nvdec' CUDA backend for non-uint8 output dtypes."</span>
+                <span class="sa">f</span><span class="s2">&quot;output_dtype=</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2"> is not supported with the &#39;ffmpeg&#39; &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;CUDA backend. Only torch.uint8 is supported. Use the default &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;&#39;nvdec&#39; CUDA backend for non-uint8 output dtypes.&quot;</span>
             <span class="p">)</span>
 
         <span class="p">(</span>
@@ -1719,20 +1719,20 @@ document.write(`
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">end_stream_seconds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># mypy.</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">num_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># mypy.</span>
 
-        <span class="n">_LG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"VideoDecoder created:</span><span class="se">\n</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">_LG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;VideoDecoder created:</span><span class="se">\n</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">begin_stream_seconds</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">end_stream_seconds</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">num_frames</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span> <span class="o">=</span> <span class="n">CpuFallbackStatus</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">device_variant</span> <span class="o">==</span> <span class="s2">"default"</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">"CUDA"</span>
+        <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">device_variant</span> <span class="o">==</span> <span class="s2">&quot;default&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">&quot;CUDA&quot;</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">"FFmpeg CUDA"</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">&quot;FFmpeg CUDA&quot;</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">"CPU"</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">=</span> <span class="s2">&quot;CPU&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span>
@@ -1743,21 +1743,21 @@ document.write(`
         <span class="c1"># either when:</span>
         <span class="c1"># - this @property has never been called before</span>
         <span class="c1"># - no frame has been decoded yet on the FFmpeg interface.</span>
-        <span class="c1"># Note that for the NVDEC interface, we're able to know the fallback</span>
+        <span class="c1"># Note that for the NVDEC interface, we&#39;re able to know the fallback</span>
         <span class="c1"># status right when the VideoDecoder is instantiated, but the</span>
         <span class="c1"># status_known attribute is initialized to False.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">status_known</span><span class="p">:</span>
             <span class="n">backend_details</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">_get_backend_details</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="s2">"status unknown"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;status unknown&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">status_known</span> <span class="o">=</span> <span class="kc">True</span>
 
-                <span class="k">if</span> <span class="s2">"CPU fallback"</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s2">&quot;CPU fallback&quot;</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_is_fallback</span> <span class="o">=</span> <span class="kc">True</span>
-                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">==</span> <span class="s2">"CUDA"</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_backend</span> <span class="o">==</span> <span class="s2">&quot;CUDA&quot;</span><span class="p">:</span>
                         <span class="c1"># Only the NVDEC interface can provide details.</span>
-                        <span class="c1"># if it's not that nvcuvid is missing, it must be video-specific</span>
-                        <span class="k">if</span> <span class="s2">"NVCUVID not available"</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
+                        <span class="c1"># if it&#39;s not that nvcuvid is missing, it must be video-specific</span>
+                        <span class="k">if</span> <span class="s2">&quot;NVCUVID not available&quot;</span> <span class="ow">in</span> <span class="n">backend_details</span><span class="p">:</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_nvcuvid_unavailable</span> <span class="o">=</span> <span class="kc">True</span>
                         <span class="k">else</span><span class="p">:</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_fallback</span><span class="o">.</span><span class="n">_video_not_supported</span> <span class="o">=</span> <span class="kc">True</span>
@@ -1785,7 +1785,7 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.__getitem__">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.__getitem__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Integral</span> <span class="o">|</span> <span class="nb">slice</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return frame or frames as tensors, at the given index or range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frame or frames as tensors, at the given index or range.</span>
 
 <span class="sd">        .. note::</span>
 
@@ -1801,14 +1801,14 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            torch.Tensor: The frame or frames at the given index or range.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Integral</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_getitem_int</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">slice</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_getitem_slice</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
 
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Unsupported key type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="si">}</span><span class="s2">. Supported types are int and slice."</span>
+            <span class="sa">f</span><span class="s2">&quot;Unsupported key type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="si">}</span><span class="s2">. Supported types are int and slice.&quot;</span>
         <span class="p">)</span></div>
 
 
@@ -1818,7 +1818,7 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_frame_at">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frame_at">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frame_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Frame</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return a single frame at the given index.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a single frame at the given index.</span>
 
 <span class="sd">        .. note::</span>
 
@@ -1834,7 +1834,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Frame: The frame at the given index.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frame_at_index</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">frame_index</span><span class="o">=</span><span class="n">index</span>
         <span class="p">)</span>
@@ -1848,14 +1848,14 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_frames_at">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frames_at">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return frames at the given indices.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frames at the given indices.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            indices (torch.Tensor or list of int): The indices of the frames to retrieve.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: The frames at the given indices.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_at_indices</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">frame_indices</span><span class="o">=</span><span class="n">indices</span>
@@ -1871,7 +1871,7 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_frames_in_range">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frames_in_range">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_in_range</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stop</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return multiple frames at the given index range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return multiple frames at the given index range.</span>
 
 <span class="sd">        Frames are in [start, stop).</span>
 
@@ -1883,7 +1883,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: The frames within the specified range.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Adjust start / stop indices to enable indexing semantics, ex. [-10, 1000] returns the last 10 frames</span>
         <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">step</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">step</span><span class="p">)</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_frames</span><span class="p">)</span>
         <span class="n">frames</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_in_range</span><span class="p">(</span>
@@ -1898,7 +1898,7 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_frame_played_at">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frame_played_at">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frame_played_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seconds</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Frame</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return a single frame played at the given timestamp in seconds.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a single frame played at the given timestamp in seconds.</span>
 
 <span class="sd">        .. note::</span>
 
@@ -1914,12 +1914,12 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Frame: The frame that is played at ``seconds``.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span> <span class="o">&lt;=</span> <span class="n">seconds</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid pts in seconds: </span><span class="si">{</span><span class="n">seconds</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="sa">f</span><span class="s2">"It must be greater than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span><span class="si">}</span><span class="s2"> "</span>
-                <span class="sa">f</span><span class="s2">"and less than </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid pts in seconds: </span><span class="si">{</span><span class="n">seconds</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;It must be greater than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;and less than </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frame_at_pts</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">seconds</span>
@@ -1934,14 +1934,14 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_frames_played_at">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_frames_played_at">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_played_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seconds</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return frames played at the given timestamps in seconds.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return frames played at the given timestamps in seconds.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            seconds (torch.Tensor or list of float): The timestamps in seconds when the frames are played.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: The frames that are played at ``seconds``.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">data</span><span class="p">,</span> <span class="n">pts_seconds</span><span class="p">,</span> <span class="n">duration_seconds</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_by_pts</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span> <span class="n">timestamps</span><span class="o">=</span><span class="n">seconds</span>
@@ -1958,10 +1958,10 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">get_frames_played_in_range</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">start_seconds</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">stop_seconds</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">fps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns multiple frames in the given range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns multiple frames in the given range.</span>
 
 <span class="sd">        Frames are in the half open range [start_seconds, stop_seconds). Each</span>
-<span class="sd">        returned frame's :term:`pts`, in seconds, is inside of the half open</span>
+<span class="sd">        returned frame&#39;s :term:`pts`, in seconds, is inside of the half open</span>
 <span class="sd">        range.</span>
 
 <span class="sd">        Args:</span>
@@ -1970,26 +1970,26 @@ document.write(`
 <span class="sd">                As a half open range, the end is excluded.</span>
 <span class="sd">            fps (float, optional): If specified, resample output to this frame</span>
 <span class="sd">                rate by duplicating or dropping frames as necessary. If None</span>
-<span class="sd">                (default), returns frames at the source video's frame rate.</span>
+<span class="sd">                (default), returns frames at the source video&#39;s frame rate.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: The frames within the specified range.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">start_seconds</span> <span class="o">&lt;=</span> <span class="n">stop_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="sa">f</span><span class="s2">"It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">)."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">).&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span> <span class="o">&lt;=</span> <span class="n">start_seconds</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="sa">f</span><span class="s2">"It must be greater than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span><span class="si">}</span><span class="s2"> "</span>
-                <span class="sa">f</span><span class="s2">"and less than </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;It must be greater than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;and less than </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">stop_seconds</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid stop seconds: </span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">. "</span>
-                <span class="sa">f</span><span class="s2">"It must be less than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid stop seconds: </span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;It must be less than or equal to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="n">frames</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">get_frames_by_pts_in_range</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span><span class="p">,</span>
@@ -2003,16 +2003,16 @@ document.write(`
 <div class="viewcode-block" id="VideoDecoder.get_all_frames">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.VideoDecoder.html#torchcodec.decoders.VideoDecoder.get_all_frames">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_all_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns all frames in the video.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns all frames in the video.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            fps (float, optional): If specified, resample output to this frame</span>
 <span class="sd">                rate by duplicating or dropping frames as necessary. If None</span>
-<span class="sd">                (default), returns frames at the source video's frame rate.</span>
+<span class="sd">                (default), returns frames at the source video&#39;s frame rate.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            FrameBatch: All frames in the video.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_frames_played_in_range</span><span class="p">(</span>
             <span class="n">start_seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_begin_stream_seconds</span><span class="p">,</span>
             <span class="n">stop_seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_end_stream_seconds</span><span class="p">,</span>
@@ -2025,7 +2025,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_custom_frame_mappings</span><span class="p">(</span>
     <span class="n">custom_frame_mappings</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Parse custom frame mappings from JSON data and extract frame metadata.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse custom frame mappings from JSON data and extract frame metadata.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        custom_frame_mappings: JSON data containing frame metadata, provided as:</span>
@@ -2037,46 +2037,46 @@ document.write(`
 <span class="sd">        - all_frames (Tensor): Presentation timestamps (PTS) for each frame</span>
 <span class="sd">        - is_key_frame (Tensor): Boolean tensor indicating which frames are key frames</span>
 <span class="sd">        - duration (Tensor): Duration of each frame</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">input_data</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">custom_frame_mappings</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">custom_frame_mappings</span><span class="p">,</span> <span class="s2">"read"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">custom_frame_mappings</span><span class="p">,</span> <span class="s2">&quot;read&quot;</span><span class="p">)</span>
             <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">custom_frame_mappings</span><span class="p">)</span>
         <span class="p">)</span>
     <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Invalid custom frame mappings: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">. It should be a valid JSON string or a file-like object."</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid custom frame mappings: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">. It should be a valid JSON string or a file-like object.&quot;</span>
         <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">input_data</span> <span class="ow">or</span> <span class="s2">"frames"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">input_data</span> <span class="ow">or</span> <span class="s2">&quot;frames&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">"Invalid custom frame mappings. The input is empty or missing the required 'frames' key."</span>
+            <span class="s2">&quot;Invalid custom frame mappings. The input is empty or missing the required &#39;frames&#39; key.&quot;</span>
         <span class="p">)</span>
 
-    <span class="n">first_frame</span> <span class="o">=</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">"frames"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-    <span class="n">pts_key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"pts"</span><span class="p">,</span> <span class="s2">"pkt_pts"</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">first_frame</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">first_frame</span> <span class="o">=</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">&quot;frames&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">pts_key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pts&quot;</span><span class="p">,</span> <span class="s2">&quot;pkt_pts&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">first_frame</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">duration_key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-        <span class="p">(</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"duration"</span><span class="p">,</span> <span class="s2">"pkt_duration"</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">first_frame</span><span class="p">),</span> <span class="kc">None</span>
+        <span class="p">(</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;duration&quot;</span><span class="p">,</span> <span class="s2">&quot;pkt_duration&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">first_frame</span><span class="p">),</span> <span class="kc">None</span>
     <span class="p">)</span>
-    <span class="n">key_frame_present</span> <span class="o">=</span> <span class="s2">"key_frame"</span> <span class="ow">in</span> <span class="n">first_frame</span>
+    <span class="n">key_frame_present</span> <span class="o">=</span> <span class="s2">&quot;key_frame&quot;</span> <span class="ow">in</span> <span class="n">first_frame</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">pts_key</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">duration_key</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">key_frame_present</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">"Invalid custom frame mappings. The 'pts'/'pkt_pts', 'duration'/'pkt_duration', and 'key_frame' keys are required in the frame metadata."</span>
+            <span class="s2">&quot;Invalid custom frame mappings. The &#39;pts&#39;/&#39;pkt_pts&#39;, &#39;duration&#39;/&#39;pkt_duration&#39;, and &#39;key_frame&#39; keys are required in the frame metadata.&quot;</span>
         <span class="p">)</span>
 
     <span class="n">all_frames</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
-        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">pts_key</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">"frames"</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span>
+        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">pts_key</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">&quot;frames&quot;</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span>
     <span class="p">)</span>
     <span class="n">is_key_frame</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
-        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">"key_frame"</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">"frames"</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;key_frame&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">&quot;frames&quot;</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
     <span class="p">)</span>
     <span class="n">duration</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
-        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">duration_key</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">"frames"</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span>
+        <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">duration_key</span><span class="p">])</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">input_data</span><span class="p">[</span><span class="s2">&quot;frames&quot;</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span>
     <span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">all_frames</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">is_key_frame</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">duration</span><span class="p">)):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Mismatched lengths in frame index data"</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mismatched lengths in frame index data&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">all_frames</span><span class="p">,</span> <span class="n">is_key_frame</span><span class="p">,</span> <span class="n">duration</span>
 </pre></div>
 

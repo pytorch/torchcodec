@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.decoders._wav_decoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.decoders._wav_decoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1470,7 +1470,7 @@ document.write(`
 <div class="viewcode-block" id="WavDecoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.WavDecoder.html#torchcodec.decoders.WavDecoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WavDecoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A fast decoder for WAV audio files.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A fast decoder for WAV audio files.</span>
 
 <span class="sd">    This is a lightweight, high-performance alternative to</span>
 <span class="sd">    :class:`~torchcodec.decoders.AudioDecoder` that is specialized for WAV</span>
@@ -1499,13 +1499,13 @@ document.write(`
 <span class="sd">    Attributes:</span>
 <span class="sd">        metadata (AudioStreamMetadata): Metadata of the audio stream.</span>
 <span class="sd">        stream_index (int): The stream index. Always 0 for WAV files.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedReader</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.decoders.WavDecoder"</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.decoders.WavDecoder&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_decoder</span> <span class="o">=</span> <span class="n">create_wav_decoder</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_source</span> <span class="o">=</span> <span class="n">source</span>
@@ -1515,29 +1515,29 @@ document.write(`
         <span class="n">metadata_dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">metadata_json</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">AudioStreamMetadata</span><span class="p">(</span>
-            <span class="n">sample_rate</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"sampleRate"</span><span class="p">],</span>
-            <span class="n">num_channels</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"numChannels"</span><span class="p">],</span>
-            <span class="n">sample_format</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"sampleFormat"</span><span class="p">],</span>
-            <span class="n">duration_seconds</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"durationSeconds"</span><span class="p">],</span>
-            <span class="n">stream_index</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"streamIndex"</span><span class="p">],</span>
-            <span class="n">codec</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"codec"</span><span class="p">],</span>
-            <span class="n">bit_rate</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"bitRate"</span><span class="p">],</span>
-            <span class="n">duration_seconds_from_header</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"durationSecondsFromHeader"</span><span class="p">],</span>
-            <span class="n">begin_stream_seconds</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">"beginStreamSeconds"</span><span class="p">],</span>
+            <span class="n">sample_rate</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;sampleRate&quot;</span><span class="p">],</span>
+            <span class="n">num_channels</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;numChannels&quot;</span><span class="p">],</span>
+            <span class="n">sample_format</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;sampleFormat&quot;</span><span class="p">],</span>
+            <span class="n">duration_seconds</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;durationSeconds&quot;</span><span class="p">],</span>
+            <span class="n">stream_index</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;streamIndex&quot;</span><span class="p">],</span>
+            <span class="n">codec</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;codec&quot;</span><span class="p">],</span>
+            <span class="n">bit_rate</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;bitRate&quot;</span><span class="p">],</span>
+            <span class="n">duration_seconds_from_header</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;durationSecondsFromHeader&quot;</span><span class="p">],</span>
+            <span class="n">begin_stream_seconds</span><span class="o">=</span><span class="n">metadata_dict</span><span class="p">[</span><span class="s2">&quot;beginStreamSeconds&quot;</span><span class="p">],</span>
             <span class="n">begin_stream_seconds_from_header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># WAV format lacks stream start time metadata</span>
         <span class="p">)</span>
 
 <div class="viewcode-block" id="WavDecoder.get_all_samples">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.WavDecoder.html#torchcodec.decoders.WavDecoder.get_all_samples">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_all_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudioSamples</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns all the audio samples from the source.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns all the audio samples from the source.</span>
 
 <span class="sd">        To decode samples in a specific range, use</span>
 <span class="sd">        :meth:`~torchcodec.decoders.WavDecoder.get_samples_played_in_range`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            AudioSamples: The samples within the file.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_samples_played_in_range</span><span class="p">()</span></div>
 
 
@@ -1546,7 +1546,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">get_samples_played_in_range</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">start_seconds</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">stop_seconds</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudioSamples</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Returns audio samples in the given range.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns audio samples in the given range.</span>
 
 <span class="sd">        Samples are in the half open range [start_seconds, stop_seconds).</span>
 
@@ -1565,10 +1565,10 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            AudioSamples: The samples within the specified range.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">stop_seconds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">start_seconds</span> <span class="o">&lt;=</span> <span class="n">stop_seconds</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">)."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid start seconds: </span><span class="si">{</span><span class="n">start_seconds</span><span class="si">}</span><span class="s2">. It must be less than or equal to stop seconds (</span><span class="si">{</span><span class="n">stop_seconds</span><span class="si">}</span><span class="s2">).&quot;</span>
             <span class="p">)</span>
 
         <span class="n">actual_start_seconds</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">start_seconds</span><span class="p">)</span>

@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.samplers._index_based &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.samplers._index_based &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1467,11 +1467,11 @@ document.write(`
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_validate_params_index_based</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">num_clips</span><span class="p">,</span> <span class="n">num_indices_between_frames</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">num_clips</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"num_clips (</span><span class="si">{</span><span class="n">num_clips</span><span class="si">}</span><span class="s2">) must be &gt; 0"</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_clips (</span><span class="si">{</span><span class="n">num_clips</span><span class="si">}</span><span class="s2">) must be &gt; 0&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">num_indices_between_frames</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"num_indices_between_frames (</span><span class="si">{</span><span class="n">num_indices_between_frames</span><span class="si">}</span><span class="s2">) must be strictly positive"</span>
+            <span class="sa">f</span><span class="s2">&quot;num_indices_between_frames (</span><span class="si">{</span><span class="n">num_indices_between_frames</span><span class="si">}</span><span class="s2">) must be strictly positive&quot;</span>
         <span class="p">)</span>
 
 
@@ -1488,8 +1488,8 @@ document.write(`
 
     <span class="k">if</span> <span class="n">sampling_range_start</span> <span class="o">&gt;=</span> <span class="n">num_frames_in_video</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"sampling_range_start (</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">) must be smaller than "</span>
-            <span class="sa">f</span><span class="s2">"the number of frames (</span><span class="si">{</span><span class="n">num_frames_in_video</span><span class="si">}</span><span class="s2">)."</span>
+            <span class="sa">f</span><span class="s2">&quot;sampling_range_start (</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">) must be smaller than &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;the number of frames (</span><span class="si">{</span><span class="n">num_frames_in_video</span><span class="si">}</span><span class="s2">).&quot;</span>
         <span class="p">)</span>
 
     <span class="n">clip_span</span> <span class="o">=</span> <span class="n">_get_clip_span</span><span class="p">(</span>
@@ -1501,9 +1501,9 @@ document.write(`
         <span class="n">sampling_range_end</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">num_frames_in_video</span> <span class="o">-</span> <span class="n">clip_span</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sampling_range_start</span> <span class="o">&gt;=</span> <span class="n">sampling_range_end</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"We determined that sampling_range_end should be </span><span class="si">{</span><span class="n">sampling_range_end</span><span class="si">}</span><span class="s2">, "</span>
-                <span class="s2">"but it is smaller than or equal to sampling_range_start "</span>
-                <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">)."</span>
+                <span class="sa">f</span><span class="s2">&quot;We determined that sampling_range_end should be </span><span class="si">{</span><span class="n">sampling_range_end</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="s2">&quot;but it is smaller than or equal to sampling_range_start &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">).&quot;</span>
             <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">sampling_range_end</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
@@ -1512,24 +1512,24 @@ document.write(`
         <span class="n">sampling_range_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sampling_range_end</span><span class="p">,</span> <span class="n">num_frames_in_video</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sampling_range_start</span> <span class="o">&gt;=</span> <span class="n">sampling_range_end</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"sampling_range_start (</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">) must be smaller than "</span>
-                <span class="sa">f</span><span class="s2">"sampling_range_end (</span><span class="si">{</span><span class="n">sampling_range_end</span><span class="si">}</span><span class="s2">)."</span>
+                <span class="sa">f</span><span class="s2">&quot;sampling_range_start (</span><span class="si">{</span><span class="n">sampling_range_start</span><span class="si">}</span><span class="s2">) must be smaller than &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;sampling_range_end (</span><span class="si">{</span><span class="n">sampling_range_end</span><span class="si">}</span><span class="s2">).&quot;</span>
             <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">sampling_range_start</span><span class="p">,</span> <span class="n">sampling_range_end</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_clip_span</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">num_indices_between_frames</span><span class="p">,</span> <span class="n">num_frames_per_clip</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Return the span of a clip, i.e. the number of frames (or indices)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the span of a clip, i.e. the number of frames (or indices)</span>
 <span class="sd">    between the first and last frame in the clip, both included.</span>
 
-<span class="sd">    This isn't the same as the number of frames in a clip!</span>
+<span class="sd">    This isn&#39;t the same as the number of frames in a clip!</span>
 <span class="sd">    Example: f means a frame in the clip, x means a frame excluded from the clip</span>
 <span class="sd">    num_frames_per_clip = 4</span>
 <span class="sd">    num_indices_between_frames = 1, clip = ffff      , span = 4</span>
 <span class="sd">    num_indices_between_frames = 2, clip = fxfxfxf   , span = 7</span>
 <span class="sd">    num_indices_between_frames = 3, clip = fxxfxxfxxf, span = 10</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">num_indices_between_frames</span> <span class="o">*</span> <span class="p">(</span><span class="n">num_frames_per_clip</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
 
 
@@ -1549,7 +1549,7 @@ document.write(`
     <span class="c1">#</span>
     <span class="c1"># All clips in the output are of length num_frames_per_clip (=4 in example</span>
     <span class="c1"># above). When the frame indices go beyond num_frames_in_video, we force the</span>
-    <span class="c1"># frame indices back to valid values by applying the user's policy (wrap,</span>
+    <span class="c1"># frame indices back to valid values by applying the user&#39;s policy (wrap,</span>
     <span class="c1"># repeat, etc.).</span>
     <span class="n">all_clips_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -1570,7 +1570,7 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_generic_index_based_sampler</span><span class="p">(</span>
-    <span class="n">kind</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"random"</span><span class="p">,</span> <span class="s2">"regular"</span><span class="p">],</span>
+    <span class="n">kind</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;random&quot;</span><span class="p">,</span> <span class="s2">&quot;regular&quot;</span><span class="p">],</span>
     <span class="n">decoder</span><span class="p">:</span> <span class="n">VideoDecoder</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">num_clips</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -1580,7 +1580,7 @@ document.write(`
     <span class="n">sampling_range_end</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># interval is [start, end).</span>
     <span class="c1"># Important note: sampling_range_end defines the upper bound of where a clip</span>
     <span class="c1"># can *start*, not where a clip can end.</span>
-    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"repeat_last"</span><span class="p">,</span> <span class="s2">"wrap"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">],</span>
+    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;repeat_last&quot;</span><span class="p">,</span> <span class="s2">&quot;wrap&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
 
     <span class="n">_validate_common_params</span><span class="p">(</span>
@@ -1601,7 +1601,7 @@ document.write(`
         <span class="n">num_frames_in_video</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">decoder</span><span class="p">),</span>
     <span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"random"</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;random&quot;</span><span class="p">:</span>
         <span class="n">clip_start_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span>
             <span class="n">low</span><span class="o">=</span><span class="n">sampling_range_start</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">sampling_range_end</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">num_clips</span><span class="p">,)</span>
         <span class="p">)</span>
@@ -1613,7 +1613,7 @@ document.write(`
         <span class="c1"># E.g. torch.linspace(0, 10, steps=20, dtype=torch.int) returns</span>
         <span class="c1"># 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10</span>
         <span class="c1"># Alternatively we could wrap around, but the current behavior is closer to</span>
-        <span class="c1"># the expected "equally spaced indices" sampling.</span>
+        <span class="c1"># the expected &quot;equally spaced indices&quot; sampling.</span>
         <span class="n">clip_start_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span>
             <span class="n">sampling_range_start</span><span class="p">,</span>
             <span class="n">sampling_range_end</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
@@ -1647,12 +1647,12 @@ document.write(`
     <span class="n">num_indices_between_frames</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">sampling_range_start</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
     <span class="n">sampling_range_end</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># interval is [start, end).</span>
-    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"repeat_last"</span><span class="p">,</span> <span class="s2">"wrap"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"repeat_last"</span><span class="p">,</span>
+    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;repeat_last&quot;</span><span class="p">,</span> <span class="s2">&quot;wrap&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;repeat_last&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
     <span class="c1"># See docstring below</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.samplers.clips_at_random_indices"</span><span class="p">)</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.samplers.clips_at_random_indices&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">_generic_index_based_sampler</span><span class="p">(</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"random"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;random&quot;</span><span class="p">,</span>
         <span class="n">decoder</span><span class="o">=</span><span class="n">decoder</span><span class="p">,</span>
         <span class="n">num_clips</span><span class="o">=</span><span class="n">num_clips</span><span class="p">,</span>
         <span class="n">num_frames_per_clip</span><span class="o">=</span><span class="n">num_frames_per_clip</span><span class="p">,</span>
@@ -1674,12 +1674,12 @@ document.write(`
     <span class="n">num_indices_between_frames</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">sampling_range_start</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
     <span class="n">sampling_range_end</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># interval is [start, end).</span>
-    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"repeat_last"</span><span class="p">,</span> <span class="s2">"wrap"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"repeat_last"</span><span class="p">,</span>
+    <span class="n">policy</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;repeat_last&quot;</span><span class="p">,</span> <span class="s2">&quot;wrap&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;repeat_last&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FrameBatch</span><span class="p">:</span>
     <span class="c1"># See docstring below</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.samplers.clips_at_regular_indices"</span><span class="p">)</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.samplers.clips_at_regular_indices&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">_generic_index_based_sampler</span><span class="p">(</span>
-        <span class="n">kind</span><span class="o">=</span><span class="s2">"regular"</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;regular&quot;</span><span class="p">,</span>
         <span class="n">decoder</span><span class="o">=</span><span class="n">decoder</span><span class="p">,</span>
         <span class="n">num_clips</span><span class="o">=</span><span class="n">num_clips</span><span class="p">,</span>
         <span class="n">num_frames_per_clip</span><span class="o">=</span><span class="n">num_frames_per_clip</span><span class="p">,</span>
@@ -1691,7 +1691,7 @@ document.write(`
 
 
 
-<span class="n">_COMMON_DOCS</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""</span>
+<span class="n">_COMMON_DOCS</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    Args:</span>
 <span class="s2">        decoder (VideoDecoder): The :class:`~torchcodec.decoders.VideoDecoder`</span>
 <span class="s2">            instance to sample clips from.</span>
@@ -1699,7 +1699,7 @@ document.write(`
 <span class="s2">        num_frames_per_clip (int, optional): The number of frames per clips. Default: 1.</span>
 <span class="s2">        num_indices_between_frames(int, optional): The number of indices between</span>
 <span class="s2">            the frames *within* a clip. Default: 1, which means frames are</span>
-<span class="s2">            consecutive. This is sometimes refered-to as "dilation".</span>
+<span class="s2">            consecutive. This is sometimes refered-to as &quot;dilation&quot;.</span>
 <span class="s2">        sampling_range_start (int, optional): The start of the sampling range,</span>
 <span class="s2">            which defines the first index that a clip may *start* at. Default:</span>
 <span class="s2">            0, i.e. the start of the video.</span>
@@ -1723,26 +1723,26 @@ document.write(`
 <span class="s2">            invalid indices, so the ``policy`` parameter defines how to replace</span>
 <span class="s2">            those frames, with valid indices:</span>
 
-<span class="s2">            - "repeat_last": repeats the last valid frame of the clip. We would</span>
+<span class="s2">            - &quot;repeat_last&quot;: repeats the last valid frame of the clip. We would</span>
 <span class="s2">              get [95, 97, 99, 99, 99].</span>
-<span class="s2">            - "wrap": wraps around to the beginning of the clip. We would get</span>
+<span class="s2">            - &quot;wrap&quot;: wraps around to the beginning of the clip. We would get</span>
 <span class="s2">              [95, 97, 99, 95, 97].</span>
-<span class="s2">            - "error": raises an error.</span>
+<span class="s2">            - &quot;error&quot;: raises an error.</span>
 
-<span class="s2">            Default is "repeat_last". Note that when ``sampling_range_end=None``</span>
+<span class="s2">            Default is &quot;repeat_last&quot;. Note that when ``sampling_range_end=None``</span>
 <span class="s2">            (default), this policy parameter is unlikely to be relevant.</span>
 
 <span class="s2">    </span><span class="si">{</span><span class="n">_FRAMEBATCH_RETURN_DOCS</span><span class="si">}</span>
-<span class="s2">"""</span>
+<span class="s2">&quot;&quot;&quot;</span>
 
-<span class="n">clips_at_random_indices</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""Sample :term:`clips` at random indices.</span>
+<span class="n">clips_at_random_indices</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;Sample :term:`clips` at random indices.</span>
 <span class="si">{</span><span class="n">_COMMON_DOCS</span><span class="si">}</span>
-<span class="s2">"""</span>
+<span class="s2">&quot;&quot;&quot;</span>
 
 
-<span class="n">clips_at_regular_indices</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""Sample :term:`clips` at regular (equally-spaced) indices.</span>
+<span class="n">clips_at_regular_indices</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;Sample :term:`clips` at regular (equally-spaced) indices.</span>
 <span class="si">{</span><span class="n">_COMMON_DOCS</span><span class="si">}</span>
-<span class="s2">"""</span>
+<span class="s2">&quot;&quot;&quot;</span>
 </pre></div>
 
                 </article>

@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.decoders._image_decoders &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.decoders._image_decoders &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1476,10 +1476,10 @@ document.write(`
 <div class="viewcode-block" id="ImageReadMode">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.ImageReadMode.html#torchcodec.decoders.ImageReadMode">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ImageReadMode</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Color mode for image decoding.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Color mode for image decoding.</span>
 
-<span class="sd">    You don't have to use this, you can just pass strings like "RGB" or "GRAY" instead.</span>
-<span class="sd">    """</span>
+<span class="sd">    You don&#39;t have to use this, you can just pass strings like &quot;RGB&quot; or &quot;GRAY&quot; instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">UNCHANGED</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">GRAY</span> <span class="o">=</span> <span class="mi">1</span>
@@ -1492,7 +1492,7 @@ document.write(`
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_mode</span><span class="p">(</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
     <span class="p">),</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImageReadMode</span><span class="p">:</span>
     <span class="c1"># Normalize the public `mode` argument (a case-insensitive string, or an</span>
@@ -1504,12 +1504,12 @@ document.write(`
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">ImageReadMode</span><span class="p">[</span><span class="n">mode</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
         <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-            <span class="n">valid</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">ImageReadMode</span><span class="p">)</span>
+            <span class="n">valid</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">ImageReadMode</span><span class="p">)</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Invalid mode </span><span class="si">{</span><span class="n">mode</span><span class="si">!r}</span><span class="s2">. Supported modes are </span><span class="si">{</span><span class="n">valid</span><span class="si">}</span><span class="s2"> "</span>
-                <span class="s2">"(case-insensitive)."</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid mode </span><span class="si">{</span><span class="n">mode</span><span class="si">!r}</span><span class="s2">. Supported modes are </span><span class="si">{</span><span class="n">valid</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="s2">&quot;(case-insensitive).&quot;</span>
             <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"mode must be a str (or ImageReadMode), got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;mode must be a str (or ImageReadMode), got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
@@ -1526,12 +1526,12 @@ document.write(`
         <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
             <span class="c1"># torch.frombuffer warns that the underlying buffer is non-writable;</span>
             <span class="c1"># we only read from the resulting tensor, so this is safe to ignore.</span>
-            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">UserWarning</span><span class="p">)</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">UserWarning</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
 
     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"Unknown source type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="si">}</span><span class="s2">. "</span>
-        <span class="s2">"Supported types are str, Path, bytes and torch.Tensor."</span>
+        <span class="sa">f</span><span class="s2">&quot;Unknown source type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+        <span class="s2">&quot;Supported types are str, Path, bytes and torch.Tensor.&quot;</span>
     <span class="p">)</span>
 
 
@@ -1558,7 +1558,7 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_rgb_to_gray</span><span class="p">(</span><span class="n">img</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-    <span class="c1"># ITU-R 601-2 luma weights, matching torchvision's rgb_to_grayscale.</span>
+    <span class="c1"># ITU-R 601-2 luma weights, matching torchvision&#39;s rgb_to_grayscale.</span>
     <span class="c1"># works on CHW and NCHW tensors.</span>
     <span class="n">weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.2989</span><span class="p">,</span> <span class="mf">0.587</span><span class="p">,</span> <span class="mf">0.114</span><span class="p">])</span>
     <span class="n">gray</span> <span class="o">=</span> <span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">*</span> <span class="n">weights</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -1587,19 +1587,19 @@ document.write(`
             <span class="k">return</span> <span class="n">_append_opaque_alpha</span><span class="p">(</span><span class="n">gray</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Reached an unexpected code path while decoding to mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">. "</span>
-            <span class="s2">"This should never happen, please report a bug to the TorchCodec repo."</span>
+            <span class="sa">f</span><span class="s2">&quot;Reached an unexpected code path while decoding to mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;This should never happen, please report a bug to the TorchCodec repo.&quot;</span>
         <span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="c1"># Validates output_dtype and returns the integer code understood by the C++</span>
     <span class="c1"># decoders. Must be kept in-sync with the OutputDtype enum in ImageCommon.h.</span>
-    <span class="n">output_dtype_to_code</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint16</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
+    <span class="n">output_dtype_to_code</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint16</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">output_dtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">output_dtype_to_code</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Invalid output_dtype (</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">). "</span>
-            <span class="s2">"Supported values are torch.uint8, torch.uint16, and 'auto'."</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid output_dtype (</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">). &quot;</span>
+            <span class="s2">&quot;Supported values are torch.uint8, torch.uint16, and &#39;auto&#39;.&quot;</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="n">output_dtype_to_code</span><span class="p">[</span><span class="n">output_dtype</span><span class="p">]</span>
 
@@ -1607,19 +1607,19 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_to_output_dtype</span><span class="p">(</span>
     <span class="n">decoded</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="nb">str</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="s2">"auto"</span> <span class="ow">or</span> <span class="n">decoded</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">output_dtype</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span> <span class="ow">or</span> <span class="n">decoded</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">output_dtype</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">decoded</span>
     <span class="k">elif</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint16</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">decoded</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Oops, please report a bug to the TorchCodec repo."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Oops, please report a bug to the TorchCodec repo.&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span> <span class="o">*</span> <span class="mi">257</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">decoded</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint16</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Oops, please report a bug to the TorchCodec repo."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Oops, please report a bug to the TorchCodec repo.&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="mi">257</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">()</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"This should never happen, please report a bug to the TorchCodec repo."</span>
+            <span class="s2">&quot;This should never happen, please report a bug to the TorchCodec repo.&quot;</span>
         <span class="p">)</span>
 
 
@@ -1639,8 +1639,8 @@ document.write(`
         <span class="n">decoded</span> <span class="o">=</span> <span class="n">_decode_jpegs_cuda</span><span class="p">(</span><span class="n">tensors</span><span class="p">,</span> <span class="n">ImageReadMode</span><span class="o">.</span><span class="n">GRAY</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">[</span><span class="n">_append_opaque_alpha</span><span class="p">(</span><span class="n">img</span><span class="p">)</span> <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">decoded</span><span class="p">]</span>
     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"Reached an unexpected code path while decoding to mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">. "</span>
-        <span class="s2">"This should never happen, please report a bug to the TorchCodec repo."</span>
+        <span class="sa">f</span><span class="s2">&quot;Reached an unexpected code path while decoding to mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">. &quot;</span>
+        <span class="s2">&quot;This should never happen, please report a bug to the TorchCodec repo.&quot;</span>
     <span class="p">)</span>
 
 
@@ -1650,19 +1650,19 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">list</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
-    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Decode a JPEG image into a ``CHW`` tensor, on CPU or CUDA.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a JPEG image into a ``CHW`` tensor, on CPU or CUDA.</span>
 
 <span class="sd">    .. note::</span>
 
 <span class="sd">        For CUDA decoding, prefer passing a batch (a list of sources) in a</span>
 <span class="sd">        single call: the whole batch is decoded in one nvJPEG call, which is</span>
 <span class="sd">        much faster than decoding images one at a time.</span>
-<span class="sd">        Passing a batch of sources is supported on CPU too, but it won't be</span>
+<span class="sd">        Passing a batch of sources is supported on CPU too, but it won&#39;t be</span>
 <span class="sd">        faster than decoding them one at a time.</span>
 
 <span class="sd">    Example:</span>
@@ -1671,8 +1671,8 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_jpeg</span>
 
-<span class="sd">            img = decode_jpeg("image.jpg")</span>
-<span class="sd">            img = decode_jpeg("image.jpg", device="cuda")  # decode on GPU</span>
+<span class="sd">            img = decode_jpeg(&quot;image.jpg&quot;)</span>
+<span class="sd">            img = decode_jpeg(&quot;image.jpg&quot;, device=&quot;cuda&quot;)  # decode on GPU</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, ``torch.Tensor``, or list of these):</span>
@@ -1682,15 +1682,15 @@ document.write(`
 <span class="sd">            tensors is returned instead of a single tensor. The encoded bytes must</span>
 <span class="sd">            live on CPU, even when decoding to a CUDA device.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. Since JPEG is an 8-bit format,</span>
-<span class="sd">            ``"auto"`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. Since JPEG is an 8-bit format,</span>
+<span class="sd">            ``&quot;auto&quot;`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
 <span class="sd">            emulates a 16-bit output by scaling the 8-bit values to the full</span>
 <span class="sd">            16-bit range (0-255 -&gt; 0-65535).</span>
-<span class="sd">        device (str or torch.device, optional): Device to decode on, ``"cpu"``</span>
+<span class="sd">        device (str or torch.device, optional): Device to decode on, ``&quot;cpu&quot;``</span>
 <span class="sd">            (default) or a CUDA device. CUDA decoding uses nvJPEG. We recommend</span>
 <span class="sd">            passing a batch of sources when decoding on CUDA, for speed.</span>
 
@@ -1698,7 +1698,7 @@ document.write(`
 <span class="sd">        torch.Tensor or list of torch.Tensor of shape ``C, H, W``: The decoded</span>
 <span class="sd">        image(s). A single tensor for a single source, or a list of tensors for</span>
 <span class="sd">        a batch.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -1706,7 +1706,7 @@ document.write(`
     <span class="n">is_batch</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
     <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_batch</span> <span class="k">else</span> <span class="p">[</span><span class="n">source</span><span class="p">]</span>  <span class="c1"># type: ignore[arg-type]</span>
 
-    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cpu&quot;</span><span class="p">:</span>
         <span class="n">decoded_list</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">_to_output_dtype</span><span class="p">(</span>
                 <span class="n">_decode_to_mode</span><span class="p">(</span>
@@ -1734,11 +1734,11 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode a PNG image into a ``CHW`` tensor.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a PNG image into a ``CHW`` tensor.</span>
 
 <span class="sd">    Example:</span>
 
@@ -1746,7 +1746,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_png</span>
 
-<span class="sd">            img = decode_png("image.png")</span>
+<span class="sd">            img = decode_png(&quot;image.png&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -1754,19 +1754,19 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. PNG images can natively store</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. PNG images can natively store</span>
 <span class="sd">            16-bit samples: ``torch.uint16`` preserves that precision (8-bit</span>
 <span class="sd">            sources are scaled up, 0-255 -&gt; 0-65535), while ``torch.uint8``</span>
-<span class="sd">            scales 16-bit sources down. ``"auto"`` keeps the source's native bit</span>
+<span class="sd">            scales 16-bit sources down. ``&quot;auto&quot;`` keeps the source&#39;s native bit</span>
 <span class="sd">            depth, yielding uint8 for 8-bit PNGs and uint16 for 16-bit ones.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``(C, H, W)``.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">output_dtype_code</span> <span class="o">=</span> <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
@@ -1785,11 +1785,11 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode a WebP image into a ``[N]CHW`` tensor.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a WebP image into a ``[N]CHW`` tensor.</span>
 
 <span class="sd">    The output shape is ``(C, H, W)`` for a still WebP and ``(N, C, H, W)`` for</span>
 <span class="sd">    an animated one (N frames).</span>
@@ -1800,7 +1800,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_webp</span>
 
-<span class="sd">            img = decode_webp("image.webp")</span>
+<span class="sd">            img = decode_webp(&quot;image.webp&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -1808,19 +1808,19 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. Since WebP is an 8-bit format,</span>
-<span class="sd">            ``"auto"`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. Since WebP is an 8-bit format,</span>
+<span class="sd">            ``&quot;auto&quot;`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
 <span class="sd">            emulates a 16-bit output by scaling the 8-bit values to the full</span>
 <span class="sd">            16-bit range (0-255 -&gt; 0-65535).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``(C, H, W)`` (still) or</span>
 <span class="sd">        ``(N, C, H, W)`` (animated).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
@@ -1835,11 +1835,11 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode a GIF image into a ``[N]CHW`` tensor.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a GIF image into a ``[N]CHW`` tensor.</span>
 
 <span class="sd">    The output shape is ``(C, H, W)`` for a still GIF and ``(N, C, H, W)`` for</span>
 <span class="sd">    an animated one (N frames).</span>
@@ -1850,7 +1850,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_gif</span>
 
-<span class="sd">            img = decode_gif("image.gif")</span>
+<span class="sd">            img = decode_gif(&quot;image.gif&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -1858,19 +1858,19 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. Since GIF is an 8-bit format,</span>
-<span class="sd">            ``"auto"`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. Since GIF is an 8-bit format,</span>
+<span class="sd">            ``&quot;auto&quot;`` and ``torch.uint8`` are equivalent. ``torch.uint16``</span>
 <span class="sd">            emulates a 16-bit output by scaling the 8-bit values to the full</span>
 <span class="sd">            16-bit range (0-255 -&gt; 0-65535).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``(C, H, W)`` (still) or</span>
 <span class="sd">        ``(N, C, H, W)`` (animated).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
@@ -1885,12 +1885,12 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
     <span class="n">num_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode an AVIF image into a ``[N]CHW`` tensor.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode an AVIF image into a ``[N]CHW`` tensor.</span>
 
 <span class="sd">    The output shape is ``(C, H, W)`` for a still AVIF and ``(N, C, H, W)`` for</span>
 <span class="sd">    an animated one (N frames).</span>
@@ -1901,7 +1901,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_avif</span>
 
-<span class="sd">            img = decode_avif("image.avif")</span>
+<span class="sd">            img = decode_avif(&quot;image.avif&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -1909,15 +1909,15 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. AVIF can store more than 8 bits per</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. AVIF can store more than 8 bits per</span>
 <span class="sd">            channel (e.g. 10- or 12-bit sources). ``torch.uint16`` always scales</span>
 <span class="sd">            the samples up to fill the full 16-bit range ``[0, 65535]`` (8-bit</span>
 <span class="sd">            0-255, 10-bit 0-1023 and 12-bit 0-4095 sources are all upscaled),</span>
-<span class="sd">            while ``torch.uint8`` scales higher-bit sources down. ``"auto"``</span>
+<span class="sd">            while ``torch.uint8`` scales higher-bit sources down. ``&quot;auto&quot;``</span>
 <span class="sd">            yields uint8 for 8-bit AVIFs and uint16 (again filling ``[0, 65535]``)</span>
 <span class="sd">            for higher-bit ones.</span>
 <span class="sd">        num_threads (int, optional): Number of threads to use for decoding,</span>
@@ -1926,7 +1926,7 @@ document.write(`
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``(C, H, W)`` (still) or</span>
 <span class="sd">        ``(N, C, H, W)`` (animated).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">output_dtype_code</span> <span class="o">=</span> <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
@@ -1945,11 +1945,11 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode an HEIC/HEIF image into a ``[N]CHW`` tensor - requires ``libheif``!</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode an HEIC/HEIF image into a ``[N]CHW`` tensor - requires ``libheif``!</span>
 
 <span class="sd">    The output shape is ``(C, H, W)`` for a single-image HEIC and</span>
 <span class="sd">    ``(N, C, H, W)`` for a multi-image one. All images must share the same</span>
@@ -1967,7 +1967,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_heic</span>
 
-<span class="sd">            img = decode_heic("image.heic")</span>
+<span class="sd">            img = decode_heic(&quot;image.heic&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -1975,22 +1975,22 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. HEIC can store more than 8 bits per</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. HEIC can store more than 8 bits per</span>
 <span class="sd">            channel (e.g. 10- or 12-bit sources). ``torch.uint16`` always scales</span>
 <span class="sd">            the samples up to fill the full 16-bit range ``[0, 65535]`` (8-bit</span>
 <span class="sd">            0-255, 10-bit 0-1023 and 12-bit 0-4095 sources are all upscaled),</span>
-<span class="sd">            while ``torch.uint8`` scales higher-bit sources down. ``"auto"``</span>
+<span class="sd">            while ``torch.uint8`` scales higher-bit sources down. ``&quot;auto&quot;``</span>
 <span class="sd">            yields uint8 for 8-bit HEICs and uint16 (again filling ``[0, 65535]``)</span>
 <span class="sd">            for higher-bit ones.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``(C, H, W)`` (single-image)</span>
 <span class="sd">        or ``(N, C, H, W)`` (multi-image).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">output_dtype_code</span> <span class="o">=</span> <span class="n">_validate_output_dtype</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">)</span>
     <span class="n">mode</span> <span class="o">=</span> <span class="n">_normalize_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
@@ -2006,48 +2006,48 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_detect_image_format</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="c1"># Sniff the codec from the leading "magic" bytes of the encoded data.</span>
+    <span class="c1"># Sniff the codec from the leading &quot;magic&quot; bytes of the encoded data.</span>
     <span class="c1"># This used to be implemented in C++ in torchvision, but benchmarks show</span>
     <span class="c1"># this is negligible in Python</span>
     <span class="n">header</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">[:</span><span class="mi">64</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
-    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\xff\xd8\xff</span><span class="s2">"</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">"jpeg"</span>
-    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">8</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\x89</span><span class="s2">PNG</span><span class="se">\r\n\x1a\n</span><span class="s2">"</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">"png"</span>
-    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="sa">b</span><span class="s2">"GIF87a"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"GIF89a"</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">"gif"</span>
-    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">4</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"RIFF"</span> <span class="ow">and</span> <span class="n">header</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"WEBP"</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">"webp"</span>
-    <span class="k">if</span> <span class="n">header</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">8</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"ftyp"</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\xff\xd8\xff</span><span class="s2">&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;jpeg&quot;</span>
+    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">8</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x89</span><span class="s2">PNG</span><span class="se">\r\n\x1a\n</span><span class="s2">&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;png&quot;</span>
+    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="sa">b</span><span class="s2">&quot;GIF87a&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;GIF89a&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;gif&quot;</span>
+    <span class="k">if</span> <span class="n">header</span><span class="p">[:</span><span class="mi">4</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;RIFF&quot;</span> <span class="ow">and</span> <span class="n">header</span><span class="p">[</span><span class="mi">8</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;WEBP&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;webp&quot;</span>
+    <span class="k">if</span> <span class="n">header</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">8</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;ftyp&quot;</span><span class="p">:</span>
         <span class="c1"># ISOBMFF container (AVIF/HEIC/...). The major brand is at [8:12], with</span>
-        <span class="c1"># compatible brands following. AVIF uses the "avif" (still) or "avis"</span>
-        <span class="c1"># (animated) brands; HEIC/HEIF uses "heic"/"heix" (HEVC-coded) and the</span>
-        <span class="c1"># generic "mif1"/"msf1" brands. We check avif first (it can also carry</span>
+        <span class="c1"># compatible brands following. AVIF uses the &quot;avif&quot; (still) or &quot;avis&quot;</span>
+        <span class="c1"># (animated) brands; HEIC/HEIF uses &quot;heic&quot;/&quot;heix&quot; (HEVC-coded) and the</span>
+        <span class="c1"># generic &quot;mif1&quot;/&quot;msf1&quot; brands. We check avif first (it can also carry</span>
         <span class="c1"># mif1/msf1), then fall back to the HEIC-specific brands.</span>
         <span class="n">brands</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="mi">8</span><span class="p">:]</span>
-        <span class="k">if</span> <span class="sa">b</span><span class="s2">"avif"</span> <span class="ow">in</span> <span class="n">brands</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">"avis"</span> <span class="ow">in</span> <span class="n">brands</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">"avif"</span>
+        <span class="k">if</span> <span class="sa">b</span><span class="s2">&quot;avif&quot;</span> <span class="ow">in</span> <span class="n">brands</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;avis&quot;</span> <span class="ow">in</span> <span class="n">brands</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;avif&quot;</span>
         <span class="k">if</span> <span class="p">(</span>
-            <span class="sa">b</span><span class="s2">"heic"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"heix"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"heim"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"heis"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"hevc"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"hevx"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"mif1"</span> <span class="ow">in</span> <span class="n">brands</span>
-            <span class="ow">or</span> <span class="sa">b</span><span class="s2">"msf1"</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="sa">b</span><span class="s2">&quot;heic&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;heix&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;heim&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;heis&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;hevc&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;hevx&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;mif1&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
+            <span class="ow">or</span> <span class="sa">b</span><span class="s2">&quot;msf1&quot;</span> <span class="ow">in</span> <span class="n">brands</span>
         <span class="p">):</span>
-            <span class="k">return</span> <span class="s2">"heic"</span>
+            <span class="k">return</span> <span class="s2">&quot;heic&quot;</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-        <span class="s2">"Unsupported or unrecognized image format. Supported formats are "</span>
-        <span class="s2">"JPEG, PNG, WebP, GIF, AVIF and HEIC. If you know you have a valid "</span>
-        <span class="s2">"image, try using the dedicated decode_* functions like decode_jpeg() "</span>
-        <span class="s2">"instead."</span>
+        <span class="s2">&quot;Unsupported or unrecognized image format. Supported formats are &quot;</span>
+        <span class="s2">&quot;JPEG, PNG, WebP, GIF, AVIF and HEIC. If you know you have a valid &quot;</span>
+        <span class="s2">&quot;image, try using the dedicated decode_* functions like decode_jpeg() &quot;</span>
+        <span class="s2">&quot;instead.&quot;</span>
     <span class="p">)</span>
 
 
 <span class="c1"># Design note: the parameters of decode_image must apply to *all* codecs</span>
-<span class="c1"># uniformly. That's why all modes are supported by decode_image even though not</span>
+<span class="c1"># uniformly. That&#39;s why all modes are supported by decode_image even though not</span>
 <span class="c1"># all codec would natively support all mode - e.g. jpeg has no alpha support, so</span>
 <span class="c1"># we prepend an opaque alpha channel as a post-processing step. As a resut, all</span>
 <span class="c1"># codec-specific entry points like decode_jpeg, decode_png etc. must still</span>
@@ -2060,11 +2060,11 @@ document.write(`
     <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">"UNCHANGED"</span><span class="p">,</span> <span class="s2">"GRAY"</span><span class="p">,</span> <span class="s2">"GRAY_ALPHA"</span><span class="p">,</span> <span class="s2">"RGB"</span><span class="p">,</span> <span class="s2">"RGB_ALPHA"</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="s2">"RGB"</span><span class="p">,</span>
-    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"auto"</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;UNCHANGED&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY&quot;</span><span class="p">,</span> <span class="s2">&quot;GRAY_ALPHA&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span> <span class="s2">&quot;RGB_ALPHA&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">ImageReadMode</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span><span class="p">,</span>
+    <span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Decode an image into a ``[N]CHW`` tensor, detecting the format automatically.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode an image into a ``[N]CHW`` tensor, detecting the format automatically.</span>
 
 <span class="sd">    The format is detected from the encoded data (not the file extension), and</span>
 <span class="sd">    decoding is delegated to the matching format-specific decoder. Supported</span>
@@ -2083,8 +2083,8 @@ document.write(`
 
 <span class="sd">            from torchcodec.decoders import decode_image</span>
 
-<span class="sd">            jpeg_img = decode_image("image.jpg")</span>
-<span class="sd">            png_img = decode_image("image.png")</span>
+<span class="sd">            jpeg_img = decode_image(&quot;image.jpg&quot;)</span>
+<span class="sd">            png_img = decode_image(&quot;image.png&quot;)</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        source (str, ``pathlib.Path``, bytes, or ``torch.Tensor``):</span>
@@ -2092,26 +2092,26 @@ document.write(`
 <span class="sd">            ``bytes`` object, or a 1-D uint8 ``torch.Tensor`` of the raw encoded</span>
 <span class="sd">            bytes.</span>
 <span class="sd">        mode (str or ImageReadMode, optional): Desired color mode of the output</span>
-<span class="sd">            image. Can be one of ``"UNCHANGED"``, ``"GRAY"``, ``"GRAY_ALPHA"``,</span>
-<span class="sd">            ``"RGB"``, or ``"RGB_ALPHA"``. Default is ``"RGB"``.</span>
-<span class="sd">        output_dtype (torch.dtype or ``"auto"``, optional): desired dtype of the</span>
+<span class="sd">            image. Can be one of ``&quot;UNCHANGED&quot;``, ``&quot;GRAY&quot;``, ``&quot;GRAY_ALPHA&quot;``,</span>
+<span class="sd">            ``&quot;RGB&quot;``, or ``&quot;RGB_ALPHA&quot;``. Default is ``&quot;RGB&quot;``.</span>
+<span class="sd">        output_dtype (torch.dtype or ``&quot;auto&quot;``, optional): desired dtype of the</span>
 <span class="sd">            output image tensor. Accepted values are ``torch.uint8`` (default),</span>
-<span class="sd">            ``torch.uint16``, and ``"auto"``. Formats that can carry more than 8</span>
+<span class="sd">            ``torch.uint16``, and ``&quot;auto&quot;``. Formats that can carry more than 8</span>
 <span class="sd">            bits per channel (PNG, AVIF, HEIC) preserve that precision with</span>
-<span class="sd">            ``torch.uint16`` and ``"auto"``. See the format-specific decoders</span>
+<span class="sd">            ``torch.uint16`` and ``&quot;auto&quot;``. See the format-specific decoders</span>
 <span class="sd">            for details.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.Tensor: The decoded image, of shape ``[N]CHW``.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">_source_to_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
     <span class="n">format_to_decoder</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">"jpeg"</span><span class="p">:</span> <span class="n">decode_jpeg</span><span class="p">,</span>
-        <span class="s2">"png"</span><span class="p">:</span> <span class="n">decode_png</span><span class="p">,</span>
-        <span class="s2">"webp"</span><span class="p">:</span> <span class="n">decode_webp</span><span class="p">,</span>
-        <span class="s2">"gif"</span><span class="p">:</span> <span class="n">decode_gif</span><span class="p">,</span>
-        <span class="s2">"avif"</span><span class="p">:</span> <span class="n">decode_avif</span><span class="p">,</span>
-        <span class="s2">"heic"</span><span class="p">:</span> <span class="n">decode_heic</span><span class="p">,</span>
+        <span class="s2">&quot;jpeg&quot;</span><span class="p">:</span> <span class="n">decode_jpeg</span><span class="p">,</span>
+        <span class="s2">&quot;png&quot;</span><span class="p">:</span> <span class="n">decode_png</span><span class="p">,</span>
+        <span class="s2">&quot;webp&quot;</span><span class="p">:</span> <span class="n">decode_webp</span><span class="p">,</span>
+        <span class="s2">&quot;gif&quot;</span><span class="p">:</span> <span class="n">decode_gif</span><span class="p">,</span>
+        <span class="s2">&quot;avif&quot;</span><span class="p">:</span> <span class="n">decode_avif</span><span class="p">,</span>
+        <span class="s2">&quot;heic&quot;</span><span class="p">:</span> <span class="n">decode_heic</span><span class="p">,</span>
     <span class="p">}</span>
     <span class="n">fmt</span> <span class="o">=</span> <span class="n">_detect_image_format</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">format_to_decoder</span><span class="p">[</span><span class="n">fmt</span><span class="p">](</span><span class="n">data</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">output_dtype</span><span class="o">=</span><span class="n">output_dtype</span><span class="p">)</span>  <span class="c1"># type: ignore[operator]</span></div>

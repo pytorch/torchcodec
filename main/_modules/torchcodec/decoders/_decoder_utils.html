@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.decoders._decoder_utils &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.decoders._decoder_utils &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1468,7 +1468,7 @@ document.write(`
 
 <span class="c1"># Thread-local and async-safe storage for the current CUDA backend</span>
 <span class="n">_CUDA_BACKEND</span><span class="p">:</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">contextvars</span><span class="o">.</span><span class="n">ContextVar</span><span class="p">(</span>
-    <span class="s2">"_CUDA_BACKEND"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">"default"</span>
+    <span class="s2">&quot;_CUDA_BACKEND&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;default&quot;</span>
 <span class="p">)</span>
 
 
@@ -1476,45 +1476,45 @@ document.write(`
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.set_cuda_backend.html#torchcodec.decoders.set_cuda_backend">[docs]</a>
 <span class="nd">@contextmanager</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">set_cuda_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Context Manager to set the CUDA backend for :class:`~torchcodec.decoders.VideoDecoder`.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context Manager to set the CUDA backend for :class:`~torchcodec.decoders.VideoDecoder`.</span>
 
 <span class="sd">    This context manager allows you to specify which CUDA backend implementation</span>
 <span class="sd">    to use when creating :class:`~torchcodec.decoders.VideoDecoder` instances</span>
 <span class="sd">    with CUDA devices.</span>
 
-<span class="sd">    The default is ``"nvdec"``. An ``"ffmpeg"`` backend is also available.</span>
+<span class="sd">    The default is ``&quot;nvdec&quot;``. An ``&quot;ffmpeg&quot;`` backend is also available.</span>
 
 <span class="sd">    Only the creation of the decoder needs to be inside the context manager, the</span>
 <span class="sd">    decoding methods can be called outside of it. You still need to pass</span>
-<span class="sd">    ``device="cuda"`` when creating the</span>
-<span class="sd">    :class:`~torchcodec.decoders.VideoDecoder` instance. If a CUDA device isn't</span>
+<span class="sd">    ``device=&quot;cuda&quot;`` when creating the</span>
+<span class="sd">    :class:`~torchcodec.decoders.VideoDecoder` instance. If a CUDA device isn&#39;t</span>
 <span class="sd">    specified, this context manager will have no effect. See example below.</span>
 
 <span class="sd">    This is thread-safe and async-safe.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        backend (str): The CUDA backend to use. Can be ``"nvdec"`` (default) or</span>
-<span class="sd">            ``"ffmpeg"``.</span>
+<span class="sd">        backend (str): The CUDA backend to use. Can be ``&quot;nvdec&quot;`` (default) or</span>
+<span class="sd">            ``&quot;ffmpeg&quot;``.</span>
 
 <span class="sd">    Example:</span>
-<span class="sd">        &gt;&gt;&gt; with set_cuda_backend("ffmpeg"):</span>
-<span class="sd">        ...     decoder = VideoDecoder("video.mp4", device="cuda")</span>
+<span class="sd">        &gt;&gt;&gt; with set_cuda_backend(&quot;ffmpeg&quot;):</span>
+<span class="sd">        ...     decoder = VideoDecoder(&quot;video.mp4&quot;, device=&quot;cuda&quot;)</span>
 <span class="sd">        ...</span>
 <span class="sd">        ... # Only the decoder creation needs to be part of the context manager.</span>
 <span class="sd">        ... # Decoder will use the FFmpeg CUDA implementation:</span>
 <span class="sd">        ... decoder.get_frame_at(0)</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">backend</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"beta"</span><span class="p">:</span>  <span class="c1"># For BC</span>
-        <span class="n">backend</span> <span class="o">=</span> <span class="s2">"nvdec"</span>
-    <span class="k">if</span> <span class="n">backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"nvdec"</span><span class="p">,</span> <span class="s2">"ffmpeg"</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">&quot;beta&quot;</span><span class="p">:</span>  <span class="c1"># For BC</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="s2">&quot;nvdec&quot;</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;nvdec&quot;</span><span class="p">,</span> <span class="s2">&quot;ffmpeg&quot;</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Invalid CUDA backend (</span><span class="si">{</span><span class="n">backend</span><span class="si">}</span><span class="s2">). Supported values are 'nvdec' and 'ffmpeg'."</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid CUDA backend (</span><span class="si">{</span><span class="n">backend</span><span class="si">}</span><span class="s2">). Supported values are &#39;nvdec&#39; and &#39;ffmpeg&#39;.&quot;</span>
         <span class="p">)</span>
-    <span class="c1"># "nvdec" is the public-facing name; internally the variant value is</span>
-    <span class="c1"># "default" (meaning "the default CUDA backend").</span>
-    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"nvdec"</span><span class="p">:</span>
-        <span class="n">backend</span> <span class="o">=</span> <span class="s2">"default"</span>
+    <span class="c1"># &quot;nvdec&quot; is the public-facing name; internally the variant value is</span>
+    <span class="c1"># &quot;default&quot; (meaning &quot;the default CUDA backend&quot;).</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">&quot;nvdec&quot;</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
 
     <span class="n">previous_state</span> <span class="o">=</span> <span class="n">_CUDA_BACKEND</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
@@ -1531,7 +1531,7 @@ document.write(`
 <div class="viewcode-block" id="set_nvdec_cache_capacity">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.set_nvdec_cache_capacity.html#torchcodec.decoders.set_nvdec_cache_capacity">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">set_nvdec_cache_capacity</span><span class="p">(</span><span class="n">capacity</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Set the maximum number of NVDEC decoders that can be cached (per GPU).</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the maximum number of NVDEC decoders that can be cached (per GPU).</span>
 
 <span class="sd">    The NVDEC decoder cache stores hardware decoders for reuse, avoiding the</span>
 <span class="sd">    overhead of creating and destructing new decoders for subsequent video</span>
@@ -1549,7 +1549,7 @@ document.write(`
 <span class="sd">    Args:</span>
 <span class="sd">        capacity (int): The maximum number of NVDEC decoders that can be cached</span>
 <span class="sd">            per GPU device. Must be non-negative. Setting to 0 disables caching.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_core</span><span class="o">.</span><span class="n">set_nvdec_cache_capacity</span><span class="p">(</span><span class="n">capacity</span><span class="p">)</span></div>
 
 
@@ -1557,20 +1557,20 @@ document.write(`
 <div class="viewcode-block" id="get_nvdec_cache_capacity">
 <a class="viewcode-back" href="../../../generated/torchcodec.decoders.get_nvdec_cache_capacity.html#torchcodec.decoders.get_nvdec_cache_capacity">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_nvdec_cache_capacity</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Get the capacity of the per-device NVDEC decoder cache.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the capacity of the per-device NVDEC decoder cache.</span>
 
 <span class="sd">    See also :func:`~torchcodec.decoders.set_nvdec_cache_capacity`.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        int: The maximum number of NVDEC decoders that can be cached per GPU device.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">_core</span><span class="o">.</span><span class="n">get_nvdec_cache_capacity</span><span class="p">()</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_device_to_str</span><span class="p">(</span><span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="c1"># The core ops take the device as a string. None means "the current default</span>
-    <span class="c1"># device".</span>
+    <span class="c1"># The core ops take the device as a string. None means &quot;the current default</span>
+    <span class="c1"># device&quot;.</span>
     <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">get_default_device</span><span class="p">()</span>
     <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -1578,13 +1578,13 @@ document.write(`
 
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_output_dtype_to_str</span><span class="p">(</span><span class="n">output_dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="c1"># The core ops take the dtype as a string.</span>
-    <span class="n">dtype_to_str</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span> <span class="s2">"uint8"</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span> <span class="s2">"float32"</span><span class="p">}</span>
-    <span class="k">if</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">"auto"</span>
+    <span class="n">dtype_to_str</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span> <span class="s2">&quot;uint8&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span> <span class="s2">&quot;float32&quot;</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">output_dtype</span> <span class="o">==</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;auto&quot;</span>
     <span class="k">if</span> <span class="n">output_dtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dtype_to_str</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Invalid output_dtype (</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">). "</span>
-            <span class="sa">f</span><span class="s2">"Supported values are torch.uint8, torch.float32, and 'auto'."</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid output_dtype (</span><span class="si">{</span><span class="n">output_dtype</span><span class="si">}</span><span class="s2">). &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Supported values are torch.uint8, torch.float32, and &#39;auto&#39;.&quot;</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="n">dtype_to_str</span><span class="p">[</span><span class="n">output_dtype</span><span class="p">]</span>
 </pre></div>

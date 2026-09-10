@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.encoders._image_encoders &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.encoders._image_encoders &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1475,7 +1475,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_encode_to_tensor_through_bytesio</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">to_file_like</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
     <span class="c1"># Encode into an in-memory BytesIO and wrap its buffer as a 1-D uint8 tensor.</span>
     <span class="c1"># getbuffer() (unlike getvalue()) exposes the buffer without copying. We</span>
-    <span class="c1"># could have native C++ implementation for that in each encoder, but it's</span>
+    <span class="c1"># could have native C++ implementation for that in each encoder, but it&#39;s</span>
     <span class="c1"># not always worth it (based on benchmarks). Currently, the only encoder</span>
     <span class="c1"># that really needs a dedicated C++ path is JPEG on CUDA.</span>
     <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
@@ -1486,7 +1486,7 @@ document.write(`
 <div class="viewcode-block" id="JpegEncoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.JpegEncoder.html#torchcodec.encoders.JpegEncoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">JpegEncoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Encoder for JPEG images.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Encoder for JPEG images.</span>
 
 <span class="sd">    For a tutorial, see:</span>
 <span class="sd">    :ref:`sphx_glr_generated_examples_encoding_image_encoding.py`.</span>
@@ -1497,7 +1497,7 @@ document.write(`
 
 <span class="sd">            from torchcodec.encoders import JpegEncoder</span>
 
-<span class="sd">            JpegEncoder(img).to_file("image.jpg")</span>
+<span class="sd">            JpegEncoder(img).to_file(&quot;image.jpg&quot;)</span>
 <span class="sd">            # or encode to a file-like object or to a tensor, see methods below.</span>
 
 <span class="sd">    Args:</span>
@@ -1505,7 +1505,7 @@ document.write(`
 <span class="sd">            in CHW layout with 1 (grayscale) or 3 (RGB) channels. If on a CUDA</span>
 <span class="sd">            device, encoding is performed on the GPU with nvJPEG, and only</span>
 <span class="sd">            3-channel RGB is supported.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_img</span> <span class="o">=</span> <span class="n">img</span>
@@ -1513,14 +1513,14 @@ document.write(`
 <div class="viewcode-block" id="JpegEncoder.to_file">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.JpegEncoder.html#torchcodec.encoders.JpegEncoder.to_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">quality</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">75</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into a JPEG file.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into a JPEG file.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest (str or ``pathlib.Path``): The path to the output file, e.g.</span>
 <span class="sd">                ``image.jpg``.</span>
 <span class="sd">            quality (int, optional): Quality of the output, between 1 and 100.</span>
 <span class="sd">                Higher means better quality and larger file size. Default: 75.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_quality</span><span class="p">(</span><span class="n">quality</span><span class="p">)</span>
         <span class="n">_encode_jpeg_to_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span><span class="p">),</span> <span class="n">quality</span><span class="p">)</span></div>
 
@@ -1530,14 +1530,14 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">to_file_like</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedIOBase</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">quality</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">75</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into a file-like object.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into a file-like object.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest: A writable file-like object supporting ``write`` and ``seek``,</span>
 <span class="sd">                such as ``io.BytesIO()`` or an open file in binary write mode.</span>
 <span class="sd">            quality (int, optional): Quality of the output, between 1 and 100.</span>
 <span class="sd">                Higher means better quality and larger file size. Default: 75.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_quality</span><span class="p">(</span><span class="n">quality</span><span class="p">)</span>
         <span class="n">_encode_jpeg_to_file_like</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="n">create_file_like_context</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="n">quality</span>
@@ -1547,7 +1547,7 @@ document.write(`
 <div class="viewcode-block" id="JpegEncoder.to_tensor">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.JpegEncoder.html#torchcodec.encoders.JpegEncoder.to_tensor">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">quality</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">75</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into raw bytes, as a 1D uint8 tensor.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into raw bytes, as a 1D uint8 tensor.</span>
 
 <span class="sd">        The returned tensor is on the same device as the input image (a CUDA</span>
 <span class="sd">        input yields a CUDA tensor).</span>
@@ -1559,7 +1559,7 @@ document.write(`
 <span class="sd">        Returns:</span>
 <span class="sd">            torch.Tensor: The encoded bytes, a 1D uint8 tensor on the same</span>
 <span class="sd">            device as the input image.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_quality</span><span class="p">(</span><span class="n">quality</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">_encode_jpeg_to_tensor_cuda</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="n">quality</span><span class="p">)</span>
@@ -1573,7 +1573,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_validate_quality</span><span class="p">(</span><span class="n">quality</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">quality</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">quality</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Image quality should be a positive number between 1 and 100"</span>
+                <span class="s2">&quot;Image quality should be a positive number between 1 and 100&quot;</span>
             <span class="p">)</span></div>
 
 
@@ -1581,7 +1581,7 @@ document.write(`
 <div class="viewcode-block" id="PngEncoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.PngEncoder.html#torchcodec.encoders.PngEncoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PngEncoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Encoder for PNG images.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Encoder for PNG images.</span>
 
 <span class="sd">    For a tutorial, see:</span>
 <span class="sd">    :ref:`sphx_glr_generated_examples_encoding_image_encoding.py`.</span>
@@ -1592,13 +1592,13 @@ document.write(`
 
 <span class="sd">            from torchcodec.encoders import PngEncoder</span>
 
-<span class="sd">            PngEncoder(img).to_file("image.png")</span>
+<span class="sd">            PngEncoder(img).to_file(&quot;image.png&quot;)</span>
 <span class="sd">            # or encode to a file-like object or to a tensor, see methods below.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        img (``torch.Tensor``): The image to encode, a 3-dimensional uint8 tensor</span>
 <span class="sd">            in CHW layout with 1 (grayscale) or 3 (RGB) channels.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_img</span> <span class="o">=</span> <span class="n">img</span>
@@ -1606,7 +1606,7 @@ document.write(`
 <div class="viewcode-block" id="PngEncoder.to_file">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.PngEncoder.html#torchcodec.encoders.PngEncoder.to_file">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">compression_level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into a PNG file.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into a PNG file.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest (str or ``pathlib.Path``): The path to the output file, e.g.</span>
@@ -1614,7 +1614,7 @@ document.write(`
 <span class="sd">            compression_level (int, optional): zlib compression level between 0</span>
 <span class="sd">                (no compression, fastest) and 9 (max compression, slowest).</span>
 <span class="sd">                Default: 6.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_encode_png_to_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span><span class="p">),</span> <span class="n">compression_level</span><span class="p">)</span></div>
 
 
@@ -1623,7 +1623,7 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">to_file_like</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">RawIOBase</span> <span class="o">|</span> <span class="n">io</span><span class="o">.</span><span class="n">BufferedIOBase</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">compression_level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into a file-like object.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into a file-like object.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest: A writable file-like object supporting ``write`` and ``seek``,</span>
@@ -1631,7 +1631,7 @@ document.write(`
 <span class="sd">            compression_level (int, optional): zlib compression level between 0</span>
 <span class="sd">                (no compression, fastest) and 9 (max compression, slowest).</span>
 <span class="sd">                Default: 6.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_encode_png_to_file_like</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="n">create_file_like_context</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="n">compression_level</span>
         <span class="p">)</span></div>
@@ -1640,7 +1640,7 @@ document.write(`
 <div class="viewcode-block" id="PngEncoder.to_tensor">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.PngEncoder.html#torchcodec.encoders.PngEncoder.to_tensor">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">compression_level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode the image into raw bytes, as a 1D uint8 tensor.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode the image into raw bytes, as a 1D uint8 tensor.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            compression_level (int, optional): zlib compression level between 0</span>
@@ -1649,7 +1649,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            torch.Tensor: The encoded bytes, a 1D uint8 tensor.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">_encode_to_tensor_through_bytesio</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_img</span><span class="p">,</span> <span class="n">compression_level</span><span class="p">,</span> <span class="n">_encode_png_to_file_like</span>
         <span class="p">)</span></div>

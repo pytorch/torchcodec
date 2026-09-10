@@ -248,7 +248,7 @@ file-like object, i.e. anything with ``write`` and ``seek``.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.014 seconds)
+   **Total running time of the script:** (0 minutes 0.015 seconds)
 
 
 .. _sphx_glr_download_generated_examples_migration_torchvision_migration.py:

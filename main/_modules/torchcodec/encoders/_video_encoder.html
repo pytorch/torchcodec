@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.encoders._video_encoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.encoders._video_encoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1464,7 +1464,7 @@ document.write(`
 <div class="viewcode-block" id="VideoEncoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.VideoEncoder.html#torchcodec.encoders.VideoEncoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">VideoEncoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A single-stream video encoder on CPU or CUDA.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single-stream video encoder on CPU or CUDA.</span>
 
 <span class="sd">    .. note::</span>
 <span class="sd">        This is a convenience class for simple, one-shot video encoding. For</span>
@@ -1482,19 +1482,19 @@ document.write(`
 <span class="sd">            The tensor can be on CPU or CUDA. The device of the tensor</span>
 <span class="sd">            determines which encoder is used (CPU or GPU).</span>
 <span class="sd">        frame_rate (float): The frame rate of the **input** ``frames``. Also defines the encoded **output** frame rate.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frames</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">frame_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.encoders.VideoEncoder"</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.encoders.VideoEncoder&quot;</span><span class="p">)</span>
         <span class="n">load_core_libraries</span><span class="p">()</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">frames</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected frames to be a Tensor, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">frames</span><span class="p">)</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected frames to be a Tensor, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">frames</span><span class="p">)</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">frames</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected 4D frames, got </span><span class="si">{</span><span class="n">frames</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected 4D frames, got </span><span class="si">{</span><span class="n">frames</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">frames</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected uint8 frames, got </span><span class="si">{</span><span class="n">frames</span><span class="o">.</span><span class="n">dtype</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected uint8 frames, got </span><span class="si">{</span><span class="n">frames</span><span class="o">.</span><span class="n">dtype</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">frame_rate</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">frame_rate</span><span class="w"> </span><span class="si">= }</span><span class="s2"> must be &gt; 0."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">frame_rate</span><span class="w"> </span><span class="si">= }</span><span class="s2"> must be &gt; 0.&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_frames</span> <span class="o">=</span> <span class="n">frames</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_frame_rate</span> <span class="o">=</span> <span class="n">frame_rate</span>
@@ -1533,33 +1533,33 @@ document.write(`
         <span class="n">preset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">extra_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode frames into a file.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode frames into a file.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest (str or ``pathlib.Path``): The path to the output file, e.g.</span>
 <span class="sd">                ``video.mp4``. The extension of the file determines the video</span>
 <span class="sd">                container format.</span>
-<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., "libx264",</span>
-<span class="sd">                "h264"). If not specified, the default codec</span>
+<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., &quot;libx264&quot;,</span>
+<span class="sd">                &quot;h264&quot;). If not specified, the default codec</span>
 <span class="sd">                for the container format will be used.</span>
 <span class="sd">                See :ref:`codec_selection` for details.</span>
 <span class="sd">            pixel_format (str, optional): The pixel format for encoding (e.g.,</span>
-<span class="sd">                "yuv420p", "yuv444p"). If not specified, uses codec's default format.</span>
+<span class="sd">                &quot;yuv420p&quot;, &quot;yuv444p&quot;). If not specified, uses codec&#39;s default format.</span>
 <span class="sd">                Must be left as ``None`` when encoding CUDA tensors.</span>
 <span class="sd">                See :ref:`pixel_format` for details.</span>
 <span class="sd">            crf (int or float, optional): Constant Rate Factor for encoding quality. Lower values</span>
 <span class="sd">                mean better quality. Valid range depends on the encoder (e.g.  0-51 for libx264).</span>
-<span class="sd">                Defaults to None (which will use encoder's default).</span>
+<span class="sd">                Defaults to None (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`crf` for details.</span>
 <span class="sd">            preset (str or int, optional): Encoder option that controls the tradeoff between</span>
 <span class="sd">                encoding encoding speed and compression (output size). Valid on the encoder (commonly</span>
-<span class="sd">                a string: "fast", "medium", "slow"). Defaults to None</span>
-<span class="sd">                (which will use encoder's default).</span>
+<span class="sd">                a string: &quot;fast&quot;, &quot;medium&quot;, &quot;slow&quot;). Defaults to None</span>
+<span class="sd">                (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`preset` for details.</span>
 <span class="sd">            extra_options (dict[str, Any], optional): A dictionary of additional</span>
-<span class="sd">                encoder options to pass, e.g. ``{"qp": 5, "tune": "film"}``.</span>
+<span class="sd">                encoder options to pass, e.g. ``{&quot;qp&quot;: 5, &quot;tune&quot;: &quot;film&quot;}``.</span>
 <span class="sd">                See :ref:`extra_options` for details.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">video</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_video</span><span class="p">(</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_add_video_kwargs</span><span class="p">(</span>
@@ -1586,35 +1586,35 @@ document.write(`
         <span class="n">preset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">extra_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode frames into raw bytes, as a 1D uint8 Tensor.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode frames into raw bytes, as a 1D uint8 Tensor.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            format (str): The container format of the encoded frames, e.g. "mp4", "mov",</span>
-<span class="sd">                    "mkv", "avi", "webm", "flv", etc.</span>
-<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., "libx264",</span>
-<span class="sd">                "h264"). If not specified, the default codec</span>
+<span class="sd">            format (str): The container format of the encoded frames, e.g. &quot;mp4&quot;, &quot;mov&quot;,</span>
+<span class="sd">                    &quot;mkv&quot;, &quot;avi&quot;, &quot;webm&quot;, &quot;flv&quot;, etc.</span>
+<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., &quot;libx264&quot;,</span>
+<span class="sd">                &quot;h264&quot;). If not specified, the default codec</span>
 <span class="sd">                for the container format will be used.</span>
 <span class="sd">                See :ref:`codec_selection` for details.</span>
 <span class="sd">            pixel_format (str, optional): The pixel format to encode frames into (e.g.,</span>
-<span class="sd">                "yuv420p", "yuv444p"). If not specified, uses codec's default format.</span>
+<span class="sd">                &quot;yuv420p&quot;, &quot;yuv444p&quot;). If not specified, uses codec&#39;s default format.</span>
 <span class="sd">                Must be left as ``None`` when encoding CUDA tensors.</span>
 <span class="sd">                See :ref:`pixel_format` for details.</span>
 <span class="sd">            crf (int or float, optional): Constant Rate Factor for encoding quality. Lower values</span>
 <span class="sd">                mean better quality. Valid range depends on the encoder (e.g.  0-51 for libx264).</span>
-<span class="sd">                Defaults to None (which will use encoder's default).</span>
+<span class="sd">                Defaults to None (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`crf` for details.</span>
 <span class="sd">            preset (str or int, optional): Encoder option that controls the tradeoff between</span>
 <span class="sd">                encoding encoding speed and compression (output size). Valid on the encoder (commonly</span>
-<span class="sd">                a string: "fast", "medium", "slow"). Defaults to None</span>
-<span class="sd">                (which will use encoder's default).</span>
+<span class="sd">                a string: &quot;fast&quot;, &quot;medium&quot;, &quot;slow&quot;). Defaults to None</span>
+<span class="sd">                (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`preset` for details.</span>
 <span class="sd">            extra_options (dict[str, Any], optional): A dictionary of additional</span>
-<span class="sd">                encoder options to pass, e.g. ``{"qp": 5, "tune": "film"}``.</span>
+<span class="sd">                encoder options to pass, e.g. ``{&quot;qp&quot;: 5, &quot;tune&quot;: &quot;film&quot;}``.</span>
 <span class="sd">                See :ref:`extra_options` for details.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Tensor: The raw encoded bytes as 1D uint8 Tensor on CPU regardless of the device of the input frames.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">video</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_video</span><span class="p">(</span>
@@ -1644,7 +1644,7 @@ document.write(`
         <span class="n">preset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">extra_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode frames into a file-like object.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode frames into a file-like object.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            file_like: A file-like object that supports ``write()`` and</span>
@@ -1652,29 +1652,29 @@ document.write(`
 <span class="sd">                write mode, etc. Methods must have the following signature:</span>
 <span class="sd">                ``write(data: bytes) -&gt; int`` and ``seek(offset: int, whence:</span>
 <span class="sd">                int = 0) -&gt; int``.</span>
-<span class="sd">            format (str): The container format of the encoded frames, e.g. "mp4", "mov",</span>
-<span class="sd">                "mkv", "avi", "webm", "flv", etc.</span>
-<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., "libx264",</span>
-<span class="sd">                "h264"). If not specified, the default codec</span>
+<span class="sd">            format (str): The container format of the encoded frames, e.g. &quot;mp4&quot;, &quot;mov&quot;,</span>
+<span class="sd">                &quot;mkv&quot;, &quot;avi&quot;, &quot;webm&quot;, &quot;flv&quot;, etc.</span>
+<span class="sd">            codec (str, optional): The codec to use for encoding (e.g., &quot;libx264&quot;,</span>
+<span class="sd">                &quot;h264&quot;). If not specified, the default codec</span>
 <span class="sd">                for the container format will be used.</span>
 <span class="sd">                See :ref:`codec_selection` for details.</span>
 <span class="sd">            pixel_format (str, optional): The pixel format for encoding (e.g.,</span>
-<span class="sd">                "yuv420p", "yuv444p"). If not specified, uses codec's default format.</span>
+<span class="sd">                &quot;yuv420p&quot;, &quot;yuv444p&quot;). If not specified, uses codec&#39;s default format.</span>
 <span class="sd">                Must be left as ``None`` when encoding CUDA tensors.</span>
 <span class="sd">                See :ref:`pixel_format` for details.</span>
 <span class="sd">            crf (int or float, optional): Constant Rate Factor for encoding quality. Lower values</span>
 <span class="sd">                mean better quality. Valid range depends on the encoder (e.g.  0-51 for libx264).</span>
-<span class="sd">                Defaults to None (which will use encoder's default).</span>
+<span class="sd">                Defaults to None (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`crf` for details.</span>
 <span class="sd">            preset (str or int, optional): Encoder option that controls the tradeoff between</span>
 <span class="sd">                encoding encoding speed and compression (output size). Valid on the encoder (commonly</span>
-<span class="sd">                a string: "fast", "medium", "slow"). Defaults to None</span>
-<span class="sd">                (which will use encoder's default).</span>
+<span class="sd">                a string: &quot;fast&quot;, &quot;medium&quot;, &quot;slow&quot;). Defaults to None</span>
+<span class="sd">                (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`preset` for details.</span>
 <span class="sd">            extra_options (dict[str, Any], optional): A dictionary of additional</span>
-<span class="sd">                encoder options to pass, e.g. ``{"qp": 5, "tune": "film"}``.</span>
+<span class="sd">                encoder options to pass, e.g. ``{&quot;qp&quot;: 5, &quot;tune&quot;: &quot;film&quot;}``.</span>
 <span class="sd">                See :ref:`extra_options` for details.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">video</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_video</span><span class="p">(</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_add_video_kwargs</span><span class="p">(</span>

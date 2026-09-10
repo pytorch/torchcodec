@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.encoders._audio_encoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.encoders._audio_encoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1463,7 +1463,7 @@ document.write(`
 <div class="viewcode-block" id="AudioEncoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.AudioEncoder.html#torchcodec.encoders.AudioEncoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AudioEncoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A single-stream audio encoder.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single-stream audio encoder.</span>
 
 <span class="sd">    .. note::</span>
 <span class="sd">        This is a convenience class for simple, one-shot audio encoding. For</span>
@@ -1481,27 +1481,27 @@ document.write(`
 <span class="sd">        sample_rate (int): The sample rate of the **input** ``samples``. The</span>
 <span class="sd">            sample rate of the encoded output can be specified using the</span>
 <span class="sd">            encoding methods (``to_file``, etc.).</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">"torchcodec.encoders.AudioEncoder"</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_log_api_usage_once</span><span class="p">(</span><span class="s2">&quot;torchcodec.encoders.AudioEncoder&quot;</span><span class="p">)</span>
         <span class="n">load_core_libraries</span><span class="p">()</span>
-        <span class="c1"># Some of these checks are also done in C++: it's OK, they're cheap, and</span>
+        <span class="c1"># Some of these checks are also done in C++: it&#39;s OK, they&#39;re cheap, and</span>
         <span class="c1"># doing them here allows to surface them when the AudioEncoder is</span>
         <span class="c1"># instantiated, rather than later when the encoding methods are called.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"Expected samples to be a Tensor, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected samples to be a Tensor, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="n">samples</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># make it 2D and assume 1 channel</span>
             <span class="n">samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">samples</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected 1D or 2D samples, got </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected 1D or 2D samples, got </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">samples</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected float32 samples, got </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">dtype</span><span class="w"> </span><span class="si">= }</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected float32 samples, got </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">dtype</span><span class="w"> </span><span class="si">= }</span><span class="s2">.&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sample_rate</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">sample_rate</span><span class="w"> </span><span class="si">= }</span><span class="s2"> must be &gt; 0."</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sample_rate</span><span class="w"> </span><span class="si">= }</span><span class="s2"> must be &gt; 0.&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_samples</span> <span class="o">=</span> <span class="n">samples</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_sample_rate</span> <span class="o">=</span> <span class="n">sample_rate</span>
@@ -1516,7 +1516,7 @@ document.write(`
         <span class="n">num_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode samples into a file.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode samples into a file.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dest (str or ``pathlib.Path``): The path to the output file, e.g.</span>
@@ -1531,7 +1531,7 @@ document.write(`
 <span class="sd">                ``samples`` is used.</span>
 <span class="sd">            sample_rate (int, optional): The sample rate of the encoded output.</span>
 <span class="sd">                By default, the sample rate of the input ``samples`` is used.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">audio</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_audio</span><span class="p">(</span>
             <span class="n">sample_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_rate</span><span class="p">,</span>
@@ -1554,11 +1554,11 @@ document.write(`
         <span class="n">num_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode samples into raw bytes, as a 1D uint8 Tensor.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode samples into raw bytes, as a 1D uint8 Tensor.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            format (str): The format of the encoded samples, e.g. "mp3", "wav"</span>
-<span class="sd">                or "flac".</span>
+<span class="sd">            format (str): The format of the encoded samples, e.g. &quot;mp3&quot;, &quot;wav&quot;</span>
+<span class="sd">                or &quot;flac&quot;.</span>
 <span class="sd">            bit_rate (int, optional): The output bit rate. Encoders typically</span>
 <span class="sd">                support a finite set of bit rate values, so ``bit_rate`` will be</span>
 <span class="sd">                matched to one of those supported values. The default is chosen</span>
@@ -1571,7 +1571,7 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Tensor: The raw encoded bytes as 1D uint8 Tensor.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">audio</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_audio</span><span class="p">(</span>
@@ -1597,7 +1597,7 @@ document.write(`
         <span class="n">num_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Encode samples into a file-like object.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Encode samples into a file-like object.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            file_like: A file-like object that supports ``write()`` and</span>
@@ -1605,8 +1605,8 @@ document.write(`
 <span class="sd">                write mode, etc. Methods must have the following signature:</span>
 <span class="sd">                ``write(data: bytes) -&gt; int`` and ``seek(offset: int, whence:</span>
 <span class="sd">                int = 0) -&gt; int``.</span>
-<span class="sd">            format (str): The format of the encoded samples, e.g. "mp3", "wav"</span>
-<span class="sd">                or "flac".</span>
+<span class="sd">            format (str): The format of the encoded samples, e.g. &quot;mp3&quot;, &quot;wav&quot;</span>
+<span class="sd">                or &quot;flac&quot;.</span>
 <span class="sd">            bit_rate (int, optional): The output bit rate. Encoders typically</span>
 <span class="sd">                support a finite set of bit rate values, so ``bit_rate`` will be</span>
 <span class="sd">                matched to one of those supported values. The default is chosen</span>
@@ -1616,7 +1616,7 @@ document.write(`
 <span class="sd">                ``samples`` is used.</span>
 <span class="sd">            sample_rate (int, optional): The sample rate of the encoded output.</span>
 <span class="sd">                By default, the sample rate of the input ``samples`` is used.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">encoder</span> <span class="o">=</span> <span class="n">Encoder</span><span class="p">()</span>
         <span class="n">audio</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">add_audio</span><span class="p">(</span>
             <span class="n">sample_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_rate</span><span class="p">,</span>

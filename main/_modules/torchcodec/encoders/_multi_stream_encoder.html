@@ -7,7 +7,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>torchcodec.encoders._multi_stream_encoder &#8212; TorchCodec 0.17.0.dev20260903+cu126 Documentation</title>
+    <title>torchcodec.encoders._multi_stream_encoder &#8212; TorchCodec 0.17.0.dev20260910+cu130 Documentation</title>
   
   
   
@@ -41,7 +41,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0493703d"></script>
+    <script src="../../../_static/documentation_options.js?v=43ae5770"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1462,22 +1462,22 @@ document.write(`
 <div class="viewcode-block" id="VideoStream">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.VideoStream.html#torchcodec.encoders.VideoStream">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">VideoStream</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A video stream within an :class:`Encoder`.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A video stream within an :class:`Encoder`.</span>
 
 <span class="sd">    Returned by :meth:`Encoder.add_video`. Use :meth:`add_frames` to feed</span>
 <span class="sd">    video frames into this stream.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoder_tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">stream_identifier</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span> <span class="o">=</span> <span class="n">encoder_tensor</span>
         <span class="c1"># This is a per-media-type index, not absolute across all media types,</span>
-        <span class="c1"># hence why we don't call this stream_index</span>
+        <span class="c1"># hence why we don&#39;t call this stream_index</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stream_identifier</span> <span class="o">=</span> <span class="n">stream_identifier</span>
 
 <div class="viewcode-block" id="VideoStream.add_frames">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.VideoStream.html#torchcodec.encoders.VideoStream.add_frames">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frames</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Add video frames to this stream.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add video frames to this stream.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            frames (``torch.Tensor``): The frames to encode. This must be a 4D</span>
@@ -1486,7 +1486,7 @@ document.write(`
 <span class="sd">                Values must be uint8 in the range ``[0, 255]``. The device of</span>
 <span class="sd">                the tensor must match the ``device`` passed to</span>
 <span class="sd">                :meth:`Encoder.add_video`.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_add_frames</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">,</span> <span class="n">frames</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stream_identifier</span>
         <span class="p">)</span></div>
@@ -1497,29 +1497,29 @@ document.write(`
 <div class="viewcode-block" id="AudioStream">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.AudioStream.html#torchcodec.encoders.AudioStream">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AudioStream</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""An audio stream within an :class:`Encoder`.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;An audio stream within an :class:`Encoder`.</span>
 
 <span class="sd">    Returned by :meth:`Encoder.add_audio`. Use :meth:`add_samples` to feed</span>
 <span class="sd">    audio samples into this stream.</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoder_tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">stream_identifier</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span> <span class="o">=</span> <span class="n">encoder_tensor</span>
         <span class="c1"># This is a per-media-type index, not absolute across all media types,</span>
-        <span class="c1"># hence why we don't call this stream_index</span>
+        <span class="c1"># hence why we don&#39;t call this stream_index</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stream_identifier</span> <span class="o">=</span> <span class="n">stream_identifier</span>
 
 <div class="viewcode-block" id="AudioStream.add_samples">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.AudioStream.html#torchcodec.encoders.AudioStream.add_samples">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">add_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">samples</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Add audio samples to this stream.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add audio samples to this stream.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            samples (``torch.Tensor``): The samples to encode. This must be a</span>
 <span class="sd">                2D tensor of shape ``(num_channels, num_samples)``. Values must</span>
 <span class="sd">                be float values in ``[-1, 1]``. The number of channels must</span>
 <span class="sd">                match the ``num_channels`` passed to :meth:`Encoder.add_audio`.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_add_samples</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">,</span> <span class="n">samples</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stream_identifier</span>
         <span class="p">)</span></div>
@@ -1530,7 +1530,7 @@ document.write(`
 <div class="viewcode-block" id="Encoder">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.Encoder.html#torchcodec.encoders.Encoder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Encoder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""A multi-stream encoder for encoding video and/or audio streams.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A multi-stream encoder for encoding video and/or audio streams.</span>
 
 <span class="sd">    Unlike :class:`VideoEncoder` and :class:`AudioEncoder` which encode a</span>
 <span class="sd">    single stream in one shot, ``Encoder`` supports multiple streams and</span>
@@ -1550,7 +1550,7 @@ document.write(`
 <span class="sd">            encoder = Encoder()</span>
 <span class="sd">            video_stream = encoder.add_video(height=256, width=256, frame_rate=30)</span>
 <span class="sd">            audio_stream = encoder.add_audio(sample_rate=16000, num_channels=1)</span>
-<span class="sd">            with encoder.open_file("output.mp4"):</span>
+<span class="sd">            with encoder.open_file(&quot;output.mp4&quot;):</span>
 <span class="sd">                video_stream.add_frames(frames_tensor)</span>
 <span class="sd">                audio_stream.add_samples(samples_tensor)</span>
 <span class="sd">                # Add more frames by calling video_stream.add_frames again</span>
@@ -1566,12 +1566,12 @@ document.write(`
 <span class="sd">            buf = io.BytesIO()</span>
 <span class="sd">            encoder = Encoder()</span>
 <span class="sd">            video_stream = encoder.add_video(height=256, width=256, frame_rate=30)</span>
-<span class="sd">            with encoder.open_file_like(buf, format="mp4"):</span>
+<span class="sd">            with encoder.open_file_like(buf, format=&quot;mp4&quot;):</span>
 <span class="sd">                video_stream.add_frames(frames_tensor)</span>
 <span class="sd">            encoded_bytes = buf.getbuffer()  # or getvalue()</span>
 <span class="sd">            # Optionally convert to a uint8 tensor of bytes with</span>
 <span class="sd">            # bytes_tensor = torch.frombuffer(encoded_bytes, dtype=torch.uint8)</span>
-<span class="sd">    """</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span> <span class="o">=</span> <span class="n">_core</span><span class="o">.</span><span class="n">create_streaming_encoder</span><span class="p">()</span>
@@ -1591,7 +1591,7 @@ document.write(`
         <span class="n">preset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">extra_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VideoStream</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Add a video stream to the encoder.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a video stream to the encoder.</span>
 
 <span class="sd">        Must be called before :meth:`open_file` or :meth:`open_file_like`.</span>
 
@@ -1601,33 +1601,33 @@ document.write(`
 <span class="sd">            frame_rate (float): The frame rate of the **input** video frames.</span>
 <span class="sd">                Also defines the encoded **output** frame rate.</span>
 <span class="sd">            device (str or torch.device, optional): The device to use for</span>
-<span class="sd">                encoding, e.g.  ``"cpu"`` or ``"cuda"``. If ``None`` (default), uses</span>
+<span class="sd">                encoding, e.g.  ``&quot;cpu&quot;`` or ``&quot;cuda&quot;``. If ``None`` (default), uses</span>
 <span class="sd">                the current default device.</span>
 <span class="sd">            codec (str, optional): The codec to use for encoding (e.g.,</span>
-<span class="sd">                ``"libx264"``). If not specified, the default codec for the</span>
+<span class="sd">                ``&quot;libx264&quot;``). If not specified, the default codec for the</span>
 <span class="sd">                container format will be used.</span>
 <span class="sd">                See :ref:`codec_selection` for details.</span>
 <span class="sd">            pixel_format (str, optional): The pixel format for encoding (e.g.,</span>
-<span class="sd">                ``"yuv420p"``). If not specified, uses codec's default format.</span>
+<span class="sd">                ``&quot;yuv420p&quot;``). If not specified, uses codec&#39;s default format.</span>
 <span class="sd">                Must be left as ``None`` when encoding on CUDA.</span>
 <span class="sd">                See :ref:`pixel_format` for details.</span>
 <span class="sd">            crf (int or float, optional): Constant Rate Factor for encoding</span>
 <span class="sd">                quality. Lower values mean better quality. Valid range depends</span>
 <span class="sd">                on the encoder (e.g. 0-51 for libx264). Defaults to None (which</span>
-<span class="sd">                will use encoder's default). See :ref:`crf` for details.</span>
+<span class="sd">                will use encoder&#39;s default). See :ref:`crf` for details.</span>
 <span class="sd">            preset (str or int, optional): Encoder option that controls the</span>
 <span class="sd">                tradeoff between encoding speed and compression (output size).</span>
-<span class="sd">                Commonly a string: ``"fast"``, ``"medium"``, ``"slow"``.</span>
-<span class="sd">                Defaults to None (which will use encoder's default).</span>
+<span class="sd">                Commonly a string: ``&quot;fast&quot;``, ``&quot;medium&quot;``, ``&quot;slow&quot;``.</span>
+<span class="sd">                Defaults to None (which will use encoder&#39;s default).</span>
 <span class="sd">                See :ref:`preset` for details.</span>
 <span class="sd">            extra_options (dict[str, Any], optional): A dictionary of additional</span>
-<span class="sd">                encoder options to pass, e.g. ``{"qp": 5, "tune": "film"}``.</span>
+<span class="sd">                encoder options to pass, e.g. ``{&quot;qp&quot;: 5, &quot;tune&quot;: &quot;film&quot;}``.</span>
 <span class="sd">                See :ref:`extra_options` for details.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            A video stream object. Use its :meth:`~VideoStream.add_frames`</span>
 <span class="sd">            method to feed frames into the stream.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">get_default_device</span><span class="p">()</span>
         <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -1660,7 +1660,7 @@ document.write(`
         <span class="n">out_num_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">out_sample_rate</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudioStream</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Add an audio stream to the encoder.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add an audio stream to the encoder.</span>
 
 <span class="sd">        Must be called before :meth:`open_file` or :meth:`open_file_like`.</span>
 
@@ -1679,7 +1679,7 @@ document.write(`
 <span class="sd">        Returns:</span>
 <span class="sd">            An audio stream object. Use its :meth:`~AudioStream.add_samples`</span>
 <span class="sd">            method to feed samples into the stream.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">stream_identifier</span> <span class="o">=</span> <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_add_audio_stream</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">,</span>
             <span class="n">sample_rate</span><span class="o">=</span><span class="n">sample_rate</span><span class="p">,</span>
@@ -1693,8 +1693,8 @@ document.write(`
 
 <div class="viewcode-block" id="Encoder.open_file">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.Encoder.html#torchcodec.encoders.Encoder.open_file">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">open_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Encoder"</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Open a file for writing the encoded output.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">open_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Encoder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Open a file for writing the encoded output.</span>
 
 <span class="sd">        Must be called after all streams have been added via :meth:`add_video`</span>
 <span class="sd">        and/or :meth:`add_audio`. The file extension determines the container</span>
@@ -1705,15 +1705,15 @@ document.write(`
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Encoder: Returns ``self`` for method chaining.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_open_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
 
 <div class="viewcode-block" id="Encoder.open_file_like">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.Encoder.html#torchcodec.encoders.Encoder.open_file_like">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">open_file_like</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Encoder"</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Open a file-like object for writing the encoded output.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">open_file_like</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Encoder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Open a file-like object for writing the encoded output.</span>
 
 <span class="sd">        Must be called after all streams have been added via :meth:`add_video`</span>
 <span class="sd">        and/or :meth:`add_audio`.</span>
@@ -1725,11 +1725,11 @@ document.write(`
 <span class="sd">                ``write(data: bytes) -&gt; int`` and ``seek(offset: int, whence:</span>
 <span class="sd">                int = 0) -&gt; int``.</span>
 <span class="sd">            format (str): The container format of the encoded output, e.g.</span>
-<span class="sd">                ``"mp4"``, ``"mov"``, ``"mkv"``, ``"avi"``, ``"webm"``, etc.</span>
+<span class="sd">                ``&quot;mp4&quot;``, ``&quot;mov&quot;``, ``&quot;mkv&quot;``, ``&quot;avi&quot;``, ``&quot;webm&quot;``, etc.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Encoder: Returns ``self`` for method chaining.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_open_file_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">,</span> <span class="nb">format</span><span class="p">,</span> <span class="n">dest</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
@@ -1737,16 +1737,16 @@ document.write(`
 <div class="viewcode-block" id="Encoder.close">
 <a class="viewcode-back" href="../../../generated/torchcodec.encoders.Encoder.html#torchcodec.encoders.Encoder.close">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Flush all remaining data and close the encoder.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Flush all remaining data and close the encoder.</span>
 
 <span class="sd">        This must be called when encoding is complete to ensure all buffered</span>
 <span class="sd">        data is written. Using the encoder as a context manager (``with``</span>
 <span class="sd">        statement) calls this automatically.</span>
-<span class="sd">        """</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">_core</span><span class="o">.</span><span class="n">streaming_encoder_close</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encoder_tensor</span><span class="p">)</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Encoder"</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Encoder&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
