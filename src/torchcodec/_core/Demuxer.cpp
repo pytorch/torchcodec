@@ -36,15 +36,19 @@ namespace {
 template <typename IsActive>
 int read_next_active_packet(
     AVFormatContext* format_context,
-    ReferenceAVPacket& packet,
+    AVPacket& packet,
     IsActive is_active) {
   int status = AVSUCCESS;
   do {
-    status = av_read_frame(format_context, packet.get());
+    // av_read_frame() requires a packet with nothing to free in it, so drop
+    // what the previous iteration read from a stream we're not following. A
+    // no-op on the first iteration.
+    av_packet_unref(&packet);
+    status = av_read_frame(format_context, &packet);
     if (status == AVERROR_EOF || status < AVSUCCESS) {
       return status;
     }
-  } while (!is_active(packet->stream_index));
+  } while (!is_active(packet.stream_index));
   return AVSUCCESS;
 }
 } // namespace
@@ -52,7 +56,7 @@ int read_next_active_packet(
 int read_next_packet(
     AVFormatContext* format_context,
     int active_stream_index,
-    ReferenceAVPacket& packet) {
+    AVPacket& packet) {
   return read_next_active_packet(
       format_context, packet, [active_stream_index](int stream_index) {
         return stream_index == active_stream_index;
@@ -62,7 +66,7 @@ int read_next_packet(
 int read_next_packet(
     AVFormatContext* format_context,
     const std::vector<int>& active_stream_indices,
-    ReferenceAVPacket& packet) {
+    AVPacket& packet) {
   return read_next_active_packet(
       format_context, packet, [&active_stream_indices](int stream_index) {
         return std::find(
@@ -305,7 +309,7 @@ void Demuxer::scan_all_video_streams() {
   while (true) {
     ReferenceAVPacket packet(auto_packet_);
     int status =
-        read_next_packet(format_context_.get(), video_stream_indices, packet);
+        read_next_packet(format_context_.get(), video_stream_indices, *packet);
     if (status == AVERROR_EOF) {
       break;
     }
@@ -378,11 +382,14 @@ UniqueAVPacket Demuxer::next_packet() {
       "This demuxer isn't following any stream yet.");
   has_demuxed_ = true;
 
-  // TODO_API_BREAKDOWN CC P2: Not a fan of the ReferenceAVPacket / AutoAVPacket
-  // / UniqueAVPacket dance here. Can we simplify?
-  ReferenceAVPacket packet(auto_packet_);
+  // Read straight into a fresh packet the caller owns, rather than into the
+  // reusable one a scan reads into: it is what makes the packet safe to hand to
+  // another thread.
+  UniqueAVPacket packet(av_packet_alloc());
+  STD_TORCH_CHECK(packet != nullptr, "Failed to allocate AVPacket");
+
   int status =
-      read_next_packet(format_context_.get(), active_stream_indices_, packet);
+      read_next_packet(format_context_.get(), active_stream_indices_, *packet);
   if (status == AVERROR_EOF) {
     return UniqueAVPacket{};
   }
@@ -391,12 +398,7 @@ UniqueAVPacket Demuxer::next_packet() {
       "Could not read frame from input file: ",
       get_ffmpeg_error_string_from_error_code(status));
 
-  // Move the reference out into a fresh, independent packet the caller owns.
-  // This is what makes the packet safe to hand to another thread.
-  UniqueAVPacket owned(av_packet_alloc());
-  STD_TORCH_CHECK(owned != nullptr, "Failed to allocate AVPacket");
-  av_packet_move_ref(owned.get(), packet.get());
-  return owned;
+  return packet;
 }
 
 } // namespace facebook::torchcodec

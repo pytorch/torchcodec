@@ -23,17 +23,20 @@ namespace facebook::torchcodec {
 // into `packet`. Returns AVSUCCESS with `packet` filled, AVERROR_EOF at end of
 // stream, or a negative error code otherwise. Shared by Demuxer and
 // SingleStreamDecoder so the demux + stream-filter loop lives in one place.
+// `packet` is only written to, never owned: it can be a scope-bound
+// ReferenceAVPacket read into repeatedly, or a UniqueAVPacket the caller is
+// about to hand out.
 int read_next_packet(
     AVFormatContext* format_context,
     int active_stream_index,
-    ReferenceAVPacket& packet);
+    AVPacket& packet);
 
 // Same, for a demuxer following more than one stream: the packet comes from
 // whichever of `active_stream_indices` has the next one.
 int read_next_packet(
     AVFormatContext* format_context,
     const std::vector<int>& active_stream_indices,
-    ReferenceAVPacket& packet);
+    AVPacket& packet);
 
 std::string get_seek_error_message(
     const AVFormatContext* format_context,
