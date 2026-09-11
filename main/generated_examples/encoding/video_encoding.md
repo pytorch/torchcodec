@@ -86,7 +86,7 @@ print(f"Encoded to {output_path}, size: {Path(output_path).stat().st_size} bytes
 ```
 frames.shape = torch.Size([60, 3, 1080, 1920]), frames.dtype = torch.uint8
 frame_rate = 24 fps
-Encoded to /tmp/tmpfh2ucd1z.mp4, size: 2509386 bytes
+Encoded to /tmp/tmp2w3d0eg6.mp4, size: 2509386 bytes
 ```
 
 Now that we have encoded data, let's decode it back to verify the
@@ -363,7 +363,7 @@ with encoder.open_file(custom_output):
  vs.add_frames(frames)
 ```
 
-**Total running time of the script:** (0 minutes 25.714 seconds)
+**Total running time of the script:** (0 minutes 26.330 seconds)
 
 [`Download Jupyter notebook: video_encoding.ipynb`](../../_downloads/e8868f804bffbeae56ed6b335353e809/video_encoding.ipynb)
 

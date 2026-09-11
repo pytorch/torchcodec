@@ -79,7 +79,7 @@ Boilerplate: a test video, and the device we'll run on.
 
     device = 'cuda'
 
-    CompletedProcess(args=['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=5', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-g', '30', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '/tmp/tmpy81aat8h/video.mp4'], returncode=0)
+    CompletedProcess(args=['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=5', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-g', '30', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '/tmp/tmp1e1ax3qr/video.mp4'], returncode=0)
 
 
 
@@ -919,7 +919,7 @@ several streams of one container instead, in one pass.
  .. code-block:: none
 
 
-    CompletedProcess(args=['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', '/tmp/tmpy81aat8h/video.mp4', '-i', '/tmp/tmpy81aat8h/audio.wav', '-c:v', 'copy', '-c:a', 'aac', '-shortest', '/tmp/tmpy81aat8h/av.mp4'], returncode=0)
+    CompletedProcess(args=['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', '/tmp/tmp1e1ax3qr/video.mp4', '-i', '/tmp/tmp1e1ax3qr/audio.wav', '-c:v', 'copy', '-c:a', 'aac', '-shortest', '/tmp/tmp1e1ax3qr/av.mp4'], returncode=0)
 
 
 
@@ -1018,7 +1018,7 @@ and has to be called before any packet is demuxed.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 2.316 seconds)
+   **Total running time of the script:** (0 minutes 2.332 seconds)
 
 
 .. _sphx_glr_download_generated_examples_decoding_blocks.py:

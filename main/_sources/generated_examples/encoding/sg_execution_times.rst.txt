@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:31.591** total execution time for 4 files **from generated_examples/encoding**:
+**00:32.724** total execution time for 4 files **from generated_examples/encoding**:
 
 .. container::
 
@@ -33,13 +33,13 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_generated_examples_encoding_video_encoding.py` (``video_encoding.py``)
-     - 00:25.714
+     - 00:26.330
      - 0.0
    * - :ref:`sphx_glr_generated_examples_encoding_multi_stream_encoding.py` (``multi_stream_encoding.py``)
-     - 00:05.685
+     - 00:06.236
      - 0.0
    * - :ref:`sphx_glr_generated_examples_encoding_image_encoding.py` (``image_encoding.py``)
-     - 00:00.162
+     - 00:00.129
      - 0.0
    * - :ref:`sphx_glr_generated_examples_encoding_audio_encoding.py` (``audio_encoding.py``)
      - 00:00.029

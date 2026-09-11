@@ -156,7 +156,7 @@ print(f"{len(buffer.getvalue()) = }")
 len(buffer.getvalue()) = 37359
 ```
 
-**Total running time of the script:** (0 minutes 0.015 seconds)
+**Total running time of the script:** (0 minutes 0.014 seconds)
 
 [`Download Jupyter notebook: torchvision_migration.ipynb`](../../_downloads/6ea3c360ab6e7139e0d6f061b01ad558/torchvision_migration.ipynb)
 
