@@ -308,7 +308,7 @@ default value ensures that clips start early enough before the end. This means
 that by default, the policy parameter rarely comes into action, and most users
 probably don't need to worry too much about it.
 
-**Total running time of the script:** (0 minutes 0.434 seconds)
+**Total running time of the script:** (0 minutes 0.429 seconds)
 
 [`Download Jupyter notebook: sampling.ipynb`](../../_downloads/98c8aa10d85bcd2ddc4f4456ad29dcbe/sampling.ipynb)
 

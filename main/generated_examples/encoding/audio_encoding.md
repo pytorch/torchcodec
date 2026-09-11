@@ -127,7 +127,7 @@ AudioSamples:
 Check the docstring of the encoding methods to learn about the different
 encoding options.
 
-**Total running time of the script:** (0 minutes 0.029 seconds)
+**Total running time of the script:** (0 minutes 0.030 seconds)
 
 [`Download Jupyter notebook: audio_encoding.ipynb`](../../_downloads/11ef1d93158a89ea05a303d1d7c2cc02/audio_encoding.ipynb)
 
