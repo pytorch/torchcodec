@@ -171,10 +171,13 @@ static UniqueCUvideodecoder create_decoder(
   decoder_params.ulWidth = video_format->coded_width;
   decoder_params.ulMaxHeight = video_format->coded_height;
   decoder_params.ulMaxWidth = video_format->coded_width;
-  decoder_params.ulTargetHeight =
-      video_format->display_area.bottom - video_format->display_area.top;
-  decoder_params.ulTargetWidth =
-      video_format->display_area.right - video_format->display_area.left;
+  // We ask NVDEC for the whole coded frame and we apply the display area crop
+  // ourselves, in convert_cuda_frame_to_av_frame(). Cropping within NVDEC would
+  // mean baking the display area into the decoder, and decoders are cached and
+  // re-used across videos: two videos with the same coded dimensions can have
+  // different display areas (heights of 530 and 532 are both coded as 544).
+  decoder_params.ulTargetHeight = video_format->coded_height;
+  decoder_params.ulTargetWidth = video_format->coded_width;
   decoder_params.ulNumDecodeSurfaces = video_format->min_num_decode_surfaces;
   // We should only ever need 1 output surface, since we process frames
   // sequentially, and we always unmap the previous frame before mapping a new
@@ -182,10 +185,12 @@ static UniqueCUvideodecoder create_decoder(
   // TODONVDEC P3: set this to 2, allow for 2 frames to be mapped at a time, and
   // benchmark to see if this makes any difference.
   decoder_params.ulNumOutputSurfaces = 1;
-  decoder_params.display_area.left = video_format->display_area.left;
-  decoder_params.display_area.right = video_format->display_area.right;
-  decoder_params.display_area.top = video_format->display_area.top;
-  decoder_params.display_area.bottom = video_format->display_area.bottom;
+  decoder_params.display_area.left = 0;
+  decoder_params.display_area.right =
+      static_cast<short>(video_format->coded_width);
+  decoder_params.display_area.top = 0;
+  decoder_params.display_area.bottom =
+      static_cast<short>(video_format->coded_height);
 
   CUvideodecoder* decoder = new CUvideodecoder();
   CUresult result = cuvidCreateDecoder(decoder, &decoder_params);
@@ -884,8 +889,8 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
     const CUVIDPARSERDISPINFO& disp_info) {
   STD_TORCH_CHECK(frame_ptr != 0, "Invalid CUDA frame pointer");
 
-  // Get frame dimensions from video format display area (not coded dimensions)
-  // This matches DALI's approach and avoids padding issues
+  // The surface we're given is the entire coded frame; the visible part of it
+  // is the display area, which we crop to below by offsetting the planes.
   int width =
       video_format_.display_area.right - video_format_.display_area.left;
   int height =
@@ -948,21 +953,42 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
       ? AVCOL_RANGE_JPEG
       : AVCOL_RANGE_MPEG;
 
-  // NVDEC stacks the planes in a single allocation, all with the same pitch,
-  // and it rounds the Y plane's row count up to even. So consecutive planes
-  // start plane_stride bytes apart, which is more than pitch * height for an
-  // odd-height frame. NVIDIA's own NvDecoder addresses the chroma plane the
-  // same way: dpSrcFrame + srcPitch * ((surface_height + 1) & ~1).
-  unsigned int num_luma_plane_rows = round_up_to_even(height);
-  unsigned int plane_stride = pitch * num_luma_plane_rows;
-  auto plane = [&](unsigned int index) {
-    return reinterpret_cast<uint8_t*>(frame_ptr + (plane_stride * index));
-  };
+  // NVDEC stacks the planes of the coded frame in a single allocation, all with
+  // the same pitch, so consecutive planes start plane_stride bytes apart.
+  // NVIDIA's own NvDecoder addresses the chroma plane the same way:
+  // dpSrcFrame + srcPitch * ((surface_height + 1) & ~1).
+  unsigned int plane_stride = pitch * round_up_to_even(surface_height());
   bool is_444 = is_444_surface_format(surface_format_);
 
-  av_frame->data[0] = plane(0);
-  av_frame->data[1] = plane(1);
-  av_frame->data[2] = is_444 ? plane(2) : nullptr;
+  // Crop to the display area. The chroma planes of a 4:2:0 surface are
+  // subsampled by 2 in both directions, so their crop offsets are halved. The
+  // horizontal offset is in bytes, and it is the same for luma and chroma even
+  // for NV12: a chroma sample there is an interleaved (U, V) pair, i.e. twice
+  // as wide as a luma sample but half as many of them per row.
+  int bytes_per_sample = is_16bit_surface_format(surface_format_) ? 2 : 1;
+  int crop_left = video_format_.display_area.left;
+  int crop_top = video_format_.display_area.top;
+  STD_TORCH_CHECK(
+      is_444 || (crop_left % 2 == 0 && crop_top % 2 == 0),
+      "Subsampled surface with an odd crop offset (",
+      crop_left,
+      ", ",
+      crop_top,
+      "), this is unexpected, please report.");
+  unsigned int luma_crop_offset =
+      crop_top * pitch + crop_left * bytes_per_sample;
+  unsigned int chroma_crop_offset = is_444
+      ? luma_crop_offset
+      : (crop_top / 2) * pitch + crop_left * bytes_per_sample;
+
+  auto plane = [&](unsigned int index, unsigned int crop_offset) {
+    return reinterpret_cast<uint8_t*>(
+        frame_ptr + (plane_stride * index) + crop_offset);
+  };
+
+  av_frame->data[0] = plane(0, luma_crop_offset);
+  av_frame->data[1] = plane(1, chroma_crop_offset);
+  av_frame->data[2] = is_444 ? plane(2, chroma_crop_offset) : nullptr;
   av_frame->data[3] = nullptr;
   // TODO_API_BREAKDOWN CC P2: Check range before cast?
   av_frame->linesize[0] = static_cast<int>(pitch);
@@ -1073,6 +1099,11 @@ std::optional<torch::stable::Tensor> BetaCudaDeviceInterface::get_frame_storage(
 torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
     UniqueAVFrame& av_frame,
     cudaStream_t current_stream) {
+  // We copy the entire surface, i.e. the whole coded frame, not just the
+  // display area that av_frame points to: the planes are all part of the same
+  // allocation, so a single copy is cheaper than one copy per cropped plane,
+  // and it lets us keep the frame's crop offsets untouched below.
+  //
   // The amount of bytes an NV12 image takes is:
   // num_bytes =  len(Y) + len(UV)
   //           = num_pixels + num_pixels / 2
@@ -1084,11 +1115,15 @@ torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
   // surface has two full-size chroma planes instead of one half-height one, so
   // it's num_pixels * 3.
   int64_t num_luma_plane_rows =
-      static_cast<int64_t>(round_up_to_even(av_frame->height));
+      static_cast<int64_t>(round_up_to_even(surface_height()));
   int64_t pitch = static_cast<int64_t>(av_frame->linesize[0]);
   bool is_444 = is_444_surface_format(surface_format_);
   int64_t num_bytes = is_444 ? pitch * num_luma_plane_rows * 3
                              : pitch * num_luma_plane_rows * 3 / 2;
+
+  auto* surface_base = reinterpret_cast<uint8_t*>(previously_mapped_frame_);
+  STD_TORCH_CHECK(
+      surface_base != nullptr, "The frame's surface is no longer mapped");
 
   auto storage =
       torch::stable::empty({num_bytes}, kStableUInt8, std::nullopt, device_);
@@ -1100,7 +1135,7 @@ torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
 
   cudaError_t err = cudaMemcpyAsync(
       storage.mutable_data_ptr(),
-      av_frame->data[0],
+      surface_base,
       static_cast<size_t>(num_bytes),
       cudaMemcpyDeviceToDevice,
       current_stream);
@@ -1112,12 +1147,13 @@ torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
   // The copy is async, so the next mapping must be ordered after it.
   record_surface_read(current_stream);
 
-  auto y_plane = static_cast<uint8_t*>(storage.mutable_data_ptr());
-  int64_t plane_stride = pitch * num_luma_plane_rows;
-  av_frame->data[0] = y_plane;
-  av_frame->data[1] = y_plane + plane_stride;
-  if (is_444) {
-    av_frame->data[2] = y_plane + (2 * plane_stride);
+  // Re-point the planes into the copy, preserving where they were within the
+  // surface: those offsets encode both the plane layout and the display area
+  // crop.
+  auto* storage_base = static_cast<uint8_t*>(storage.mutable_data_ptr());
+  int num_planes = is_444 ? 3 : 2;
+  for (int i = 0; i < num_planes; ++i) {
+    av_frame->data[i] = storage_base + (av_frame->data[i] - surface_base);
   }
 
   return storage;

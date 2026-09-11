@@ -127,6 +127,13 @@ class BetaCudaDeviceInterface : public DeviceInterface {
       unsigned int pitch,
       const CUVIDPARSERDISPINFO& disp_info);
 
+  // Height of the surfaces NVDEC outputs. We create decoders that output the
+  // entire coded frame and we crop to the display area ourselves, so this is
+  // taller than the frames we hand out.
+  int surface_height() const {
+    return static_cast<int>(video_format_.coded_height);
+  }
+
   void make_frame_standalone(UniqueAVFrame& av_frame) override;
 
   std::optional<torch::stable::Tensor> get_frame_storage(
