@@ -71,7 +71,11 @@ class NVDECCache {
 
  private:
   // Cache key struct: a decoder can be reused and taken from the cache only if
-  // all these parameters match.
+  // all these parameters match. Note that the display area is deliberately not
+  // part of it: decoders are created for the entire coded frame and the crop is
+  // applied afterwards, see Note: [NVDEC surface dimensions and cropping] in
+  // BetaCudaDeviceInterface.h. Anything that gets baked into a decoder at
+  // creation time must be a field here.
   struct CacheKey {
     cudaVideoCodec codec_type;
     uint32_t width;

@@ -75,6 +75,8 @@ from .utils import (
     BT601_LIMITED_RANGE,
     BT709_FULL_RANGE,
     CMYK_JPEG,
+    CODED64_DISPLAY50_VIDEO,
+    CODED64_DISPLAY52_VIDEO,
     CORRUPT_JPEG,
     cuda_devices,
     DISCARD_FIRST_KEYFRAME_VIDEO,
@@ -2524,6 +2526,34 @@ class TestVideoDecoder:
             # Create a new decoder, it's not cached since capacity is 0
             create_decoder()
             assert _core._get_nvdec_cache_size(device_index=0) == 0
+
+    @needs_cuda
+    def test_nvdec_cache_different_display_areas(self):
+        # Videos with the same coded dimensions but different display areas
+        # must not end up sharing a cached decoder: the display area dictates
+        # the size of the surfaces the decoder outputs, so decoding one video
+        # with another one's decoder silently corrupts the frames.
+        with self.restore_nvdec_cache_capacity():
+            # Evict any leftover cached decoders from previous tests
+            set_nvdec_cache_capacity(0)
+
+        for priming_video, video in itertools.permutations(
+            (CODED64_DISPLAY50_VIDEO, CODED64_DISPLAY52_VIDEO)
+        ):
+            reference = VideoDecoder(video.path, device="cpu")[:].cuda()
+
+            with set_cuda_backend("nvdec"):
+                decoder = VideoDecoder(priming_video.path, device="cuda")
+                decoder[0]
+                assert not decoder.cpu_fallback
+                del decoder
+                gc.collect()
+
+                decoder = VideoDecoder(video.path, device="cuda")
+                frames = decoder[:]
+                assert not decoder.cpu_fallback
+
+            assert_frames_equal(frames, reference)
 
     def test_cpu_fallback_no_fallback_on_cpu_device(self):
         """Test that CPU device doesn't trigger fallback (it's not a fallback scenario)."""
