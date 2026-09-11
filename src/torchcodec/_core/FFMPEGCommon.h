@@ -406,9 +406,6 @@ struct SwsConfig {
   int output_width = 0;
   int output_height = 0;
   AVPixelFormat output_format = AV_PIX_FMT_NONE;
-  // swscale derives the output range from the output pixel format alone: YUV
-  // gets limited range. AVCOL_RANGE_UNSPECIFIED keeps that; anything else
-  // overrides it.
   AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED;
 
   SwsConfig() = default;

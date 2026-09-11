@@ -1239,19 +1239,17 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       width,
       height,
       target_pix_fmt,
-      // The frame keeps its range tag through the upload, so the samples must
-      // keep the range that tag names. Left to itself, swscale writes limited
-      // range into a YUV target whatever it read, and the color conversion
-      // would then expand a full-range source a second time.
+      // We have to tell swscale to respect the source's color range because
+      // we're converting to a YUV format, and by default, swscale would assume
+      // limited range only.
       cpu_frame.color_range);
 
   if (!sws_context_ || prev_sws_config_ != sws_config) {
-    // Nothing is rescaled here, so the flags only pick how chroma is
+    // Nothing is rescaled here, so the flags only defines how chroma is
     // resampled, which happens when the source is subsampled more finely than
-    // the target surface (4:2:2 into 4:4:4, say). SWS_POINT replicates it,
-    // which is what the CPU converter does on its way to RGB - interpolating
-    // instead would invent chroma the CPU never sees, and show up as colored
-    // fringes along sharp edges.
+    // the target surface (4:2:2 into 4:4:4, say). SWS_POINT replicates the
+    // chroma, which is what we want here. SWS_BILINEAR would interpolate it,
+    // leading to results that aren't as close to the CPU ref.
     sws_context_ = create_sws_context(sws_config, SWS_POINT);
     prev_sws_config_ = sws_config;
   }
@@ -1339,9 +1337,10 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       "Failed to copy frame properties: ",
       get_ffmpeg_error_string_from_error_code(ret));
 
-  // AVCOL_SPC_RGB says "these planes are RGB", which the planes we just wrote
-  // aren't. Name the matrix swscale encoded them with instead: it maps
-  // AVCOL_SPC_RGB, like any colorspace it doesn't know, to its BT.601 default.
+  // The input CPU frame might be AVCOL_SPC_RGB, and the GPU frame we just
+  // produced is YUV. We set the colorspace of the GPU frame to BT.601, which is
+  // (hopefully??) what libswscale assumed. The alternative would be to let the
+  // GPU frame describe "RGB" as its colorspace which is probably more wrong.
   if (cpu_frame.colorspace == AVCOL_SPC_RGB) {
     gpu_frame->colorspace = AVCOL_SPC_SMPTE170M;
   }

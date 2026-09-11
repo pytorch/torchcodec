@@ -960,9 +960,7 @@ UniqueSwsContext create_sws_context(
       &saturation);
   STD_TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
 
-  // swscale spells a range as an int: 1 is full, 0 is limited. FFmpeg names
-  // those AVCOL_RANGE_JPEG and AVCOL_RANGE_MPEG, after the two worlds they come
-  // from - JPEG is the full one.
+  // swscale spells a range as an int: 1 is full (jpeg), 0 is limited.
   if (sws_config.output_color_range != AVCOL_RANGE_UNSPECIFIED) {
     dst_range = sws_config.output_color_range == AVCOL_RANGE_JPEG;
   }

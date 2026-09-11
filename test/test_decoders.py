@@ -2380,12 +2380,11 @@ class TestVideoDecoder:
         ),
         ids=lambda video: video.path.stem,
     )
-    def test_cpu_fallback_matches_cpu(self, video):
-        # NVDEC decodes none of these, so CUDA decodes them on the CPU and
-        # uploads them in an NVDEC surface format. Monochrome, planar RGB, alpha
-        # and 4:2:2 all convert to something those formats hold, and all but the
-        # FFV1 one are full range, which is what a conversion that quietly
-        # narrowed them to limited range would squash.
+    def test_cpu_fallback_matches_cpu_special_cases(self, video):
+        # Non regression test for a bunch of special-case videos that go through
+        # the fallback. These videos are natively "YUV" and the upload path must
+        # still handle them correctly. The equivalent test for the "blocks" APIs
+        # is test_cpu_fallback_upload_keeps_full_range
         num_frames = 5
         cpu_decoder = VideoDecoder(video.path, device="cpu")
         cuda_decoder = VideoDecoder(video.path, device="cuda")
@@ -2394,9 +2393,6 @@ class TestVideoDecoder:
         cpu_frames = cpu_decoder[:num_frames]
         cuda_frames = cuda_decoder[:num_frames].cpu()
 
-        # A couple of levels for the color-conversion kernel, and a couple more
-        # for the planar RGB source, whose samples make a round trip through
-        # 8-bit YUV that the CPU never puts them through.
         torch.testing.assert_close(cuda_frames, cpu_frames, atol=3, rtol=0)
 
     @needs_cuda
@@ -3586,8 +3582,6 @@ class _PlanesCase(NamedTuple):
     bit_depth: int
     cpu_pix_fmt: str
     cuda_pix_fmt: str
-    # One per component of the pixel format, so three for YUV and RGB, one for
-    # grayscale, and one more when the format has an alpha component.
     cpu_num_planes: int = 3
     cuda_num_planes: int = 3
     # FFmpeg 6 added P012. Before that, NVDEC's 12-bit surface can only be
@@ -4295,8 +4289,6 @@ class TestBlocks:
         )
 
         assert pix_fmt == expected_pix_fmt
-        # "gbr" is what a planar RGB frame reports: its samples are already RGB,
-        # so there is no YUV matrix to name.
         assert frame.colorspace in ("bt709", "bt2020nc", "smpte170m", "gbr", "unknown")
         assert frame.color_range in ("tv", "pc", "unknown")  # FFmpeg has only these
 
@@ -4579,8 +4571,6 @@ class TestBlocks:
         "video, expected_colorspace, has_luma",
         (
             pytest.param(TESTSRC2_GRAY_HEVC, "unknown", True, id="gray"),
-            # "gbr" describes RGB planes, which the uploaded frame doesn't have.
-            # It names the YUV matrix its planes were encoded with instead.
             pytest.param(TESTSRC2_GBRP_HEVC, "smpte170m", False, id="gbrp"),
             pytest.param(TESTSRC2_FULL_RANGE_422, "unknown", True, id="422"),
         ),
@@ -4589,10 +4579,7 @@ class TestBlocks:
         self, video, expected_colorspace, has_luma
     ):
         # Full-range sources NVDEC can't decode, so they go through the CPU
-        # fallback and its conversion to an NVDEC surface format. The samples
-        # stay full range across that conversion: narrowing them to limited
-        # range while the frame still says "pc" would have the color conversion
-        # stretch them a second time.
+        # fallback and its conversion to an NVDEC surface format.
         cpu_frame, cpu_converter = self._first_frame(video.path, "cpu")
         cuda_frame, cuda_converter = self._first_frame(video.path, "cuda")
 
