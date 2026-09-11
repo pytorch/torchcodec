@@ -373,6 +373,22 @@ void CUDAJpegDecoder::decode_batched_hardware(
     formats.push_back(output_format);
   }
 
+  // nvJPEG's hardware engine does not honour the stream it is given: with work
+  // already queued on `stream`, nvjpegDecodeBatched() can write its
+  // destinations before that work has run. Those destinations are the outputs
+  // allocated above, which come from the caching allocator, so a block that was
+  // just freed on this stream can be handed to the decoder while kernels
+  // reading it are still queued, and an early write silently corrupts them.
+  // Waiting on the device (cudaStreamWaitEvent) is not enough, only a host
+  // barrier is. It costs no wall time here, because decode_images() already
+  // host-synchronizes `stream` before returning. The software path below is
+  // unaffected. Remove once nvJPEG orders the write itself.
+  cudaError_t presync_status = cudaStreamSynchronize(stream);
+  STD_TORCH_CHECK(
+      presync_status == cudaSuccess,
+      "Failed to synchronize CUDA stream: ",
+      presync_status);
+
   // The batch nvjpeg API only support a single output format per call, but we
   // may want both grayscale and RGB images here. So we need to split the input
   // into two groups and decode them separately. To be safe, we add  stream sync

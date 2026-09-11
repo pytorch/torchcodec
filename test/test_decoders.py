@@ -6676,6 +6676,46 @@ class TestImageDecoder:
                 assert got.shape == ref.shape
                 assert_tensor_close_on_at_least(got.cpu(), ref, percentage=99, atol=3)
 
+    @needs_cuda
+    @needs_jpeg
+    def test_cuda_jpeg_waits_for_callers_stream(self):
+        # nvJPEG's hardware engine can write its destination before work that was
+        # already queued on the stream it was given has run. The outputs come from
+        # the caching allocator, which hands out a block as soon as it is freed on
+        # the stream that owns it, so a decode can be handed memory that queued
+        # kernels are still reading.
+        #
+        # Here the reductions are queued behind a long-running kernel and their
+        # inputs are freed while they are still queued, so the decoder is handed
+        # that memory. The sums are exact integers, and are only wrong if the
+        # decode wrote early.
+        num_bytes = 3 * GRADIENT_JPEG.height * GRADIENT_JPEG.width  # the output's size
+        values = (1, 2, 3, 4)
+        expected = float(sum(value * num_bytes for value in values))
+
+        landed_on_freed = 0
+        for _ in range(5):
+            victims = [
+                torch.full((num_bytes,), value, dtype=torch.uint8, device="cuda")
+                for value in values
+            ]
+            pointers = {victim.data_ptr() for victim in victims}
+            torch.cuda.synchronize()  # the victims' contents are resident
+
+            torch.cuda._sleep(200_000_000)  # keep the stream busy for ~100ms
+            total = torch.zeros((), dtype=torch.float64, device="cuda")
+            for victim in victims:
+                total = total + victim.sum(dtype=torch.float64)
+            victims.clear()  # freed while their reductions are still queued
+
+            decoded = decode_jpeg(GRADIENT_JPEG.path, device="cuda")
+            landed_on_freed += decoded.data_ptr() in pointers
+            torch.cuda.synchronize()
+            assert float(total) == expected
+
+        if not landed_on_freed:
+            pytest.skip("the allocator never reused a freed block, nothing was tested")
+
     # ===== PNG =====
 
     @needs_png
