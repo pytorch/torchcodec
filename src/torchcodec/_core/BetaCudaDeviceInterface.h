@@ -34,9 +34,8 @@
 #include "nvcuvid_include/nvcuvid.h"
 
 namespace facebook::torchcodec {
-// TODO_API_BREAKDOWN P2: the name says "standalone", but this is really about
-// owning a GPU buffer. Find one that covers both.
-struct StandAloneFrameAttachedData {
+// The buffer a frame owns its samples in, hung off the AVFrame as opaque data.
+struct OwnedFrameStorage {
   // Marks the point where the copy (or upload) that filled `storage` was
   // enqueued. A consumer on another stream must wait on it.
   CudaEvent frame_ready;

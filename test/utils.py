@@ -1100,6 +1100,28 @@ BT601_LIMITED_RANGE = TestVideo(
     frames={0: {}},  # Not needed for now
 )
 
+# Full range BT.601 10-bit video (see test_full_range_10bit()). Generated with:
+# ffmpeg -f lavfi -i "color=c=0x404060:s=66x64:r=25:d=0.4" -c:v libx265 \
+# -tag:v hvc1 -pix_fmt yuv420p10le -colorspace smpte170m -color_range pc \
+# -x265-params lossless=1 bt601_full_range_10bit.mp4
+#
+# Confirm color space with:
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=pix_fmt,color_space,color_range -of default=noprint_wrappers=1 test/resources/bt601_full_range_10bit.mp4
+# pix_fmt=yuv420p10le
+# color_range=pc
+# color_space=smpte170m
+BT601_FULL_RANGE_10BIT = TestVideo(
+    filename="bt601_full_range_10bit.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=66, height=64, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
+)
+
+# The solid color BT601_FULL_RANGE_10BIT is filled with.
+BT601_FULL_RANGE_10BIT_RGB = (0x40, 0x40, 0x60)
+
 # HDR re-encode of NASA video (10-bit H265 with BT.2020 + PQ), generated with:
 # ffmpeg -i test/resources/nasa_13013.mp4 -map 0:v:0 -c:v libx265 -pix_fmt yuv420p10le \
 # -x265-params "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:range=limited" \
@@ -1298,6 +1320,59 @@ TESTSRC2_444_12BIT_HEVC = TestVideo(
     default_stream_index=0,
     stream_infos={
         0: TestVideoStreamInfo(width=321, height=241, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# The sources whose frames don't come out as three YUV planes. libx264 accepts
+# -pix_fmt gray but silently encodes 4:2:0 anyway, hence libx265 here. Even
+# dimensions, because both encoders below round odd ones down.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=1" \
+#  -vf format=gray -c:v libx265 -tag:v hvc1 testsrc2_gray_hevc.mp4
+TESTSRC2_GRAY_HEVC = TestVideo(
+    filename="testsrc2_gray_hevc.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# ffmpeg -f lavfi -i "testsrc2=size=321x241:rate=25:duration=1,format=rgb24" \
+#  -vf format=gbrp -c:v libx265 -tag:v hvc1 testsrc2_gbrp_hevc.mp4
+TESTSRC2_GBRP_HEVC = TestVideo(
+    filename="testsrc2_gbrp_hevc.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=321, height=241, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# FFV1 is lossless, so this one is a fifth of a second rather than a full one.
+# VP9's alpha is not an option: it rides in a separate layer, and the frames the
+# decoder produces are plain yuv420p.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=0.2" \
+#  -vf format=yuva420p -c:v ffv1 testsrc2_yuva420p_ffv1.mkv
+TESTSRC2_YUVA420P_FFV1 = TestVideo(
+    filename="testsrc2_yuva420p_ffv1.mkv",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
+    },
+    frames={0: {}},
+)
+
+# Full range (pc) 4:2:2, i.e. neither the range nor the chroma layout that NVDEC
+# surfaces come in. yuvj422p is what -pix_fmt yuvj422p and -pix_fmt yuv422p
+# -color_range pc both produce.
+# ffmpeg -f lavfi -i "testsrc2=size=320x240:rate=25:duration=1" \
+#  -c:v libx264 -pix_fmt yuvj422p testsrc2_full_range_422.mp4
+TESTSRC2_FULL_RANGE_422 = TestVideo(
+    filename="testsrc2_full_range_422.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=320, height=240, num_color_channels=3),
     },
     frames={0: {}},
 )

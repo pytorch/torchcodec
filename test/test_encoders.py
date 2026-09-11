@@ -2001,6 +2001,41 @@ class TestEncoder:
         assert metadata["color_space"] == colorspace
         assert metadata["color_range"] == color_range
 
+    @pytest.mark.parametrize(
+        "extra_options",
+        (
+            {},
+            {"color_range": "pc"},
+            {"colorspace": "bt709"},
+            {"colorspace": "bt709", "color_range": "pc"},
+        ),
+    )
+    def test_color_tags_describe_the_samples(self, tmp_path, extra_options):
+        # Non regression test to ensure the color range is respected by the
+        # encoder for pixel values, not just what the stream reports as
+        # metadata.
+        frames = torch.zeros((5, 3, 64, 64), dtype=torch.uint8)
+        frames[:, 0], frames[:, 1], frames[:, 2] = 0x40, 0x80, 0x60
+
+        dest = str(tmp_path / "output.mp4")
+        enc = Encoder()
+        video = enc.add_video(
+            height=64,
+            width=64,
+            frame_rate=30.0,
+            # Lossless and unsubsampled, so the only thing left between these
+            # frames and the ones we decode back is the color conversion.
+            crf=0,
+            pixel_format="yuv444p",
+            extra_options=extra_options,
+        )
+        enc.open_file(dest)
+        video.add_frames(frames)
+        enc.close()
+
+        decoded = VideoDecoder(dest).get_frames_in_range(start=0, stop=5).data
+        torch.testing.assert_close(decoded, frames, rtol=0, atol=3)
+
     @pytest.mark.parametrize("method", ("to_file", "to_file_like"))
     @pytest.mark.parametrize("crf", [23, 23.5, -0.9])
     def test_crf_valid_values(self, method, crf, tmp_path):

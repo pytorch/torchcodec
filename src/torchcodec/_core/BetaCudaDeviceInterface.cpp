@@ -4,6 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <limits>
 #include <map>
 #include <mutex>
 #include <vector>
@@ -345,7 +346,7 @@ std::optional<cudaVideoSurfaceFormat> get_nvdec_surface_format(
 void standalone_frame_free_callback(
     [[maybe_unused]] void* opaque,
     uint8_t* data) {
-  delete reinterpret_cast<StandAloneFrameAttachedData*>(data);
+  delete reinterpret_cast<OwnedFrameStorage*>(data);
 }
 
 class CudaContextGuard {
@@ -993,7 +994,12 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
   av_frame->data[1] = plane(1, crop.chroma);
   av_frame->data[2] = is_444 ? plane(2, crop.chroma) : nullptr;
   av_frame->data[3] = nullptr;
-  // TODO_API_BREAKDOWN CC P2: Check range before cast?
+  STD_TORCH_CHECK(
+      pitch <= static_cast<unsigned int>(std::numeric_limits<int>::max()),
+      "NVDEC returned a pitch of ",
+      pitch,
+      " bytes, which doesn't fit in an AVFrame line size. This should never "
+      "happen, please report.");
   av_frame->linesize[0] = static_cast<int>(pitch);
   av_frame->linesize[1] = static_cast<int>(pitch);
   av_frame->linesize[2] = is_444 ? static_cast<int>(pitch) : 0;
@@ -1029,12 +1035,12 @@ void BetaCudaDeviceInterface::make_frame_standalone(UniqueAVFrame& av_frame) {
     storage = copy_nvdec_surface(av_frame, current_stream);
   }
 
-  auto attached_data = new StandAloneFrameAttachedData();
+  auto attached_data = new OwnedFrameStorage();
   attached_data->frame_ready.record(current_stream);
   attached_data->storage = std::move(storage);
   av_frame->opaque_ref = av_buffer_create(
       reinterpret_cast<uint8_t*>(attached_data),
-      sizeof(StandAloneFrameAttachedData),
+      sizeof(OwnedFrameStorage),
       standalone_frame_free_callback,
       nullptr,
       0);
@@ -1094,8 +1100,7 @@ std::optional<torch::stable::Tensor> BetaCudaDeviceInterface::get_frame_storage(
   // for those users who would like to consume the frame with their own
   // consumer, i.e. not using the ColorConverter: they need to call
   // frame.storage.record_stream(color_conversion_stream) themselves.
-  return reinterpret_cast<StandAloneFrameAttachedData*>(
-             av_frame.opaque_ref->data)
+  return reinterpret_cast<OwnedFrameStorage*>(av_frame.opaque_ref->data)
       ->storage;
 }
 
@@ -1265,17 +1270,26 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
   // Source and destination dimensions are the same: this is a pixel format
   // conversion, not a rescale. sws_scale() writes into the even-sized buffer
   // allocated above but only fills the real width and height.
-  SwsConfig sws_config(
-      width,
-      height,
-      static_cast<AVPixelFormat>(cpu_frame.format),
-      cpu_frame.colorspace,
-      width,
-      height,
-      target_pix_fmt);
+  SwsConfig sws_config{
+      .input_width = width,
+      .input_height = height,
+      .input_format = static_cast<AVPixelFormat>(cpu_frame.format),
+      .input_colorspace = cpu_frame.colorspace,
+      .output_width = width,
+      .output_height = height,
+      .output_format = target_pix_fmt,
+      // We have to tell swscale to respect the source's color range because
+      // we're converting to a YUV format, and by default, swscale would assume
+      // limited range only.
+      .output_color_range = cpu_frame.color_range};
 
   if (!sws_context_ || prev_sws_config_ != sws_config) {
-    sws_context_ = create_sws_context(sws_config, SWS_BILINEAR);
+    // Nothing is rescaled here, so the flags only defines how chroma is
+    // resampled, which happens when the source is subsampled more finely than
+    // the target surface (4:2:2 into 4:4:4, say). SWS_POINT replicates the
+    // chroma, which is what we want here. SWS_BILINEAR would interpolate it,
+    // leading to results that aren't as close to the CPU ref.
+    sws_context_ = create_sws_context(sws_config, SWS_POINT);
     prev_sws_config_ = sws_config;
   }
 
@@ -1362,6 +1376,14 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       "Failed to copy frame properties: ",
       get_ffmpeg_error_string_from_error_code(ret));
 
+  // The input CPU frame might be AVCOL_SPC_RGB, and the GPU frame we just
+  // produced is YUV. We set the colorspace of the GPU frame to BT.601, which is
+  // (hopefully??) what libswscale assumed. The alternative would be to let the
+  // GPU frame describe "RGB" as its colorspace which is probably more wrong.
+  if (cpu_frame.colorspace == AVCOL_SPC_RGB) {
+    gpu_frame->colorspace = AVCOL_SPC_SMPTE170M;
+  }
+
   return {std::move(gpu_frame), std::move(storage)};
 }
 
@@ -1408,8 +1430,8 @@ void BetaCudaDeviceInterface::convert_av_frame_to_frame_output(
         gpu_frame.opaque_ref != nullptr,
         "ColorConverter received a non-standalone frame; frames fed to a "
         "standalone ColorConverter must come from a PacketDecoder.");
-    auto attached_data = reinterpret_cast<StandAloneFrameAttachedData*>(
-        gpu_frame.opaque_ref->data);
+    auto attached_data =
+        reinterpret_cast<OwnedFrameStorage*>(gpu_frame.opaque_ref->data);
     attached_data->frame_ready.make_stream_wait(current_stream);
   } else {
     STD_TORCH_CHECK(

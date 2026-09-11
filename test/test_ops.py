@@ -43,6 +43,8 @@ from torchcodec._core.ops import (
 from .utils import (
     all_supported_devices,
     assert_frames_equal,
+    BT601_FULL_RANGE_10BIT,
+    BT601_FULL_RANGE_10BIT_RGB,
     DISCARD_FIRST_KEYFRAME_VIDEO,
     get_python_version,
     NASA_AUDIO,
@@ -617,6 +619,19 @@ class TestVideoDecoderOps:
             INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame_time6, reference_frame_time6)
+
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library_full_range_10bit(self, color_conversion_library):
+        # Non regression test ensuring >8bit full range videos are decoded
+        # correctly on CPU and GPU. We used to not pass the color-range tag to
+        # libswscale (worked fine for 8 bit as it could be derived from pixel
+        # format), but didn't for >8bit.
+        decoder = create_from_file(str(BT601_FULL_RANGE_10BIT.path))
+        _add_video_stream(decoder, color_conversion_library=color_conversion_library)
+
+        frame, *_ = get_next_frame(decoder)
+        expected = torch.tensor(BT601_FULL_RANGE_10BIT_RGB, dtype=torch.float32)
+        assert (frame.float() - expected[:, None, None]).abs().max() <= 3
 
     @pytest.mark.parametrize("dimension_order", ("NHWC", "NCHW"))
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
