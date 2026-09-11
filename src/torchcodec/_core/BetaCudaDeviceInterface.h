@@ -127,12 +127,18 @@ class BetaCudaDeviceInterface : public DeviceInterface {
       unsigned int pitch,
       const CUVIDPARSERDISPINFO& disp_info);
 
-  // Height of the surfaces NVDEC outputs. We create decoders that output the
-  // entire coded frame and we crop to the display area ourselves, so this is
-  // taller than the frames we hand out.
+  // Height of the surfaces NVDEC outputs, which is taller than the frames we
+  // hand out. See Note: [NVDEC surface dimensions and cropping].
   int surface_height() const {
     return static_cast<int>(video_format_.coded_height);
   }
+
+  struct CropOffsets {
+    unsigned int luma;
+    unsigned int chroma;
+  };
+
+  CropOffsets crop_offsets(unsigned int pitch) const;
 
   void make_frame_standalone(UniqueAVFrame& av_frame) override;
 
@@ -279,4 +285,60 @@ class BetaCudaDeviceInterface : public DeviceInterface {
 // - we have to guess the frame's pts ourselves
 // - we have to re-order the frames ourselves to preserve display order.
 //
+/* clang-format on */
+
+/* clang-format off */
+// Note: [NVDEC surface dimensions and cropping]
+//
+// Codecs encode whole macroblocks (or CTUs), so the dimensions of a coded frame
+// are rounded up: a 1280x530 video is coded as 1280x544. The part of it that is
+// actually visible is the "display area", a window within the coded frame that
+// the bitstream describes, and that's the frame size we report and hand out:
+//
+//     0    32                     1248 1280
+//   0 +-----+------------------------+---+
+//     |          top crop, 16 rows       |
+//  16 +-----+------------------------+---+ ---
+//     |     |                        |   |  |
+//     |left | display area 1216x512  |rgt|  |
+//     |crop |   (what users get)     |crp|  | 512
+//     |  32 |                        | 32|  |
+//     |     |                        |   |  |
+// 528 +-----+------------------------+---+ ---
+//     |        bottom crop, 16 rows      |
+// 544 +----------------------------------+
+//       coded frame 1280x544
+//
+// Encoders start at (0, 0) and only pad the right and bottom edges, so in
+// practice left and top are 0 and the picture above degenerates to the 14 junk
+// rows at the bottom of our 1280x544 example. But all four sides can be
+// cropped: H.264 has four independent frame_crop_*_offset fields in its SPS
+// (HEVC has an equivalent conformance window), which an encoder may use to trim
+// e.g. letterbox bars.
+//
+// We use the display area in two places. Its left/top say where the visible
+// region starts, and that's the offset we apply to the frame's planes, see
+// crop_offsets(). Its right/bottom give the region's extent, and that's the
+// frame's width and height, which along with the pitch is what stops consumers
+// from reading into the padding. Careful with 4:2:0: the offsets are expressed
+// in luma samples while the chroma plane is subsampled, so the vertical offset
+// is halved for chroma while the horizontal one isn't - an NV12 chroma sample
+// is an interleaved (U, V) pair, twice as wide as a luma sample but half as
+// many per row.
+//
+// NVDEC can apply that crop for us, but it gets baked into the decoder when the
+// decoder is created, and decoders are cached and re-used across videos (see
+// NVDECCache): two videos with the same coded dimensions but different display
+// areas would then share a decoder whose output surfaces aren't the size we
+// expect, and their frames would be silently corrupted. So we create decoders
+// that output the entire coded frame, and we crop to the display area ourselves
+// by offsetting the frame's planes, see crop_offsets().
+//
+// The consequence is that anything describing the surface rather than the frame
+// - the distance between planes, the size of the copy in copy_nvdec_surface() -
+// must use surface_height(), not the frame's height.
+//
+// This crop has nothing to do with the one in convert_yuv_to_rgb()
+// [color_conversion.cpp], which trims the output of a color-conversion kernel
+// that ran on even-rounded dimensions.
 /* clang-format on */

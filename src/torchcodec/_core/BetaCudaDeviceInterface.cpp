@@ -171,11 +171,8 @@ static UniqueCUvideodecoder create_decoder(
   decoder_params.ulWidth = video_format->coded_width;
   decoder_params.ulMaxHeight = video_format->coded_height;
   decoder_params.ulMaxWidth = video_format->coded_width;
-  // We ask NVDEC for the whole coded frame and we apply the display area crop
-  // ourselves, in convert_cuda_frame_to_av_frame(). Cropping within NVDEC would
-  // mean baking the display area into the decoder, and decoders are cached and
-  // re-used across videos: two videos with the same coded dimensions can have
-  // different display areas (heights of 530 and 532 are both coded as 544).
+  // The decoder outputs the entire coded frame, see Note: [NVDEC surface
+  // dimensions and cropping].
   decoder_params.ulTargetHeight = video_format->coded_height;
   decoder_params.ulTargetWidth = video_format->coded_width;
   decoder_params.ulNumDecodeSurfaces = video_format->min_num_decode_surfaces;
@@ -883,6 +880,32 @@ void BetaCudaDeviceInterface::unmap_previous_frame() {
   previously_mapped_frame_ = 0;
 }
 
+// Where the display area starts within a plane of the surface, in bytes. See
+// Note: [NVDEC surface dimensions and cropping].
+BetaCudaDeviceInterface::CropOffsets BetaCudaDeviceInterface::crop_offsets(
+    unsigned int pitch) const {
+  int crop_left = video_format_.display_area.left;
+  int crop_top = video_format_.display_area.top;
+  bool is_444 = is_444_surface_format(surface_format_);
+  STD_TORCH_CHECK(
+      is_444 || (crop_left % 2 == 0 && crop_top % 2 == 0),
+      "Subsampled surface with an odd crop offset (",
+      crop_left,
+      ", ",
+      crop_top,
+      "), this is unexpected, please report.");
+
+  // The chroma planes of a 4:2:0 surface are subsampled by 2 in both
+  // directions, but only their vertical offset is halved: an NV12 chroma sample
+  // is an interleaved (U, V) pair, i.e. it is twice as wide as a luma sample,
+  // and there are half as many of them per row.
+  int bytes_per_sample = is_16bit_surface_format(surface_format_) ? 2 : 1;
+  unsigned int luma = crop_top * pitch + crop_left * bytes_per_sample;
+  unsigned int chroma =
+      is_444 ? luma : (crop_top / 2) * pitch + crop_left * bytes_per_sample;
+  return {luma, chroma};
+}
+
 UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
     CUdeviceptr frame_ptr,
     unsigned int pitch,
@@ -960,35 +983,15 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
   unsigned int plane_stride = pitch * round_up_to_even(surface_height());
   bool is_444 = is_444_surface_format(surface_format_);
 
-  // Crop to the display area. The chroma planes of a 4:2:0 surface are
-  // subsampled by 2 in both directions, so their crop offsets are halved. The
-  // horizontal offset is in bytes, and it is the same for luma and chroma even
-  // for NV12: a chroma sample there is an interleaved (U, V) pair, i.e. twice
-  // as wide as a luma sample but half as many of them per row.
-  int bytes_per_sample = is_16bit_surface_format(surface_format_) ? 2 : 1;
-  int crop_left = video_format_.display_area.left;
-  int crop_top = video_format_.display_area.top;
-  STD_TORCH_CHECK(
-      is_444 || (crop_left % 2 == 0 && crop_top % 2 == 0),
-      "Subsampled surface with an odd crop offset (",
-      crop_left,
-      ", ",
-      crop_top,
-      "), this is unexpected, please report.");
-  unsigned int luma_crop_offset =
-      crop_top * pitch + crop_left * bytes_per_sample;
-  unsigned int chroma_crop_offset = is_444
-      ? luma_crop_offset
-      : (crop_top / 2) * pitch + crop_left * bytes_per_sample;
-
+  CropOffsets crop = crop_offsets(pitch);
   auto plane = [&](unsigned int index, unsigned int crop_offset) {
     return reinterpret_cast<uint8_t*>(
         frame_ptr + (plane_stride * index) + crop_offset);
   };
 
-  av_frame->data[0] = plane(0, luma_crop_offset);
-  av_frame->data[1] = plane(1, chroma_crop_offset);
-  av_frame->data[2] = is_444 ? plane(2, chroma_crop_offset) : nullptr;
+  av_frame->data[0] = plane(0, crop.luma);
+  av_frame->data[1] = plane(1, crop.chroma);
+  av_frame->data[2] = is_444 ? plane(2, crop.chroma) : nullptr;
   av_frame->data[3] = nullptr;
   // TODO_API_BREAKDOWN CC P2: Check range before cast?
   av_frame->linesize[0] = static_cast<int>(pitch);
@@ -1102,7 +1105,8 @@ torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
   // We copy the entire surface, i.e. the whole coded frame, not just the
   // display area that av_frame points to: the planes are all part of the same
   // allocation, so a single copy is cheaper than one copy per cropped plane,
-  // and it lets us keep the frame's crop offsets untouched below.
+  // and it lets us keep the frame's crop offsets untouched below. See
+  // Note: [NVDEC surface dimensions and cropping].
   //
   // The amount of bytes an NV12 image takes is:
   // num_bytes =  len(Y) + len(UV)
@@ -1121,9 +1125,8 @@ torch::stable::Tensor BetaCudaDeviceInterface::copy_nvdec_surface(
   int64_t num_bytes = is_444 ? pitch * num_luma_plane_rows * 3
                              : pitch * num_luma_plane_rows * 3 / 2;
 
-  auto* surface_base = reinterpret_cast<uint8_t*>(previously_mapped_frame_);
-  STD_TORCH_CHECK(
-      surface_base != nullptr, "The frame's surface is no longer mapped");
+  auto* surface_base =
+      av_frame->data[0] - crop_offsets(static_cast<unsigned int>(pitch)).luma;
 
   auto storage =
       torch::stable::empty({num_bytes}, kStableUInt8, std::nullopt, device_);
