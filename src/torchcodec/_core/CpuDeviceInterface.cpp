@@ -589,19 +589,23 @@ UniqueAVFrame CpuDeviceInterface::convert_tensor_to_av_frame_for_encoding(
 
   // Initialize and cache scaling context if it does not exist
   if (!encoding_sws_context_) {
-    encoding_sws_context_.reset(sws_getContext(
+    SwsConfig sws_config(
         in_width,
         in_height,
         in_pixel_format,
+        // The matrix to encode with. SwsConfig names this after the input
+        // because the input is the YUV end when decoding; here it's the output.
+        codec_context->colorspace,
         out_width,
         out_height,
-        out_pixel_format,
-        SWS_BICUBIC, // Used by FFmpeg CLI
-        nullptr,
-        nullptr,
-        nullptr));
-    STD_TORCH_CHECK(
-        encoding_sws_context_ != nullptr, "Failed to create scaling context");
+        out_pixel_format);
+    // Whatever range the stream will claim, the samples we write have to be in.
+    // Left alone, swscale writes limited range into a YUV frame, and a stream
+    // that says pc would then be describing samples that aren't.
+    sws_config.output_color_range = codec_context->color_range;
+
+    encoding_sws_context_ =
+        create_sws_context(sws_config, SWS_BICUBIC); // Used by FFmpeg CLI
   }
 
   UniqueAVFrame av_frame(av_frame_alloc());
@@ -612,6 +616,8 @@ UniqueAVFrame CpuDeviceInterface::convert_tensor_to_av_frame_for_encoding(
   av_frame->width = out_width;
   av_frame->height = out_height;
   av_frame->pts = frame_index;
+  av_frame->colorspace = codec_context->colorspace;
+  av_frame->color_range = codec_context->color_range;
 
   int status = av_frame_get_buffer(av_frame.get(), 0);
   STD_TORCH_CHECK(status >= 0, "Failed to allocate frame buffer");
