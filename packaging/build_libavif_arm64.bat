@@ -15,7 +15,19 @@
 set PROJ_FOLDER=%cd%
 
 choco install -y --no-progress msys2 --package-parameters "/NoUpdate" || exit /b 1
-C:\tools\msys64\usr\bin\env MSYSTEM=CLANGARM64 /bin/bash -l -c "pacman -S --noconfirm --needed base-devel mingw-w64-clang-aarch64-toolchain mingw-w64-clang-aarch64-cmake mingw-w64-clang-aarch64-ninja mingw-w64-clang-aarch64-meson diffutils" || exit /b 1
+call :retry_pacman "pacman -S --noconfirm --needed base-devel mingw-w64-clang-aarch64-toolchain mingw-w64-clang-aarch64-cmake mingw-w64-clang-aarch64-ninja mingw-w64-clang-aarch64-meson diffutils" || exit /b 1
 C:\tools\msys64\usr\bin\env MSYSTEM=CLANGARM64 /bin/bash -l -c "cd \"${PROJ_FOLDER}\" && packaging/build_libavif.sh" || exit /b 1
 
 :end
+goto :eof
+
+:retry_pacman
+for /L %%I in (1,1,3) do (
+    C:\tools\msys64\usr\bin\env MSYSTEM=CLANGARM64 /bin/bash -l -c "%~1" && exit /b 0
+    if %%I LSS 3 (
+        echo pacman attempt %%I failed, retrying after 15 seconds...
+        timeout /t 15 /nobreak >nul
+    )
+)
+echo ERROR: pacman failed after 3 attempts. >&2
+exit /b 1
