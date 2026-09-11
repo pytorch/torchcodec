@@ -20,14 +20,15 @@ SwScale::SwScale(const SwsConfig& config, int sws_flags)
   // When no resize is needed, input and output resolutions are the same.
   // See [Transform and Format Conversion Order] for more on the output pixel
   // format.
-  SwsConfig color_conversion_frame_config(
-      config_.input_width,
-      config_.input_height,
-      config_.input_format,
-      config_.input_colorspace,
-      config_.input_width,
-      config_.input_height,
-      config_.output_format);
+  SwsConfig color_conversion_frame_config{
+      .input_width = config_.input_width,
+      .input_height = config_.input_height,
+      .input_format = config_.input_format,
+      .input_colorspace = config_.input_colorspace,
+      .input_color_range = config_.input_color_range,
+      .output_width = config_.input_width,
+      .output_height = config_.input_height,
+      .output_format = config_.output_format};
 
   color_conversion_sws_context_ = create_sws_context(
       color_conversion_frame_config,
@@ -38,14 +39,14 @@ SwScale::SwScale(const SwsConfig& config, int sws_flags)
   // Create resize context if needed (output RGB at input resolution ->
   // output RGB at output resolution).
   if (needs_resize_) {
-    SwsConfig resize_frame_config(
-        config_.input_width,
-        config_.input_height,
-        config_.output_format,
-        AVCOL_SPC_RGB,
-        config_.output_width,
-        config_.output_height,
-        config_.output_format);
+    SwsConfig resize_frame_config{
+        .input_width = config_.input_width,
+        .input_height = config_.input_height,
+        .input_format = config_.output_format,
+        .input_colorspace = AVCOL_SPC_RGB,
+        .output_width = config_.output_width,
+        .output_height = config_.output_height,
+        .output_format = config_.output_format};
 
     resize_sws_context_ = create_sws_context(resize_frame_config, sws_flags_);
   }

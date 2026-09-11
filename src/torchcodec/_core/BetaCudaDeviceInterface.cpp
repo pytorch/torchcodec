@@ -1231,18 +1231,18 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
   // Source and destination dimensions are the same: this is a pixel format
   // conversion, not a rescale. sws_scale() writes into the even-sized buffer
   // allocated above but only fills the real width and height.
-  SwsConfig sws_config(
-      width,
-      height,
-      static_cast<AVPixelFormat>(cpu_frame.format),
-      cpu_frame.colorspace,
-      width,
-      height,
-      target_pix_fmt,
+  SwsConfig sws_config{
+      .input_width = width,
+      .input_height = height,
+      .input_format = static_cast<AVPixelFormat>(cpu_frame.format),
+      .input_colorspace = cpu_frame.colorspace,
+      .output_width = width,
+      .output_height = height,
+      .output_format = target_pix_fmt,
       // We have to tell swscale to respect the source's color range because
       // we're converting to a YUV format, and by default, swscale would assume
       // limited range only.
-      cpu_frame.color_range);
+      .output_color_range = cpu_frame.color_range};
 
   if (!sws_context_ || prev_sws_config_ != sws_config) {
     // Nothing is rescaled here, so the flags only defines how chroma is

@@ -897,29 +897,12 @@ void set_display_matrix_on_frame(
   std::memcpy(side_data->data, display_matrix, kDisplayMatrixSize);
 }
 
-SwsConfig::SwsConfig(
-    int input_width,
-    int input_height,
-    AVPixelFormat input_format,
-    AVColorSpace input_colorspace,
-    int output_width,
-    int output_height,
-    AVPixelFormat output_format,
-    AVColorRange output_color_range)
-    : input_width(input_width),
-      input_height(input_height),
-      input_format(input_format),
-      input_colorspace(input_colorspace),
-      output_width(output_width),
-      output_height(output_height),
-      output_format(output_format),
-      output_color_range(output_color_range) {}
-
 bool SwsConfig::operator==(const SwsConfig& other) const {
   return input_width == other.input_width &&
       input_height == other.input_height &&
       input_format == other.input_format &&
       input_colorspace == other.input_colorspace &&
+      input_color_range == other.input_color_range &&
       output_width == other.output_width &&
       output_height == other.output_height &&
       output_format == other.output_format &&
@@ -961,6 +944,9 @@ UniqueSwsContext create_sws_context(
   STD_TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
 
   // swscale spells a range as an int: 1 is full (jpeg), 0 is limited.
+  if (sws_config.input_color_range != AVCOL_RANGE_UNSPECIFIED) {
+    src_range = sws_config.input_color_range == AVCOL_RANGE_JPEG;
+  }
   if (sws_config.output_color_range != AVCOL_RANGE_UNSPECIFIED) {
     dst_range = sws_config.output_color_range == AVCOL_RANGE_JPEG;
   }
