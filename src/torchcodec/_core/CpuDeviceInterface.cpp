@@ -278,6 +278,11 @@ void CpuDeviceInterface::convert_video_av_frame_to_frame_output(
         output_dims.width,
         output_dims.height,
         output_pixel_format_);
+    // Above 8 bits there is no yuvj pixel format for swscale to read the range
+    // off, so a full-range frame comes as plain yuv420p10le and only its tag
+    // says pc. Without this, those frames are treated as limited range and come
+    // out with washed-out contrast.
+    sws_config.input_color_range = av_frame.color_range;
 
     if (!sw_scale_ || sw_scale_->get_config() != sws_config) {
       sw_scale_ = std::make_unique<SwScale>(sws_config, sws_flags_);

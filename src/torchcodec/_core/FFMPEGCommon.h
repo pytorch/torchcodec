@@ -406,6 +406,11 @@ struct SwsConfig {
   int output_width = 0;
   int output_height = 0;
   AVPixelFormat output_format = AV_PIX_FMT_NONE;
+  // swscale reads the range of either end off its pixel format, never off the
+  // frame: it knows yuvj420p is full range, but a yuv420p10le frame tagged pc
+  // is a full-range frame in a format that doesn't say so. Leaving one of these
+  // unspecified keeps swscale's own guess for that end.
+  AVColorRange input_color_range = AVCOL_RANGE_UNSPECIFIED;
   AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED;
 
   SwsConfig() = default;
@@ -416,8 +421,7 @@ struct SwsConfig {
       AVColorSpace input_colorspace,
       int output_width,
       int output_height,
-      AVPixelFormat output_format,
-      AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED);
+      AVPixelFormat output_format);
 
   bool operator==(const SwsConfig& other) const;
   bool operator!=(const SwsConfig& other) const;

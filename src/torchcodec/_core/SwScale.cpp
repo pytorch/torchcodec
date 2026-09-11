@@ -28,6 +28,7 @@ SwScale::SwScale(const SwsConfig& config, int sws_flags)
       config_.input_width,
       config_.input_height,
       config_.output_format);
+  color_conversion_frame_config.input_color_range = config_.input_color_range;
 
   color_conversion_sws_context_ = create_sws_context(
       color_conversion_frame_config,

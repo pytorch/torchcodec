@@ -70,6 +70,8 @@ from .utils import (
     BAD_HUFFMAN_JPEG,
     BT2020_LIMITED_RANGE_10BIT,
     BT601_FULL_RANGE,
+    BT601_FULL_RANGE_10BIT,
+    BT601_FULL_RANGE_10BIT_RGB,
     BT601_LIMITED_RANGE,
     BT709_FULL_RANGE,
     CMYK_JPEG,
@@ -1680,6 +1682,18 @@ class TestVideoDecoder:
             cpu_frame = decoder_cpu.get_frame_at(frame_index).data
 
             assert_tensor_close_on_at_least(gpu_frame, cpu_frame, percentage=90, atol=3)
+
+    @pytest.mark.parametrize("device", all_supported_devices())
+    def test_full_range_10bit(self, device):
+        # Above 8 bits there is no yuvj pixel format, so a full range video is
+        # plain yuv420p10le and only its color_range tag says pc. Reading it as
+        # limited range squashes the contrast, which on this solid-color video
+        # lands about 10 levels away from the color it was made with.
+        decoder, _ = make_video_decoder(BT601_FULL_RANGE_10BIT.path, device=device)
+        expected = torch.tensor(BT601_FULL_RANGE_10BIT_RGB, dtype=torch.float32)
+
+        frame = decoder[0].cpu().float()
+        assert (frame - expected[:, None, None]).abs().max() <= 3
 
     @needs_cuda
     @pytest.mark.parametrize(

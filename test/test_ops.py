@@ -43,6 +43,8 @@ from torchcodec._core.ops import (
 from .utils import (
     all_supported_devices,
     assert_frames_equal,
+    BT601_FULL_RANGE_10BIT,
+    BT601_FULL_RANGE_10BIT_RGB,
     DISCARD_FIRST_KEYFRAME_VIDEO,
     get_python_version,
     NASA_AUDIO,
@@ -617,6 +619,18 @@ class TestVideoDecoderOps:
             INDEX_OF_FRAME_AT_6_SECONDS
         )
         assert_frames_equal(frame_time6, reference_frame_time6)
+
+    @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
+    def test_color_conversion_library_full_range_10bit(self, color_conversion_library):
+        # Both color conversion paths have to honor the color_range tag of a
+        # 10-bit full range video. No yuvj pixel format exists above 8 bits to
+        # carry that information for them.
+        decoder = create_from_file(str(BT601_FULL_RANGE_10BIT.path))
+        _add_video_stream(decoder, color_conversion_library=color_conversion_library)
+
+        frame, *_ = get_next_frame(decoder)
+        expected = torch.tensor(BT601_FULL_RANGE_10BIT_RGB, dtype=torch.float32)
+        assert (frame.float() - expected[:, None, None]).abs().max() <= 3
 
     @pytest.mark.parametrize("dimension_order", ("NHWC", "NCHW"))
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))

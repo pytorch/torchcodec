@@ -1238,11 +1238,11 @@ GpuFrameAndStorage BetaCudaDeviceInterface::upload_cpu_frame_to_gpu(
       cpu_frame.colorspace,
       width,
       height,
-      target_pix_fmt,
-      // We have to tell swscale to respect the source's color range because
-      // we're converting to a YUV format, and by default, swscale would assume
-      // limited range only.
-      cpu_frame.color_range);
+      target_pix_fmt);
+  // We have to tell swscale to respect the source's color range because we're
+  // converting to a YUV format, and by default, swscale would assume limited
+  // range only.
+  sws_config.output_color_range = cpu_frame.color_range;
 
   if (!sws_context_ || prev_sws_config_ != sws_config) {
     // Nothing is rescaled here, so the flags only defines how chroma is
