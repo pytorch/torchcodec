@@ -2399,6 +2399,10 @@ class TestVideoDecoder:
         # the fallback. These videos are natively "YUV" and the upload path must
         # still handle them correctly. The equivalent test for the "blocks" APIs
         # is test_cpu_fallback_upload_keeps_full_range
+
+        if ffmpeg_major_version is not None and ffmpeg_major_version < 6:
+            pytest.skip("Colors don't line up across devices before FFmpeg 6")
+
         num_frames = 5
         cpu_decoder = VideoDecoder(video.path, device="cpu")
         cuda_decoder = VideoDecoder(video.path, device="cuda")
