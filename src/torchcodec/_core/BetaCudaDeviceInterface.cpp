@@ -913,8 +913,9 @@ UniqueAVFrame BetaCudaDeviceInterface::convert_cuda_frame_to_av_frame(
     const CUVIDPARSERDISPINFO& disp_info) {
   STD_TORCH_CHECK(frame_ptr != 0, "Invalid CUDA frame pointer");
 
-  // The surface we're given is the entire coded frame; the visible part of it
-  // is the display area, which we crop to below by offsetting the planes.
+  // The surface we're given is the entire coded frame; the frame we hand out is
+  // its display area, which we crop to below by offsetting the planes. See
+  // Note: [NVDEC surface dimensions and cropping].
   int width =
       video_format_.display_area.right - video_format_.display_area.left;
   int height =

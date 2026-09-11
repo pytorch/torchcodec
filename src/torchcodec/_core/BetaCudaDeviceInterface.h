@@ -126,8 +126,9 @@ class BetaCudaDeviceInterface : public DeviceInterface {
       unsigned int pitch,
       const CUVIDPARSERDISPINFO& disp_info);
 
-  // Height of the surfaces NVDEC outputs, which is taller than the frames we
-  // hand out. See Note: [NVDEC surface dimensions and cropping].
+  // Height of the surfaces NVDEC outputs, i.e. the coded height, which is
+  // taller than the frames we hand out. See Note: [NVDEC surface dimensions and
+  // cropping].
   int surface_height() const {
     return static_cast<int>(video_format_.coded_height);
   }
@@ -289,10 +290,21 @@ class BetaCudaDeviceInterface : public DeviceInterface {
 /* clang-format off */
 // Note: [NVDEC surface dimensions and cropping]
 //
-// Codecs encode whole macroblocks (or CTUs), so the dimensions of a coded frame
-// are rounded up: a 1280x530 video is coded as 1280x544. The part of it that is
-// actually visible is the "display area", a window within the coded frame that
-// the bitstream describes, and that's the frame size we report and hand out:
+// Three different sets of dimensions are involved when decoding with NVDEC, and
+// mixing them up silently corrupts frames:
+//
+// - The *coded* dimensions: CUVIDEOFORMAT.coded_width / coded_height, which the
+//   NVCUVID parser gives us. Codecs encode whole macroblocks (or CTUs), so
+//   these are rounded up: a 1280x530 video is coded as 1280x544.
+//
+// - The *display area*: CUVIDEOFORMAT.display_area, also from the parser. It is
+//   a window within the coded frame, and it is the part of it that is actually
+//   visible, i.e. the frame size we report and hand out to users: 1280x530.
+//
+// - The *surface* dimensions. The surface is the buffer that
+//   cuvidMapVideoFrame() gives us for a decoded frame. Its size is whatever we
+//   asked for in CUVIDDECODECREATEINFO.ulTargetWidth / ulTargetHeight when
+//   creating the decoder, and NVDEC scales the display area into it.
 //
 //     0    32                     1248 1280
 //   0 +-----+------------------------+---+
@@ -308,36 +320,61 @@ class BetaCudaDeviceInterface : public DeviceInterface {
 // 544 +----------------------------------+
 //       coded frame 1280x544
 //
-// Encoders start at (0, 0) and only pad the right and bottom edges, so in
-// practice left and top are 0 and the picture above degenerates to the 14 junk
-// rows at the bottom of our 1280x544 example. But all four sides can be
-// cropped: H.264 has four independent frame_crop_*_offset fields in its SPS
-// (HEVC has an equivalent conformance window), which an encoder may use to trim
-// e.g. letterbox bars.
+// Most of the time the crop is nothing but the macroblock padding, and since
+// the picture is laid out from (0, 0) the padding can only be at the right and
+// bottom edges: left and top are 0, and the picture above degenerates to the 14
+// junk rows below the display area of our 1280x530 example. But the display
+// area is a general window and nothing forces it to start at (0, 0): H.264 has
+// four independent frame_crop_*_offset fields in its SPS (HEVC has an
+// equivalent conformance window), which an encoder can use to trim e.g.
+// letterbox bars from all four sides, as pictured above.
 //
-// We use the display area in two places. Its left/top say where the visible
-// region starts, and that's the offset we apply to the frame's planes, see
-// crop_offsets(). Its right/bottom give the region's extent, and that's the
-// frame's width and height, which along with the pitch is what stops consumers
-// from reading into the padding. Careful with 4:2:0: the offsets are expressed
-// in luma samples while the chroma plane is subsampled, so the vertical offset
-// is halved for chroma while the horizontal one isn't - an NV12 chroma sample
-// is an interleaved (U, V) pair, twice as wide as a luma sample but half as
-// many per row.
+// We create decoders whose surface is the *entire coded frame*, and we crop to
+// the display area ourselves. The alternative, letting NVDEC crop for us by
+// asking for a surface the size of the display area, doesn't work here: the
+// crop is baked into the decoder when the decoder is created, and decoders are
+// cached and re-used across videos (see NVDECCache). Two videos with the same
+// coded dimensions but different display areas would then share a decoder whose
+// surfaces aren't the size we expect, and their frames would be silently
+// corrupted.
 //
-// NVDEC can apply that crop for us, but it gets baked into the decoder when the
-// decoder is created, and decoders are cached and re-used across videos (see
-// NVDECCache): two videos with the same coded dimensions but different display
-// areas would then share a decoder whose output surfaces aren't the size we
-// expect, and their frames would be silently corrupted. So we create decoders
-// that output the entire coded frame, and we crop to the display area ourselves
-// by offsetting the frame's planes, see crop_offsets().
+// So, in create_decoder(), at decoder creation:
 //
-// The consequence is that anything describing the surface rather than the frame
-// - the distance between planes, the size of the copy in copy_nvdec_surface() -
-// must use surface_height(), not the frame's height.
+//   ulWidth, ulHeight             <- coded_width, coded_height
+//   ulMaxWidth, ulMaxHeight       <- coded_width, coded_height
+//   display_area                  <- the whole coded frame, i.e. no crop
+//   ulTargetWidth, ulTargetHeight <- coded_width, coded_height
 //
-// This crop has nothing to do with the one in convert_yuv_to_rgb()
+// which means the surface dimensions ARE the coded dimensions. That's what
+// surface_height() returns, and everything that describes the surface rather
+// than the frame must use it: the distance between two planes, and the number
+// of bytes to copy in copy_nvdec_surface().
+//
+// And in convert_cuda_frame_to_av_frame(), for every frame:
+//
+//   av_frame->width, height <- the display area's extent, i.e. right - left and
+//                              bottom - top.
+//   av_frame->data[i]       <- where plane i starts within the surface, plus
+//                              the crop offset given by the display area's left
+//                              and top, see crop_offsets(). Careful with 4:2:0:
+//                              the offsets are expressed in luma samples while
+//                              the chroma plane is subsampled, so the vertical
+//                              offset is halved for chroma while the horizontal
+//                              one isn't - an NV12 chroma sample is an
+//                              interleaved (U, V) pair, twice as wide as a luma
+//                              sample but half as many per row.
+//   av_frame->linesize[i]   <- the pitch that cuvidMapVideoFrame() returns.
+//                              That's the surface's row stride in bytes, and
+//                              the only thing that describes the surface's
+//                              width: the driver aligns it, so it is larger
+//                              than coded_width * bytes_per_sample.
+//
+// Caveat: the surface dimensions are the coded dimensions of the video the
+// decoder was *created* for, which is the current video's, unless the stream
+// changes resolution mid-way. stream_property_change() then updates
+// video_format_ but keeps the existing decoder, see TODONVDEC P1 there.
+//
+// Finally, this crop has nothing to do with the one in convert_yuv_to_rgb()
 // [color_conversion.cpp], which trims the output of a color-conversion kernel
 // that ran on even-rounded dimensions.
 /* clang-format on */
