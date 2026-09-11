@@ -904,14 +904,16 @@ SwsConfig::SwsConfig(
     AVColorSpace input_colorspace,
     int output_width,
     int output_height,
-    AVPixelFormat output_format)
+    AVPixelFormat output_format,
+    AVColorRange output_color_range)
     : input_width(input_width),
       input_height(input_height),
       input_format(input_format),
       input_colorspace(input_colorspace),
       output_width(output_width),
       output_height(output_height),
-      output_format(output_format) {}
+      output_format(output_format),
+      output_color_range(output_color_range) {}
 
 bool SwsConfig::operator==(const SwsConfig& other) const {
   return input_width == other.input_width &&

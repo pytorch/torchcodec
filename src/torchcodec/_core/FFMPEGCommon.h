@@ -421,7 +421,8 @@ struct SwsConfig {
       AVColorSpace input_colorspace,
       int output_width,
       int output_height,
-      AVPixelFormat output_format);
+      AVPixelFormat output_format,
+      AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED);
 
   bool operator==(const SwsConfig& other) const;
   bool operator!=(const SwsConfig& other) const;
