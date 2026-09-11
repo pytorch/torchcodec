@@ -974,6 +974,34 @@ DISCARD_FIRST_KEYFRAME_VIDEO = TestVideo(
     },
 )
 
+# A pair of videos whose heights, 50 and 52, are both encoded as 64 rows: H.264
+# codes whole 16x16 macroblocks and crops the padding away with the display
+# area. They're what it takes to exercise decoders that NVDEC considers to have
+# the same coded dimensions while their frames have different sizes.
+#
+# Generated with:
+#   $ for h in 50 52; do
+#       ffmpeg -f lavfi -i testsrc2=size=64x${h}:rate=25:duration=0.4 \
+#           -c:v libx264 -pix_fmt yuv420p -an coded64_display${h}.mp4
+#     done
+CODED64_DISPLAY50_VIDEO = TestVideo(
+    filename="coded64_display50.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=64, height=50, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
+)
+
+CODED64_DISPLAY52_VIDEO = TestVideo(
+    filename="coded64_display52.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=64, height=52, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed yet
+)
+
 AV1_VIDEO = TestVideo(
     filename="av1_video.mkv",
     default_stream_index=0,

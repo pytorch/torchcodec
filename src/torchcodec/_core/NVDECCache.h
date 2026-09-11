@@ -76,6 +76,16 @@ class NVDECCache {
     cudaVideoCodec codec_type;
     uint32_t width;
     uint32_t height;
+    // The display area is the crop that NVDEC applies to the coded frame, and
+    // it is baked into the decoder when it is created: it dictates the
+    // dimensions of the output surface. Different videos can have the same
+    // coded dimensions but a different display area (heights of 530 and 532 are
+    // both coded as 544), so it has to be part of the key. Reusing a decoder
+    // whose output surface isn't the size we expect silently corrupts frames.
+    int display_left;
+    int display_top;
+    int display_right;
+    int display_bottom;
     cudaVideoChromaFormat chroma_format;
     uint32_t bit_depth_luma_minus8;
     uint8_t num_decode_surfaces;
@@ -90,6 +100,10 @@ class NVDECCache {
       codec_type = video_format->codec;
       width = video_format->coded_width;
       height = video_format->coded_height;
+      display_left = video_format->display_area.left;
+      display_top = video_format->display_area.top;
+      display_right = video_format->display_area.right;
+      display_bottom = video_format->display_area.bottom;
       chroma_format = video_format->chroma_format;
       bit_depth_luma_minus8 = video_format->bit_depth_luma_minus8;
       num_decode_surfaces = video_format->min_num_decode_surfaces;
@@ -104,6 +118,10 @@ class NVDECCache {
                  codec_type,
                  width,
                  height,
+                 display_left,
+                 display_top,
+                 display_right,
+                 display_bottom,
                  chroma_format,
                  bit_depth_luma_minus8,
                  num_decode_surfaces,
@@ -112,6 +130,10 @@ class NVDECCache {
                  other.codec_type,
                  other.width,
                  other.height,
+                 other.display_left,
+                 other.display_top,
+                 other.display_right,
+                 other.display_bottom,
                  other.chroma_format,
                  other.bit_depth_luma_minus8,
                  other.num_decode_surfaces,
