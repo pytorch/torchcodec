@@ -398,31 +398,24 @@ AVFilterContext* create_av_filter_context_with_options(
     const AVFilter* buffer,
     const enum AVPixelFormat output_format);
 
+// An aggregate, so that call sites name the fields they set and leave the rest
+// at their defaults.
 struct SwsConfig {
   int input_width = 0;
   int input_height = 0;
   AVPixelFormat input_format = AV_PIX_FMT_NONE;
   AVColorSpace input_colorspace = AVCOL_SPC_UNSPECIFIED;
+  // Converting between YUV and RGB needs to know whether the YUV samples are
+  // limited or full range, and swscale works that out from the pixel format
+  // alone: for 8-bit YUV, FFmpeg has one format per range (yuv420p, and
+  // yuvj420p for full range), so the format says it. Above 8 bits both ranges
+  // share a format and swscale assumes limited, so full-range samples come out
+  // washed out unless the range is set here. Unspecified keeps swscale's guess.
+  AVColorRange input_color_range = AVCOL_RANGE_UNSPECIFIED;
   int output_width = 0;
   int output_height = 0;
   AVPixelFormat output_format = AV_PIX_FMT_NONE;
-  // swscale reads the range of either end off its pixel format, never off the
-  // frame: it knows yuvj420p is full range, but a yuv420p10le frame tagged pc
-  // is a full-range frame in a format that doesn't say so. Leaving one of these
-  // unspecified keeps swscale's own guess for that end.
-  AVColorRange input_color_range = AVCOL_RANGE_UNSPECIFIED;
   AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED;
-
-  SwsConfig() = default;
-  SwsConfig(
-      int input_width,
-      int input_height,
-      AVPixelFormat input_format,
-      AVColorSpace input_colorspace,
-      int output_width,
-      int output_height,
-      AVPixelFormat output_format,
-      AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED);
 
   bool operator==(const SwsConfig& other) const;
   bool operator!=(const SwsConfig& other) const;
