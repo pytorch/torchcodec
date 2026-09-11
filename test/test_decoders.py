@@ -1685,10 +1685,10 @@ class TestVideoDecoder:
 
     @pytest.mark.parametrize("device", all_supported_devices())
     def test_full_range_10bit(self, device):
-        # Above 8 bits there is no yuvj pixel format, so a full range video is
-        # plain yuv420p10le and only its color_range tag says pc. Reading it as
-        # limited range squashes the contrast, which on this solid-color video
-        # lands about 10 levels away from the color it was made with.
+        # Non regression test ensuring >8bit full range videos are decoded
+        # correctly on CPU and GPU. We used to not pass the color-range tag to
+        # libswscale (worked fine for 8 bit as it could be derived from pixel
+        # format), but didn't for >8bit.
         decoder, _ = make_video_decoder(BT601_FULL_RANGE_10BIT.path, device=device)
         expected = torch.tensor(BT601_FULL_RANGE_10BIT_RGB, dtype=torch.float32)
 

@@ -622,9 +622,10 @@ class TestVideoDecoderOps:
 
     @pytest.mark.parametrize("color_conversion_library", ("filtergraph", "swscale"))
     def test_color_conversion_library_full_range_10bit(self, color_conversion_library):
-        # Both color conversion paths have to honor the color_range tag of a
-        # 10-bit full range video. No yuvj pixel format exists above 8 bits to
-        # carry that information for them.
+        # Non regression test ensuring >8bit full range videos are decoded
+        # correctly on CPU and GPU. We used to not pass the color-range tag to
+        # libswscale (worked fine for 8 bit as it could be derived from pixel
+        # format), but didn't for >8bit.
         decoder = create_from_file(str(BT601_FULL_RANGE_10BIT.path))
         _add_video_stream(decoder, color_conversion_library=color_conversion_library)
 

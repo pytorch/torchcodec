@@ -1072,12 +1072,7 @@ BT601_LIMITED_RANGE = TestVideo(
     frames={0: {}},  # Not needed for now
 )
 
-# Full range BT.601 10-bit video. Above 8 bits there is no yuvj pixel format, so
-# the color_range tag is the only thing saying this is full range. It's a solid
-# 0x404060 so that the decoded color is known exactly, and lossless so that the
-# encoder doesn't move it. Its width isn't a multiple of 32, which is what makes
-# the CPU decoder reach for filtergraph rather than swscale unless swscale is
-# explicitly asked for - the two convert colors independently. Generated with:
+# Full range BT.601 10-bit video (see test_full_range_10bit()). Generated with:
 # ffmpeg -f lavfi -i "color=c=0x404060:s=66x64:r=25:d=0.4" -c:v libx265 \
 # -tag:v hvc1 -pix_fmt yuv420p10le -colorspace smpte170m -color_range pc \
 # -x265-params lossless=1 bt601_full_range_10bit.mp4

@@ -275,8 +275,6 @@ void CpuDeviceInterface::convert_video_av_frame_to_frame_output(
         .input_height = av_frame.height,
         .input_format = av_frame_format,
         .input_colorspace = av_frame.colorspace,
-        // The frame's tag is the only thing that knows its range once we're
-        // above 8 bits, where the pixel format is the same either way.
         .input_color_range = av_frame.color_range,
         .output_width = output_dims.width,
         .output_height = output_dims.height,
