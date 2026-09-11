@@ -590,20 +590,20 @@ UniqueAVFrame CpuDeviceInterface::convert_tensor_to_av_frame_for_encoding(
 
   // Initialize and cache scaling context if it does not exist
   if (!encoding_sws_context_) {
-    SwsConfig sws_config(
-        in_width,
-        in_height,
-        in_pixel_format,
+    SwsConfig sws_config{
+        .input_width = in_width,
+        .input_height = in_height,
+        .input_format = in_pixel_format,
         // The matrix to encode with. SwsConfig names this after the input
         // because the input is the YUV end when decoding; here it's the output.
-        codec_context->colorspace,
-        out_width,
-        out_height,
-        out_pixel_format);
-    // Whatever range the stream will claim, the samples we write have to be in.
-    // Left alone, swscale writes limited range into a YUV frame, and a stream
-    // that says pc would then be describing samples that aren't.
-    sws_config.output_color_range = codec_context->color_range;
+        .input_colorspace = codec_context->colorspace,
+        .output_width = out_width,
+        .output_height = out_height,
+        .output_format = out_pixel_format,
+        // Whatever range the stream will claim, the samples we write have to be
+        // in. Left alone, swscale writes limited range into a YUV frame, and a
+        // stream that says pc would then be describing samples that aren't.
+        .output_color_range = codec_context->color_range};
 
     encoding_sws_context_ =
         create_sws_context(sws_config, SWS_BICUBIC); // Used by FFmpeg CLI
