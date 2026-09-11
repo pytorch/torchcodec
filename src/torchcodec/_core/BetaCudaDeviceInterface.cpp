@@ -676,14 +676,14 @@ int BetaCudaDeviceInterface::stream_property_change(
 
 // Moral equivalent of avcodec_send_packet(). Here, we pass the AVPacket down to
 // the NVCUVID parser.
-int BetaCudaDeviceInterface::send_packet(ReferenceAVPacket& packet) {
+int BetaCudaDeviceInterface::send_packet(const AVPacket& packet) {
   CudaContextGuard context_guard(device_.index());
   if (decoding_on_cpu_) {
     return cpu_interface_->send_packet(packet);
   }
 
   STD_TORCH_CHECK(
-      packet.get() && packet->data && packet->size > 0,
+      packet.data && packet.size > 0,
       "sendPacket received an empty packet, this is unexpected, please report.");
 
   // Apply BSF if needed. We want applyBSF to return a *new* filtered packet, or
@@ -693,15 +693,15 @@ int BetaCudaDeviceInterface::send_packet(ReferenceAVPacket& packet) {
   // reference.
   AutoAVPacket filtered_auto_packet;
   ReferenceAVPacket filtered_packet(filtered_auto_packet);
-  ReferenceAVPacket& packet_to_send = apply_bsf(packet, filtered_packet);
+  const AVPacket& packet_to_send = apply_bsf(packet, filtered_packet);
 
   CUVIDSOURCEDATAPACKET cuvid_packet = {};
-  cuvid_packet.payload = packet_to_send->data;
-  cuvid_packet.payload_size = packet_to_send->size;
+  cuvid_packet.payload = packet_to_send.data;
+  cuvid_packet.payload_size = packet_to_send.size;
   cuvid_packet.flags = CUVID_PKT_TIMESTAMP;
-  cuvid_packet.timestamp = packet_to_send->pts;
+  cuvid_packet.timestamp = packet_to_send.pts;
 
-  if (packet_to_send->flags & AV_PKT_FLAG_DISCARD) {
+  if (packet_to_send.flags & AV_PKT_FLAG_DISCARD) {
     discarded_timestamps_.insert(cuvid_packet.timestamp);
   }
 
@@ -727,14 +727,25 @@ int BetaCudaDeviceInterface::send_cuvid_packet(
   return result == CUDA_SUCCESS ? AVSUCCESS : AVERROR_EXTERNAL;
 }
 
-ReferenceAVPacket& BetaCudaDeviceInterface::apply_bsf(
-    ReferenceAVPacket& packet,
+const AVPacket& BetaCudaDeviceInterface::apply_bsf(
+    const AVPacket& packet,
     ReferenceAVPacket& filtered_packet) {
   if (!bitstream_filter_) {
     return packet;
   }
 
-  int ret_val = av_bsf_send_packet(bitstream_filter_.get(), packet.get());
+  // av_bsf_send_packet() takes ownership of what it is given: it moves the
+  // reference out of the packet, leaving it empty. Our caller only lends us
+  // theirs, so send a reference of our own instead.
+  AutoAVPacket auto_input_packet;
+  ReferenceAVPacket input_packet(auto_input_packet);
+  int ret_val = av_packet_ref(input_packet.get(), &packet);
+  STD_TORCH_CHECK(
+      ret_val >= AVSUCCESS,
+      "Failed to reference packet for the bitstream filter: ",
+      get_ffmpeg_error_string_from_error_code(ret_val));
+
+  ret_val = av_bsf_send_packet(bitstream_filter_.get(), input_packet.get());
   STD_TORCH_CHECK(
       ret_val >= AVSUCCESS,
       "Failed to send packet to bitstream filter: ",
@@ -751,7 +762,7 @@ ReferenceAVPacket& BetaCudaDeviceInterface::apply_bsf(
       "Failed to receive packet from bitstream filter: ",
       get_ffmpeg_error_string_from_error_code(ret_val));
 
-  return filtered_packet;
+  return *filtered_packet;
 }
 
 // Parser triggers this callback within cuvidParseVideoData when a frame is

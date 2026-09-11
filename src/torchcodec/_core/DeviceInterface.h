@@ -130,11 +130,13 @@ class DeviceInterface {
   // Returns AVSUCCESS on success, AVERROR(EAGAIN) if decoder queue full, or
   // other AVERROR on failure
   // Default implementation uses FFmpeg directly
-  virtual int send_packet(ReferenceAVPacket& av_packet) {
+  // The packet is borrowed: an implementation that hands it to something which
+  // takes ownership (a bitstream filter, say) must reference it first.
+  virtual int send_packet(const AVPacket& av_packet) {
     STD_TORCH_CHECK(
         codec_context_ != nullptr,
         "Codec context not available for default packet sending");
-    return avcodec_send_packet(codec_context_.get(), av_packet.get());
+    return avcodec_send_packet(codec_context_.get(), &av_packet);
   }
 
   // Send an EOF packet to flush the decoder

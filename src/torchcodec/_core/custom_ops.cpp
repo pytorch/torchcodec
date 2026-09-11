@@ -963,9 +963,8 @@ int64_t _blocks_packet_decoder_send_packet(
     torch::stable::Tensor& decoder,
     torch::stable::Tensor& packet) {
   PacketDecoder* decoder_ptr = unwrap_tensor_to_pointer<PacketDecoder>(decoder);
-  // TODO_API_BREAKDOWN CC P1: Do we really need this to be a raw AVPacket*?
-  AVPacket* raw_packet = unwrap_tensor_to_pointer<AVPacket>(packet);
-  return static_cast<int64_t>(decoder_ptr->send_packet(raw_packet));
+  return static_cast<int64_t>(
+      decoder_ptr->send_packet(*unwrap_tensor_to_pointer<AVPacket>(packet)));
 }
 
 int64_t _blocks_packet_decoder_send_eof(torch::stable::Tensor& decoder) {

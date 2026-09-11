@@ -121,17 +121,8 @@ PacketDecoder::PacketDecoder(
       stream, demuxer.format_context(), options);
 }
 
-int PacketDecoder::send_packet(AVPacket* packet) {
-  // The decode seam expects a ReferenceAVPacket. Copy a reference of the
-  // caller- owned packet into a temporary one (cheap, refcount bump); the
-  // temporary is unref'd on scope exit while the caller retains ownership of
-  // `packet`.
-  AutoAVPacket auto_packet;
-  ReferenceAVPacket ref(auto_packet);
-  int status = av_packet_ref(ref.get(), packet);
-  STD_TORCH_CHECK(status >= AVSUCCESS, "av_packet_ref failed");
-
-  status = device_interface_->send_packet(ref);
+int PacketDecoder::send_packet(const AVPacket& packet) {
+  int status = device_interface_->send_packet(packet);
 
   if (status == AVERROR_INVALIDDATA && packet_data_may_be_misaligned_) {
     // Seeking in an MPEG program stream lands on a container-level byte offset,
