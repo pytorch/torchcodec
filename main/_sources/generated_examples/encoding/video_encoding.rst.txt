@@ -130,7 +130,7 @@ ensure the output is properly flushed and closed.
 
     frames.shape = torch.Size([60, 3, 1080, 1920]), frames.dtype = torch.uint8
     frame_rate = 24 fps
-    Encoded to /tmp/tmpc4ta4k3b.mp4, size: 2509386 bytes
+    Encoded to /tmp/tmpfh2ucd1z.mp4, size: 2509386 bytes
 
 
 
@@ -537,7 +537,7 @@ For example, some potential extra options for the commonly used H.264 codec, ``l
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 26.645 seconds)
+   **Total running time of the script:** (0 minutes 25.714 seconds)
 
 
 .. _sphx_glr_download_generated_examples_encoding_video_encoding.py:

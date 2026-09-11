@@ -240,7 +240,7 @@ in one nvJPEG call, which is much faster than decoding images one at a time.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.157 seconds)
+   **Total running time of the script:** (0 minutes 0.129 seconds)
 
 
 .. _sphx_glr_download_generated_examples_decoding_image_decoding.py:
