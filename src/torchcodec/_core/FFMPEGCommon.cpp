@@ -904,14 +904,16 @@ SwsConfig::SwsConfig(
     AVColorSpace input_colorspace,
     int output_width,
     int output_height,
-    AVPixelFormat output_format)
+    AVPixelFormat output_format,
+    AVColorRange output_color_range)
     : input_width(input_width),
       input_height(input_height),
       input_format(input_format),
       input_colorspace(input_colorspace),
       output_width(output_width),
       output_height(output_height),
-      output_format(output_format) {}
+      output_format(output_format),
+      output_color_range(output_color_range) {}
 
 bool SwsConfig::operator==(const SwsConfig& other) const {
   return input_width == other.input_width &&
@@ -920,7 +922,8 @@ bool SwsConfig::operator==(const SwsConfig& other) const {
       input_colorspace == other.input_colorspace &&
       output_width == other.output_width &&
       output_height == other.output_height &&
-      output_format == other.output_format;
+      output_format == other.output_format &&
+      output_color_range == other.output_color_range;
 }
 
 bool SwsConfig::operator!=(const SwsConfig& other) const {
@@ -956,6 +959,11 @@ UniqueSwsContext create_sws_context(
       &contrast,
       &saturation);
   STD_TORCH_CHECK(ret != -1, "sws_getColorspaceDetails returned -1");
+
+  // swscale spells a range as an int: 1 is full (jpeg), 0 is limited.
+  if (sws_config.output_color_range != AVCOL_RANGE_UNSPECIFIED) {
+    dst_range = sws_config.output_color_range == AVCOL_RANGE_JPEG;
+  }
 
   const int* colorspace_table =
       sws_getCoefficients(sws_config.input_colorspace);

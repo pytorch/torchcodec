@@ -406,6 +406,7 @@ struct SwsConfig {
   int output_width = 0;
   int output_height = 0;
   AVPixelFormat output_format = AV_PIX_FMT_NONE;
+  AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED;
 
   SwsConfig() = default;
   SwsConfig(
@@ -415,7 +416,8 @@ struct SwsConfig {
       AVColorSpace input_colorspace,
       int output_width,
       int output_height,
-      AVPixelFormat output_format);
+      AVPixelFormat output_format,
+      AVColorRange output_color_range = AVCOL_RANGE_UNSPECIFIED);
 
   bool operator==(const SwsConfig& other) const;
   bool operator!=(const SwsConfig& other) const;
