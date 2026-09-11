@@ -270,14 +270,15 @@ void CpuDeviceInterface::convert_video_av_frame_to_frame_output(
             output_dims, kStableCPU, video_stream_options_.output_dtype));
 
     auto av_frame_format = static_cast<AVPixelFormat>(av_frame.format);
-    SwsConfig sws_config(
-        av_frame.width,
-        av_frame.height,
-        av_frame_format,
-        av_frame.colorspace,
-        output_dims.width,
-        output_dims.height,
-        output_pixel_format_);
+    SwsConfig sws_config{
+        .input_width = av_frame.width,
+        .input_height = av_frame.height,
+        .input_format = av_frame_format,
+        .input_colorspace = av_frame.colorspace,
+        .input_color_range = av_frame.color_range,
+        .output_width = output_dims.width,
+        .output_height = output_dims.height,
+        .output_format = output_pixel_format_};
 
     if (!sw_scale_ || sw_scale_->get_config() != sws_config) {
       sw_scale_ = std::make_unique<SwScale>(sws_config, sws_flags_);

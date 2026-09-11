@@ -1072,6 +1072,28 @@ BT601_LIMITED_RANGE = TestVideo(
     frames={0: {}},  # Not needed for now
 )
 
+# Full range BT.601 10-bit video (see test_full_range_10bit()). Generated with:
+# ffmpeg -f lavfi -i "color=c=0x404060:s=66x64:r=25:d=0.4" -c:v libx265 \
+# -tag:v hvc1 -pix_fmt yuv420p10le -colorspace smpte170m -color_range pc \
+# -x265-params lossless=1 bt601_full_range_10bit.mp4
+#
+# Confirm color space with:
+# ffprobe -v quiet -select_streams v:0 -show_entries stream=pix_fmt,color_space,color_range -of default=noprint_wrappers=1 test/resources/bt601_full_range_10bit.mp4
+# pix_fmt=yuv420p10le
+# color_range=pc
+# color_space=smpte170m
+BT601_FULL_RANGE_10BIT = TestVideo(
+    filename="bt601_full_range_10bit.mp4",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=66, height=64, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
+)
+
+# The solid color BT601_FULL_RANGE_10BIT is filled with.
+BT601_FULL_RANGE_10BIT_RGB = (0x40, 0x40, 0x60)
+
 # HDR re-encode of NASA video (10-bit H265 with BT.2020 + PQ), generated with:
 # ffmpeg -i test/resources/nasa_13013.mp4 -map 0:v:0 -c:v libx265 -pix_fmt yuv420p10le \
 # -x265-params "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc:range=limited" \
