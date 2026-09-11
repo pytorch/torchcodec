@@ -594,15 +594,10 @@ UniqueAVFrame CpuDeviceInterface::convert_tensor_to_av_frame_for_encoding(
         .input_width = in_width,
         .input_height = in_height,
         .input_format = in_pixel_format,
-        // The matrix to encode with. SwsConfig names this after the input
-        // because the input is the YUV end when decoding; here it's the output.
         .input_colorspace = codec_context->colorspace,
         .output_width = out_width,
         .output_height = out_height,
         .output_format = out_pixel_format,
-        // Whatever range the stream will claim, the samples we write have to be
-        // in. Left alone, swscale writes limited range into a YUV frame, and a
-        // stream that says pc would then be describing samples that aren't.
         .output_color_range = codec_context->color_range};
 
     encoding_sws_context_ =

@@ -2011,11 +2011,10 @@ class TestEncoder:
         ),
     )
     def test_color_tags_describe_the_samples(self, tmp_path, extra_options):
-        # The colorspace and range a stream advertises are what every decoder
-        # reads it back with, so the samples have to be encoded with those.
-        # swscale writes limited range BT.601 unless it is told otherwise.
+        # Non regression test to ensure the color range is respected by the
+        # encoder for pixel values, not just what the stream reports as
+        # metadata.
         frames = torch.zeros((5, 3, 64, 64), dtype=torch.uint8)
-        # Mid-tones: the extremes clip to the same place either way.
         frames[:, 0], frames[:, 1], frames[:, 2] = 0x40, 0x80, 0x60
 
         dest = str(tmp_path / "output.mp4")
