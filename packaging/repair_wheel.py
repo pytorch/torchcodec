@@ -169,6 +169,42 @@ def repair_linux(wheels):
         "libnvshmem*",
         "libnvfatbin*",
         "libnvcuvid*",
+        # rocJPEG: the GPU JPEG decoder our image lib links on ROCm. Unlike
+        # nvJPEG (which we bundle), rocJPEG is not shipped by the torch-ROCm
+        # wheel, and bundling it would drag in torch's ROCm libs under mismatched
+        # (hashed) sonames. So we treat it as a runtime dependency provided by the
+        # ROCm install, like FFmpeg. decode_jpeg(device='cuda') therefore needs
+        # ROCm (with rocJPEG) present at runtime.
+        # TODO_ROCM: Should we still try to ship librocjpeg?
+        "librocjpeg*",
+        # ROCm/HIP runtime and its system deps: provided by the torch-ROCm wheel
+        # (torch/lib/) at runtime, exactly like the CUDA libs above. Never bundle
+        # them, they'd duplicate torch's copies and bloat the wheel.
+        "libamdhip64*",
+        "libamd_comgr*",
+        "libhsa-runtime64*",
+        "libhiprtc*",
+        "librocm-core*",
+        "librocprofiler-register*",
+        "libroctx64*",
+        "librocroller*",
+        "libMIOpen*",
+        "libhipblas*",
+        "libhipfft*",
+        "libhiprand*",
+        "libhipsolver*",
+        "libhipsparse*",
+        "librocblas*",
+        "librocfft*",
+        "librocrand*",
+        "librocsolver*",
+        "librocsparse*",
+        "librccl*",
+        "libnuma*",
+        "libdrm*",
+        "libelf*",
+        "libbz2*",
+        "liblzma*",
     ):
         excludes += ["--exclude", pattern]
     for wheel in wheels:

@@ -43,7 +43,7 @@ endif()
 if(NOT DEFINED TORCHCODEC_BUILD_IMAGE)
     set(TORCHCODEC_BUILD_IMAGE "ON")
 endif()
-foreach(_codec JPEG PNG WEBP AVIF GIF HEIC NVJPEG)
+foreach(_codec JPEG PNG WEBP AVIF GIF HEIC NVJPEG ROCJPEG)
     if(NOT DEFINED TORCHCODEC_BUILD_${_codec})
         set(TORCHCODEC_BUILD_${_codec} "AUTO")
     endif()
@@ -501,6 +501,45 @@ function(make_torchcodec_image_library)
         message(STATUS "Building torchcodec with nvJPEG GPU JPEG decoding/encoding support.")
     elseif(ENABLE_CUDA)
         message(STATUS "Not building torchcodec with nvJPEG support (disabled via TORCHCODEC_BUILD_NVJPEG/TORCHCODEC_BUILD_IMAGE): decode_jpeg(device='cuda') and encode_jpeg() on CUDA tensors will raise at runtime.")
+    endif()
+
+    resolve_image_codec("${TORCHCODEC_BUILD_ROCJPEG}" want_rocjpeg)
+    if(ENABLE_ROCM AND want_rocjpeg)
+        execute_process(
+            COMMAND "${Python3_EXECUTABLE}" -c
+                "from torch.utils.cpp_extension import ROCM_HOME; print(ROCM_HOME or '')"
+            OUTPUT_VARIABLE ROCM_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(NOT ROCM_PATH)
+            set(ROCM_PATH "/opt/rocm")
+        endif()
+        message(STATUS "Using ROCM_PATH=${ROCM_PATH}")
+
+        # So find_package(hip) locates ${ROCM_PATH}/lib/cmake/hip/hip-config.cmake.
+        list(APPEND CMAKE_PREFIX_PATH "${ROCM_PATH}")
+        find_package(hip REQUIRED)
+        find_path(ROCJPEG_INCLUDE_DIR
+            NAMES rocjpeg/rocjpeg.h
+            HINTS "${ROCM_PATH}/include" "${ROCM_PATH}")
+        find_library(ROCJPEG_LIBRARY
+            NAMES rocjpeg
+            HINTS "${ROCM_PATH}/lib" "${ROCM_PATH}/lib64" "${ROCM_PATH}")
+        if(NOT ROCJPEG_INCLUDE_DIR OR NOT ROCJPEG_LIBRARY)
+            message(FATAL_ERROR
+                "rocJPEG not found under ROCM_PATH=${ROCM_PATH}. "
+                "include=${ROCJPEG_INCLUDE_DIR} lib=${ROCJPEG_LIBRARY}. Install the "
+                "rocJPEG runtime and dev headers (e.g. the 'rocjpeg' / 'rocjpeg-devel' "
+                "package), or set TORCHCODEC_BUILD_ROCJPEG=0 to build without it "
+                "(decode_jpeg(device='cuda') will raise at runtime).")
+        endif()
+        target_include_directories(${image_library_name} PRIVATE ${ROCJPEG_INCLUDE_DIR})
+        target_link_libraries(${image_library_name} PRIVATE ${ROCJPEG_LIBRARY} hip::host)
+        target_compile_definitions(${image_library_name} PRIVATE
+            TORCHCODEC_ENABLE_ROCJPEG=1 USE_ROCM __HIP_PLATFORM_AMD__)
+        message(STATUS "Building torchcodec with rocJPEG GPU JPEG decoding support (${ROCJPEG_LIBRARY}).")
+    elseif(ENABLE_ROCM)
+        message(STATUS "Not building torchcodec with rocJPEG support (disabled via TORCHCODEC_BUILD_ROCJPEG/TORCHCODEC_BUILD_IMAGE): decode_jpeg(device='cuda') will raise at runtime.")
     endif()
 
     if(want_jpeg)

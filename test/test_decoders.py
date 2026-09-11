@@ -6661,8 +6661,9 @@ class TestImageDecoder:
     @needs_cuda
     @needs_jpeg
     def test_cuda_jpeg_errors(self):
-        # Corrupt input raises.
-        with pytest.raises(RuntimeError, match="nvjpegDecode failed:"):
+        # Corrupt input raises. The message differs by GPU backend: nvJPEG on
+        # NVIDIA, rocJPEG on AMD/ROCm.
+        with pytest.raises(RuntimeError, match="nvjpegDecode failed:|rocJPEG|rocJpeg"):
             decode_jpeg(CORRUPT_JPEG.path, device="cuda")
 
         cuda_data = torch.frombuffer(

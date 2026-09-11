@@ -1,7 +1,7 @@
 name: Linux CPU x86
 
 on:
-  pull_request:
+  # pull_request:  # disabled while iterating on ROCm CI
   push:
     branches:
       - nightly

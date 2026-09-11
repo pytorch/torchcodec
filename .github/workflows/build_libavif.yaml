@@ -10,11 +10,11 @@ name: Build decode-only libavif from source
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - packaging/build_libavif.sh
-      - packaging/build_libavif.bat
-      - .github/workflows/build_libavif.yaml
+  # pull_request:  # disabled while iterating on ROCm CI
+  #   paths:
+  #     - packaging/build_libavif.sh
+  #     - packaging/build_libavif.bat
+  #     - .github/workflows/build_libavif.yaml
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 

@@ -1,0 +1,174 @@
+name: Linux ROCm x86
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+    tags:
+        - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+        - v[0-9]+.[0-9]+.[0-9]+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash -l -eo pipefail {0}
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    with:
+      package-type: wheel
+      os: linux
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-cpu: disable
+      with-xpu: disable
+      with-cuda: disable
+      with-rocm: enable
+      build-python-only: "disable"
+
+  build:
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+    name: Build and Upload wheel
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    with:
+      repository: meta-pytorch/torchcodec
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      pre-script: packaging/pre_build_script.sh
+      post-script: packaging/post_build_script.sh
+      smoke-test-script: packaging/fake_smoke_test.py
+      package-name: torchcodec
+      trigger-event: ${{ github.event_name }}
+      build-platform: "python-build-package"
+      # ENABLE_ROCM=1 compiles the rocJPEG GPU JPEG decoder into
+      # libtorchcodec_image.so (the ROCm counterpart of nvJPEG). Video decoding
+      # stays on CPU. The FFmpeg core libs are still built against all FFmpeg.
+      build-command: "BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 ENABLE_ROCM=1 python -m build --wheel -vvv --no-isolation"
+
+  install-and-test:
+    # ROCm runners are not on EC2 and authenticate to AWS (ECR) via GitHub OIDC.
+    # Fork PRs don't get an OIDC id-token from GitHub, so the job can't pull the
+    # docker image and always fails. Skip it for fork PRs; it still runs on
+    # same-repo PRs, push, and workflow_dispatch.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10']
+        rocm-version: ['7.1']
+    uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@main
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      repository: meta-pytorch/torchcodec
+      runner: "linux.rocm.gpu.meta-pytorch.mi350.1"
+      gpu-arch-type: "rocm"
+      gpu-arch-version: ${{ matrix.rocm-version }}
+      # ROCm self-hosted runners are not on EC2, so they can't pull the default
+      # ECR-hosted docker image (no AWS credentials). Use a Docker Hub image and
+      # run without sudo, matching pytorch/vision's ROCm job.
+      docker-image: pytorch/manylinux2_28-builder:rocm${{ matrix.rocm-version }}
+      no-sudo: true
+      timeout: 120
+      test-infra-ref: main
+      download-artifact: meta-pytorch_torchcodec__${{ matrix.python-version }}_rocm${{ matrix.rocm-version }}_x86_64
+      script: |
+        set -euo pipefail
+
+        # We use conda only to get a Python env matching the cp310 wheel (the
+        # image's base env may be a different Python). Point conda at conda-forge
+        # only, with libmamba, so env creation is fast and never touches the
+        # 'defaults'/pkgs/main channel (repo.anaconda.com), which hangs from the
+        # ROCm runners.
+        echo '::group::Configure conda (libmamba solver, conda-forge only)'
+        conda install -n base -y -c conda-forge conda-libmamba-solver
+        conda config --set solver libmamba
+        conda config --remove-key channels 2>/dev/null || true
+        conda config --add channels conda-forge
+        conda config --set channel_priority strict
+        conda config --show channels
+        echo '::endgroup::'
+
+        # linux_job_v2 runs the script in the manylinux container's base conda
+        # env, whose Python isn't necessarily 3.10. The wheel is built cp310, so
+        # pip would reject it ("not a supported wheel on this platform"). Create
+        # and activate a matching Python env (conda is sourced by linux_job_v2).
+        echo '::group::Create Python ${{ matrix.python-version }} env'
+        conda create -y -n test -c conda-forge python=${{ matrix.python-version }} pip
+        conda activate test
+        python --version
+        echo '::endgroup::'
+
+        python -m pip install --upgrade pip
+
+        echo '::group::Install PyTorch (ROCm)'
+        pip install --progress-bar=off --pre torch \
+          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm-version }}
+        echo '::endgroup::'
+
+        echo '::group::Assert we are on ROCm'
+        rocm-smi
+        python -c "
+        import torch
+        print('torch:', torch.__version__, '| hip:', torch.version.hip)
+        assert torch.version.hip is not None, 'torch is not a ROCm/HIP build'
+        assert torch.cuda.is_available(), 'no GPU visible to torch'
+        print('device:', torch.cuda.get_device_name(0))
+        "
+        echo '::endgroup::'
+
+        # Prevent the checked-out src/ tree from shadowing the installed wheel.
+        bash packaging/remove_src.sh
+
+        echo '::group::Install rocJPEG runtime'
+        # The wheel deliberately does not bundle librocjpeg (see repair_wheel.py),
+        # so decode_jpeg(device="cuda") needs it present at runtime.
+        bash packaging/install_rocjpeg.sh
+        echo '::endgroup::'
+
+        echo '::group::Install torchcodec from the wheel'
+        python -m pip install "${RUNNER_ARTIFACT_DIR}"/*.whl -vvv
+        echo '::endgroup::'
+
+        # This job intentionally does NOT install FFmpeg: the rocJPEG decoder and
+        # the other image decoders don't need it, and conda's heavy ffmpeg
+        # install (~110MB, 100+ pkgs) is unreliable on the ROCm runners. So we
+        # run only the FFmpeg-free image-decoder tests, mirroring the no-ffmpeg
+        # CUDA job. Video decoding on ROCm (which needs FFmpeg) is a later step.
+        echo '::group::Install test dependencies (no FFmpeg)'
+        # false: skip the optional libheif conda install (HEIC is CPU-only and
+        # covered elsewhere); this leaves a pip-only install (numpy/pytest/pillow).
+        bash packaging/install_test_dependencies.sh false
+        echo '::endgroup::'
+
+        echo '::group::Run FFmpeg-free image decoder tests (incl. rocJPEG GPU)'
+        # torch.cuda.is_available() is True on ROCm (HIP masquerades as CUDA), so
+        # the needs_cuda image tests run here and exercise the GPU JPEG decoder,
+        # which is rocJPEG on ROCm: the jpeg_cuda params call
+        # decode_jpeg(device="cuda"). FAIL_WITHOUT_CUDA=1 makes the job fail
+        # loudly rather than silently skip them if no GPU is visible.
+        # FAIL_WITHOUT_IMAGE_CODECS=1 is the catch-all requiring every image codec
+        # to be present; FAIL_WITHOUT_HEIC=0 opts out of HEIC (libheif isn't
+        # installed here), so HEIC tests skip instead of failing.
+        FAIL_WITHOUT_CUDA=1 FAIL_WITHOUT_IMAGE_CODECS=1 FAIL_WITHOUT_HEIC=0 \
+          pytest --override-ini="addopts=-v" \
+          test/test_ffmpeg_optional.py test/test_decoders.py::TestImageDecoder --tb=short
+        echo '::endgroup::'

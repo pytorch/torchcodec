@@ -80,6 +80,7 @@ custom_ops_sources = [
 image_sources = [
     "DecodeJpeg.cpp",
     "DecodeJpegCuda.cpp",
+    "DecodeJpegRocm.cpp",
     "DecodePng.cpp",
     "DecodeWebp.cpp",
     "DecodeGif.cpp",

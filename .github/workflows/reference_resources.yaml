@@ -2,10 +2,10 @@ name: Reference resource generation tests
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - test/generate_reference_resources.py
-      - .github/workflows/reference_resources.yaml # self reference
+  # pull_request:  # disabled while iterating on ROCm CI
+  #   paths:
+  #     - test/generate_reference_resources.py
+  #     - .github/workflows/reference_resources.yaml # self reference
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 
