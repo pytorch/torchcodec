@@ -14,6 +14,8 @@ on:
   pull_request:
     paths:
       - packaging/build_ffmpeg.sh
+      - packaging/build_ffmpeg_arm64.bat
+      - packaging/build_ffmpeg.bat
       - .github/workflows/build_ffmpeg.yaml # self reference
   schedule:
     - cron: '0 0 * * 0'  # on sunday
@@ -119,3 +121,41 @@ jobs:
         artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/windows_$(uname -m)"
         mkdir -p "${artifact_dir}"
         mv ffmpeg.tar.gz "${artifact_dir}/${FFMPEG_VERSION}.tar.gz"
+
+  # Native Windows ARM64 counterpart of LGPL-Windows. Runs on GitHub's
+  # standard `windows-11-arm` hosted runner (GA for public repos since
+  # 2025-08-07) instead of pytorch/test-infra's windows_job.yml wrapper,
+  # since that reusable workflow targets test-infra's own x86_64 runner
+  # fleet. This job only produces a build artifact; per this workflow's
+  # header comment, uploading it to the S3 bucket consumed by
+  # BUILD_AGAINST_ALL_FFMPEG_FROM_S3 is a separate, manual, maintainer-only
+  # step that must be done once to unblock windows_wheel.yaml's arm64 build.
+  LGPL-Windows-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        ffmpeg-version: ["4.4.4", "5.1.4", "6.1.1", "7.0.1", "8.0", "9.0"]
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: bash -l -eo pipefail {0}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v6
+
+      - name: Build FFmpeg (LGPL, decode/encode symbols only) and package artifact
+        run: |
+          export FFMPEG_VERSION="${{ matrix.ffmpeg-version }}"
+          export FFMPEG_ROOT="${PWD}/ffmpeg"
+
+          packaging/build_ffmpeg_arm64.bat
+
+          tar -cf ffmpeg.tar.gz ffmpeg/include ffmpeg/bin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-lgpl-windows_arm64-${{ matrix.ffmpeg-version }}
+          path: ffmpeg.tar.gz
+          if-no-files-found: error
+          retention-days: 14
