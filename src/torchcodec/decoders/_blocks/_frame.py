@@ -29,13 +29,30 @@ class _Metadata(NamedTuple):
 class Packet:
     """Opaque, thread-movable handle to a demuxed (compressed) packet.
 
-    Produced by :class:`VideoDemuxer`, consumed by :class:`VideoPacketDecoder`. It wraps a raw
+    Produced by :class:`Demuxer`, consumed by :class:`VideoPacketDecoder`. It wraps a raw
     pointer, so it is only valid within the process that created it (it cannot
     cross a process boundary).
+
+    Attributes:
+        stream_index (int): The index of the stream this packet belongs to,
+            absolute across all media types. This is what routes a packet to
+            its decoder when it comes out of a :class:`Demuxer` following more
+            than one stream.
     """
 
-    def __init__(self, handle: torch.Tensor):
+    def __init__(
+        self,
+        handle: torch.Tensor,
+        stream_index: int,
+        *,
+        generation: int = 0,
+    ):
         self._handle = handle
+        self.stream_index = stream_index
+        # Which side of the demuxer's last seek this packet came from. Private:
+        # it exists so a decoder can catch a missing reset(), not for callers to
+        # reason about. See _BasePacketDecoder.decode().
+        self._generation = generation
 
 
 # TODO_API_BREAKDOWN DESIGN P1: API design - the public fields, the class name,
@@ -172,8 +189,8 @@ class RawFrame:
 class RawAudioSamples:
     """One decoded audio frame's samples, as the decoder produced them.
 
-    Produced by :class:`VideoPacketDecoder` for an :class:`AudioDemuxer`'s stream,
-    consumed by :class:`AudioConverter`. This is the audio counterpart of
+    Produced by :class:`AudioPacketDecoder`, consumed by
+    :class:`AudioConverter`. This is the audio counterpart of
     :class:`RawFrame`, and like it, nothing has been converted: the samples are
     in the codec's own sample type.
 
@@ -203,6 +220,8 @@ class RawAudioSamples:
     sample_format: str
     pts_seconds: float
     duration_seconds: float
+    # See Packet._generation.
+    _generation: int = 0
 
     @property
     def num_channels(self) -> int:

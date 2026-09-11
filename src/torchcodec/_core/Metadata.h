@@ -12,6 +12,7 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
@@ -103,5 +104,10 @@ struct ContainerMetadata {
   // If set, this is the index to the default video stream.
   std::optional<int> best_video_stream_index;
 };
+
+// Builds the container and per-stream metadata that the header describes, from
+// an already-opened and probed AVFormatContext.
+ContainerMetadata get_container_metadata_from_format_context(
+    AVFormatContext* format_context);
 
 } // namespace facebook::torchcodec

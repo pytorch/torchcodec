@@ -101,6 +101,16 @@ _blocks_create_demuxer_from_tensor = (
 _blocks_create_demuxer_from_file_like_context = (
     torch.ops.torchcodec_ns._blocks_create_demuxer_from_file_like.default
 )
+_blocks_demuxer_add_stream = torch.ops.torchcodec_ns._blocks_demuxer_add_stream.default
+_blocks_demuxer_get_audio_video_stream_indices = (
+    torch.ops.torchcodec_ns._blocks_demuxer_get_audio_video_stream_indices.default
+)
+_blocks_demuxer_container_json_metadata = (
+    torch.ops.torchcodec_ns._blocks_demuxer_container_json_metadata.default
+)
+_blocks_demuxer_stream_json_metadata = (
+    torch.ops.torchcodec_ns._blocks_demuxer_stream_json_metadata.default
+)
 _blocks_demuxer_next_packet = (
     torch.ops.torchcodec_ns._blocks_demuxer_next_packet.default
 )
@@ -224,28 +234,18 @@ def create_from_file_like(
     )
 
 
-def _blocks_create_demuxer_from_bytes(
-    video_bytes: bytes,
-    stream_index: int | None = None,
-    media_type: str = "video",
-) -> torch.Tensor:
-    return _blocks_create_demuxer_from_tensor(
-        _bytes_to_tensor(video_bytes), stream_index, media_type
-    )
+def _blocks_create_demuxer_from_bytes(video_bytes: bytes) -> torch.Tensor:
+    return _blocks_create_demuxer_from_tensor(_bytes_to_tensor(video_bytes))
 
 
 def _blocks_create_demuxer_from_file_like(
     file_like: io.RawIOBase | io.BufferedReader,
-    stream_index: int | None = None,
-    media_type: str = "video",
 ) -> torch.Tensor:
     assert _pybind_ops is not None
     return _blocks_create_demuxer_from_file_like_context(
         _pybind_ops.create_file_like_context(
             file_like, False  # False means not for writing
         ),
-        stream_index,
-        media_type,
     )
 
 

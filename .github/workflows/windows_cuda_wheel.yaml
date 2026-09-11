@@ -75,7 +75,7 @@ jobs:
           # For the actual release we should add that label and change this to
           # include more python versions.
         python-version: ['3.10']
-        cuda-version: ['12.6', '13.0']
+        cuda-version: ['13.0', '13.2']
         # TODO: FFmpeg 5 on Windows segfaults in avcodec_open2() when passing
         # bad parameters.
         # See https://github.com/pytorch/torchcodec/pull/806
@@ -164,7 +164,7 @@ jobs:
     needs: build
     env:
       PYTHON_VERSION: '3.10'
-      CUDA_VERSION: '12.6'
+      CUDA_VERSION: '13.0'
       FFMPEG_VERSION: '7'
     steps:
       - name: Setup env vars

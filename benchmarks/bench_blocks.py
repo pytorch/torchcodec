@@ -15,7 +15,7 @@ import psutil
 import torch
 
 from torchcodec.decoders import VideoDecoder
-from torchcodec.decoders._blocks import ColorConverter, VideoDemuxer, VideoPacketDecoder
+from torchcodec.decoders._blocks import ColorConverter, Demuxer
 
 # Kept minimal on purpose; the filename is derived from exactly these.
 _DURATION_S = 10
@@ -112,16 +112,16 @@ def _consume(frames):
 
 
 def _decode_sequential(path, device="cpu"):
-    demuxer = VideoDemuxer(path)
-    decoder = VideoPacketDecoder(demuxer, device=device)
+    demuxer = Demuxer(path)
+    decoder = demuxer.streams[0].make_decoder(device=device)
     converter = ColorConverter(device=device)
     _consume(_convert(converter, _decode(decoder, _demux(demuxer))))
 
 
 def _decode_prefetch_frames(path, device="cpu"):
     # [demux + decode] on one thread || [color-convert] on another.
-    demuxer = VideoDemuxer(path)
-    decoder = VideoPacketDecoder(demuxer, device=device)
+    demuxer = Demuxer(path)
+    decoder = demuxer.streams[0].make_decoder(device=device)
     converter = ColorConverter(device=device)
     frames = prefetch(_decode(decoder, _demux(demuxer)))
     _consume(_convert(converter, frames))
@@ -129,8 +129,8 @@ def _decode_prefetch_frames(path, device="cpu"):
 
 def _decode_prefetch_packets(path, device="cpu"):
     # [demux] on one thread || [decode + color-convert] on another.
-    demuxer = VideoDemuxer(path)
-    decoder = VideoPacketDecoder(demuxer, device=device)
+    demuxer = Demuxer(path)
+    decoder = demuxer.streams[0].make_decoder(device=device)
     converter = ColorConverter(device=device)
     packets = prefetch(_demux(demuxer))
     _consume(_convert(converter, _decode(decoder, packets)))
@@ -138,8 +138,8 @@ def _decode_prefetch_packets(path, device="cpu"):
 
 def _decode_prefetch_packets_and_frames(path, device="cpu"):
     # [demux] || [decode] || [color-convert], each on its own thread.
-    demuxer = VideoDemuxer(path)
-    decoder = VideoPacketDecoder(demuxer, device=device)
+    demuxer = Demuxer(path)
+    decoder = demuxer.streams[0].make_decoder(device=device)
     converter = ColorConverter(device=device)
     packets = prefetch(_demux(demuxer))
     frames = prefetch(_decode(decoder, packets))

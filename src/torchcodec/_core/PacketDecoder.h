@@ -31,11 +31,12 @@ SharedAVCodecContext create_and_open_codec_context(
 
 // Decode building block: turns compressed packets into decoded frames - (YUV)
 // pictures for a video stream, samples in the codec's own format for an audio
-// one. Configured from a Demuxer's active stream; stateful. Not thread-safe.
+// one. Configured from one of a Demuxer's streams; stateful. Not thread-safe.
 class FORCE_PUBLIC_VISIBILITY PacketDecoder {
  public:
   explicit PacketDecoder(
       const Demuxer& demuxer,
+      std::optional<int> stream_index = std::nullopt,
       const StableDevice& device = StableDevice(kStableCPU),
       std::optional<int> ffmpeg_thread_count = std::nullopt);
 

@@ -73,6 +73,10 @@ class AudioConverter:
         self._first_frame_pts_seconds: float | None = None
         self._out_sample_rate: int | None = None
         self._num_emitted_samples = 0
+        # The demuxer position these samples come from. See Packet._generation:
+        # a resampler carries state across calls, so a seek invalidates it just
+        # as it invalidates the decoder's.
+        self._generation: int | None = None
 
     def _wrap(self, data) -> AudioSamples:
         assert self._out_sample_rate is not None  # mypy
@@ -100,6 +104,15 @@ class AudioConverter:
         The result may be empty: when resampling, the converter needs the
         following frame before it can emit the tail of this one.
         """
+        if self._generation is None:
+            self._generation = raw_samples._generation
+        elif self._generation != raw_samples._generation:
+            raise RuntimeError(
+                "The demuxer seeked since this converter was last reset(), and "
+                "a resampler carries state across calls, so these samples "
+                "would be resampled against the wrong history. Call reset() on "
+                "every converter fed by that demuxer after a seek."
+            )
         if self._drained:
             raise RuntimeError(
                 "This AudioConverter has been drained. Call reset() to convert "
@@ -139,4 +152,5 @@ class AudioConverter:
         self._drained = False
         self._first_frame_pts_seconds = None
         self._out_sample_rate = None
+        self._generation = None
         self._num_emitted_samples = 0

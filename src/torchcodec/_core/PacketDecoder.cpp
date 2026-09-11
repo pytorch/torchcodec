@@ -59,9 +59,13 @@ const AVCodec* find_decoder(
 
 PacketDecoder::PacketDecoder(
     const Demuxer& demuxer,
+    std::optional<int> stream_index,
     const StableDevice& device,
-    std::optional<int> ffmpeg_thread_count)
-    : media_type_(demuxer.media_type()) {
+    std::optional<int> ffmpeg_thread_count) {
+  AVStream* stream = demuxer.format_context()
+                         ->streams[demuxer.resolve_stream_index(stream_index)];
+  media_type_ = stream->codecpar->codec_type;
+
   bool is_audio = media_type_ == AVMEDIA_TYPE_AUDIO;
   STD_TORCH_CHECK(
       !is_audio || device.type() == kStableCPU,
@@ -72,7 +76,6 @@ PacketDecoder::PacketDecoder(
       device_interface_ != nullptr,
       "Failed to create device interface. This should never happen, please report.");
 
-  AVStream* stream = demuxer.active_stream();
   time_base_ = stream->time_base;
 
   is_mpeg_ps_ =

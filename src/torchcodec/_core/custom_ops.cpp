@@ -74,18 +74,25 @@ STABLE_TORCH_LIBRARY_FRAGMENT(torchcodec_ns, m) {
       "get_frames_by_pts_in_range_audio(Tensor(a!) decoder, *, float start_seconds, float? stop_seconds) -> (Tensor, Tensor)");
   m.def(
       "get_frames_by_pts(Tensor(a!) decoder, *, Tensor timestamps) -> (Tensor, Tensor, Tensor)");
+  m.def("_blocks_create_demuxer_from_file(str filename) -> Tensor");
+  m.def("_blocks_create_demuxer_from_tensor(Tensor video_tensor) -> Tensor");
   m.def(
-      "_blocks_create_demuxer_from_file(str filename, int? stream_index=None, str media_type=\"video\") -> Tensor");
+      "_blocks_create_demuxer_from_file_like(int file_like_context) -> Tensor");
   m.def(
-      "_blocks_create_demuxer_from_tensor(Tensor video_tensor, int? stream_index=None, str media_type=\"video\") -> Tensor");
+      "_blocks_demuxer_add_stream(Tensor(a!) demuxer, int? stream_index=None, str? media_type=None) -> (int, str)");
   m.def(
-      "_blocks_create_demuxer_from_file_like(int file_like_context, int? stream_index=None, str media_type=\"video\") -> Tensor");
-  m.def("_blocks_demuxer_next_packet(Tensor(a!) demuxer) -> (Tensor, bool)");
-  m.def("_blocks_demuxer_seek(Tensor(a!) demuxer, float seconds) -> ()");
+      "_blocks_demuxer_get_audio_video_stream_indices(Tensor demuxer) -> Tensor");
+  m.def("_blocks_demuxer_container_json_metadata(Tensor demuxer) -> str");
   m.def(
-      "_blocks_demuxer_scan(Tensor(a!) demuxer) -> (Tensor, Tensor, Tensor, int, int)");
+      "_blocks_demuxer_stream_json_metadata(Tensor demuxer, int stream_index) -> str");
   m.def(
-      "_blocks_create_packet_decoder(Tensor demuxer, *, int? num_threads=None, str device=\"cpu\") -> Tensor");
+      "_blocks_demuxer_next_packet(Tensor(a!) demuxer) -> (Tensor, bool, int)");
+  m.def(
+      "_blocks_demuxer_seek(Tensor(a!) demuxer, float seconds, int? stream_index=None) -> ()");
+  m.def(
+      "_blocks_demuxer_scan(Tensor(a!) demuxer, int? stream_index=None) -> (Tensor, Tensor, Tensor, int, int)");
+  m.def(
+      "_blocks_create_packet_decoder(Tensor demuxer, *, int? stream_index=None, int? num_threads=None, str device=\"cpu\") -> Tensor");
   m.def(
       "_blocks_packet_decoder_send_packet(Tensor(a!) decoder, Tensor packet) -> int");
   m.def("_blocks_packet_decoder_send_eof(Tensor(a!) decoder) -> int");
@@ -830,19 +837,13 @@ AVMediaType parse_media_type(const std::string& media_type) {
   return AVMEDIA_TYPE_AUDIO;
 }
 
-torch::stable::Tensor _blocks_create_demuxer_from_file(
-    std::string filename,
-    std::optional<int64_t> stream_index,
-    std::string media_type) {
-  auto demuxer = std::make_unique<Demuxer>(
-      filename, to_optional_int(stream_index), parse_media_type(media_type));
+torch::stable::Tensor _blocks_create_demuxer_from_file(std::string filename) {
+  auto demuxer = std::make_unique<Demuxer>(filename);
   return wrap_pointer_to_tensor<Demuxer>(std::move(demuxer));
 }
 
 torch::stable::Tensor _blocks_create_demuxer_from_tensor(
-    const torch::stable::Tensor& video_tensor,
-    std::optional<int64_t> stream_index,
-    std::string media_type) {
+    const torch::stable::Tensor& video_tensor) {
   STD_TORCH_CHECK(
       video_tensor.is_contiguous(), "video_tensor must be contiguous");
   STD_TORCH_CHECK(
@@ -851,17 +852,12 @@ torch::stable::Tensor _blocks_create_demuxer_from_tensor(
 
   auto avio_context_holder = std::make_unique<AVIOContextHolder>(
       std::make_unique<TensorReadIO>(video_tensor), /*is_for_writing=*/false);
-  auto demuxer = std::make_unique<Demuxer>(
-      std::move(avio_context_holder),
-      to_optional_int(stream_index),
-      parse_media_type(media_type));
+  auto demuxer = std::make_unique<Demuxer>(std::move(avio_context_holder));
   return wrap_pointer_to_tensor<Demuxer>(std::move(demuxer));
 }
 
 torch::stable::Tensor _blocks_create_demuxer_from_file_like(
-    int64_t file_like_context,
-    std::optional<int64_t> stream_index,
-    std::string media_type) {
+    int64_t file_like_context) {
   auto file_like_context_ptr =
       reinterpret_cast<IOInterface*>(file_like_context);
   STD_TORCH_CHECK(
@@ -871,28 +867,55 @@ torch::stable::Tensor _blocks_create_demuxer_from_file_like(
   auto avio_context_holder = std::make_unique<AVIOContextHolder>(
       std::unique_ptr<IOInterface>(file_like_context_ptr),
       /*is_for_writing=*/false);
-  auto demuxer = std::make_unique<Demuxer>(
-      std::move(avio_context_holder),
-      to_optional_int(stream_index),
-      parse_media_type(media_type));
+  auto demuxer = std::make_unique<Demuxer>(std::move(avio_context_holder));
   return wrap_pointer_to_tensor<Demuxer>(std::move(demuxer));
 }
 
-// (packet_handle, is_eof). On EOF the packet_handle is a dummy tensor that must
-// not be used. Native bool avoids per-frame .item() overhead in Python.
-using OpsPacketOutput = std::tuple<torch::stable::Tensor, bool>;
+torch::stable::Tensor _blocks_demuxer_get_audio_video_stream_indices(
+    torch::stable::Tensor& demuxer) {
+  return unwrap_tensor_to_pointer<Demuxer>(demuxer)
+      ->get_audio_video_stream_indices();
+}
+
+// (stream index, media type) of the stream that is now being followed. The
+// media type comes back so the caller doesn't have to ask for it separately
+// when it identified the stream by index.
+std::tuple<int64_t, std::string> _blocks_demuxer_add_stream(
+    torch::stable::Tensor& demuxer,
+    std::optional<int64_t> stream_index,
+    std::optional<std::string> media_type) {
+  auto [index, type] = unwrap_tensor_to_pointer<Demuxer>(demuxer)->add_stream(
+      to_optional_int(stream_index),
+      media_type.has_value()
+          ? std::optional<AVMediaType>(parse_media_type(*media_type))
+          : std::nullopt);
+  return {
+      static_cast<int64_t>(index),
+      type == AVMEDIA_TYPE_VIDEO ? "video" : "audio"};
+}
+
+// (packet_handle, is_eof, stream_index). On EOF the packet_handle is a dummy
+// tensor that must not be used and stream_index is -1. Native bool avoids
+// per-frame .item() overhead in Python.
+using OpsPacketOutput = std::tuple<torch::stable::Tensor, bool, int64_t>;
 
 OpsPacketOutput _blocks_demuxer_next_packet(torch::stable::Tensor& demuxer) {
   Demuxer* demuxer_ptr = unwrap_tensor_to_pointer<Demuxer>(demuxer);
   UniqueAVPacket packet = demuxer_ptr->next_packet();
   if (packet == nullptr) {
-    return std::make_tuple(torch::stable::full({1}, 0, kStableInt64), true);
+    return std::make_tuple(torch::stable::full({1}, 0, kStableInt64), true, -1);
   }
-  return std::make_tuple(wrap_pointer_to_tensor(std::move(packet)), false);
+  int64_t stream_index = packet->stream_index;
+  return std::make_tuple(
+      wrap_pointer_to_tensor(std::move(packet)), false, stream_index);
 }
 
-void _blocks_demuxer_seek(torch::stable::Tensor& demuxer, double seconds) {
-  unwrap_tensor_to_pointer<Demuxer>(demuxer)->seek(seconds);
+void _blocks_demuxer_seek(
+    torch::stable::Tensor& demuxer,
+    double seconds,
+    std::optional<int64_t> stream_index) {
+  unwrap_tensor_to_pointer<Demuxer>(demuxer)->seek(
+      seconds, to_optional_int(stream_index));
 }
 
 // (pts, duration, is_key_frame, time_base_num, time_base_den). pts and duration
@@ -904,8 +927,11 @@ using OpsScanOutput = std::tuple<
     int64_t,
     int64_t>;
 
-OpsScanOutput _blocks_demuxer_scan(torch::stable::Tensor& demuxer) {
-  StreamIndex index = unwrap_tensor_to_pointer<Demuxer>(demuxer)->scan();
+OpsScanOutput _blocks_demuxer_scan(
+    torch::stable::Tensor& demuxer,
+    std::optional<int64_t> stream_index) {
+  FrameIndex index = unwrap_tensor_to_pointer<Demuxer>(demuxer)->scan(
+      to_optional_int(stream_index));
   return std::make_tuple(
       index.pts,
       index.duration,
@@ -916,6 +942,7 @@ OpsScanOutput _blocks_demuxer_scan(torch::stable::Tensor& demuxer) {
 
 torch::stable::Tensor _blocks_create_packet_decoder(
     torch::stable::Tensor& demuxer,
+    std::optional<int64_t> stream_index,
     std::optional<int64_t> num_threads,
     std::string device) {
   Demuxer* demuxer_ptr = unwrap_tensor_to_pointer<Demuxer>(demuxer);
@@ -925,7 +952,10 @@ torch::stable::Tensor _blocks_create_packet_decoder(
     thread_count = static_cast<int>(num_threads.value());
   }
   auto decoder = std::make_unique<PacketDecoder>(
-      *demuxer_ptr, StableDevice(device), thread_count);
+      *demuxer_ptr,
+      to_optional_int(stream_index),
+      StableDevice(device),
+      thread_count);
   return wrap_pointer_to_tensor<PacketDecoder>(std::move(decoder));
 }
 
@@ -1211,65 +1241,20 @@ std::string get_json_metadata(torch::stable::Tensor& decoder) {
 }
 
 // Get the container metadata as a string.
-std::string get_container_json_metadata(torch::stable::Tensor& decoder) {
-  auto video_decoder = unwrap_tensor_to_get_decoder(decoder);
-
-  auto container_metadata = video_decoder->get_container_metadata();
-
-  std::map<std::string, std::string> map;
-
-  if (container_metadata.duration_seconds_from_header.has_value()) {
-    map["durationSecondsFromHeader"] =
-        fmt::to_string(*container_metadata.duration_seconds_from_header);
-  }
-
-  if (container_metadata.bit_rate.has_value()) {
-    map["bitRate"] = fmt::to_string(*container_metadata.bit_rate);
-  }
-
-  if (container_metadata.best_video_stream_index.has_value()) {
-    map["bestVideoStreamIndex"] =
-        std::to_string(*container_metadata.best_video_stream_index);
-  }
-  if (container_metadata.best_audio_stream_index.has_value()) {
-    map["bestAudioStreamIndex"] =
-        std::to_string(*container_metadata.best_audio_stream_index);
-  }
-
-  map["numStreams"] =
-      std::to_string(container_metadata.all_stream_metadata.size());
-
-  return map_to_json(map);
-}
-
-// Get the stream metadata as a string.
-std::string get_stream_json_metadata(
-    torch::stable::Tensor& decoder,
-    int64_t stream_index) {
-  auto video_decoder = unwrap_tensor_to_get_decoder(decoder);
-  auto all_stream_metadata =
-      video_decoder->get_container_metadata().all_stream_metadata;
-  STABLE_CHECK_INDEX(
-      stream_index >= 0 &&
-          stream_index < static_cast<int64_t>(all_stream_metadata.size()),
-      "stream_index out of bounds: " + std::to_string(stream_index));
-
-  auto stream_metadata = all_stream_metadata[stream_index];
-  auto seek_mode = video_decoder->get_seek_mode();
-  int active_stream_index = video_decoder->get_active_stream_index();
-
-  std::map<std::string, std::string> map;
-
+namespace {
+// The half of a stream's metadata that comes from the container header. Shared
+// by get_stream_json_metadata, which then adds the content-derived and
+// fallback-computed fields, and by the Demuxer building block, which has only
+// this half to report.
+void write_header_based_metadata(
+    std::map<std::string, std::string>& map,
+    const StreamMetadata& stream_metadata) {
   if (stream_metadata.duration_seconds_from_header.has_value()) {
     map["durationSecondsFromHeader"] =
         fmt::to_string(*stream_metadata.duration_seconds_from_header);
   }
   if (stream_metadata.bit_rate.has_value()) {
     map["bitRate"] = fmt::to_string(*stream_metadata.bit_rate);
-  }
-  if (stream_metadata.num_frames_from_content.has_value()) {
-    map["numFramesFromContent"] =
-        std::to_string(*stream_metadata.num_frames_from_content);
   }
   if (stream_metadata.num_frames_from_header.has_value()) {
     map["numFramesFromHeader"] =
@@ -1278,14 +1263,6 @@ std::string get_stream_json_metadata(
   if (stream_metadata.begin_stream_seconds_from_header.has_value()) {
     map["beginStreamSecondsFromHeader"] =
         fmt::to_string(*stream_metadata.begin_stream_seconds_from_header);
-  }
-  if (stream_metadata.begin_stream_pts_seconds_from_content.has_value()) {
-    map["beginStreamSecondsFromContent"] =
-        fmt::to_string(*stream_metadata.begin_stream_pts_seconds_from_content);
-  }
-  if (stream_metadata.end_stream_pts_seconds_from_content.has_value()) {
-    map["endStreamSecondsFromContent"] =
-        fmt::to_string(*stream_metadata.end_stream_pts_seconds_from_content);
   }
   if (stream_metadata.codec_name.has_value()) {
     map["codec"] = quote_value(stream_metadata.codec_name.value());
@@ -1336,6 +1313,116 @@ std::string get_stream_json_metadata(
     map["mediaType"] = quote_value("audio");
   } else {
     map["mediaType"] = quote_value("other");
+  }
+}
+} // namespace
+
+// The container header, as the Demuxer building block reports it: container
+// facts plus one entry per stream, and nothing derived from content. The
+// building blocks never merge the two, so a caller always knows which of the
+// two sources a number came from.
+std::string _blocks_demuxer_container_json_metadata(
+    torch::stable::Tensor& demuxer) {
+  ContainerMetadata metadata = get_container_metadata_from_format_context(
+      unwrap_tensor_to_pointer<Demuxer>(demuxer)->format_context().get());
+
+  std::map<std::string, std::string> map;
+  if (metadata.duration_seconds_from_header.has_value()) {
+    map["durationSecondsFromHeader"] =
+        fmt::to_string(*metadata.duration_seconds_from_header);
+  }
+  if (metadata.bit_rate.has_value()) {
+    map["bitRate"] = fmt::to_string(*metadata.bit_rate);
+  }
+  if (metadata.best_video_stream_index.has_value()) {
+    map["bestVideoStreamIndex"] =
+        std::to_string(*metadata.best_video_stream_index);
+  }
+  if (metadata.best_audio_stream_index.has_value()) {
+    map["bestAudioStreamIndex"] =
+        std::to_string(*metadata.best_audio_stream_index);
+  }
+  map["numStreams"] = std::to_string(metadata.all_stream_metadata.size());
+  return map_to_json(map);
+}
+
+std::string _blocks_demuxer_stream_json_metadata(
+    torch::stable::Tensor& demuxer,
+    int64_t stream_index) {
+  ContainerMetadata metadata = get_container_metadata_from_format_context(
+      unwrap_tensor_to_pointer<Demuxer>(demuxer)->format_context().get());
+  STABLE_CHECK_INDEX(
+      stream_index >= 0 &&
+          stream_index <
+              static_cast<int64_t>(metadata.all_stream_metadata.size()),
+      "stream_index out of bounds: " + std::to_string(stream_index));
+
+  std::map<std::string, std::string> map;
+  write_header_based_metadata(map, metadata.all_stream_metadata[stream_index]);
+  return map_to_json(map);
+}
+
+std::string get_container_json_metadata(torch::stable::Tensor& decoder) {
+  auto video_decoder = unwrap_tensor_to_get_decoder(decoder);
+
+  auto container_metadata = video_decoder->get_container_metadata();
+
+  std::map<std::string, std::string> map;
+
+  if (container_metadata.duration_seconds_from_header.has_value()) {
+    map["durationSecondsFromHeader"] =
+        fmt::to_string(*container_metadata.duration_seconds_from_header);
+  }
+
+  if (container_metadata.bit_rate.has_value()) {
+    map["bitRate"] = fmt::to_string(*container_metadata.bit_rate);
+  }
+
+  if (container_metadata.best_video_stream_index.has_value()) {
+    map["bestVideoStreamIndex"] =
+        std::to_string(*container_metadata.best_video_stream_index);
+  }
+  if (container_metadata.best_audio_stream_index.has_value()) {
+    map["bestAudioStreamIndex"] =
+        std::to_string(*container_metadata.best_audio_stream_index);
+  }
+
+  map["numStreams"] =
+      std::to_string(container_metadata.all_stream_metadata.size());
+
+  return map_to_json(map);
+}
+
+// Get the stream metadata as a string.
+std::string get_stream_json_metadata(
+    torch::stable::Tensor& decoder,
+    int64_t stream_index) {
+  auto video_decoder = unwrap_tensor_to_get_decoder(decoder);
+  auto all_stream_metadata =
+      video_decoder->get_container_metadata().all_stream_metadata;
+  STABLE_CHECK_INDEX(
+      stream_index >= 0 &&
+          stream_index < static_cast<int64_t>(all_stream_metadata.size()),
+      "stream_index out of bounds: " + std::to_string(stream_index));
+
+  auto stream_metadata = all_stream_metadata[stream_index];
+  auto seek_mode = video_decoder->get_seek_mode();
+  int active_stream_index = video_decoder->get_active_stream_index();
+
+  std::map<std::string, std::string> map;
+
+  write_header_based_metadata(map, stream_metadata);
+  if (stream_metadata.num_frames_from_content.has_value()) {
+    map["numFramesFromContent"] =
+        std::to_string(*stream_metadata.num_frames_from_content);
+  }
+  if (stream_metadata.begin_stream_pts_seconds_from_content.has_value()) {
+    map["beginStreamSecondsFromContent"] =
+        fmt::to_string(*stream_metadata.begin_stream_pts_seconds_from_content);
+  }
+  if (stream_metadata.end_stream_pts_seconds_from_content.has_value()) {
+    map["endStreamSecondsFromContent"] =
+        fmt::to_string(*stream_metadata.end_stream_pts_seconds_from_content);
   }
 
   // Check whether content-based metadata is available for this stream.
@@ -1672,6 +1759,16 @@ STABLE_TORCH_LIBRARY_IMPL(torchcodec_ns, CPU, m) {
       "get_frames_by_pts_in_range_audio",
       TORCH_BOX(&get_frames_by_pts_in_range_audio));
   m.impl("get_frames_by_pts", TORCH_BOX(&get_frames_by_pts));
+  m.impl("_blocks_demuxer_add_stream", TORCH_BOX(&_blocks_demuxer_add_stream));
+  m.impl(
+      "_blocks_demuxer_get_audio_video_stream_indices",
+      TORCH_BOX(&_blocks_demuxer_get_audio_video_stream_indices));
+  m.impl(
+      "_blocks_demuxer_container_json_metadata",
+      TORCH_BOX(&_blocks_demuxer_container_json_metadata));
+  m.impl(
+      "_blocks_demuxer_stream_json_metadata",
+      TORCH_BOX(&_blocks_demuxer_stream_json_metadata));
   m.impl(
       "_blocks_demuxer_next_packet", TORCH_BOX(&_blocks_demuxer_next_packet));
   m.impl("_blocks_demuxer_seek", TORCH_BOX(&_blocks_demuxer_seek));

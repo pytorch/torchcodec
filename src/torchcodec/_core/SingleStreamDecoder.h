@@ -333,7 +333,6 @@ class FORCE_PUBLIC_VISIBILITY SingleStreamDecoder {
   // for more details about the heuristics.
   // Returns the key frame index of the presentation timestamp using FFMPEG's
   // index. Note that this index may be truncated for some files.
-  int get_best_stream_index(AVMediaType media_type);
 
   // --------------------------------------------------------------------------
   // VALIDATION UTILS

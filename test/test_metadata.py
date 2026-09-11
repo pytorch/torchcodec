@@ -81,11 +81,6 @@ def test_get_metadata(metadata_getter):
     assert metadata.best_video_stream_index == 3
     assert metadata.best_audio_stream_index == 4
 
-    with pytest.raises(NotImplementedError, match="Decide on logic"):
-        metadata.duration_seconds
-    with pytest.raises(NotImplementedError, match="Decide on logic"):
-        metadata.bit_rate
-
     if ffmpeg_major_version <= 5:
         expected_duration_seconds_from_header = 16.57
         expected_bit_rate_from_header = 324915
@@ -100,7 +95,6 @@ def test_get_metadata(metadata_getter):
 
     best_video_stream_metadata = metadata.streams[metadata.best_video_stream_index]
     assert isinstance(best_video_stream_metadata, VideoStreamMetadata)
-    assert best_video_stream_metadata is metadata.best_video_stream
     assert best_video_stream_metadata.duration_seconds == pytest.approx(
         13.013, abs=0.001
     )
@@ -118,7 +112,6 @@ def test_get_metadata(metadata_getter):
 
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
-    assert best_audio_stream_metadata is metadata.best_audio_stream
     assert best_audio_stream_metadata.duration_seconds_from_header == 13.056
     assert best_audio_stream_metadata.begin_stream_seconds_from_header == 0
     assert best_audio_stream_metadata.bit_rate == 128837
@@ -137,7 +130,6 @@ def test_get_metadata_audio_file(metadata_getter):
     metadata = metadata_getter(NASA_AUDIO_MP3.path)
     best_audio_stream_metadata = metadata.streams[metadata.best_audio_stream_index]
     assert isinstance(best_audio_stream_metadata, AudioStreamMetadata)
-    assert best_audio_stream_metadata is metadata.best_audio_stream
 
     expected_duration_seconds_from_header = (
         13.056 if ffmpeg_major_version >= 8 else 13.248
@@ -199,14 +191,9 @@ def test_repr():
   bit_rate: 128783
   codec: h264
   stream_index: 3
-  duration_seconds: 13.013
-  begin_stream_seconds: 0
-  begin_stream_seconds_from_content: 0
-  end_stream_seconds_from_content: 13.013
   width: 480
   height: 270
   num_frames_from_header: 390
-  num_frames_from_content: 390
   average_fps_from_header: 29.97002997002997
   pixel_aspect_ratio: 1
   rotation: None
@@ -214,6 +201,11 @@ def test_repr():
   color_space: bt709
   color_transfer_characteristic: bt709
   pixel_format: yuv420p
+  begin_stream_seconds_from_content: 0
+  end_stream_seconds_from_content: 13.013
+  num_frames_from_content: 390
+  duration_seconds: 13.013
+  begin_stream_seconds: 0
   end_stream_seconds: 13.013
   num_frames: 390
   average_fps: 29.97002997002997
@@ -231,10 +223,10 @@ def test_repr():
   bit_rate: 64000
   codec: mp3
   stream_index: 0
-  duration_seconds: {expected_duration_seconds_from_header}
-  begin_stream_seconds: 0.138125
   sample_rate: 8000
   num_channels: 2
   sample_format: fltp
+  duration_seconds: {expected_duration_seconds_from_header}
+  begin_stream_seconds: 0.138125
 """
     )
