@@ -49,6 +49,13 @@ foreach(_codec JPEG PNG WEBP AVIF GIF HEIC NVJPEG)
     endif()
 endforeach()
 
+# Packagers building against a system-provided libavif (Linux distros,
+# conda-forge, ...) can set this to ON to use find_package(libavif) instead of
+# fetching the decode-only prebuilt libavif from our S3 bucket.
+if(NOT DEFINED TORCHCODEC_USE_SYSTEM_LIBAVIF)
+    set(TORCHCODEC_USE_SYSTEM_LIBAVIF "OFF")
+endif()
+
 # Returns true (via out_want) if TORCHCODEC_BUILD_IMAGE is on, or if that
 # specific codec flag is explicitly on, and false otherwise.
 function(resolve_image_codec codec_flag out_want)
@@ -139,9 +146,16 @@ function(discover_image_codecs)
 
     resolve_image_codec("${TORCHCODEC_BUILD_AVIF}" want_avif)
     if(want_avif)
-        include(${CMAKE_CURRENT_SOURCE_DIR}/fetch_avif_from_s3.cmake)
-        set(libavif_FOUND TRUE)
-        message(STATUS "Building torchcodec with AVIF image decoding support (libavif from S3).")
+        if(TORCHCODEC_USE_SYSTEM_LIBAVIF)
+            # Link the system libavif instead of the decode-only prebuilt from
+            # S3, mirroring how the HEIC decoder uses the system libheif below.
+            find_package(libavif CONFIG REQUIRED)
+            message(STATUS "libavif found: building torchcodec with AVIF image decoding support (system libavif).")
+        else()
+            include(${CMAKE_CURRENT_SOURCE_DIR}/fetch_avif_from_s3.cmake)
+            set(libavif_FOUND TRUE)
+            message(STATUS "Building torchcodec with AVIF image decoding support (libavif from S3).")
+        endif()
     else()
         message(STATUS "Not building torchcodec with AVIF image decoding support (disabled via TORCHCODEC_BUILD_AVIF/TORCHCODEC_BUILD_IMAGE): decode_avif will raise at runtime.")
     endif()
