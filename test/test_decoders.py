@@ -149,6 +149,7 @@ from .utils import (
     TEST_SRC_2_720P_VP8,
     TEST_SRC_2_720P_VP9,
     TEST_SRC_2_720P_VP9_ALTREF,
+    TEST_SRC_2_H264_NO_PTS,
     TEST_SRC_2_MPEG4_MP4,
     TESTSRC2_444_10BIT_HEVC,
     TESTSRC2_444_12BIT_HEVC,
@@ -1657,15 +1658,7 @@ class TestVideoDecoder:
             assert_frames_equal(ref_frame3, frames[1].data)
             assert_frames_equal(ref_frame5, frames[2].data)
 
-    # The test video we have is from
-    # https://huggingface.co/datasets/raushan-testing-hf/videos-test/blob/main/sample_video_2.avi
-    # We can't check it into the repo due to potential licensing issues, so
-    # we have to unconditionally skip this test.
-    # TODO: encode a video with no pts values to unskip this test. Couldn't
-    # find a way to do that with FFmpeg's CLI, but this should be doable
-    # once we have our own video encoder.
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
-    @pytest.mark.skip(reason="TODO: Need video with no pts values.")
     def test_pts_to_dts_fallback(self, seek_mode):
         # Non-regression test for
         # https://github.com/pytorch/torchcodec/issues/677 and
@@ -1673,26 +1666,38 @@ class TestVideoDecoder:
         # More accurately, this is a non-regression test for videos which do
         # *not* specify pts values (all pts values are N/A and set to
         # INT64_MIN), but specify *dts* value - which we fallback to.
-        path = "/home/nicolashug/Downloads/sample_video_2.avi"
-        decoder = VideoDecoder(path, seek_mode=seek_mode)
+        decoder = VideoDecoder(TEST_SRC_2_H264_NO_PTS.path, seek_mode=seek_mode)
         metadata = decoder.metadata
 
-        assert metadata.average_fps == pytest.approx(29.916667)
-        assert metadata.duration_seconds_from_header == 9.02507
-        assert metadata.duration_seconds == 9.02507
+        assert metadata.num_frames == 30
+        assert metadata.average_fps == pytest.approx(30)
+        assert metadata.duration_seconds_from_header == pytest.approx(1)
+        assert metadata.duration_seconds == pytest.approx(1)
         assert metadata.begin_stream_seconds_from_content == (
             None if seek_mode == "approximate" else 0
         )
         assert metadata.end_stream_seconds_from_content == (
-            None if seek_mode == "approximate" else 9.02507
+            None if seek_mode == "approximate" else pytest.approx(1)
         )
 
-        assert decoder[0].shape == (3, 240, 320)
-        decoder[10].shape == (3, 240, 320)
-        decoder.get_frame_at(2).data.shape == (3, 240, 320)
-        decoder.get_frames_at([2, 10]).data.shape == (2, 3, 240, 320)
-        decoder.get_frame_played_at(9).data.shape == (3, 240, 320)
-        decoder.get_frames_played_at([2, 4]).data.shape == (2, 3, 240, 320)
+        all_frames = decoder.get_frames_in_range(0, len(decoder))
+        assert all_frames.data.shape == (30, 3, 96, 128)
+        torch.testing.assert_close(
+            all_frames.pts_seconds,
+            torch.arange(30, dtype=torch.float64) / 30,
+        )
+
+        assert decoder[0].shape == (3, 96, 128)
+        assert_frames_equal(decoder[10], all_frames.data[10])
+        assert_frames_equal(decoder.get_frame_at(2).data, all_frames.data[2])
+        assert_frames_equal(
+            decoder.get_frames_at([2, 10]).data, all_frames.data[[2, 10]]
+        )
+        assert_frames_equal(decoder.get_frame_played_at(0.91).data, all_frames.data[27])
+        assert_frames_equal(
+            decoder.get_frames_played_at([0.21, 0.41]).data,
+            all_frames.data[[6, 12]],
+        )
         with pytest.raises(AssertionError, match="not equal"):
             torch.testing.assert_close(decoder[0], decoder[10])
 
