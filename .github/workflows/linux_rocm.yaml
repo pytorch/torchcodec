@@ -40,7 +40,7 @@ jobs:
 
   filter-matrix:
     # torchcodec only supports the TheRock/pip-wheel layout (ROCm 10.0+).
-    # Strip legacy ROCm versions that the upstream matrix may include.
+    # Keep 10.1 and drop older ROCm versions the upstream matrix may include.
     needs: generate-matrix
     runs-on: ubuntu-latest
     outputs:
@@ -48,8 +48,29 @@ jobs:
     steps:
       - id: filter
         run: |
+          # Keep ROCm 10.1. Drop the legacy 7.x entries. Nightly already
+          # includes 10.1, so drop 10.0 there. On the test channel, which
+          # still lists 10.0, rewrite that entry onto the 10.1 image and index.
           matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
-            | jq -c 'del(.include[] | select(.gpu_arch_version == "7.14"))')
+            | jq -c '
+                .include |= (
+                  map(select(.gpu_arch_version != "7.14" and .gpu_arch_version != "7.2"))
+                  | if any(.[]; .gpu_arch_version == "10.1") then
+                      map(select(.gpu_arch_version != "10.0"))
+                    else
+                      map(
+                        if .gpu_arch_version == "10.0" then
+                          .gpu_arch_version = "10.1"
+                          | .desired_cuda = "rocm10.1"
+                          | .container_image |= sub(":rocm10\\.0$"; ":rocm10.1")
+                          | .build_name |= sub("rocm10_0"; "rocm10_1")
+                          | .installation |= gsub("rocm10\\.0"; "rocm10.1")
+                        else .
+                        end
+                      )
+                    end
+                )
+              ')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build:
@@ -86,7 +107,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.10']
-        rocm-version: ['10.0']
+        rocm-version: ['10.1']
     uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@main
     permissions:
       id-token: write
@@ -171,7 +192,8 @@ jobs:
         # _rocm_sdk_devel is only available for Python 3.11+ but our test env
         # uses Python 3.10. Install and run rocm-sdk init in the base conda env
         # which has the matching Python version.
-        conda run -n base pip install "rocm[devel]"
+        conda run -n base pip install --pre "rocm[devel]" \
+          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm-version }}
         conda run -n base rocm-sdk init
         echo '::endgroup::'
 

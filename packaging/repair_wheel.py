@@ -43,7 +43,7 @@ def _is_cuda_wheel(wheel):
 
 
 def _is_rocm_wheel(wheel):
-    # Detect a ROCm wheel from its local-version tag (e.g. "+rocm10.0") in the filename.
+    # Detect a ROCm wheel from its local-version tag (e.g. "+rocm10.1") in the filename.
     return re.search(r"[+_]rocm", Path(wheel).name) is not None
 
 
