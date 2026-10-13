@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>AudioStream &#8212; TorchCodec 0.18.0.dev20261008+cu130 Documentation</title>
+    <title>AudioStream &#8212; TorchCodec 0.18.0.dev20261013+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8f4bb3c4"></script>
+    <script src="../_static/documentation_options.js?v=41619669"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1200,12 +1200,12 @@ document.write(`
 <h1>AudioStream<a class="headerlink" href="#audiostream" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.decoders.AudioStream">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioStream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">demuxer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="torchcodec.decoders.Demuxer.html#torchcodec.decoders.Demuxer" title="torchcodec.decoders._blocks._demuxer.Demuxer"><span class="pre">Demuxer</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#AudioStream"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioStream" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioStream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">demuxer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="torchcodec.decoders.Demuxer.html#torchcodec.decoders.Demuxer" title="torchcodec.decoders._blocks._demuxer.Demuxer"><span class="pre">Demuxer</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#AudioStream"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioStream" title="Link to this definition">#</a></dt>
 <dd><p>An audio stream followed by a <a class="reference internal" href="torchcodec.decoders.Demuxer.html#torchcodec.decoders.Demuxer" title="torchcodec.decoders.Demuxer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Demuxer</span></code></a>.</p>
 <p>You should not build one yourself: a <code class="docutils literal notranslate"><span class="pre">Demuxer</span></code> creates one for you.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Variables<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>index</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The stream’s index within the container, absolute across
+<dd class="field-odd"><p><strong>index</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a>) – The stream’s index within the container, absolute across
 all media types. This is what a <a class="reference internal" href="torchcodec.decoders.Packet.html#torchcodec.decoders.Packet" title="torchcodec.decoders.Packet"><code class="xref py py-class docutils literal notranslate"><span class="pre">Packet</span></code></a>’s <code class="docutils literal notranslate"><span class="pre">stream_index</span></code>
 can be compared against.</p>
 </dd>

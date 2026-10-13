@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>AudioConverter &#8212; TorchCodec 0.18.0.dev20261008+cu130 Documentation</title>
+    <title>AudioConverter &#8212; TorchCodec 0.18.0.dev20261013+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8f4bb3c4"></script>
+    <script src="../_static/documentation_options.js?v=41619669"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1200,7 +1200,7 @@ document.write(`
 <h1>AudioConverter<a class="headerlink" href="#audioconverter" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.decoders.AudioConverter">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioConverter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_audio_converter.html#AudioConverter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioConverter" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">AudioConverter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_audio_converter.html#AudioConverter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioConverter" title="Link to this definition">#</a></dt>
 <dd><p>Turn <a class="reference internal" href="torchcodec.decoders.RawAudioSamples.html#torchcodec.decoders.RawAudioSamples" title="torchcodec.decoders.RawAudioSamples"><code class="xref py py-class docutils literal notranslate"><span class="pre">RawAudioSamples</span></code></a> into normalised float32
 <a class="reference internal" href="torchcodec.AudioSamples.html#torchcodec.AudioSamples" title="torchcodec.AudioSamples"><code class="xref py py-class docutils literal notranslate"><span class="pre">AudioSamples</span></code></a>, optionally resampling and remixing
 channels.</p>
@@ -1224,9 +1224,9 @@ call to <a class="reference internal" href="#torchcodec.decoders.AudioConverter.
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>sample_rate</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – The output sample rate. Defaults to the
+<li><p><strong>sample_rate</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a><em>, </em><em>optional</em>) – The output sample rate. Defaults to the
 source’s own, i.e. no resampling.</p></li>
-<li><p><strong>num_channels</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – The output number of channels. Defaults
+<li><p><strong>num_channels</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a><em>, </em><em>optional</em>) – The output number of channels. Defaults
 to the source’s own.</p></li>
 </ul>
 </dd>
@@ -1260,7 +1260,7 @@ which <a class="reference internal" href="torchcodec.decoders.AudioPacketDecoder
 
 <dl class="py method">
 <dt class="sig sig-object py" id="torchcodec.decoders.AudioConverter.reset">
-<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_audio_converter.html#AudioConverter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioConverter.reset" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_audio_converter.html#AudioConverter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.AudioConverter.reset" title="Link to this definition">#</a></dt>
 <dd><p>Drop the resampler’s state and start over.</p>
 <p>Needed after a <a class="reference internal" href="torchcodec.decoders.Demuxer.html#torchcodec.decoders.Demuxer.seek" title="torchcodec.decoders.Demuxer.seek"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Demuxer.seek()</span></code></a>, after <a class="reference internal" href="#torchcodec.decoders.AudioConverter.drain" title="torchcodec.decoders.AudioConverter.drain"><code class="xref py py-meth docutils literal notranslate"><span class="pre">drain()</span></code></a>, and before
 converting a different stream.</p>

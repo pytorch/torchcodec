@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>CpuFallbackStatus &#8212; TorchCodec 0.18.0.dev20261008+cu130 Documentation</title>
+    <title>CpuFallbackStatus &#8212; TorchCodec 0.18.0.dev20261013+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8f4bb3c4"></script>
+    <script src="../_static/documentation_options.js?v=41619669"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1200,7 +1200,7 @@ document.write(`
 <h1>CpuFallbackStatus<a class="headerlink" href="#cpufallbackstatus" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.decoders.CpuFallbackStatus">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">CpuFallbackStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">status_known</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_video_decoder.html#CpuFallbackStatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.CpuFallbackStatus" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">CpuFallbackStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">status_known</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_video_decoder.html#CpuFallbackStatus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.CpuFallbackStatus" title="Link to this definition">#</a></dt>
 <dd><p>Information about CPU fallback status.</p>
 <p>This class tracks whether the decoder fell back to CPU decoding.
 Users should not instantiate this class directly; instead, access it
@@ -1216,7 +1216,7 @@ via the <code class="xref py py-attr docutils literal notranslate"><span class="
   <div class="sphx-glr-thumbnail-title">Accelerated video decoding on GPUs with CUDA and NVDEC</div>
 </div></div><dl class="py attribute">
 <dt class="sig sig-object py" id="torchcodec.decoders.CpuFallbackStatus.status_known">
-<span class="sig-name descname"><span class="pre">status_known</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#torchcodec.decoders.CpuFallbackStatus.status_known" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">status_known</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#torchcodec.decoders.CpuFallbackStatus.status_known" title="Link to this definition">#</a></dt>
 <dd><p>Whether the fallback status has been determined.
 For the NVDEC CUDA backend (the default; see
 <a class="reference internal" href="torchcodec.decoders.set_cuda_backend.html#torchcodec.decoders.set_cuda_backend" title="torchcodec.decoders.set_cuda_backend"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_cuda_backend()</span></code></a>), this is always <code class="docutils literal notranslate"><span class="pre">True</span></code>

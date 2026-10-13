@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Frame &#8212; TorchCodec 0.18.0.dev20261008+cu130 Documentation</title>
+    <title>Frame &#8212; TorchCodec 0.18.0.dev20261013+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8f4bb3c4"></script>
+    <script src="../_static/documentation_options.js?v=41619669"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1200,7 +1200,7 @@ document.write(`
 <h1>Frame<a class="headerlink" href="#frame" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.Frame">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.</span></span><span class="sig-name descname"><span class="pre">Frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">pts_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/_frame.html#Frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.Frame" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.</span></span><span class="sig-name descname"><span class="pre">Frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">pts_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/_frame.html#Frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.Frame" title="Link to this definition">#</a></dt>
 <dd><p>A single video frame with associated metadata.</p>
 <p>Examples using <code class="docutils literal notranslate"><span class="pre">Frame</span></code>:</p>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="In this example, we&#x27;ll learn how to decode a video using the VideoDecoder class."><img alt="" src="../_images/sphx_glr_basic_example_thumb.png" />
@@ -1220,13 +1220,13 @@ document.write(`
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="torchcodec.Frame.duration_seconds">
-<span class="sig-name descname"><span class="pre">duration_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.Frame.duration_seconds" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">duration_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.Frame.duration_seconds" title="Link to this definition">#</a></dt>
 <dd><p>The duration of the frame, in seconds (float).</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="torchcodec.Frame.pts_seconds">
-<span class="sig-name descname"><span class="pre">pts_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.Frame.pts_seconds" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">pts_seconds</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.Frame.pts_seconds" title="Link to this definition">#</a></dt>
 <dd><p>The <a class="reference internal" href="../glossary.html#term-pts"><span class="xref std std-term">pts</span></a> of the frame, in seconds (float).</p>
 </dd></dl>
 

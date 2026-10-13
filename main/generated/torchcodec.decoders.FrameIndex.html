@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>FrameIndex &#8212; TorchCodec 0.18.0.dev20261008+cu130 Documentation</title>
+    <title>FrameIndex &#8212; TorchCodec 0.18.0.dev20261013+cu130 Documentation</title>
   
   
   
@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8f4bb3c4"></script>
+    <script src="../_static/documentation_options.js?v=41619669"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
@@ -1200,7 +1200,7 @@ document.write(`
 <h1>FrameIndex<a class="headerlink" href="#frameindex" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">FrameIndex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_key_frame</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_pts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_time_base_num</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_time_base_den</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torchcodec.decoders.</span></span><span class="sig-name descname"><span class="pre">FrameIndex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_key_frame</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_pts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_time_base_num</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">_time_base_den</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex" title="Link to this definition">#</a></dt>
 <dd><p>What the packets of a video stream say about its frames, as returned by
 a <a class="reference internal" href="../glossary.html#term-scan"><span class="xref std std-term">scan</span></a> (<a class="reference internal" href="torchcodec.decoders.VideoStream.html#torchcodec.decoders.VideoStream.scan" title="torchcodec.decoders.VideoStream.scan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">VideoStream.scan()</span></code></a>).</p>
 <p>Its members come in three shapes:</p>
@@ -1239,13 +1239,13 @@ on <a class="reference internal" href="torchcodec.decoders.VideoStream.html#torc
   <div class="sphx-glr-thumbnail-title">Build your own decoding pipeline</div>
 </div></div><dl class="py property">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.average_fps_from_content">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">average_fps_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.average_fps_from_content" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">average_fps_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.average_fps_from_content" title="Link to this definition">#</a></dt>
 <dd><p>The average number of frames per second over the stream.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.begin_stream_seconds_from_content">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">begin_stream_seconds_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.begin_stream_seconds_from_content" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">begin_stream_seconds_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.begin_stream_seconds_from_content" title="Link to this definition">#</a></dt>
 <dd><p>The <a class="reference internal" href="../glossary.html#term-pts"><span class="xref std std-term">pts</span></a> of the first frame.</p>
 </dd></dl>
 
@@ -1258,7 +1258,7 @@ for.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.end_stream_seconds_from_content">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">end_stream_seconds_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.end_stream_seconds_from_content" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">end_stream_seconds_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.end_stream_seconds_from_content" title="Link to this definition">#</a></dt>
 <dd><p>The time at which the last frame stops being displayed.</p>
 <p>This is the largest <code class="docutils literal notranslate"><span class="pre">pts</span> <span class="pre">+</span> <span class="pre">duration</span></code> across the stream, not the last
 frame’s own end time. Durations vary, so the frame that finishes last
@@ -1267,13 +1267,13 @@ isn’t necessarily the one that starts last.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.index_at">
-<span class="sig-name descname"><span class="pre">index_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex.index_at"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex.index_at" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">index_at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.pytorch.org/docs/stable/tensors.html#torch.Tensor" title="(in PyTorch v2.14)"><span class="pre">Tensor</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex.index_at"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex.index_at" title="Link to this definition">#</a></dt>
 <dd><p>The index of the frame being displayed at <code class="docutils literal notranslate"><span class="pre">seconds</span></code>.</p>
 <p>A frame is displayed from its own <a class="reference internal" href="../glossary.html#term-pts"><span class="xref std std-term">pts</span></a> until that plus its
 duration, so this is the frame whose interval contains <code class="docutils literal notranslate"><span class="pre">seconds</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>seconds</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em> or </em><em>Tensor</em>) – The timestamp(s) to look up. A value
+<dd class="field-odd"><p><strong>seconds</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em> or </em><em>Tensor</em>) – The timestamp(s) to look up. A value
 outside the stream gives the closest frame, i.e. the first or
 the last one.</p>
 </dd>
@@ -1282,7 +1282,7 @@ the last one.</p>
 gives an int64 tensor of indices of the same shape.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a> or Tensor</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a> or Tensor</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1301,24 +1301,24 @@ gives an int64 tensor of indices of the same shape.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.key_frame_seconds_for">
-<span class="sig-name descname"><span class="pre">key_frame_seconds_for</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex.key_frame_seconds_for"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex.key_frame_seconds_for" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">key_frame_seconds_for</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../_modules/torchcodec/decoders/_blocks/_demuxer.html#FrameIndex.key_frame_seconds_for"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torchcodec.decoders.FrameIndex.key_frame_seconds_for" title="Link to this definition">#</a></dt>
 <dd><p>The timestamp of the last keyframe at or before <code class="docutils literal notranslate"><span class="pre">seconds</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>seconds</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The timestamp you want to reach.</p>
+<dd class="field-odd"><p><strong>seconds</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a>) – The timestamp you want to reach.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>The timestamp to seek to.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)">float</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="torchcodec.decoders.FrameIndex.num_frames_from_content">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_frames_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.num_frames_from_content" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_frames_from_content</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></em><a class="headerlink" href="#torchcodec.decoders.FrameIndex.num_frames_from_content" title="Link to this definition">#</a></dt>
 <dd><p>The number of frames in the stream.</p>
 </dd></dl>
 
