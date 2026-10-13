@@ -145,6 +145,7 @@ int PacketDecoder::send_eof() {
 
 void PacketDecoder::reset() {
   device_interface_->flush();
+  audio_pts_extrapolator_.reset();
   packet_data_may_be_misaligned_ = is_mpeg_ps_;
 }
 
@@ -152,7 +153,9 @@ int PacketDecoder::receive_frame(UniqueAVFrame& av_frame) {
   int status = device_interface_->receive_frame(av_frame);
   if (status == AVSUCCESS) {
     device_interface_->make_frame_standalone(av_frame);
-    if (media_type_ == AVMEDIA_TYPE_VIDEO) {
+    if (media_type_ == AVMEDIA_TYPE_AUDIO) {
+      audio_pts_extrapolator_.process(*av_frame, time_base_);
+    } else if (media_type_ == AVMEDIA_TYPE_VIDEO) {
       // Attach a copy of the display matrix to the frame, so the ColorConverter
       // can use it.
       set_display_matrix_on_frame(

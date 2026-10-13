@@ -3034,6 +3034,32 @@ class TestVideoDecoder:
             )
 
 
+def _make_adpcm_file(tmp_path, codec, container="wav"):
+    # At 44.1kHz stereo with 512-byte blocks, the bitrate is high enough that
+    # the WAV demuxer puts several blocks in each packet, on all FFmpeg
+    # versions. Remuxing into MKV keeps those packets.
+    path = tmp_path / f"{codec}.wav"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=1",
+            "-ac", "2", "-c:a", codec, "-block_size", "512", str(path),
+        ],
+        check=True,
+    )  # fmt: skip
+    if container != "wav":
+        remuxed_path = path.with_suffix(f".{container}")
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(path), "-c", "copy", str(remuxed_path),
+            ],
+            check=True,
+        )  # fmt: skip
+        path = remuxed_path
+    return path
+
+
 class TestAudioDecoder:
     @pytest.mark.parametrize(
         "asset", (NASA_AUDIO, NASA_AUDIO_MP3, SINE_MONO_S32, SINE_16_CHANNEL_S16)
@@ -3087,6 +3113,33 @@ class TestAudioDecoder:
         path = str(tmp_path / "test.flac")
         AudioEncoder(torch.rand(1, 1000), sample_rate=16000).to_file(path)
         AudioDecoder(path).get_all_samples()
+
+    @needs_ffmpeg_cli
+    @pytest.mark.parametrize("codec", ("adpcm_ms", "adpcm_ima_wav"))
+    def test_multi_block_packets(self, tmp_path, codec):
+        # The WAV demuxer packs several ADPCM blocks per packet, and libavcodec
+        # leaves all but the first frame of each packet without a pts.
+        path = _make_adpcm_file(tmp_path, codec)
+        decoder = AudioDecoder(path)
+        samples = decoder.get_all_samples()
+
+        reference = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(path), "-f", "f32le", "-"],
+            check=True,
+            capture_output=True,
+        ).stdout
+        reference = torch.frombuffer(bytearray(reference), dtype=torch.float32)
+        reference = reference.reshape(-1, 2).T
+        torch.testing.assert_close(samples.data, reference, atol=0, rtol=0)
+
+        start_seconds, stop_seconds = 0.5, 0.6
+        samples = decoder.get_samples_played_in_range(start_seconds, stop_seconds)
+        start = round(start_seconds * 44100)
+        stop = round(stop_seconds * 44100)
+        assert samples.pts_seconds == pytest.approx(start_seconds)
+        torch.testing.assert_close(
+            samples.data, reference[:, start:stop], atol=0, rtol=0
+        )
 
     def test_unseekable_format(self):
         decoder = AudioDecoder(UNSEEKABLE_SWF.path)
@@ -5943,6 +5996,36 @@ class TestLowLevel:
         pts = [chunk.pts_seconds for chunk in chunks]
         assert pts == sorted(pts)
         assert pts[0] == pytest.approx(0, abs=1e-6)
+
+    @needs_ffmpeg_cli
+    @pytest.mark.parametrize(
+        "container, time_base_seconds", (("wav", 1 / 44100), ("mkv", 1e-3))
+    )
+    def test_audio_raw_samples_pts_multi_block_packets(
+        self, tmp_path, container, time_base_seconds
+    ):
+        # See TestAudioDecoder.test_multi_block_packets. MKV's time base can't
+        # represent the frames' duration exactly, so the extrapolated pts must
+        # stay within one tick of the exact ones rather than drift away.
+        path = _make_adpcm_file(tmp_path, "adpcm_ms", container)
+        demuxer = Demuxer(path, streams="audio")
+        decoder = demuxer.streams[0].make_decoder()
+        chunks = []
+        for packet in demuxer:
+            chunks += decoder.decode(packet)
+        chunks += decoder.drain()
+
+        num_samples = 0
+        for chunk in chunks:
+            exact_pts_seconds = num_samples / chunk.sample_rate
+            exact_duration_seconds = chunk.num_samples / chunk.sample_rate
+            assert chunk.pts_seconds == pytest.approx(
+                exact_pts_seconds, abs=time_base_seconds
+            )
+            assert chunk.duration_seconds == pytest.approx(
+                exact_duration_seconds, abs=time_base_seconds
+            )
+            num_samples += chunk.num_samples
 
     def test_decoder_output_type_follows_the_stream(self):
         # The two decoders are one class in C++; the split is a Python-level

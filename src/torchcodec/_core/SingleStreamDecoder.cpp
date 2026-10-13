@@ -1393,6 +1393,7 @@ bool SingleStreamDecoder::maybe_seek_to_before_desired_pts() {
 
   decode_stats_.num_flushes++;
   device_interface_->flush();
+  audio_pts_extrapolator_.reset();
   return true;
 }
 
@@ -1429,6 +1430,12 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
     }
 
     decode_stats_.num_frames_received_by_decoder++;
+    if (status == AVSUCCESS &&
+        stream_infos_[active_stream_index_].av_media_type ==
+            AVMEDIA_TYPE_AUDIO) {
+      audio_pts_extrapolator_.process(
+          *av_frame, stream_infos_[active_stream_index_].time_base);
+    }
     // Is this the kind of frame we're looking for?
     if (status == AVSUCCESS && filter_function(*av_frame)) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
