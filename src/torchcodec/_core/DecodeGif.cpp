@@ -134,7 +134,9 @@ torch::stable::Tensor decode_gif(
       num_images > 0, "GIF file should contain at least one image!");
 
   GifColorType bg{0, 0, 0};
-  if (gif_file->SColorMap) {
+  if (gif_file->SColorMap &&
+      // out of range background falls back to black
+      gif_file->SBackGroundColor < gif_file->SColorMap->ColorCount) {
     bg = gif_file->SColorMap->Colors[gif_file->SBackGroundColor];
   }
 
@@ -294,7 +296,8 @@ torch::stable::Tensor decode_gif(
         if (c == gcb.TransparentColor) {
           continue;
         }
-        GifColorType rgb = cmap->Colors[c];
+        GifColorType rgb =
+            c < cmap->ColorCount ? cmap->Colors[c] : GifColorType{0, 0, 0};
         output_a[i][0][y][x] = rgb.Red;
         output_a[i][1][y][x] = rgb.Green;
         output_a[i][2][y][x] = rgb.Blue;
