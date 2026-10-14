@@ -3,7 +3,7 @@ name: CPP tests
 on:
   push:
     branches: [ main ]
-  pull_request:
+  # pull_request:  # disabled while iterating on ROCm CI
 
 concurrency:
   group: unit-test${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_number || github.ref }}

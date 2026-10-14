@@ -11,10 +11,10 @@ name: Build non-GPL FFmpeg from source
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - packaging/build_ffmpeg.sh
-      - .github/workflows/build_ffmpeg.yaml # self reference
+  # pull_request:  # disabled while iterating on ROCm CI
+  #   paths:
+  #     - packaging/build_ffmpeg.sh
+  #     - .github/workflows/build_ffmpeg.yaml # self reference
   schedule:
     - cron: '0 0 * * 0'  # on sunday
 

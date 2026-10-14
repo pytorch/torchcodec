@@ -189,6 +189,8 @@ def _decode_jpegs_cuda_with_mode(
     )
 
 
+# TODO_ROCM: How do we document ROCm support? "CUDA" isn't enough to know ROCm is supported.
+# TODO_ROCM: Install instructions on README etc.
 def decode_jpeg(
     source: str | Path | bytes | torch.Tensor | list,
     *,
@@ -203,8 +205,8 @@ def decode_jpeg(
     .. note::
 
         For CUDA decoding, prefer passing a batch (a list of sources) in a
-        single call: the whole batch is decoded in one nvJPEG call, which is
-        much faster than decoding images one at a time.
+        single call: the whole batch is decoded in one nvJPEG/rocJPEG call, which
+        is much faster than decoding images one at a time.
         Passing a batch of sources is supported on CPU too, but it won't be
         faster than decoding them one at a time.
 
@@ -234,8 +236,10 @@ def decode_jpeg(
             emulates a 16-bit output by scaling the 8-bit values to the full
             16-bit range (0-255 -> 0-65535).
         device (str or torch.device, optional): Device to decode on, ``"cpu"``
-            (default) or a CUDA device. CUDA decoding uses nvJPEG. We recommend
-            passing a batch of sources when decoding on CUDA, for speed.
+            (default) or a CUDA device. On a CUDA device, decoding uses nvJPEG on
+            NVIDIA GPUs and rocJPEG on AMD/ROCm GPUs (both exposed under the
+            ``"cuda"`` device string). We recommend passing a batch of sources
+            when decoding on CUDA, for speed.
 
     Returns:
         torch.Tensor or list of torch.Tensor of shape ``C, H, W``: The decoded
