@@ -40,7 +40,7 @@ jobs:
 
   filter-matrix:
     # torchcodec only supports the TheRock/pip-wheel layout (ROCm 10.0+).
-    # Keep 10.1 and drop older ROCm versions the upstream matrix may include.
+    # Keep 10.1 and drop older ROCm versions from the matrix, since rocJPEG support is only available from 10.1 onwards
     needs: generate-matrix
     runs-on: ubuntu-latest
     outputs:
