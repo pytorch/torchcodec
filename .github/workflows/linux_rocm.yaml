@@ -46,12 +46,25 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.filter.outputs.matrix }}
+      test-matrix: ${{ steps.filter.outputs.test-matrix }}
     steps:
       - id: filter
         run: |
           matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
             | jq -c '.include |= map(select((.gpu_arch_version | tonumber) >= 10.1))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          # Build may cover several Python versions; the GPU test job only
+          # needs one. Take the first unique python_version, then one entry
+          # per ROCm version so install-and-test stays in sync with the wheel.
+          test_matrix=$(echo "$matrix" | jq -c '
+            (.include | map(.python_version) | unique | .[0]) as $py
+            | {include: [
+                .include[]
+                | select(.python_version == $py)
+                | {python_version: .python_version, rocm_version: .gpu_arch_version}
+              ] | unique_by(.rocm_version)}
+          ')
+          echo "test-matrix=$test_matrix" >> "$GITHUB_OUTPUT"
 
   build:
     needs: filter-matrix
@@ -82,12 +95,10 @@ jobs:
     # docker image and always fails. Skip it for fork PRs; it still runs on
     # same-repo PRs, push, and workflow_dispatch.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    needs: build
+    needs: [build, filter-matrix]
     strategy:
       fail-fast: false
-      matrix:
-        python-version: ['3.10']
-        rocm-version: ['10.1']
+      matrix: ${{ fromJson(needs.filter-matrix.outputs.test-matrix) }}
     uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@main
     permissions:
       id-token: write
@@ -96,19 +107,19 @@ jobs:
       repository: meta-pytorch/torchcodec
       runner: "linux.rocm.gpu.meta-pytorch.mi350.1"
       gpu-arch-type: "rocm"
-      gpu-arch-version: ${{ matrix.rocm-version }}
+      gpu-arch-version: ${{ matrix.rocm_version }}
       # ROCm self-hosted runners are not on EC2, so they can't pull the default
       # ECR-hosted docker image (no AWS credentials). Use a Docker Hub image and
       # run without sudo, matching pytorch/vision's ROCm job.
-      docker-image: pytorch/manylinux2_28-builder:rocm${{ matrix.rocm-version }}
+      docker-image: pytorch/manylinux2_28-builder:rocm${{ matrix.rocm_version }}
       no-sudo: true
       timeout: 120
       test-infra-ref: main
-      download-artifact: meta-pytorch_torchcodec__${{ matrix.python-version }}_rocm${{ matrix.rocm-version }}_x86_64
+      download-artifact: meta-pytorch_torchcodec__${{ matrix.python_version }}_rocm${{ matrix.rocm_version }}_x86_64
       script: |
         set -euo pipefail
 
-        # We use conda only to get a Python env matching the cp310 wheel (the
+        # We use conda only to get a Python env matching the built wheel (the
         # image's base env may be a different Python). Point conda at conda-forge
         # only, with libmamba, so env creation is fast and never touches the
         # 'defaults'/pkgs/main channel (repo.anaconda.com), which hangs from the
@@ -123,11 +134,10 @@ jobs:
         echo '::endgroup::'
 
         # linux_job_v2 runs the script in the manylinux container's base conda
-        # env, whose Python isn't necessarily 3.10. The wheel is built cp310, so
-        # pip would reject it ("not a supported wheel on this platform"). Create
-        # and activate a matching Python env (conda is sourced by linux_job_v2).
-        echo '::group::Create Python ${{ matrix.python-version }} env'
-        conda create -y -n test -c conda-forge python=${{ matrix.python-version }} pip
+        # env, whose Python may not match the wheel. Create and activate a
+        # matching Python env (conda is sourced by linux_job_v2).
+        echo '::group::Create Python ${{ matrix.python_version }} env'
+        conda create -y -n test -c conda-forge python=${{ matrix.python_version }} pip
         conda activate test
         python --version
         echo '::endgroup::'
@@ -136,7 +146,7 @@ jobs:
 
         echo '::group::Install PyTorch (ROCm)'
         pip install --progress-bar=off --pre torch \
-          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm-version }}
+          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
         echo '::endgroup::'
 
         echo '::group::Assert we are on ROCm'
@@ -169,11 +179,11 @@ jobs:
         echo '::endgroup::'
 
         echo '::group::Initialize ROCm SDK'
-        # _rocm_sdk_devel is only available for Python 3.11+ but our test env
-        # uses Python 3.10. Install and run rocm-sdk init in the base conda env
-        # which has the matching Python version.
+        # _rocm_sdk_devel may be unavailable for older Python versions. Install
+        # and run rocm-sdk init in the base conda env, which matches the builder
+        # image Python.
         conda run -n base pip install --pre "rocm[devel]" \
-          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm-version }}
+          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
         conda run -n base rocm-sdk init
         echo '::endgroup::'
 
