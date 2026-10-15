@@ -50,28 +50,8 @@ jobs:
     steps:
       - id: filter
         run: |
-          # TEMPORARY: expand to the full nightly Python list so this PR
-          # simulates a merge-to-main build (test-infra otherwise sets
-          # LIMIT_PR_BUILDS and keeps only the first Python on PRs).
-          # Revert this commit before landing; on main the expansion is a
-          # no-op relative to the unrestricted matrix.
           matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
-            | jq -c '
-                .include |= map(select((.gpu_arch_version | tonumber) >= 10.1))
-                | (.include | unique_by(.gpu_arch_version)) as $by_rocm
-                | ["3.11", "3.12", "3.13", "3.14", "3.14t", "3.15", "3.15t"] as $pys
-                | .include = [
-                    $pys[] as $py
-                    | $by_rocm[]
-                    | . + {
-                        python_version: $py,
-                        build_name: (
-                          "\(.package_type)-py\($py)-\(.gpu_arch_type)\(.gpu_arch_version)"
-                          | gsub("\\."; "_")
-                        )
-                      }
-                  ]
-              ')
+            | jq -c '.include |= map(select((.gpu_arch_version | tonumber) >= 10.1))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           # Build may cover several Python versions; the GPU test job only
           # needs one. Take the first unique python_version, then one entry
