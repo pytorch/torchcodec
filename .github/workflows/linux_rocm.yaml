@@ -40,8 +40,8 @@ jobs:
       build-python-only: "disable"
 
   filter-matrix:
-    # torchcodec only supports the TheRock/pip-wheel layout (ROCm 10.0+).
-    # Keep 10.1 and drop older ROCm versions from the matrix, since rocJPEG support is only available from 10.1 onwards
+    # Keep ROCm >= 10.1 and drop older versions from the matrix, since
+    # rocJPEG support is only available from 10.1 onwards.
     needs: generate-matrix
     runs-on: ubuntu-latest
     outputs:
@@ -49,29 +49,8 @@ jobs:
     steps:
       - id: filter
         run: |
-          # Keep ROCm 10.1. Drop the legacy 7.x entries. Nightly already
-          # includes 10.1, so drop 10.0 there. On the test channel, which
-          # still lists 10.0, rewrite that entry onto the 10.1 image and index.
           matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
-            | jq -c '
-                .include |= (
-                  map(select(.gpu_arch_version != "7.14" and .gpu_arch_version != "7.2"))
-                  | if any(.[]; .gpu_arch_version == "10.1") then
-                      map(select(.gpu_arch_version != "10.0"))
-                    else
-                      map(
-                        if .gpu_arch_version == "10.0" then
-                          .gpu_arch_version = "10.1"
-                          | .desired_cuda = "rocm10.1"
-                          | .container_image |= sub(":rocm10\\.0$"; ":rocm10.1")
-                          | .build_name |= sub("rocm10_0"; "rocm10_1")
-                          | .installation |= gsub("rocm10\\.0"; "rocm10.1")
-                        else .
-                        end
-                      )
-                    end
-                )
-              ')
+            | jq -c '.include |= map(select((.gpu_arch_version | tonumber) >= 10.1))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build:
