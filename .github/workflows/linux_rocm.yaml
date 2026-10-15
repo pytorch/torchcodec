@@ -149,17 +149,6 @@ jobs:
           --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
         echo '::endgroup::'
 
-        echo '::group::Assert we are on ROCm'
-        rocm-smi
-        python -c "
-        import torch
-        print('torch:', torch.__version__, '| hip:', torch.version.hip)
-        assert torch.version.hip is not None, 'torch is not a ROCm/HIP build'
-        assert torch.cuda.is_available(), 'no GPU visible to torch'
-        print('device:', torch.cuda.get_device_name(0))
-        "
-        echo '::endgroup::'
-
         # Prevent the checked-out src/ tree from shadowing the installed wheel.
         bash packaging/remove_src.sh
 
@@ -187,7 +176,6 @@ jobs:
         conda run -n base rocm-sdk init
         echo '::endgroup::'
 
-        echo '::group::Run FFmpeg-free image decoder tests (incl. rocJPEG GPU)'
         rocm_core_lib=$(python -c "import importlib.util, pathlib, os; spec = importlib.util.find_spec('_rocm_sdk_core'); p = pathlib.Path(spec.submodule_search_locations[0]) if spec else None; dirs = [str(p/'lib'), str(p/'lib'/'rocm_sysdeps'/'lib')] if p else []; print(os.pathsep.join(d for d in dirs if pathlib.Path(d).is_dir()))" 2>/dev/null || true)
         if [ -n "${rocm_core_lib}" ]; then
           export LD_LIBRARY_PATH="${rocm_core_lib}:${LD_LIBRARY_PATH:-}"
@@ -203,6 +191,36 @@ jobs:
         if [ -n "${rocm_path}" ]; then
           export ROCM_PATH="${rocm_path}"
         fi
+
+        echo '::group::Assert we are on ROCm'
+        # The manylinux ROCm builder image does not put system rocm-smi on PATH.
+        # After rocm[devel], amd-smi lives under the SDK bin dirs.
+        for candidate in \
+            "${ROCM_PATH:+${ROCM_PATH}/bin}" \
+            "$(python -c "import importlib.util, pathlib; spec = importlib.util.find_spec('_rocm_sdk_core'); print(pathlib.Path(spec.submodule_search_locations[0]) / 'bin' if spec else '')" 2>/dev/null || true)" \
+            "$(conda run -n base python -c "import importlib.util, pathlib; spec = importlib.util.find_spec('_rocm_sdk_core'); print(pathlib.Path(spec.submodule_search_locations[0]) / 'bin' if spec else '')" 2>/dev/null || true)"; do
+          if [ -n "${candidate}" ] && [ -d "${candidate}" ]; then
+            export PATH="${candidate}:${PATH}"
+          fi
+        done
+        if command -v amd-smi >/dev/null 2>&1; then
+          amd-smi
+        elif command -v rocm-smi >/dev/null 2>&1; then
+          rocm-smi
+        else
+          echo "Neither amd-smi nor rocm-smi found on PATH after rocm[devel]" >&2
+          exit 1
+        fi
+        python -c "
+        import torch
+        print('torch:', torch.__version__, '| hip:', torch.version.hip)
+        assert torch.version.hip is not None, 'torch is not a ROCm/HIP build'
+        assert torch.cuda.is_available(), 'no GPU visible to torch'
+        print('device:', torch.cuda.get_device_name(0))
+        "
+        echo '::endgroup::'
+
+        echo '::group::Run FFmpeg-free image decoder tests (incl. rocJPEG GPU)'
         # torch.cuda.is_available() is True on ROCm (HIP masquerades as CUDA), so
         # the needs_cuda image tests run here and exercise the GPU JPEG decoder,
         # which is rocJPEG on ROCm: the jpeg_cuda params call
