@@ -151,7 +151,7 @@ jobs:
         python -m pip install --upgrade pip
 
         echo '::group::Install PyTorch (ROCm)'
-        pip install --progress-bar=off --pre torch \
+        pip install --progress-bar=off --pre torch "rocm[devel]" \
           --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
         echo '::endgroup::'
 
