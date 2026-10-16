@@ -53,6 +53,9 @@ jobs:
           matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
             | jq -c '.include |= map(select((.gpu_arch_version | tonumber) >= 10.1))')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "::group::Filtered build matrix"
+          echo "$matrix" | jq .
+          echo "::endgroup::"
           # Build may cover several Python versions; the GPU test job only
           # needs one. Take the first unique python_version, then one entry
           # per ROCm version so install-and-test stays in sync with the wheel.
