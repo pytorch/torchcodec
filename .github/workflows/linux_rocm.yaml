@@ -68,6 +68,9 @@ jobs:
               ] | unique_by(.rocm_version)}
           ')
           echo "test-matrix=$test_matrix" >> "$GITHUB_OUTPUT"
+          echo "::group::Filtered test matrix"
+          echo "$test_matrix" | jq .
+          echo "::endgroup::"
 
   build:
     needs: filter-matrix
