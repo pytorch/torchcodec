@@ -174,47 +174,14 @@ jobs:
         echo '::endgroup::'
 
         echo '::group::Initialize ROCm SDK'
-        # _rocm_sdk_devel may be unavailable for older Python versions. Install
-        # and run rocm-sdk init in the base conda env, which matches the builder
-        # image Python.
-        conda run -n base pip install --pre "rocm[devel]" \
-          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
-        conda run -n base rocm-sdk init
+        rocm-sdk init
         echo '::endgroup::'
 
-        rocm_core_lib=$(python -c "import importlib.util, pathlib, os; spec = importlib.util.find_spec('_rocm_sdk_core'); p = pathlib.Path(spec.submodule_search_locations[0]) if spec else None; dirs = [str(p/'lib'), str(p/'lib'/'rocm_sysdeps'/'lib')] if p else []; print(os.pathsep.join(d for d in dirs if pathlib.Path(d).is_dir()))" 2>/dev/null || true)
-        if [ -n "${rocm_core_lib}" ]; then
-          export LD_LIBRARY_PATH="${rocm_core_lib}:${LD_LIBRARY_PATH:-}"
-        fi
-        _rocm_devel_py='import importlib.util, pathlib; spec = importlib.util.find_spec("_rocm_sdk_devel"); print(str(pathlib.Path(spec.submodule_search_locations[0]))) if spec else ""'
-        rocm_path=$(python -c "${_rocm_devel_py}" 2>/dev/null || true)
-        if [ -z "${rocm_path}" ]; then
-          # _rocm_sdk_devel is only available for Python 3.11+; if the test env
-          # uses an older Python the package isn't there and python exits 0 with
-          # empty output (so || wouldn't fire). Check the base env explicitly.
-          rocm_path=$(conda run -n base python -c "${_rocm_devel_py}" 2>/dev/null || true)
-        fi
-        if [ -n "${rocm_path}" ]; then
-          export ROCM_PATH="${rocm_path}"
-        fi
-
         echo '::group::Assert we are on ROCm'
-        # The manylinux ROCm builder image does not put system rocm-smi on PATH.
-        # After rocm[devel], amd-smi lives under the SDK bin dirs.
-        for candidate in \
-            "${ROCM_PATH:+${ROCM_PATH}/bin}" \
-            "$(python -c "import importlib.util, pathlib; spec = importlib.util.find_spec('_rocm_sdk_core'); print(pathlib.Path(spec.submodule_search_locations[0]) / 'bin' if spec else '')" 2>/dev/null || true)" \
-            "$(conda run -n base python -c "import importlib.util, pathlib; spec = importlib.util.find_spec('_rocm_sdk_core'); print(pathlib.Path(spec.submodule_search_locations[0]) / 'bin' if spec else '')" 2>/dev/null || true)"; do
-          if [ -n "${candidate}" ] && [ -d "${candidate}" ]; then
-            export PATH="${candidate}:${PATH}"
-          fi
-        done
         if command -v amd-smi >/dev/null 2>&1; then
           amd-smi
-        elif command -v rocm-smi >/dev/null 2>&1; then
-          rocm-smi
         else
-          echo "Neither amd-smi nor rocm-smi found on PATH after rocm[devel]" >&2
+          echo "amd-smi not found on PATH after rocm[devel]" >&2
           exit 1
         fi
         python -c "
