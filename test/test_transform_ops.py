@@ -99,6 +99,54 @@ class TestPublicVideoDecoderTransformOps:
                         frame_resize, frame_tv_no_antialias, rtol=0, atol=6
                     )
 
+    @pytest.mark.parametrize(
+        "size, max_size",
+        (
+            (180, None),
+            ((180,), None),
+            (300, 400),
+            (None, 320),
+        ),
+    )
+    def test_resize_preserving_aspect_ratio_torchvision(self, size, max_size):
+        tc_resize = torchcodec.transforms.Resize(size=size, max_size=max_size)
+        decoder_resize = VideoDecoder(NASA_VIDEO.path, transforms=[tc_resize])
+        decoder_resize_tv = VideoDecoder(
+            NASA_VIDEO.path,
+            transforms=[v2.Resize(size=size, max_size=max_size)],
+        )
+        decoder_full = VideoDecoder(NASA_VIDEO.path)
+
+        frame_resize = decoder_resize[0]
+        frame_resize_tv = decoder_resize_tv[0]
+        frame_full = decoder_full[0]
+        frame_tv = v2.Resize(size=size, max_size=max_size)(frame_full)
+
+        assert_frames_equal(frame_resize, frame_resize_tv)
+        assert frame_resize.shape == frame_tv.shape
+        assert_tensor_close_on_at_least(frame_resize, frame_tv, percentage=99.8, atol=1)
+        torch.testing.assert_close(frame_resize, frame_tv, rtol=0, atol=6)
+
+    @pytest.mark.parametrize(
+        "size, max_size, input_dims, expected_output_dims",
+        (
+            ((100, 200), None, (270, 480), (100, 200)),
+            (100, None, (270, 480), (100, 177)),
+            ((100,), None, (480, 270), (177, 100)),
+            (300, 400, (270, 480), (225, 400)),
+            (None, 320, (270, 480), (180, 320)),
+            (None, 640, (270, 480), (360, 640)),
+            (100, None, (300, 300), (100, 100)),
+        ),
+    )
+    def test_resize_output_dims(self, size, max_size, input_dims, expected_output_dims):
+        resize = torchcodec.transforms.Resize(size=size, max_size=max_size)
+
+        assert resize._get_output_dims(input_dims) == expected_output_dims
+        assert resize._make_transform_spec(input_dims) == (
+            f"resize, {expected_output_dims[0]}, {expected_output_dims[1]}"
+        )
+
     def test_resize_fails(self):
         with pytest.raises(
             ValueError,
@@ -124,26 +172,47 @@ class TestPublicVideoDecoderTransformOps:
 
         with pytest.raises(
             ValueError,
-            match=r"must have a size specified",
-        ):
-            VideoDecoder(
-                NASA_VIDEO.path, transforms=[v2.Resize(size=None, max_size=100)]
-            )
-
-        with pytest.raises(
-            ValueError,
-            match=r"must have a \(height, width\) pair for the size",
-        ):
-            VideoDecoder(NASA_VIDEO.path, transforms=[v2.Resize(size=(100))])
-
-        with pytest.raises(
-            ValueError,
-            match=r"must have a \(height, width\) pair for the size",
+            match=r"size can be an integer, a sequence of one or two integers, or None",
         ):
             VideoDecoder(
                 NASA_VIDEO.path,
                 transforms=[torchcodec.transforms.Resize(size=(100, 100, 100))],
             )
+
+        with pytest.raises(
+            ValueError,
+            match=r"max_size must be an integer when size is None",
+        ):
+            torchcodec.transforms.Resize(size=None)
+
+        with pytest.raises(
+            ValueError,
+            match=r"max_size should only be passed",
+        ):
+            VideoDecoder(
+                NASA_VIDEO.path,
+                transforms=[
+                    torchcodec.transforms.Resize(size=(100, 100), max_size=200)
+                ],
+            )
+
+        with pytest.raises(
+            ValueError,
+            match=r"must be strictly greater than",
+        ):
+            VideoDecoder(
+                NASA_VIDEO.path,
+                transforms=[torchcodec.transforms.Resize(size=100, max_size=100)],
+            )
+
+        with pytest.raises(
+            ValueError,
+            match=r"input frame dimensions are known",
+        ):
+            torchcodec.transforms.Resize(size=100)._get_output_dims((None, 480))
+
+        with pytest.raises(TypeError):
+            torchcodec.transforms.Resize(100, 200)
 
     def test_resize_non_32_aligned_input_width(self):
         assert NON_32_ALIGNED_WIDTH_VIDEO.get_width() % 32 != 0
@@ -370,6 +439,28 @@ class TestPublicVideoDecoderTransformOps:
         ]:
             frame = decoder[frame_index]
             assert frame.shape == (TEST_SRC_2_720P.get_num_color_channels(), 1080, 1920)
+
+    @pytest.mark.parametrize(
+        "resize, random_crop",
+        [
+            (torchcodec.transforms.Resize, torchcodec.transforms.RandomCrop),
+            (v2.Resize, v2.RandomCrop),
+        ],
+    )
+    def test_aspect_ratio_resize_transform_pipeline(self, resize, random_crop):
+        decoder = VideoDecoder(
+            TEST_SRC_2_720P.path,
+            transforms=[
+                resize(size=1440),
+                random_crop(size=(1200, 2400)),
+            ],
+        )
+
+        assert decoder[0].shape == (
+            TEST_SRC_2_720P.get_num_color_channels(),
+            1200,
+            2400,
+        )
 
     def test_transform_fails(self):
         with pytest.raises(
