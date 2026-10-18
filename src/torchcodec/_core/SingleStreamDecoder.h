@@ -269,6 +269,26 @@ class FORCE_PUBLIC_VISIBILITY SingleStreamDecoder {
 
   bool maybe_seek_to_before_desired_pts();
 
+  // Rewinds the AVFormatContext back to the beginning of the input. For raw
+  // streams without timestamps (AVFMT_NOTIMESTAMPS), avformat_seek_file() is
+  // not supported, so we fall back to a byte-level seek of the AVIOContext.
+  // Also resets raw_stream_frame_ordinal_.
+  void rewind_to_beginning();
+
+  // Whether decoded frames of the active stream must be identified by their
+  // reception ordinal rather than by their (absent) pts. True only for raw
+  // streams without timestamps (AVFMT_NOTIMESTAMPS) when decoding video.
+  bool uses_raw_stream_ordinals() const;
+
+  // pts/duration accessors that, for raw streams without timestamps, return
+  // the values synthesized during the scan for the frame identified by
+  // raw_stream_frame_ordinal_ instead of the frame's (unset) pts/duration.
+  int64_t get_effective_pts(const AVFrame& av_frame) const;
+  int64_t get_effective_duration(const AVFrame& av_frame) const;
+  int64_t get_raw_stream_pts_for_ordinal(int64_t ordinal) const;
+  int64_t get_raw_stream_duration_for_ordinal(int64_t ordinal) const;
+  static int64_t get_raw_stream_frame_duration(const AVStream* stream);
+
   UniqueAVFrame decode_av_frame(
       std::function<bool(const AVFrame&)> filter_function);
 
@@ -364,6 +384,17 @@ class FORCE_PUBLIC_VISIBILITY SingleStreamDecoder {
   // Whether the container is an MPEG program stream, whose demuxer needs
   // special care after a seek. See decode_av_frame().
   bool is_mpeg_ps_ = false;
+  // Whether the input is a raw elementary stream without timestamps
+  // (AVFMT_NOTIMESTAMPS, e.g. raw H.264 Annex B). Such streams don't support
+  // timestamp-based seeking and their packets and decoded frames have no pts,
+  // so we synthesize pts values during the scan and identify decoded frames
+  // by their reception ordinal. See uses_raw_stream_ordinals().
+  bool no_timestamps_input_ = false;
+  // Number of frames received from the decoder for the active stream since
+  // the last rewind/seek. For raw streams without timestamps, the n-th
+  // received frame corresponds to the n-th packet, whose synthesized pts is
+  // stored in StreamInfo::all_frames[n].
+  int64_t raw_stream_frame_ordinal_ = 0;
   // Initialized to INT64_MIN instead of 0. With 0, canWeAvoidSeeking() could
   // incorrectly skip a seek when the internal FFmpeg frame index (used by
   // av_index_search_timestamp() in approximate mode) had not yet been built,

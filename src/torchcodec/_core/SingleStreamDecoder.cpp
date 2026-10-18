@@ -82,6 +82,8 @@ void SingleStreamDecoder::initialize_decoder() {
   STD_TORCH_CHECK(!initialized_, "Attempted double initialization.");
 
   is_mpeg_ps_ = std::string_view(format_context_->iformat->name) == "mpeg";
+  no_timestamps_input_ =
+      (format_context_->iformat->flags & AVFMT_NOTIMESTAMPS) != 0;
 
   // In principle, the AVFormatContext should be filled in by the call to
   // avformat_open_input() which reads the header. However, some formats do not
@@ -97,6 +99,14 @@ void SingleStreamDecoder::initialize_decoder() {
   container_metadata_ =
       get_container_metadata_from_format_context(format_context_.get());
 
+  // Raw streams without timestamps can't be seeked into with
+  // avformat_seek_file(), so approximate mode is not viable for them: we
+  // degrade to exact mode and scan the file to build our own index. All
+  // seek_mode_-dependent behavior (metadata, pts/index conversions) then
+  // consistently uses the scanned index.
+  if (no_timestamps_input_ && seek_mode_ == SeekMode::approximate) {
+    seek_mode_ = SeekMode::exact;
+  }
   if (seek_mode_ == SeekMode::exact) {
     scan_file_and_update_metadata_and_index();
   }
@@ -153,6 +163,10 @@ void SingleStreamDecoder::scan_file_and_update_metadata_and_index() {
   }
 
   AutoAVPacket auto_av_packet;
+  // For raw streams without timestamps, packets have no pts/dts, so we
+  // synthesize increasing pts values per stream from the cumulative sum of
+  // the packets' durations.
+  std::map<int, int64_t> next_synthesized_pts_per_stream;
   while (true) {
     ReferenceAVPacket packet(auto_av_packet);
 
@@ -171,25 +185,39 @@ void SingleStreamDecoder::scan_file_and_update_metadata_and_index() {
     if (packet->flags & AV_PKT_FLAG_DISCARD) {
       continue;
     }
+    if (no_timestamps_input_ && packet->size == 0) {
+      continue;
+    }
 
     // We got a valid packet. Let's figure out what stream it belongs to and
     // record its relevant metadata.
     int stream_index = packet->stream_index;
 
+    int64_t packet_pts = get_pts_or_dts(packet);
+    int64_t packet_duration = packet->duration;
+    if (no_timestamps_input_) {
+      if (packet_duration <= 0) {
+        packet_duration = get_raw_stream_frame_duration(
+            format_context_->streams[stream_index]);
+      }
+      packet_pts = next_synthesized_pts_per_stream[stream_index];
+      next_synthesized_pts_per_stream[stream_index] += packet_duration;
+    }
+
     auto& stream_metadata =
         container_metadata_.all_stream_metadata[stream_index];
     stream_metadata.begin_stream_pts_from_content = std::min(
         stream_metadata.begin_stream_pts_from_content.value_or(INT64_MAX),
-        get_pts_or_dts(packet));
+        packet_pts);
     stream_metadata.end_stream_pts_from_content = std::max(
         stream_metadata.end_stream_pts_from_content.value_or(INT64_MIN),
-        get_pts_or_dts(packet) + packet->duration);
+        packet_pts + packet_duration);
     stream_metadata.num_frames_from_content =
         stream_metadata.num_frames_from_content.value_or(0) + 1;
 
     // Note that we set the other value in this struct, nextPts, only after
     // we have scanned all packets and sorted by pts.
-    FrameInfo frame_info = {get_pts_or_dts(packet)};
+    FrameInfo frame_info = {packet_pts};
     if (packet->flags & AV_PKT_FLAG_KEY) {
       frame_info.is_key_frame = true;
       stream_infos_[stream_index].key_frames.push_back(frame_info);
@@ -228,9 +256,7 @@ void SingleStreamDecoder::scan_file_and_update_metadata_and_index() {
   }
 
   // Reset the seek-cursor back to the beginning.
-  int status = avformat_seek_file(format_context_.get(), 0, INT64_MIN, 0, 0, 0);
-  STD_TORCH_CHECK(
-      status >= 0, get_seek_error_message(format_context_.get(), 0, status));
+  rewind_to_beginning();
 
   // Sort all frames by their pts.
   sort_all_frames();
@@ -548,7 +574,7 @@ FrameOutput SingleStreamDecoder::get_next_frame_internal(
     std::optional<torch::stable::Tensor> pre_allocated_output_tensor) {
   validate_active_stream();
   UniqueAVFrame av_frame = decode_av_frame([this](const AVFrame& av_frame) {
-    return get_pts_or_dts(av_frame) >= cursor_;
+    return get_effective_pts(av_frame) >= cursor_;
   });
   return convert_av_frame_to_frame_output(
       *av_frame, pre_allocated_output_tensor);
@@ -739,9 +765,9 @@ FrameOutput SingleStreamDecoder::get_frame_played_at(double seconds) {
       decode_av_frame([seconds, this](const AVFrame& av_frame) {
         StreamInfo& stream_info = stream_infos_[active_stream_index_];
         double frame_start_time =
-            pts_to_seconds(get_pts_or_dts(av_frame), stream_info.time_base);
+            pts_to_seconds(get_effective_pts(av_frame), stream_info.time_base);
         double frame_end_time = pts_to_seconds(
-            get_pts_or_dts(av_frame) + get_duration(av_frame),
+            get_effective_pts(av_frame) + get_effective_duration(av_frame),
             stream_info.time_base);
         if (frame_start_time > seconds) {
           // FFMPEG seeked past the frame we are looking for even though we
@@ -1345,6 +1371,30 @@ bool SingleStreamDecoder::can_we_avoid_seeking() const {
       frame_reorder_buffer_size + in_flight_frames;
 }
 
+void SingleStreamDecoder::rewind_to_beginning() {
+  int status = avformat_seek_file(format_context_.get(), 0, INT64_MIN, 0, 0, 0);
+  if (status < 0 && no_timestamps_input_) {
+    // Raw streams without timestamps don't support timestamp-based seeking,
+    // but they can be rewound with a byte-level seek.
+    AVIOContext* pb = format_context_->pb;
+    STD_TORCH_CHECK(
+        pb != nullptr && (pb->seekable & AVIO_SEEKABLE_NORMAL),
+        "Input is a raw stream without timestamps and is not seekable; "
+        "random access requires a seekable source.");
+    int64_t avio_status = avio_seek(pb, 0, SEEK_SET);
+    STD_TORCH_CHECK(
+        avio_status >= 0,
+        "Failed to rewind raw stream to the beginning: ",
+        get_ffmpeg_error_string_from_error_code(
+            static_cast<int>(avio_status)));
+    avformat_flush(format_context_.get());
+    status = AVSUCCESS;
+  }
+  STD_TORCH_CHECK(
+      status >= 0, get_seek_error_message(format_context_.get(), 0, status));
+  raw_stream_frame_ordinal_ = 0;
+}
+
 // This method looks at currentPts and desiredPts and seeks in the
 // AVFormatContext if it is needed. We can skip seeking in certain cases. See
 // the comment of canWeAvoidSeeking() for details.
@@ -1357,6 +1407,16 @@ bool SingleStreamDecoder::maybe_seek_to_before_desired_pts() {
   if (can_we_avoid_seeking()) {
     decode_stats_.num_seeks_skipped++;
     return false;
+  }
+
+  if (no_timestamps_input_) {
+    // Timestamp-based seeking is not supported on raw streams: rewinding to
+    // the beginning is the only option. The frame filter in decode_av_frame()
+    // will forward-decode to the desired frame.
+    rewind_to_beginning();
+    decode_stats_.num_flushes++;
+    device_interface_->flush();
+    return true;
   }
 
   int64_t desired_pts = cursor_;
@@ -1439,6 +1499,9 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
       // But since we did just receive a frame, we should skip reading more
       // packets and sending them to the decoder and just try to receive more
       // frames from the decoder.
+      if (uses_raw_stream_ordinals()) {
+        ++raw_stream_frame_ordinal_;
+      }
       continue;
     }
 
@@ -1520,8 +1583,11 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
   // received as frames. Eventually we will either hit AVERROR_EOF from
   // av_receive_frame() or the user will have seeked to a different location
   // in the file and that will flush the decoder.
-  last_decoded_av_frame_pts_ = get_pts_or_dts(*av_frame);
-  last_decoded_av_frame_duration_ = get_duration(*av_frame);
+  last_decoded_av_frame_pts_ = get_effective_pts(*av_frame);
+  last_decoded_av_frame_duration_ = get_effective_duration(*av_frame);
+  if (uses_raw_stream_ordinals()) {
+    ++raw_stream_frame_ordinal_;
+  }
 
   return av_frame;
 }
@@ -1535,15 +1601,81 @@ FrameOutput SingleStreamDecoder::convert_av_frame_to_frame_output(
     std::optional<torch::stable::Tensor> pre_allocated_output_tensor) {
   // Convert the frame to tensor.
   FrameOutput frame_output;
+  int64_t pts = get_pts_or_dts(av_frame);
+  int64_t duration = get_duration(av_frame);
+  if (uses_raw_stream_ordinals()) {
+    // The frame being converted is the one just returned by
+    // decode_av_frame(), which already recorded its effective timing.
+    pts = last_decoded_av_frame_pts_;
+    duration = last_decoded_av_frame_duration_;
+  }
   frame_output.pts_seconds = pts_to_seconds(
-      get_pts_or_dts(av_frame),
-      format_context_->streams[active_stream_index_]->time_base);
+      pts, format_context_->streams[active_stream_index_]->time_base);
   frame_output.duration_seconds = pts_to_seconds(
-      get_duration(av_frame),
-      format_context_->streams[active_stream_index_]->time_base);
+      duration, format_context_->streams[active_stream_index_]->time_base);
   device_interface_->convert_av_frame_to_frame_output(
       av_frame, frame_output, std::move(pre_allocated_output_tensor));
   return frame_output;
+}
+
+bool SingleStreamDecoder::uses_raw_stream_ordinals() const {
+  return no_timestamps_input_ && active_stream_index_ != no_active_stream_ &&
+      stream_infos_.count(active_stream_index_) > 0 &&
+      stream_infos_.at(active_stream_index_).av_media_type ==
+      AVMEDIA_TYPE_VIDEO;
+}
+
+int64_t SingleStreamDecoder::get_effective_pts(const AVFrame& av_frame) const {
+  if (uses_raw_stream_ordinals()) {
+    return get_raw_stream_pts_for_ordinal(raw_stream_frame_ordinal_);
+  }
+  return get_pts_or_dts(av_frame);
+}
+
+int64_t SingleStreamDecoder::get_effective_duration(
+    const AVFrame& av_frame) const {
+  if (uses_raw_stream_ordinals()) {
+    return get_raw_stream_duration_for_ordinal(raw_stream_frame_ordinal_);
+  }
+  return get_duration(av_frame);
+}
+
+int64_t SingleStreamDecoder::get_raw_stream_pts_for_ordinal(
+    int64_t ordinal) const {
+  const StreamInfo& stream_info = stream_infos_.at(active_stream_index_);
+  if (ordinal >= 0 &&
+      ordinal < static_cast<int64_t>(stream_info.all_frames.size())) {
+    return stream_info.all_frames[ordinal].pts;
+  }
+  // The scan counted the same packets that we decode, so this should never
+  // happen. Fall back to the framerate-derived duration just in case.
+  return ordinal * get_raw_stream_frame_duration(stream_info.stream);
+}
+
+int64_t SingleStreamDecoder::get_raw_stream_duration_for_ordinal(
+    int64_t ordinal) const {
+  const StreamInfo& stream_info = stream_infos_.at(active_stream_index_);
+  if (ordinal >= 0 &&
+      ordinal < static_cast<int64_t>(stream_info.all_frames.size())) {
+    const FrameInfo& frame_info = stream_info.all_frames[ordinal];
+    if (frame_info.next_pts != INT64_MAX) {
+      return frame_info.next_pts - frame_info.pts;
+    }
+  }
+  return get_raw_stream_frame_duration(stream_info.stream);
+}
+
+int64_t SingleStreamDecoder::get_raw_stream_frame_duration(
+    const AVStream* stream) {
+  int64_t duration =
+      compute_safe_duration(stream->avg_frame_rate, stream->time_base);
+  if (duration <= 0) {
+    duration = compute_safe_duration(stream->r_frame_rate, stream->time_base);
+  }
+  if (duration <= 0) {
+    duration = compute_safe_duration(AVRational{25, 1}, stream->time_base);
+  }
+  return duration;
 }
 
 // --------------------------------------------------------------------------
