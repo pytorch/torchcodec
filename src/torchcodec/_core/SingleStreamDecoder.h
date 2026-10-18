@@ -275,16 +275,14 @@ class FORCE_PUBLIC_VISIBILITY SingleStreamDecoder {
   // Also resets raw_stream_frame_ordinal_.
   void rewind_to_beginning();
 
-  // Whether decoded frames of the active stream must be identified by their
-  // reception ordinal rather than by their (absent) pts. True only for raw
-  // streams without timestamps (AVFMT_NOTIMESTAMPS) when decoding video.
+  // Whether decoded frames of the active stream must be stamped with
+  // synthesized pts/duration values, identified by their reception ordinal.
+  // True only for raw streams without timestamps (AVFMT_NOTIMESTAMPS) when
+  // decoding video.
   bool uses_raw_stream_ordinals() const;
 
-  // pts/duration accessors that, for raw streams without timestamps, return
-  // the values synthesized during the scan for the frame identified by
-  // raw_stream_frame_ordinal_ instead of the frame's (unset) pts/duration.
-  int64_t get_effective_pts(const AVFrame& av_frame) const;
-  int64_t get_effective_duration(const AVFrame& av_frame) const;
+  // pts/duration synthesized during the scan for the frame identified by its
+  // reception ordinal. See StreamInfo::all_frames.
   int64_t get_raw_stream_pts_for_ordinal(int64_t ordinal) const;
   int64_t get_raw_stream_duration_for_ordinal(int64_t ordinal) const;
   static int64_t get_raw_stream_frame_duration(const AVStream* stream);

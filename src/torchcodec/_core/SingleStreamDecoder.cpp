@@ -574,7 +574,7 @@ FrameOutput SingleStreamDecoder::get_next_frame_internal(
     std::optional<torch::stable::Tensor> pre_allocated_output_tensor) {
   validate_active_stream();
   UniqueAVFrame av_frame = decode_av_frame([this](const AVFrame& av_frame) {
-    return get_effective_pts(av_frame) >= cursor_;
+    return get_pts_or_dts(av_frame) >= cursor_;
   });
   return convert_av_frame_to_frame_output(
       *av_frame, pre_allocated_output_tensor);
@@ -765,9 +765,9 @@ FrameOutput SingleStreamDecoder::get_frame_played_at(double seconds) {
       decode_av_frame([seconds, this](const AVFrame& av_frame) {
         StreamInfo& stream_info = stream_infos_[active_stream_index_];
         double frame_start_time =
-            pts_to_seconds(get_effective_pts(av_frame), stream_info.time_base);
+            pts_to_seconds(get_pts_or_dts(av_frame), stream_info.time_base);
         double frame_end_time = pts_to_seconds(
-            get_effective_pts(av_frame) + get_effective_duration(av_frame),
+            get_pts_or_dts(av_frame) + get_duration(av_frame),
             stream_info.time_base);
         if (frame_start_time > seconds) {
           // FFMPEG seeked past the frame we are looking for even though we
@@ -1489,6 +1489,19 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
     }
 
     decode_stats_.num_frames_received_by_decoder++;
+
+    if (status == AVSUCCESS && uses_raw_stream_ordinals()) {
+      // The decoded frames of raw streams carry no pts: stamp them with the
+      // values synthesized during the scan, so that all the pts-based logic
+      // (frame filters, FrameOutput, etc.) works unchanged. The n-th received
+      // frame is the n-th frame in presentation order, which matches the
+      // scanned index by construction.
+      av_frame->pts = get_raw_stream_pts_for_ordinal(raw_stream_frame_ordinal_);
+      av_frame->duration =
+          get_raw_stream_duration_for_ordinal(raw_stream_frame_ordinal_);
+      ++raw_stream_frame_ordinal_;
+    }
+
     // Is this the kind of frame we're looking for?
     if (status == AVSUCCESS && filter_function(*av_frame)) {
       // Yes, this is the frame we'll return; break out of the decoding loop.
@@ -1499,9 +1512,6 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
       // But since we did just receive a frame, we should skip reading more
       // packets and sending them to the decoder and just try to receive more
       // frames from the decoder.
-      if (uses_raw_stream_ordinals()) {
-        ++raw_stream_frame_ordinal_;
-      }
       continue;
     }
 
@@ -1583,11 +1593,8 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
   // received as frames. Eventually we will either hit AVERROR_EOF from
   // av_receive_frame() or the user will have seeked to a different location
   // in the file and that will flush the decoder.
-  last_decoded_av_frame_pts_ = get_effective_pts(*av_frame);
-  last_decoded_av_frame_duration_ = get_effective_duration(*av_frame);
-  if (uses_raw_stream_ordinals()) {
-    ++raw_stream_frame_ordinal_;
-  }
+  last_decoded_av_frame_pts_ = get_pts_or_dts(*av_frame);
+  last_decoded_av_frame_duration_ = get_duration(*av_frame);
 
   return av_frame;
 }
@@ -1601,18 +1608,12 @@ FrameOutput SingleStreamDecoder::convert_av_frame_to_frame_output(
     std::optional<torch::stable::Tensor> pre_allocated_output_tensor) {
   // Convert the frame to tensor.
   FrameOutput frame_output;
-  int64_t pts = get_pts_or_dts(av_frame);
-  int64_t duration = get_duration(av_frame);
-  if (uses_raw_stream_ordinals()) {
-    // The frame being converted is the one just returned by
-    // decode_av_frame(), which already recorded its effective timing.
-    pts = last_decoded_av_frame_pts_;
-    duration = last_decoded_av_frame_duration_;
-  }
   frame_output.pts_seconds = pts_to_seconds(
-      pts, format_context_->streams[active_stream_index_]->time_base);
+      get_pts_or_dts(av_frame),
+      format_context_->streams[active_stream_index_]->time_base);
   frame_output.duration_seconds = pts_to_seconds(
-      duration, format_context_->streams[active_stream_index_]->time_base);
+      get_duration(av_frame),
+      format_context_->streams[active_stream_index_]->time_base);
   device_interface_->convert_av_frame_to_frame_output(
       av_frame, frame_output, std::move(pre_allocated_output_tensor));
   return frame_output;
@@ -1623,21 +1624,6 @@ bool SingleStreamDecoder::uses_raw_stream_ordinals() const {
       stream_infos_.count(active_stream_index_) > 0 &&
       stream_infos_.at(active_stream_index_).av_media_type ==
       AVMEDIA_TYPE_VIDEO;
-}
-
-int64_t SingleStreamDecoder::get_effective_pts(const AVFrame& av_frame) const {
-  if (uses_raw_stream_ordinals()) {
-    return get_raw_stream_pts_for_ordinal(raw_stream_frame_ordinal_);
-  }
-  return get_pts_or_dts(av_frame);
-}
-
-int64_t SingleStreamDecoder::get_effective_duration(
-    const AVFrame& av_frame) const {
-  if (uses_raw_stream_ordinals()) {
-    return get_raw_stream_duration_for_ordinal(raw_stream_frame_ordinal_);
-  }
-  return get_duration(av_frame);
 }
 
 int64_t SingleStreamDecoder::get_raw_stream_pts_for_ordinal(
