@@ -66,6 +66,10 @@ TORCHCODEC_BUILD_GIF = {env = "TORCHCODEC_BUILD_GIF", default = "AUTO"}
 TORCHCODEC_BUILD_HEIC = {env = "TORCHCODEC_BUILD_HEIC", default = "AUTO"}
 TORCHCODEC_BUILD_NVJPEG = {env = "TORCHCODEC_BUILD_NVJPEG", default = "AUTO"}
 
+# Set to ON to link against a system-provided libavif (located with CMake's
+# find_package) instead of fetching the decode-only prebuilt libavif from S3.
+TORCHCODEC_USE_SYSTEM_LIBAVIF = {env = "TORCHCODEC_USE_SYSTEM_LIBAVIF", default = "OFF"}
+
 [project.optional-dependencies]
 dev = [
     "numpy",
