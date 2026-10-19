@@ -177,16 +177,10 @@ jobs:
         rocm-sdk init
         echo '::endgroup::'
 
-        # rocJPEG HARDWARE/VA-API init needs ROCM_PATH pointing at the pip
-        # TheRock devel tree; RPATH alone is not enough for InitVAAPI.
-        _rocm_devel_py='import importlib.util, pathlib; spec = importlib.util.find_spec("_rocm_sdk_devel"); print(str(pathlib.Path(spec.submodule_search_locations[0]))) if spec else ""'
-        rocm_path=$(python -c "${_rocm_devel_py}" 2>/dev/null || true)
-        if [ -n "${rocm_path}" ]; then
-          export ROCM_PATH="${rocm_path}"
-        else
-          echo "ROCM_PATH unset: _rocm_sdk_devel not found" >&2
-          exit 1
-        fi
+        # rocJPEG HARDWARE/VA-API init needs ROCM_PATH; RPATH alone is not
+        # enough for InitVAAPI. Use the SDK CLI rather than guessing the
+        # site-packages layout (see TheRock: rocm-sdk path --root).
+        export ROCM_PATH="$(rocm-sdk path --root)"
 
         echo '::group::Assert we are on ROCm'
         if command -v amd-smi >/dev/null 2>&1; then
