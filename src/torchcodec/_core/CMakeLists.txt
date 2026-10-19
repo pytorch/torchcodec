@@ -512,7 +512,10 @@ function(make_torchcodec_image_library)
             OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET)
         if(NOT ROCM_PATH)
-            set(ROCM_PATH "/opt/rocm")
+            message(FATAL_ERROR
+                "ROCM_HOME is not set. Install ROCm via the TheRock/pip-wheel layout "
+                "(_rocm_sdk_core and _rocm_sdk_devel packages), which sets ROCM_HOME "
+                "through torch.utils.cpp_extension.")
         endif()
         message(STATUS "Using ROCM_PATH=${ROCM_PATH}")
 
@@ -528,10 +531,10 @@ function(make_torchcodec_image_library)
         if(NOT ROCJPEG_INCLUDE_DIR OR NOT ROCJPEG_LIBRARY)
             message(FATAL_ERROR
                 "rocJPEG not found under ROCM_PATH=${ROCM_PATH}. "
-                "include=${ROCJPEG_INCLUDE_DIR} lib=${ROCJPEG_LIBRARY}. Install the "
-                "rocJPEG runtime and dev headers (e.g. the 'rocjpeg' / 'rocjpeg-devel' "
-                "package), or set TORCHCODEC_BUILD_ROCJPEG=0 to build without it "
-                "(decode_jpeg(device='cuda') will raise at runtime).")
+                "include=${ROCJPEG_INCLUDE_DIR} lib=${ROCJPEG_LIBRARY}. "
+                "Install the _rocm_sdk_core and _rocm_sdk_devel pip packages "
+                "(TheRock/pip-wheel layout), or set TORCHCODEC_BUILD_ROCJPEG=0 to build "
+                "without it (decode_jpeg(device='cuda') will raise at runtime).")
         endif()
         target_include_directories(${image_library_name} PRIVATE ${ROCJPEG_INCLUDE_DIR})
         target_link_libraries(${image_library_name} PRIVATE ${ROCJPEG_LIBRARY} hip::host)

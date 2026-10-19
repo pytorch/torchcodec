@@ -29,6 +29,7 @@ jobs:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
+      channel: nightly
       os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
@@ -38,8 +39,41 @@ jobs:
       with-rocm: enable
       build-python-only: "disable"
 
-  build:
+  filter-matrix:
+    # Keep ROCm >= 10.1 and drop older versions from the matrix, since
+    # rocJPEG support is only available from 10.1 onwards.
     needs: generate-matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.filter.outputs.matrix }}
+      test-matrix: ${{ steps.filter.outputs.test-matrix }}
+    steps:
+      - id: filter
+        run: |
+          matrix=$(echo '${{ needs.generate-matrix.outputs.matrix }}' \
+            | jq -c '.include |= map(select((.gpu_arch_version | tonumber) >= 10.1))')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "::group::Filtered build matrix"
+          echo "$matrix" | jq .
+          echo "::endgroup::"
+          # Build may cover several Python versions; the GPU test job only
+          # needs one. Take the first unique python_version, then one entry
+          # per ROCm version so install-and-test stays in sync with the wheel.
+          test_matrix=$(echo "$matrix" | jq -c '
+            (.include | map(.python_version) | unique | .[0]) as $py
+            | {include: [
+                .include[]
+                | select(.python_version == $py)
+                | {python_version: .python_version, rocm_version: .gpu_arch_version}
+              ] | unique_by(.rocm_version)}
+          ')
+          echo "test-matrix=$test_matrix" >> "$GITHUB_OUTPUT"
+          echo "::group::Filtered test matrix"
+          echo "$test_matrix" | jq .
+          echo "::endgroup::"
+
+  build:
+    needs: filter-matrix
     strategy:
       fail-fast: false
     name: Build and Upload wheel
@@ -49,7 +83,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       post-script: packaging/post_build_script.sh
       smoke-test-script: packaging/fake_smoke_test.py
@@ -67,12 +101,10 @@ jobs:
     # docker image and always fails. Skip it for fork PRs; it still runs on
     # same-repo PRs, push, and workflow_dispatch.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    needs: build
+    needs: [build, filter-matrix]
     strategy:
       fail-fast: false
-      matrix:
-        python-version: ['3.10']
-        rocm-version: ['7.1']
+      matrix: ${{ fromJson(needs.filter-matrix.outputs.test-matrix) }}
     uses: pytorch/test-infra/.github/workflows/linux_job_v2.yml@main
     permissions:
       id-token: write
@@ -81,19 +113,19 @@ jobs:
       repository: meta-pytorch/torchcodec
       runner: "linux.rocm.gpu.meta-pytorch.mi350.1"
       gpu-arch-type: "rocm"
-      gpu-arch-version: ${{ matrix.rocm-version }}
+      gpu-arch-version: ${{ matrix.rocm_version }}
       # ROCm self-hosted runners are not on EC2, so they can't pull the default
       # ECR-hosted docker image (no AWS credentials). Use a Docker Hub image and
       # run without sudo, matching pytorch/vision's ROCm job.
-      docker-image: pytorch/manylinux2_28-builder:rocm${{ matrix.rocm-version }}
+      docker-image: pytorch/manylinux2_28-builder:rocm${{ matrix.rocm_version }}
       no-sudo: true
       timeout: 120
       test-infra-ref: main
-      download-artifact: meta-pytorch_torchcodec__${{ matrix.python-version }}_rocm${{ matrix.rocm-version }}_x86_64
+      download-artifact: meta-pytorch_torchcodec__${{ matrix.python_version }}_rocm${{ matrix.rocm_version }}_x86_64
       script: |
         set -euo pipefail
 
-        # We use conda only to get a Python env matching the cp310 wheel (the
+        # We use conda only to get a Python env matching the built wheel (the
         # image's base env may be a different Python). Point conda at conda-forge
         # only, with libmamba, so env creation is fast and never touches the
         # 'defaults'/pkgs/main channel (repo.anaconda.com), which hangs from the
@@ -108,11 +140,10 @@ jobs:
         echo '::endgroup::'
 
         # linux_job_v2 runs the script in the manylinux container's base conda
-        # env, whose Python isn't necessarily 3.10. The wheel is built cp310, so
-        # pip would reject it ("not a supported wheel on this platform"). Create
-        # and activate a matching Python env (conda is sourced by linux_job_v2).
-        echo '::group::Create Python ${{ matrix.python-version }} env'
-        conda create -y -n test -c conda-forge python=${{ matrix.python-version }} pip
+        # env, whose Python may not match the wheel. Create and activate a
+        # matching Python env (conda is sourced by linux_job_v2).
+        echo '::group::Create Python ${{ matrix.python_version }} env'
+        conda create -y -n test -c conda-forge python=${{ matrix.python_version }} pip
         conda activate test
         python --version
         echo '::endgroup::'
@@ -120,29 +151,12 @@ jobs:
         python -m pip install --upgrade pip
 
         echo '::group::Install PyTorch (ROCm)'
-        pip install --progress-bar=off --pre torch \
-          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm-version }}
-        echo '::endgroup::'
-
-        echo '::group::Assert we are on ROCm'
-        rocm-smi
-        python -c "
-        import torch
-        print('torch:', torch.__version__, '| hip:', torch.version.hip)
-        assert torch.version.hip is not None, 'torch is not a ROCm/HIP build'
-        assert torch.cuda.is_available(), 'no GPU visible to torch'
-        print('device:', torch.cuda.get_device_name(0))
-        "
+        pip install --progress-bar=off --pre torch "rocm[devel]" \
+          --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm_version }}
         echo '::endgroup::'
 
         # Prevent the checked-out src/ tree from shadowing the installed wheel.
         bash packaging/remove_src.sh
-
-        echo '::group::Install rocJPEG runtime'
-        # The wheel deliberately does not bundle librocjpeg (see repair_wheel.py),
-        # so decode_jpeg(device="cuda") needs it present at runtime.
-        bash packaging/install_rocjpeg.sh
-        echo '::endgroup::'
 
         echo '::group::Install torchcodec from the wheel'
         python -m pip install "${RUNNER_ARTIFACT_DIR}"/*.whl -vvv
@@ -157,6 +171,31 @@ jobs:
         # false: skip the optional libheif conda install (HEIC is CPU-only and
         # covered elsewhere); this leaves a pip-only install (numpy/pytest/pillow).
         bash packaging/install_test_dependencies.sh false
+        echo '::endgroup::'
+
+        echo '::group::Initialize ROCm SDK'
+        rocm-sdk init
+        echo '::endgroup::'
+
+        # rocJPEG HARDWARE/VA-API init needs ROCM_PATH; RPATH alone is not
+        # enough for InitVAAPI. Use the SDK CLI rather than guessing the
+        # site-packages layout (see TheRock: rocm-sdk path --root).
+        export ROCM_PATH="$(rocm-sdk path --root)"
+
+        echo '::group::Assert we are on ROCm'
+        if command -v amd-smi >/dev/null 2>&1; then
+          amd-smi
+        else
+          echo "amd-smi not found on PATH after rocm[devel]" >&2
+          exit 1
+        fi
+        python -c "
+        import torch
+        print('torch:', torch.__version__, '| hip:', torch.version.hip)
+        assert torch.version.hip is not None, 'torch is not a ROCm/HIP build'
+        assert torch.cuda.is_available(), 'no GPU visible to torch'
+        print('device:', torch.cuda.get_device_name(0))
+        "
         echo '::endgroup::'
 
         echo '::group::Run FFmpeg-free image decoder tests (incl. rocJPEG GPU)'

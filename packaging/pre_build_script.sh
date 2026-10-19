@@ -8,7 +8,3 @@
 set -ex
 
 bash packaging/install_build_dependencies.sh
-
-if [[ "${CU_VERSION:-}" == rocm* ]]; then
-    bash packaging/install_rocjpeg.sh
-fi
