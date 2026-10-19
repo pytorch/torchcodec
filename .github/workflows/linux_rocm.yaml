@@ -177,57 +177,16 @@ jobs:
         rocm-sdk init
         echo '::endgroup::'
 
-        # TEMPORARY A/B: set ROCM_PATH from the pip SDK and see if InitVAAPI
-        # starts succeeding (RPATH/ldd already resolve librocjpeg without this).
+        # rocJPEG HARDWARE/VA-API init needs ROCM_PATH pointing at the pip
+        # TheRock devel tree; RPATH alone is not enough for InitVAAPI.
         _rocm_devel_py='import importlib.util, pathlib; spec = importlib.util.find_spec("_rocm_sdk_devel"); print(str(pathlib.Path(spec.submodule_search_locations[0]))) if spec else ""'
         rocm_path=$(python -c "${_rocm_devel_py}" 2>/dev/null || true)
         if [ -n "${rocm_path}" ]; then
           export ROCM_PATH="${rocm_path}"
-          echo "ROCM_PATH=${ROCM_PATH}"
         else
           echo "ROCM_PATH unset: _rocm_sdk_devel not found" >&2
+          exit 1
         fi
-
-        # Temporary CI diagnosis: does librocjpeg already resolve its deps via
-        # RPATH/RUNPATH ($ORIGIN → _rocm_sdk_core), or do we still need
-        # LD_LIBRARY_PATH / ROCM_PATH for VA-API?
-        echo '::group::Diagnose librocjpeg RPATH / ldd (ROCm ${{ matrix.rocm_version }})'
-        librocjpeg=$(python -c "
-        import importlib.util, pathlib, sys
-        for pkg in ('_rocm_sdk_core', '_rocm_sdk_devel'):
-            spec = importlib.util.find_spec(pkg)
-            if not spec or not spec.submodule_search_locations:
-                continue
-            root = pathlib.Path(spec.submodule_search_locations[0])
-            for pat in ('lib/librocjpeg.so*', 'lib/*/librocjpeg.so*'):
-                hits = sorted(root.glob(pat))
-                if hits:
-                    print(hits[0].resolve())
-                    sys.exit(0)
-        sys.exit(1)
-        " 2>/dev/null || true)
-        if [ -z "${librocjpeg}" ] || [ ! -e "${librocjpeg}" ]; then
-          echo "librocjpeg.so not found under _rocm_sdk_core/_rocm_sdk_devel" >&2
-          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH-}"
-          echo "ROCM_PATH=${ROCM_PATH-}"
-          echo "LIBVA_DRIVERS_PATH=${LIBVA_DRIVERS_PATH-}"
-        else
-          echo "librocjpeg=${librocjpeg}"
-          ls -la "${librocjpeg}"
-          echo '----- readelf -d (RPATH/RUNPATH/NEEDED/SONAME) -----'
-          readelf -d "${librocjpeg}" | grep -E 'RPATH|RUNPATH|NEEDED|SONAME' || readelf -d "${librocjpeg}"
-          echo '----- ldd -----'
-          ldd "${librocjpeg}" || true
-          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH-}"
-          echo "ROCM_PATH=${ROCM_PATH-}"
-          echo "LIBVA_DRIVERS_PATH=${LIBVA_DRIVERS_PATH-}"
-          sysdeps="$(dirname "${librocjpeg}")/rocm_sysdeps/lib"
-          if [ -d "${sysdeps}" ]; then
-            echo "----- ${sysdeps} (va / gallium) -----"
-            ls -la "${sysdeps}"/*va* "${sysdeps}"/*gallium* 2>/dev/null || true
-          fi
-        fi
-        echo '::endgroup::'
 
         echo '::group::Assert we are on ROCm'
         if command -v amd-smi >/dev/null 2>&1; then
