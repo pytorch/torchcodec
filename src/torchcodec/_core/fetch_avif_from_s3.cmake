@@ -24,9 +24,13 @@ if (LINUX)
     if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
         set(platform_url ${base_url}/linux_aarch64)
         set(avif_sha256 9a377d3183bfabdc2e5f2e2f3969d8c3d605de56640b695832827aa7df8a8cce)
-    else()  # assume x86_64
+    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
         set(platform_url ${base_url}/linux_x86_64)
         set(avif_sha256 b814cbb53ede0b2e32f4907116f466cd68a789283ba8be149d919fb33d336300)
+    else()
+        message(FATAL_ERROR
+            "No prebuilt libavif available for linux_${CMAKE_SYSTEM_PROCESSOR}. "
+            "Set TORCHCODEC_BUILD_AVIF=0 to build without AVIF support")
     endif()
 elseif (APPLE)
     set(platform_url ${base_url}/macos_arm64)
