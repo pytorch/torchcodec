@@ -534,6 +534,12 @@ class TestVideoDecoder:
         also_empty = decoder[10000:]
         assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
 
+        # as with Python sequences, slices with start past stop are empty too
+        also_empty = decoder[10:0]
+        assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
+        also_empty = decoder[-1:5:2]
+        assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
+
         # should be just a copy
         all_frames = decoder[:].to(device)
         assert all_frames.shape == torch.Size(
@@ -1048,6 +1054,20 @@ class TestVideoDecoder:
         torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+        # as with Python slices, a start past stop is also an empty range
+        for start, stop, step in ((10, 0, 1), (-1, 5, 2)):
+            empty_frames = decoder.get_frames_in_range(start, stop, step)
+            assert_frames_equal(
+                empty_frames.data,
+                NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
+            )
+            torch.testing.assert_close(
+                empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds
+            )
+            torch.testing.assert_close(
+                empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
+            )
 
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))

@@ -320,7 +320,7 @@ class VideoDecoder:
         frame_data, *_ = core.get_frames_in_range(
             self._decoder,
             start=start,
-            stop=stop,
+            stop=max(start, stop),
             step=step,
         )
         return frame_data
@@ -421,7 +421,7 @@ class VideoDecoder:
         frames = core.get_frames_in_range(
             self._decoder,
             start=start,
-            stop=stop,
+            stop=max(start, stop),
             step=step,
         )
         return FrameBatch(*frames)
