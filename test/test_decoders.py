@@ -3141,6 +3141,39 @@ class TestAudioDecoder:
             samples.data, reference[:, start:stop], atol=0, rtol=0
         )
 
+    @needs_ffmpeg_cli
+    def test_mkv_packets_without_duration(self, tmp_path):
+        # Non-regression test for
+        # https://github.com/meta-pytorch/torchcodec/issues/1772
+        # Matroska SimpleBlocks don't store a duration, so the decoded frames
+        # have a duration of 0 and used to be dropped by the range filter.
+        path = tmp_path / "alac.mkv"
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(SINE_MONO_S16.path), "-c:a", "alac", str(path),
+            ],
+            check=True,
+        )  # fmt: skip
+        # ALAC is lossless, so we can compare against the original WAV.
+        reference = AudioDecoder(SINE_MONO_S16.path).get_all_samples().data
+
+        samples = AudioDecoder(path).get_all_samples()
+        assert samples.pts_seconds == 0
+        torch.testing.assert_close(samples.data, reference, atol=0, rtol=0)
+
+        start_seconds, stop_seconds = 0.3, 1.0
+        samples = AudioDecoder(path).get_samples_played_in_range(
+            start_seconds, stop_seconds
+        )
+        sample_rate = SINE_MONO_S16.stream_infos[0].sample_rate
+        start = round(start_seconds * sample_rate)
+        stop = round(stop_seconds * sample_rate)
+        assert samples.pts_seconds == pytest.approx(start_seconds)
+        torch.testing.assert_close(
+            samples.data, reference[:, start:stop], atol=0, rtol=0
+        )
+
     def test_unseekable_format(self):
         decoder = AudioDecoder(UNSEEKABLE_SWF.path)
         samples = decoder.get_all_samples()
