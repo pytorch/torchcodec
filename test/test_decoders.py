@@ -534,12 +534,6 @@ class TestVideoDecoder:
         also_empty = decoder[10000:]
         assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
 
-        # as with Python sequences, slices with start past stop are empty too
-        also_empty = decoder[10:0]
-        assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
-        also_empty = decoder[-1:5:2]
-        assert_frames_equal(also_empty, NASA_VIDEO.empty_chw_tensor.to(device))
-
         # should be just a copy
         all_frames = decoder[:].to(device)
         assert all_frames.shape == torch.Size(
@@ -604,6 +598,12 @@ class TestVideoDecoder:
 
         with pytest.raises(TypeError, match="Unsupported key type"):
             frame = decoder[2.3]  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder[10:0]  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder[-1:5:2]  # noqa
 
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
@@ -1055,19 +1055,18 @@ class TestVideoDecoder:
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
 
-        # as with Python slices, a start past stop is also an empty range
-        for start, stop, step in ((10, 0, 1), (-1, 5, 2)):
-            empty_frames = decoder.get_frames_in_range(start, stop, step)
-            assert_frames_equal(
-                empty_frames.data,
-                NASA_VIDEO.get_empty_chw_tensor(stream_index=stream_index).to(device),
-            )
-            torch.testing.assert_close(
-                empty_frames.pts_seconds, NASA_VIDEO.empty_pts_seconds
-            )
-            torch.testing.assert_close(
-                empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
-            )
+    @pytest.mark.parametrize("device", all_supported_devices())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range_fails(self, device, seek_mode):
+        decoder, _ = make_video_decoder(
+            NASA_VIDEO.path, device=device, seek_mode=seek_mode
+        )
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder.get_frames_in_range(10, 0)  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder.get_frames_in_range(-1, 5, 2)  # noqa
 
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))

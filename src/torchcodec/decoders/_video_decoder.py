@@ -317,10 +317,11 @@ class VideoDecoder:
         assert isinstance(key, slice)
 
         start, stop, step = key.indices(len(self))
+        _check_start_not_past_stop(start, stop, step)
         frame_data, *_ = core.get_frames_in_range(
             self._decoder,
             start=start,
-            stop=max(start, stop),
+            stop=stop,
             step=step,
         )
         return frame_data
@@ -418,10 +419,11 @@ class VideoDecoder:
         """
         # Adjust start / stop indices to enable indexing semantics, ex. [-10, 1000] returns the last 10 frames
         start, stop, step = slice(start, stop, step).indices(self._num_frames)
+        _check_start_not_past_stop(start, stop, step)
         frames = core.get_frames_in_range(
             self._decoder,
             start=start,
-            stop=max(start, stop),
+            stop=stop,
             step=step,
         )
         return FrameBatch(*frames)
@@ -537,6 +539,16 @@ class VideoDecoder:
             start_seconds=self._begin_stream_seconds,
             stop_seconds=self._end_stream_seconds,
             fps=fps,
+        )
+
+
+def _check_start_not_past_stop(start: int, stop: int, step: int) -> None:
+    # start and stop are the indices returned by slice.indices(). Negative
+    # steps are left to the core op, which rejects them.
+    if step > 0 and start > stop:
+        raise ValueError(
+            f"Invalid start index: {start}. "
+            f"It must be less than or equal to stop index ({stop})."
         )
 
 
