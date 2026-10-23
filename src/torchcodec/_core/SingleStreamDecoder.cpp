@@ -517,6 +517,7 @@ void SingleStreamDecoder::add_audio_stream(
 
   auto& stream_info = stream_infos_[active_stream_index_];
   stream_info.audio_stream_options = audio_stream_options;
+  audio_pts_extrapolator_ = AudioPtsExtrapolator(stream_info.time_base);
 
   // FFmpeg docs say that the decoder will try to decode natively in this
   // format, if it can. Docs don't say what the decoder does when it doesn't
@@ -1393,6 +1394,7 @@ bool SingleStreamDecoder::maybe_seek_to_before_desired_pts() {
 
   decode_stats_.num_flushes++;
   device_interface_->flush();
+  audio_pts_extrapolator_.reset();
   return true;
 }
 
@@ -1429,6 +1431,11 @@ UniqueAVFrame SingleStreamDecoder::decode_av_frame(
     }
 
     decode_stats_.num_frames_received_by_decoder++;
+    if (status == AVSUCCESS &&
+        stream_infos_[active_stream_index_].av_media_type ==
+            AVMEDIA_TYPE_AUDIO) {
+      audio_pts_extrapolator_.process(*av_frame);
+    }
     // Is this the kind of frame we're looking for?
     if (status == AVSUCCESS && filter_function(*av_frame)) {
       // Yes, this is the frame we'll return; break out of the decoding loop.

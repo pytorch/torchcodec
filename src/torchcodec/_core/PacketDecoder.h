@@ -83,6 +83,7 @@ class FORCE_PUBLIC_VISIBILITY PacketDecoder {
   // first ones we're fed may not be decodable. See send_packet().
   bool is_mpeg_ps_ = false;
   bool packet_data_may_be_misaligned_ = false;
+  AudioPtsExtrapolator audio_pts_extrapolator_;
 };
 
 // How a decoded frame's samples are laid out and how they should be
