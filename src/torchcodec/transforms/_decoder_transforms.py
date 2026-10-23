@@ -63,12 +63,18 @@ class DecoderTransform(ABC):
         """
         pass
 
-    def _get_output_dims(self) -> tuple[int | None, int | None] | None:
+    def _get_output_dims(
+        self, input_dims: tuple[int | None, int | None]
+    ) -> tuple[int | None, int | None] | None:
         """Get the dimensions of the output frame.
 
         Transforms that change the frame dimensions need to override this
         method. Transforms that don't change the frame dimensions can rely on
         this default implementation.
+
+        Args:
+            input_dims (tuple[int | None, int | None]): The dimensions of
+                the input frame in the form (height, width).
 
         Returns:
             tuple[int | None, int | None] | None: The output dimensions.
@@ -95,23 +101,98 @@ class Resize(DecoderTransform):
     Interpolation is always bilinear. Anti-aliasing is always on.
 
     Args:
-        size (Sequence[int]): Desired output size. Must be a sequence of
-            the form (height, width).
+        size (int, Sequence[int], or None): Desired output size. If ``size`` is
+            a sequence of the form (height, width), the output will have that
+            exact size. If it is an int or a one-element sequence, the shorter
+            edge will be matched to that value while preserving the aspect
+            ratio. If it is None, the output size is determined by
+            ``max_size``.
+        max_size (int, optional): Maximum size of the longer edge. This is only
+            supported when ``size`` is an int, a one-element sequence, or None.
+            When ``size`` is None, the longer edge is matched to ``max_size``
+            exactly, which may upscale the input.
     """
 
-    def __init__(self, size: Sequence[int]):
-        if len(size) != 2:
+    def __init__(
+        self,
+        size: int | Sequence[int] | None,
+        *,
+        max_size: int | None = None,
+    ):
+        if not (
+            isinstance(size, int)
+            or size is None
+            or (isinstance(size, Sequence) and len(size) in (1, 2))
+        ):
             raise ValueError(
-                "Resize transform must have a (height, width) "
-                f"pair for the size, got {size}."
+                "Resize size can be an integer, a sequence of one or two "
+                f"integers, or None, but got {size}."
             )
+
+        if size is None and not isinstance(max_size, int):
+            raise ValueError(
+                "max_size must be an integer when size is None, "
+                f"but got {max_size} instead."
+            )
+
+        if max_size is not None and not isinstance(max_size, int):
+            raise ValueError(
+                f"max_size must be an integer or None, but got {max_size} instead."
+            )
+
+        if max_size is not None and isinstance(size, Sequence) and len(size) == 2:
+            raise ValueError(
+                "max_size should only be passed if size is None or specifies "
+                "the length of the smaller edge."
+            )
+
         self.size = size
+        self.max_size = max_size
 
     def _make_transform_spec(self, input_dims: tuple[int | None, int | None]) -> str:
-        return f"resize, {self.size[0]}, {self.size[1]}"
+        output_height, output_width = self._get_output_dims(input_dims)
+        return f"resize, {output_height}, {output_width}"
 
-    def _get_output_dims(self) -> tuple[int | None, int | None] | None:
-        return (self.size[0], self.size[1])
+    def _get_output_dims(
+        self, input_dims: tuple[int | None, int | None]
+    ) -> tuple[int, int]:
+        if isinstance(self.size, Sequence) and len(self.size) == 2:
+            return (self.size[0], self.size[1])
+
+        height, width = input_dims
+        if height is None or width is None:
+            raise ValueError(
+                "Resize with an aspect-ratio-preserving size can only be used "
+                "when input frame dimensions are known."
+            )
+
+        short, long = (width, height) if width <= height else (height, width)
+        if self.size is None:
+            assert self.max_size is not None
+            new_short = int(self.max_size * short / long)
+            new_long = self.max_size
+        else:
+            requested_new_short = (
+                self.size if isinstance(self.size, int) else self.size[0]
+            )
+            new_short = requested_new_short
+            new_long = int(requested_new_short * long / short)
+
+            if self.max_size is not None:
+                if self.max_size <= requested_new_short:
+                    raise ValueError(
+                        f"max_size = {self.max_size} must be strictly greater "
+                        "than the requested size for the smaller edge "
+                        f"size = {self.size}."
+                    )
+                if new_long > self.max_size:
+                    new_short = int(self.max_size * new_short / new_long)
+                    new_long = self.max_size
+
+        new_width, new_height = (
+            (new_short, new_long) if width <= height else (new_long, new_short)
+        )
+        return (new_height, new_width)
 
     @classmethod
     def _from_torchvision(cls, tv_resize: nn.Module):
@@ -127,14 +208,7 @@ class Resize(DecoderTransform):
             raise ValueError(
                 "TorchVision Resize transform must have antialias enabled."
             )
-        if tv_resize.size is None:
-            raise ValueError("TorchVision Resize transform must have a size specified.")
-        if len(tv_resize.size) != 2:
-            raise ValueError(
-                "TorchVision Resize transform must have a (height, width) "
-                f"pair for the size, got {tv_resize.size}."
-            )
-        return cls(size=tv_resize.size)
+        return cls(size=tv_resize.size, max_size=tv_resize.max_size)
 
 
 class CenterCrop(DecoderTransform):
@@ -158,7 +232,9 @@ class CenterCrop(DecoderTransform):
     def _make_transform_spec(self, input_dims: tuple[int | None, int | None]) -> str:
         return f"center_crop, {self.size[0]}, {self.size[1]}"
 
-    def _get_output_dims(self) -> tuple[int | None, int | None] | None:
+    def _get_output_dims(
+        self, input_dims: tuple[int | None, int | None]
+    ) -> tuple[int | None, int | None] | None:
         return (self.size[0], self.size[1])
 
     @classmethod
@@ -235,7 +311,9 @@ class RandomCrop(DecoderTransform):
 
         return f"crop, {self.size[0]}, {self.size[1]}, {left}, {top}"
 
-    def _get_output_dims(self) -> tuple[int | None, int | None] | None:
+    def _get_output_dims(
+        self, input_dims: tuple[int | None, int | None]
+    ) -> tuple[int | None, int | None] | None:
         return (self.size[0], self.size[1])
 
     @classmethod
@@ -369,7 +447,7 @@ def _make_transform_specs(
                 )
 
         converted_transforms.append((transform, curr_input_dims))
-        output_dims = transform._get_output_dims()
+        output_dims = transform._get_output_dims(curr_input_dims)
         curr_input_dims = output_dims if output_dims is not None else curr_input_dims
 
     return ";".join([t._make_transform_spec(dims) for t, dims in converted_transforms])
