@@ -143,33 +143,35 @@ void set_duration(AVFrame& av_frame, int64_t duration) {
 #endif
 }
 
-void AudioPtsExtrapolator::process(AVFrame& av_frame, AVRational time_base) {
-  int sample_rate = av_frame.sample_rate;
-  if (sample_rate <= 0) {
-    next_pts_ = INT64_MIN;
+void AudioPtsExtrapolator::process(AVFrame& av_frame) {
+  if (av_frame.sample_rate != sample_rate_) {
+    // next_frame_start_ was counted at the old rate. A rate change within a
+    // packet is far-fetched enough that we don't bother converting it.
+    sample_rate_ = av_frame.sample_rate;
+    next_frame_start_ = INT64_MIN;
+  }
+  if (sample_rate_ <= 0) {
     return;
   }
-  AVRational samples_time_base = {1, sample_rate};
+  AVRational samples_time_base = {1, sample_rate_};
+
   set_duration(
       av_frame,
-      av_rescale_q(av_frame.nb_samples, samples_time_base, time_base));
+      av_rescale_q(av_frame.nb_samples, samples_time_base, time_base_));
 
-  if (next_pts_ != INT64_MIN && sample_rate != next_pts_sample_rate_) {
-    next_pts_ = av_rescale_q(
-        next_pts_, AVRational{1, next_pts_sample_rate_}, samples_time_base);
-  }
-  next_pts_sample_rate_ = sample_rate;
-
+  int64_t frame_start;
   int64_t pts = get_pts_or_dts(av_frame);
   if (pts != INT64_MIN) {
-    next_pts_ =
-        av_rescale_q(pts, time_base, samples_time_base) + av_frame.nb_samples;
-  } else if (next_pts_ != INT64_MIN) {
+    frame_start = av_rescale_q(pts, time_base_, samples_time_base);
+  } else if (next_frame_start_ != INT64_MIN) {
     // TODO: log when we guess a pts like this, so users can tell their
     // timestamps were extrapolated rather than read from the file.
-    av_frame.pts = av_rescale_q(next_pts_, samples_time_base, time_base);
-    next_pts_ += av_frame.nb_samples;
+    frame_start = next_frame_start_;
+    av_frame.pts = av_rescale_q(frame_start, samples_time_base, time_base_);
+  } else {
+    return;
   }
+  next_frame_start_ = frame_start + av_frame.nb_samples;
 }
 
 const int* get_supported_sample_rates(const AVCodec& av_codec) {

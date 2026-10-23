@@ -85,6 +85,7 @@ PacketDecoder::PacketDecoder(
     // Audio codecs are hardcoded to a single FFmpeg thread, see
     // https://github.com/pytorch/torchcodec/issues/1253.
     ffmpeg_thread_count = 1;
+    audio_pts_extrapolator_ = AudioPtsExtrapolator(time_base_);
   } else if (const int32_t* matrix = get_display_matrix_from_stream(stream)) {
     display_matrix_.emplace();
     std::copy(
@@ -154,7 +155,7 @@ int PacketDecoder::receive_frame(UniqueAVFrame& av_frame) {
   if (status == AVSUCCESS) {
     device_interface_->make_frame_standalone(av_frame);
     if (media_type_ == AVMEDIA_TYPE_AUDIO) {
-      audio_pts_extrapolator_.process(*av_frame, time_base_);
+      audio_pts_extrapolator_.process(*av_frame);
     } else if (media_type_ == AVMEDIA_TYPE_VIDEO) {
       // Attach a copy of the display matrix to the frame, so the ColorConverter
       // can use it.
