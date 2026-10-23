@@ -151,13 +151,13 @@ bench(direct_url_to_ffmpeg)
 
 ```
 Decode from existing download:
-med = 194.02ms +- 0.46
+med = 194.49ms +- 0.33
 
 Download before decode:
-med = 1028.82ms +- 73.97
+med = 1026.92ms +- 44.65
 
 Direct url to FFmpeg:
-med = 237.46ms +- 9.39
+med = 249.11ms +- 7.67
 ```
 
 Decoding the already downloaded video is clearly the fastest. Having to
@@ -192,7 +192,7 @@ bench(stream_while_decode)
 
 ```
 Stream while decode:
-med = 213.41ms +- 4.22
+med = 214.59ms +- 5.42
 ```
 
 Streaming the data through a file-like object is much faster than
@@ -318,10 +318,10 @@ bench(decode_from_existing_open_file_object)
 
 ```
 Decode from existing file path:
-med = 194.37ms +- 0.16
+med = 193.80ms +- 0.53
 
 Decode from existing open file object:
-med = 194.48ms +- 0.11
+med = 193.85ms +- 0.19
 ```
 
 Thankfully, the answer is both means of decoding from a local file take about
@@ -337,7 +337,7 @@ import shutil
 shutil.rmtree(temp_dir)
 ```
 
-**Total running time of the script:** (0 minutes 26.475 seconds)
+**Total running time of the script:** (0 minutes 26.411 seconds)
 
 [`Download Jupyter notebook: file_like.ipynb`](../../_downloads/f0caa5fce0f20da68647d009fb8dd8d0/file_like.ipynb)
 
