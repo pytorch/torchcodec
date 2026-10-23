@@ -200,7 +200,7 @@ print(f"Option 2: {len(frames)} frames, {frames[0].data.shape = }")
 Option 2: 60 frames, frames[0].data.shape = torch.Size([3, 720, 1280])
 ```
 
-**Total running time of the script:** (0 minutes 0.452 seconds)
+**Total running time of the script:** (0 minutes 0.467 seconds)
 
 [`Download Jupyter notebook: cuda_streams.ipynb`](../../_downloads/7aeb5a6bda96251b470424d6612d4f8b/cuda_streams.ipynb)
 
