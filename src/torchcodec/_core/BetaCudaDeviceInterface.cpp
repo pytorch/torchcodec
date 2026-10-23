@@ -4,6 +4,7 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -745,16 +746,22 @@ int BetaCudaDeviceInterface::stream_property_change(
     // Same as DALI's fallback
     video_format_.min_num_decode_surfaces = 20;
   }
+  // We request 4 more surfaces than the minimum, like in pynvvideocodec
+  // (ffmpeg's cuviddec.c adds 3). This should help mitigate a bug where NVCUVID
+  // re-uses a decode surface that we haven't yet mapped. See
+  // test_nvdec_surface_reuse. 32 is the NVDEC maximum.
+  video_format_.min_num_decode_surfaces = static_cast<unsigned char>(
+      std::min(video_format_.min_num_decode_surfaces + 4, 32));
 
   if (!decoder_) {
     decoder_ = NVDECCache::get_cache(device_).get_decoder(
-        video_format, surface_format_);
+        &video_format_, surface_format_);
 
     if (!decoder_) {
       // TODONVDEC P2: consider re-configuring an existing decoder instead of
       // re-creating one. See docs, see DALI. Re-configuration doesn't seem to
       // be enabled in DALI by default.
-      decoder_ = create_decoder(video_format, surface_format_);
+      decoder_ = create_decoder(&video_format_, surface_format_);
     }
 
     STD_TORCH_CHECK(decoder_, "Failed to get or create decoder");
@@ -876,6 +883,19 @@ int BetaCudaDeviceInterface::frame_ready_for_decoding(
     CUVIDPICPARAMS* pic_params) {
   STD_TORCH_CHECK(pic_params != nullptr, "Invalid picture parameters");
   STD_TORCH_CHECK(decoder_, "Decoder not initialized before picture decode");
+  // See the comment about surfaces in stream_property_change().
+  for (const auto& queued_frame : ready_frames_) {
+    if (queued_frame.picture_index == pic_params->CurrPicIdx &&
+        discarded_timestamps_.count(queued_frame.timestamp) == 0) {
+      TC_LOG(
+          "NVDEC is decoding into surface %d, which still holds the frame with "
+          "pts %lld that hasn't been returned yet. That frame will be "
+          "returned with the wrong content.",
+          pic_params->CurrPicIdx,
+          static_cast<long long>(queued_frame.timestamp));
+    }
+  }
+
   // Send frame to be decoded by NVDEC. This may or may not block, depending on
   // the internal state of the NVDEC. Presumably, when it blocks, it gets
   // automatically unblocked once a frame has been decoded, although how and
@@ -897,7 +917,7 @@ int BetaCudaDeviceInterface::frame_ready_in_display_order(
     disp_info->timestamp = pending_pts_.front();
     pending_pts_.pop();
   }
-  ready_frames_.push(*disp_info);
+  ready_frames_.push_back(*disp_info);
   return 1; // success
 }
 
@@ -912,7 +932,7 @@ int BetaCudaDeviceInterface::receive_frame(UniqueAVFrame& av_frame) {
   // those, not to return them.
   while (!ready_frames_.empty() &&
          discarded_timestamps_.erase(ready_frames_.front().timestamp) > 0) {
-    ready_frames_.pop();
+    ready_frames_.pop_front();
   }
 
   if (ready_frames_.empty()) {
@@ -922,7 +942,7 @@ int BetaCudaDeviceInterface::receive_frame(UniqueAVFrame& av_frame) {
   }
 
   CUVIDPARSERDISPINFO disp_info = ready_frames_.front();
-  ready_frames_.pop();
+  ready_frames_.pop_front();
 
   CUVIDPROCPARAMS proc_params = {};
   proc_params.progressive_frame = disp_info.progressive_frame;
@@ -1256,8 +1276,7 @@ void BetaCudaDeviceInterface::flush() {
   send_eof_packet();
   eof_sent_ = false;
 
-  std::queue<CUVIDPARSERDISPINFO> empty_queue;
-  std::swap(ready_frames_, empty_queue);
+  ready_frames_.clear();
   discarded_timestamps_.clear();
 
   std::queue<int64_t> empty_pts;

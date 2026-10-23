@@ -143,6 +143,37 @@ void set_duration(AVFrame& av_frame, int64_t duration) {
 #endif
 }
 
+void AudioPtsExtrapolator::process(AVFrame& av_frame) {
+  if (av_frame.sample_rate != sample_rate_) {
+    // next_frame_start_ was counted at the old rate. A rate change within a
+    // packet is far-fetched enough that we don't bother converting it.
+    sample_rate_ = av_frame.sample_rate;
+    next_frame_start_ = INT64_MIN;
+  }
+  if (sample_rate_ <= 0) {
+    return;
+  }
+  AVRational samples_time_base = {1, sample_rate_};
+
+  set_duration(
+      av_frame,
+      av_rescale_q(av_frame.nb_samples, samples_time_base, time_base_));
+
+  int64_t pts = get_pts_or_dts(av_frame);
+  if (pts != INT64_MIN) {
+    // Real pts: nothing to fix, just remember where this frame ends.
+    next_frame_start_ =
+        av_rescale_q(pts, time_base_, samples_time_base) + av_frame.nb_samples;
+  } else if (next_frame_start_ != INT64_MIN) {
+    // No pts: this frame starts where the previous one ended.
+    // TODO: log when we guess a pts like this, so users can tell their
+    // timestamps were extrapolated rather than read from the file.
+    av_frame.pts =
+        av_rescale_q(next_frame_start_, samples_time_base, time_base_);
+    next_frame_start_ += av_frame.nb_samples;
+  }
+}
+
 const int* get_supported_sample_rates(const AVCodec& av_codec) {
   const int* supported_sample_rates = nullptr;
 #if FFMPEG_HAS_SUPPORTED_CONFIG

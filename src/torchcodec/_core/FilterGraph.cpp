@@ -150,15 +150,60 @@ FilterGraph::FilterGraph(
       ", provided filters: " + filters_config.filtergraph_str);
 }
 
+namespace {
+
+bool is_reserved(AVColorPrimaries primaries) {
+  return primaries == AVCOL_PRI_RESERVED0 || primaries == AVCOL_PRI_RESERVED ||
+      av_color_primaries_name(primaries) == nullptr;
+}
+
+bool is_reserved(AVColorTransferCharacteristic trc) {
+  return trc == AVCOL_TRC_RESERVED0 || trc == AVCOL_TRC_RESERVED ||
+      av_color_transfer_name(trc) == nullptr;
+}
+
+bool is_reserved(AVColorSpace colorspace) {
+  return colorspace == AVCOL_SPC_RESERVED ||
+      av_color_space_name(colorspace) == nullptr;
+}
+
+} // namespace
+
 UniqueAVFrame FilterGraph::convert(const AVFrame& av_frame) {
-  int status = av_buffersrc_write_frame(source_context_, &av_frame);
+  // From FFmpeg >= 8, swscale (used by the scale filter) rejects frames with
+  // reserved color properties. FFmpeg < 8 ignores them. A 'reserved' value is
+  // argulably a bad encoding. We just preserve the FFmpeg < 8 behavior by
+  // setting them to unspecified, which ignores them.
+  const AVFrame* input_frame = &av_frame;
+  UniqueAVFrame sanitized_frame;
+  if (is_reserved(av_frame.color_primaries) ||
+      is_reserved(av_frame.color_trc) || is_reserved(av_frame.colorspace)) {
+    sanitized_frame.reset(av_frame_clone(&av_frame));
+    STD_TORCH_CHECK(sanitized_frame != nullptr, "Failed to clone frame");
+    if (is_reserved(sanitized_frame->color_primaries)) {
+      sanitized_frame->color_primaries = AVCOL_PRI_UNSPECIFIED;
+    }
+    if (is_reserved(sanitized_frame->color_trc)) {
+      sanitized_frame->color_trc = AVCOL_TRC_UNSPECIFIED;
+    }
+    if (is_reserved(sanitized_frame->colorspace)) {
+      sanitized_frame->colorspace = AVCOL_SPC_UNSPECIFIED;
+    }
+    input_frame = sanitized_frame.get();
+  }
+
+  int status = av_buffersrc_write_frame(source_context_, input_frame);
   STD_TORCH_CHECK(
-      status >= AVSUCCESS, "Failed to add frame to buffer source context");
+      status >= AVSUCCESS,
+      "Failed to add frame to buffer source context: ",
+      get_ffmpeg_error_string_from_error_code(status));
 
   UniqueAVFrame filtered_av_frame(av_frame_alloc());
   status = av_buffersink_get_frame(sink_context_, filtered_av_frame.get());
   STD_TORCH_CHECK(
-      status >= AVSUCCESS, "Failed to get frame from buffer sink context");
+      status >= AVSUCCESS,
+      "Failed to get frame from buffer sink context: ",
+      get_ffmpeg_error_string_from_error_code(status));
 
   return filtered_av_frame;
 }

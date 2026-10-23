@@ -23,6 +23,7 @@
 #include "Transform.h"
 #include "color_conversion.h"
 
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -157,7 +158,7 @@ class BetaCudaDeviceInterface : public DeviceInterface {
   CUVIDEOFORMAT video_format_ = {};
   CUVIDEOFORMATEX parser_ext_info_ = {};
 
-  std::queue<CUVIDPARSERDISPINFO> ready_frames_;
+  std::deque<CUVIDPARSERDISPINFO> ready_frames_;
 
   // Whether we track the pts ourselves, instead of relying on the NVCUVID
   // parser.
