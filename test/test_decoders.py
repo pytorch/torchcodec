@@ -3035,9 +3035,11 @@ class TestVideoDecoder:
 
 
 def _make_adpcm_file(tmp_path, codec, container="wav"):
-    # At 44.1kHz stereo with 512-byte blocks, the bitrate is high enough that
-    # the WAV demuxer puts several blocks in each packet, on all FFmpeg
-    # versions. Remuxing into MKV keeps those packets.
+    # Creates a file whose decoded frames mostly have no pts. ADPCM decoders
+    # output one frame per block, and libavcodec only gives a pts to the first
+    # frame of each packet. At 44.1kHz stereo with 512-byte blocks, the bitrate
+    # is high enough that the WAV demuxer puts several blocks in each packet, on
+    # all FFmpeg versions. Remuxing into MKV keeps those packets.
     path = tmp_path / f"{codec}.wav"
     subprocess.run(
         [
@@ -3117,8 +3119,9 @@ class TestAudioDecoder:
     @needs_ffmpeg_cli
     @pytest.mark.parametrize("codec", ("adpcm_ms", "adpcm_ima_wav"))
     def test_multi_block_packets(self, tmp_path, codec):
-        # The WAV demuxer packs several ADPCM blocks per packet, and libavcodec
-        # leaves all but the first frame of each packet without a pts.
+        # Non-regression test for
+        # https://github.com/meta-pytorch/torchcodec/issues/1767
+        # Frames without a pts used to be dropped. See _make_adpcm_file().
         path = _make_adpcm_file(tmp_path, codec)
         decoder = AudioDecoder(path)
         samples = decoder.get_all_samples()
@@ -6037,7 +6040,9 @@ class TestLowLevel:
     def test_audio_raw_samples_pts_multi_block_packets(
         self, tmp_path, container, time_base_seconds
     ):
-        # See TestAudioDecoder.test_multi_block_packets. MKV's time base can't
+        # Non-regression test for
+        # https://github.com/meta-pytorch/torchcodec/issues/1767
+        # See _make_adpcm_file(). MKV's time base can't
         # represent the frames' duration exactly, so the extrapolated pts must
         # stay within one tick of the exact ones rather than drift away.
         path = _make_adpcm_file(tmp_path, "adpcm_ms", container)

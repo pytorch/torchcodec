@@ -284,14 +284,9 @@ void set_duration(AVFrame& frame, int64_t duration);
 int64_t get_pts_or_dts(ReferenceAVPacket& packet);
 int64_t get_pts_or_dts(const AVFrame& av_frame);
 
-// Some audio decoders (e.g. adpcm_ms, adpcm_ima_wav) decode a single block per
-// call, while demuxers like WAV put several blocks in one packet. libavcodec
-// then only stamps the first frame of each packet with a pts: the following
-// ones have none, and all of them carry the duration of the whole packet.
-// Other containers, like Matroska, don't store packet durations at all, so
-// frames come out with a duration of 0.
-// This fills in a missing pts from the end of the previous frame, and derives
-// the duration from nb_samples, like the ffmpeg CLI does in audio_ts_process():
+// Fills in a missing pts from the end of the previous frame if missing, and
+// derives the duration from nb_samples, like the ffmpeg CLI does in
+// audio_ts_process():
 // https://github.com/FFmpeg/FFmpeg/blob/d244d438c372b76d825be4527fccfd162429010a/fftools/ffmpeg_dec.c#L246-L281
 // It must see every frame the decoder outputs, in order, and be reset whenever
 // the decoder is flushed.
@@ -310,7 +305,7 @@ class AudioPtsExtrapolator {
  private:
   // The stream time base, in which frame pts and durations are expressed.
   AVRational time_base_ = {};
-  // Where we expect the next frame to start, in samples at sample_rate_.
+  // Where we expect the next frame to start, in samples.
   // INT64_MIN when unknown, e.g. after a seek: we then leave a missing pts
   // unset rather than guessing 0 like the CLI does.
   // We count in samples rather than in the stream time base because the latter

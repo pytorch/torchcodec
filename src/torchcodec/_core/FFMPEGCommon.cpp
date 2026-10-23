@@ -159,19 +159,19 @@ void AudioPtsExtrapolator::process(AVFrame& av_frame) {
       av_frame,
       av_rescale_q(av_frame.nb_samples, samples_time_base, time_base_));
 
-  int64_t frame_start;
   int64_t pts = get_pts_or_dts(av_frame);
   if (pts != INT64_MIN) {
-    frame_start = av_rescale_q(pts, time_base_, samples_time_base);
+    // Real pts: nothing to fix, just remember where this frame ends.
+    next_frame_start_ =
+        av_rescale_q(pts, time_base_, samples_time_base) + av_frame.nb_samples;
   } else if (next_frame_start_ != INT64_MIN) {
+    // No pts: this frame starts where the previous one ended.
     // TODO: log when we guess a pts like this, so users can tell their
     // timestamps were extrapolated rather than read from the file.
-    frame_start = next_frame_start_;
-    av_frame.pts = av_rescale_q(frame_start, samples_time_base, time_base_);
-  } else {
-    return;
+    av_frame.pts =
+        av_rescale_q(next_frame_start_, samples_time_base, time_base_);
+    next_frame_start_ += av_frame.nb_samples;
   }
-  next_frame_start_ = frame_start + av_frame.nb_samples;
 }
 
 const int* get_supported_sample_rates(const AVCodec& av_codec) {
