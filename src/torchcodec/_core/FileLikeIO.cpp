@@ -5,57 +5,48 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "FileLikeIO.h"
+
+#include <string>
+
 #include "StableABICompat.h"
 
 namespace facebook::torchcodec {
 
-FileLikeIO::FileLikeIO(const py::object& file_like, bool is_for_writing)
-    : file_like_{UniquePyObject(new py::object(file_like))} {
-  py::gil_scoped_acquire gil;
+FileLikeIO::FileLikeIO(const FileLikeCallbacks& callbacks)
+    : callbacks_(callbacks) {}
 
-  if (is_for_writing) {
-    STD_TORCH_CHECK(
-        py::hasattr(file_like, "write"),
-        "File like object must implement a write method for writing.");
-  } else {
-    STD_TORCH_CHECK(
-        py::hasattr(file_like, "read"),
-        "File like object must implement a read method for reading.");
-  }
-
-  STD_TORCH_CHECK(
-      py::hasattr(file_like, "seek"),
-      "File like object must implement a seek method.");
+FileLikeIO::~FileLikeIO() {
+  callbacks_.release(callbacks_.handle);
 }
 
-// FFmpeg calls read(), write() and seek() from within the decoding and
-// encoding ops, which run with the GIL released. Releasing the GIL also
-// detaches the thread from the interpreter, and a detached thread cannot call
-// into Python. We thus re-acquire the GIL before calling into Python.  This
-// still applies to a free-threaded interpreter: the `py::gil_scoped_acquire`
-// statement won't acquire the GIL (there's none), but it re-attaches the
-// thread, which is needed in order to call into Python.
-int FileLikeIO::read(uint8_t* buf, int size) {
-  py::gil_scoped_acquire gil;
+void FileLikeIO::check_callback_result(int64_t result, const char* method) {
+  if (result != kFileLikeCallbackError) {
+    return;
+  }
+  std::string message(1024, '\0');
+  int64_t length = callbacks_.get_error(
+      callbacks_.handle, message.data(), static_cast<int64_t>(message.size()));
+  message.resize(static_cast<size_t>(length));
+  STD_TORCH_CHECK(
+      false,
+      "Calling the ",
+      method,
+      "() method of the file-like object raised an exception: ",
+      message);
+}
 
+int FileLikeIO::read(uint8_t* buf, int size) {
   int total_num_read = 0;
   while (total_num_read < size) {
     int request = size - total_num_read;
-
-    // The Python method returns the actual bytes, which we access through
-    // the py::bytes wrapper. That wrapper, however, does not provide us
-    // access to the underlying data pointer, which we need for the memcpy
-    // below. So we convert the bytes to a string_view to get access to
-    // the data pointer. Because it's a view and not a copy, it should be
-    // cheap.
-    auto bytes_read = static_cast<py::bytes>(file_like_->attr("read")(request));
-    auto bytes_view = static_cast<std::string_view>(bytes_read);
-
-    int num_bytes_read = static_cast<int>(bytes_view.size());
+    int64_t num_bytes_read = callbacks_.read(callbacks_.handle, buf, request);
+    check_callback_result(num_bytes_read, "read");
     if (num_bytes_read == 0) {
       break;
     }
 
+    // The Python side refuses to copy more than `request` bytes into buf, so
+    // this is only a sanity check.
     STD_TORCH_CHECK(
         num_bytes_read <= request,
         "Requested up to ",
@@ -65,29 +56,38 @@ int FileLikeIO::read(uint8_t* buf, int size) {
         " bytes. The given object does not conform to read protocol "
         "of file object.");
 
-    std::memcpy(buf, bytes_view.data(), num_bytes_read);
     buf += num_bytes_read;
-    total_num_read += num_bytes_read;
+    total_num_read += static_cast<int>(num_bytes_read);
   }
 
   return total_num_read == 0 ? -1 : total_num_read;
 }
 
 int FileLikeIO::write(const uint8_t* buf, int size) {
-  py::gil_scoped_acquire gil;
-  py::bytes bytes_obj(reinterpret_cast<const char*>(buf), size);
-  return py::cast<int>(file_like_->attr("write")(bytes_obj));
+  int64_t result = callbacks_.write(callbacks_.handle, buf, size);
+  check_callback_result(result, "write");
+  return static_cast<int>(result);
 }
 
 int64_t FileLikeIO::seek(int64_t offset, int whence) {
-  py::gil_scoped_acquire gil;
-  return py::cast<int64_t>(file_like_->attr("seek")(offset, whence));
+  int64_t result = callbacks_.seek(callbacks_.handle, offset, whence);
+  check_callback_result(result, "seek");
+  return result;
 }
 
 int64_t FileLikeIO::get_size() {
   // Size of file-like is typically unknown, since the data is potentially
   // streaming.
   return INT64_MAX;
+}
+
+std::unique_ptr<IOInterface> adopt_file_like_context(
+    int64_t file_like_context) {
+  auto* callbacks = reinterpret_cast<const FileLikeCallbacks*>(
+      static_cast<intptr_t>(file_like_context));
+  STD_TORCH_CHECK(
+      callbacks != nullptr, "file_like_context must be a valid pointer");
+  return std::make_unique<FileLikeIO>(*callbacks);
 }
 
 } // namespace facebook::torchcodec

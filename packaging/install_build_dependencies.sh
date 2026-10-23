@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 # Installs the build-time dependencies needed to *compile* torchcodec: the
-# scikit-build-core build backend, the Ninja generator it drives, and pybind11.
+# scikit-build-core build backend and the Ninja generator it drives.
 # Because we build with --no-build-isolation (torch must come from a custom index,
 # so it can't live in pyproject's build-system.requires), pip does not install
 # build-system.requires for us -- we must do it here.
@@ -26,7 +26,6 @@
 
 set -ex
 
-conda install -y pybind11 -c conda-forge
 python -m pip install "scikit-build-core>=0.10" ninja
 
 if [[ "${TORCHCODEC_BUILD_IMAGE:-ON}" != "0" ]]; then

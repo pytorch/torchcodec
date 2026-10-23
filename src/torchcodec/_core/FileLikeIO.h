@@ -6,28 +6,43 @@
 
 #pragma once
 
-// pybind11 headers from torch error out if TORCH_TARGET_VERSION is defined,
-// so we temporarily undefine it.
-// See https://github.com/pytorch/pytorch/pull/174372 for context
-#pragma push_macro("TORCH_TARGET_VERSION")
-#undef TORCH_TARGET_VERSION
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#pragma pop_macro("TORCH_TARGET_VERSION")
+#include <memory>
 
 #include "IOInterface.h"
 
-namespace py = pybind11;
-
 namespace facebook::torchcodec {
 
-// FFmpeg-free bridge to a Python file-like object: read/write/seek are
-// forwarded to the corresponding methods on the Python object. Wrap it in an
+// C callbacks into a Python file-like object. Built on the Python side with
+// ctypes (see torchcodec/_core/_file_like.py, which mirrors this layout), so
+// that no torchcodec library depends on the CPython C API. ctypes callbacks
+// attach the calling thread to the interpreter and take the GIL themselves, so
+// they're safe to call from ops that run with the GIL released.
+//
+// read/write/seek return kFileLikeCallbackError if the Python call raised;
+// get_error then writes the Python error message into buf (truncated to
+// buf_len) and returns the number of bytes written. release() drops the Python
+// side's reference to the file-like object and must be called exactly once.
+struct FileLikeCallbacks {
+  int64_t handle;
+  int64_t (*read)(int64_t handle, uint8_t* buf, int64_t size);
+  int64_t (*write)(int64_t handle, const uint8_t* buf, int64_t size);
+  int64_t (*seek)(int64_t handle, int64_t offset, int64_t whence);
+  void (*release)(int64_t handle);
+  int64_t (*get_error)(int64_t handle, char* buf, int64_t buf_len);
+};
+
+inline constexpr int64_t kFileLikeCallbackError = INT64_MIN;
+
+// FFmpeg-free bridge to a Python file-like object. Wrap it in an
 // AVIOContextHolder to feed FFmpeg, or use it directly (e.g. the image
 // encoders write straight through it).
 class FileLikeIO : public IOInterface {
  public:
-  explicit FileLikeIO(const py::object& file_like, bool is_for_writing);
+  explicit FileLikeIO(const FileLikeCallbacks& callbacks);
+  ~FileLikeIO() override;
+
+  FileLikeIO(const FileLikeIO&) = delete;
+  FileLikeIO& operator=(const FileLikeIO&) = delete;
 
   int read(uint8_t* buf, int size) override;
   int write(const uint8_t* buf, int size) override;
@@ -35,30 +50,15 @@ class FileLikeIO : public IOInterface {
   int64_t get_size() override;
 
  private:
-  // Note that we dynamically allocate the Python object because we need to
-  // strictly control when its destructor is called. We must hold the GIL
-  // when its destructor gets called, as it needs to update the reference
-  // count. It's easiest to control that when it's dynamic memory. Otherwise,
-  // we'd have to ensure whatever enclosing scope holds the object has the GIL,
-  // and that's, at least, hard. For all of the common pitfalls, see:
-  //
-  //   https://pybind11.readthedocs.io/en/stable/advanced/misc.html#common-sources-of-global-interpreter-lock-errors
-  //
-  // We maintain a reference to the file-like object because the file-like
-  // object that was created on the Python side must live as long as our
-  // potential use. That is, even if there are no more references to the object
-  // on the Python side, we require that the object is still live.
-  struct PyObjectDeleter {
-    inline void operator()(py::object* obj) const {
-      if (obj) {
-        py::gil_scoped_acquire gil;
-        delete obj;
-      }
-    }
-  };
+  void check_callback_result(int64_t result, const char* method);
 
-  using UniquePyObject = std::unique_ptr<py::object, PyObjectDeleter>;
-  UniquePyObject file_like_;
+  FileLikeCallbacks callbacks_;
 };
+
+// file_like_context is the address of a FileLikeCallbacks struct, as returned
+// by create_file_like_context() on the Python side. Call this before doing
+// anything else in an op, so that release() is guaranteed to run even if the
+// op fails.
+std::unique_ptr<IOInterface> adopt_file_like_context(int64_t file_like_context);
 
 } // namespace facebook::torchcodec

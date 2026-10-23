@@ -21,7 +21,6 @@ test locally you will need the following dependencies:
 - cmake
 - ninja
 - pkg-config
-- pybind11
 - scikit-build-core (our build backend)
 - FFmpeg
 - (Optional) image codec libraries - see image decoder section below
@@ -33,7 +32,7 @@ Start by installing the **nightly** build of PyTorch following the
 Then, the easiest way to install the rest of the dependencies is to run:
 
 ```bash
-conda install cmake ninja pkg-config pybind11 scikit-build-core "ffmpeg" -c conda-forge
+conda install cmake ninja pkg-config scikit-build-core "ffmpeg" -c conda-forge
 ```
 
 ### Clone and build

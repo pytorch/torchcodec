@@ -13,11 +13,11 @@ from pathlib import Path
 
 import torch
 from torchcodec._core._ffmpeg_op_names import FFMPEG_OP_NAMES
+from torchcodec._core._file_like import create_file_like_context  # noqa: F401
 from torchcodec._internally_replaced_utils import (  # @manual=//pytorch/torchcodec/src:internally_replaced_utils
     load_core_libraries,
     load_heic_library,
     load_image_library,
-    load_pybind_ops,
 )
 
 expose_ffmpeg_dlls = nullcontext
@@ -33,9 +33,6 @@ if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
 
 
 load_image_library()
-
-_pybind_ops = load_pybind_ops()
-create_file_like_context = _pybind_ops.create_file_like_context
 
 decode_jpeg = torch.ops.torchcodec_ns.decode_jpeg.default
 decode_jpegs_cuda = torch.ops.torchcodec_ns.decode_jpegs_cuda.default

@@ -4,13 +4,12 @@
 // This source code is licensed under the BSD-style license found in the
 // LICENSE file in the root directory of this source tree.
 
-// fmt and pybind11 headers from torch error out if TORCH_TARGET_VERSION is
-// defined, so we temporarily undefine it.
+// fmt headers from torch error out if TORCH_TARGET_VERSION is defined, so we
+// temporarily undefine it.
 // See https://github.com/pytorch/pytorch/pull/174372 for context
 #pragma push_macro("TORCH_TARGET_VERSION")
 #undef TORCH_TARGET_VERSION
 #include <fmt/format.h>
-#include <pybind11/pybind11.h>
 #pragma pop_macro("TORCH_TARGET_VERSION")
 #include <cstdint>
 #include <string>
@@ -25,6 +24,7 @@ extern "C" {
 #include "Demuxer.h"
 #include "Encoder.h"
 #include "FileIO.h"
+#include "FileLikeIO.h"
 #include "IOInterface.h"
 #include "Logging.h"
 #include "NVDECCacheConfig.h"
@@ -554,13 +554,9 @@ torch::stable::Tensor create_from_tensor(
 torch::stable::Tensor _create_from_file_like(
     int64_t file_like_context,
     std::optional<std::string> seek_mode) {
-  auto file_like_context_ptr =
-      reinterpret_cast<IOInterface*>(file_like_context);
-  STD_TORCH_CHECK(
-      file_like_context_ptr != nullptr,
-      "file_like_context must be a valid pointer");
+  auto io = adopt_file_like_context(file_like_context);
   auto avio_context_holder = std::make_unique<AVIOContextHolder>(
-      std::unique_ptr<IOInterface>(file_like_context_ptr),
+      std::move(io),
       /*is_for_writing=*/false);
 
   SeekMode real_seek = SeekMode::exact;
@@ -858,14 +854,10 @@ torch::stable::Tensor _blocks_create_demuxer_from_tensor(
 
 torch::stable::Tensor _blocks_create_demuxer_from_file_like(
     int64_t file_like_context) {
-  auto file_like_context_ptr =
-      reinterpret_cast<IOInterface*>(file_like_context);
-  STD_TORCH_CHECK(
-      file_like_context_ptr != nullptr,
-      "file_like_context must be a valid pointer");
+  auto io = adopt_file_like_context(file_like_context);
 
   auto avio_context_holder = std::make_unique<AVIOContextHolder>(
-      std::unique_ptr<IOInterface>(file_like_context_ptr),
+      std::move(io),
       /*is_for_writing=*/false);
   auto demuxer = std::make_unique<Demuxer>(std::move(avio_context_holder));
   return wrap_pointer_to_tensor<Demuxer>(std::move(demuxer));
@@ -1547,13 +1539,9 @@ void streaming_encoder_open_file_like(
     torch::stable::Tensor& encoder,
     std::string format,
     int64_t file_like_context) {
-  auto file_like_context_ptr =
-      reinterpret_cast<IOInterface*>(file_like_context);
-  STD_TORCH_CHECK(
-      file_like_context_ptr != nullptr,
-      "file_like_context must be a valid pointer");
+  auto io = adopt_file_like_context(file_like_context);
   auto avio_context_holder = std::make_unique<AVIOContextHolder>(
-      std::unique_ptr<IOInterface>(file_like_context_ptr),
+      std::move(io),
       /*is_for_writing=*/true);
   unwrap_tensor_to_get_multi_stream_encoder(encoder)->open(
       format, std::move(avio_context_holder));
@@ -1609,9 +1597,7 @@ torch::stable::Tensor create_wav_decoder_from_tensor(
 
 torch::stable::Tensor _create_wav_decoder_from_file_like(
     int64_t file_like_context) {
-  auto file_like_context_ptr =
-      reinterpret_cast<IOInterface*>(file_like_context);
-  std::unique_ptr<IOInterface> io(file_like_context_ptr);
+  auto io = adopt_file_like_context(file_like_context);
   auto decoder = std::make_unique<WavDecoder>(std::move(io));
   return wrap_wav_decoder_pointer_to_tensor(std::move(decoder));
 }

@@ -14,13 +14,17 @@ GitHub = "https://github.com/pytorch/torchcodec"
 Documentation = "https://pytorch.org/torchcodec/stable/index.html"
 
 [build-system]
-requires = ["scikit-build-core>=0.10", "pybind11"]
+requires = ["scikit-build-core>=0.10"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["src/torchcodec"]
+# Tag wheels as py3-none-<platform>: none of our compiled libraries use the
+# CPython C API (they're loaded with torch.ops.load_library), so a single wheel
+# works on every Python version, free-threaded builds included.
+wheel.py-api = "py3"
 # Required to use our own dynamic-metadata plugin (packaging/torchcodec_version.py)
 # for the version field below.
 experimental = true

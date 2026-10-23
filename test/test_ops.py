@@ -1057,7 +1057,8 @@ class TestAudioDecoderOps:
                 return self._file.seeK(offset, whence)
 
         with pytest.raises(
-            TypeError, match="takes 1 positional argument but 2 were given"
+            RuntimeError,
+            match="TypeError: .*takes 1 positional argument but 2 were given",
         ):
             create_from_file_like(
                 ReadMethodWrongSignature(open(NASA_VIDEO.path, mode="rb", buffering=0)),
@@ -1076,7 +1077,8 @@ class TestAudioDecoderOps:
                 return 0
 
         with pytest.raises(
-            TypeError, match="takes 2 positional arguments but 3 were given"
+            RuntimeError,
+            match="TypeError: .*takes 2 positional arguments but 3 were given",
         ):
             create_from_file_like(
                 SeekMethodWrongSignature(open(NASA_VIDEO.path, mode="rb", buffering=0)),

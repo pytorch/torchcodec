@@ -23,24 +23,13 @@
 #include "EncodeJpegCuda.h"
 #include "EncodePng.h"
 #include "FileIO.h"
+#include "FileLikeIO.h"
 #include "IOInterface.h"
 #include "StableABICompat.h"
 
 namespace facebook::torchcodec {
 
 namespace {
-
-// Adopts ownership of an IOInterface* laundered through an int64 by the image
-// pybind module's create_image_file_like_context (a Python file-like wrapped in
-// a FileLikeIO). The unique_ptr frees it when encoding is done, releasing the
-// Python object under the GIL.
-std::unique_ptr<IOInterface> adopt_file_like_context(
-    int64_t file_like_context) {
-  auto* interface = reinterpret_cast<IOInterface*>(file_like_context);
-  STD_TORCH_CHECK(
-      interface != nullptr, "file_like_context must be a valid pointer");
-  return std::unique_ptr<IOInterface>(interface);
-}
 
 void encode_png_to_file(
     const torch::stable::Tensor& img,

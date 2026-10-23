@@ -38,9 +38,9 @@ jobs:
         run: python -m pip install --upgrade pip
       - name: Install torch dependencies
         run: bash packaging/install_pytorch.sh cpu "torch"
-      - name: Install ffmpeg, pkg-config and pybind11
+      - name: Install ffmpeg and pkg-config
         run: |
-          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" pkg-config pybind11 -c conda-forge
+          conda install "ffmpeg=${{ matrix.ffmpeg-version-for-tests }}" pkg-config -c conda-forge
           ffmpeg -version
       - name: Build and run C++ tests
         run: |

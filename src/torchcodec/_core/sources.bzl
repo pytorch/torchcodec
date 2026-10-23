@@ -110,10 +110,3 @@ giflib_sources = [
     "giflib/gif_hash.c",
     "giflib/openbsd-reallocarray.c",
 ]
-
-# pybind11 bindings (file-like support). Built into the single, FFmpeg-free
-# libtorchcodec_pybind_ops (alongside io_sources and file_like_context_sources)
-# and used by both the image encoders and the FFmpeg encoders/decoders.
-pybind_ops_sources = [
-    "pybind_ops.cpp",
-]

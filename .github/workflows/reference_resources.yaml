@@ -25,6 +25,11 @@ jobs:
       with-rocm: disable
       with-cuda: disable
       build-python-only: "disable"
+      # Our wheels are tagged py3-none (see wheel.py-api in pyproject.toml) and
+      # work on every Python version, so we only build them with one Python.
+      # The install-and-test jobs download that single wheel by name, so keep
+      # them in sync if this changes.
+      python-versions: '["3.11"]'
 
   build:
     needs: generate-matrix
@@ -77,7 +82,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: meta-pytorch_torchcodec__${{ matrix.python-version }}_cpu_x86_64
+          name: meta-pytorch_torchcodec__3.11_cpu_x86_64
           path: dist/
 
       - name: Install torchcodec from the wheel

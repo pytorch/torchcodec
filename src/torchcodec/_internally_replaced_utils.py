@@ -6,17 +6,12 @@
 
 import functools
 import importlib
-import importlib.util
+import importlib.machinery
 import sys
 import traceback
 from pathlib import Path
-from types import ModuleType
 
 import torch
-
-# Note that this value must match the value used as PYBIND_OPS_MODULE_NAME when we compile _core/pybind_ops.cpp.
-# If the values do not match, we will not be able to import the C++ shared library as a Python module at runtime.
-_PYBIND_OPS_MODULE_NAME = "core_pybind_ops"
 
 
 # Copy pasted from torchvision
@@ -49,38 +44,10 @@ def _get_extension_path(lib_name: str) -> str:
     return ext_specs.origin
 
 
-def _load_pybind11_module(module_name: str, library_path: str) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        module_name,
-        library_path,
-    )
-    if spec is None or spec.loader is None:
-        raise ImportError(
-            f"Unable to load spec or spec.loader for module {module_name} from path {library_path}"
-        )
-
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    return mod
-
-
 def load_image_library() -> None:
     """Load the FFmpeg-free image library"""
     image_library_path = _get_extension_path("libtorchcodec_image")
     torch.ops.load_library(image_library_path)
-
-
-@functools.cache
-def load_pybind_ops() -> ModuleType:
-    """Load the pybind module providing file-like support (create_file_like_context).
-
-    This module links no FFmpeg, so it's loaded eagerly (regardless of whether
-    FFmpeg is available) and shared by both the image encoders and the FFmpeg
-    encoders/decoders.
-    """
-    library_path = _get_extension_path("libtorchcodec_pybind_ops")
-    return _load_pybind11_module(_PYBIND_OPS_MODULE_NAME, library_path)
 
 
 @functools.cache

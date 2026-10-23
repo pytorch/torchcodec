@@ -16,6 +16,9 @@ done
 
 # 2. Update python/ffmpeg/cuda versions in wheel install-and-test jobs only.
 #    This must NOT touch install-and-test-third-party-interface or build-docs.
+#    The `python-version` sed below only expands the *test* matrix: wheels are
+#    py3-none and are always built with a single Python (the plural
+#    `python-versions` input of the generate-matrix jobs, left untouched).
 WHEEL_FILES=(
     "${WORKFLOW_DIR}/linux_wheel.yaml"
     "${WORKFLOW_DIR}/linux_aarch64_wheel.yaml"
