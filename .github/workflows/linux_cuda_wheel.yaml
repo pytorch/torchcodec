@@ -68,10 +68,7 @@ jobs:
           # For the actual release we should add that label and change this to
           # include more python versions.
         python-version: ['3.11']
-        # We only test against a subset of the CUDA versions we build for, to
-        # avoid having too big of a CI matrix. For releases we should add the
-        # remaining ones.
-        cuda-version: ['13.0', '13.2']
+        cuda-version: ['13.2', '13.4']
         # TODO: put back ffmpeg 5 https://github.com/pytorch/torchcodec/issues/325
         ffmpeg-version-for-tests: ['4', '6', '7', '8', '9']
 
@@ -150,7 +147,7 @@ jobs:
     needs: build
     env:
       PYTHON_VERSION: '3.11'
-      CUDA_VERSION: '13.0'
+      CUDA_VERSION: '13.2'
       FFMPEG_VERSION: '7'
     steps:
       - name: Setup env vars
@@ -212,7 +209,7 @@ jobs:
     needs: build
     env:
       PYTHON_VERSION: '3.11'
-      CUDA_VERSION: '13.0'
+      CUDA_VERSION: '13.2'
     steps:
       - name: Setup env vars
         run: |
@@ -267,10 +264,10 @@ jobs:
     runs-on: linux.g5.4xlarge.nvidia.gpu
     env:
       PYTHON_VERSION: '3.11'
-      CUDA_VERSION: '13.0'
+      CUDA_VERSION: '13.2'
       FFMPEG_VERSION: '7'
     container:
-      image: "pytorch/manylinux2_28-builder:cuda13.0"  # must be same as env!!
+      image: "pytorch/manylinux2_28-builder:cuda13.2"  # must be same as env!!
       options: "--gpus all -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility"
     needs: build
     steps:
