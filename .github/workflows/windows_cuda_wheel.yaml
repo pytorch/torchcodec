@@ -104,7 +104,8 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          miniforge-version: latest
+          # Miniforge 26.9.4-0 fails `conda init` on Windows ("needs sudo ... conda.exe").
+          miniforge-version: 26.7.2-0
           activate-environment: test
           python-version: ${{ matrix.python-version }}
       - name: Install CUDA and FFmpeg conda packages
@@ -184,7 +185,8 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          miniforge-version: latest
+          # Miniforge 26.9.4-0 fails `conda init` on Windows ("needs sudo ... conda.exe").
+          miniforge-version: 26.7.2-0
           activate-environment: test
           python-version: ${{ env.PYTHON_VERSION }}
 

@@ -92,7 +92,8 @@ jobs:
           # conda channel is conda-forge instead of main/default. This ensures
           # ABI consistency between dependencies:
           # https://conda-forge.org/docs/user/transitioning_from_defaults/
-          miniforge-version: latest
+          # Miniforge 26.9.4-0 fails `conda init` on Windows ("needs sudo ... conda.exe").
+          miniforge-version: 26.7.2-0
           activate-environment: test
           python-version: ${{ matrix.python-version }}
       - name: Update pip

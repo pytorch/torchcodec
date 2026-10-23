@@ -284,6 +284,38 @@ void set_duration(AVFrame& frame, int64_t duration);
 int64_t get_pts_or_dts(ReferenceAVPacket& packet);
 int64_t get_pts_or_dts(const AVFrame& av_frame);
 
+// Fills in a missing pts from the end of the previous frame if missing, and
+// derives the duration from nb_samples, like the ffmpeg CLI does in
+// audio_ts_process():
+// https://github.com/FFmpeg/FFmpeg/blob/d244d438c372b76d825be4527fccfd162429010a/fftools/ffmpeg_dec.c#L246-L281
+// It must see every frame the decoder outputs, in order, and be reset whenever
+// the decoder is flushed.
+class AudioPtsExtrapolator {
+ public:
+  AudioPtsExtrapolator() = default;
+
+  explicit AudioPtsExtrapolator(AVRational time_base) : time_base_(time_base) {}
+
+  void process(AVFrame& av_frame);
+
+  void reset() {
+    next_frame_start_ = INT64_MIN;
+  }
+
+ private:
+  // The stream time base, in which frame pts and durations are expressed.
+  AVRational time_base_ = {};
+  // Where we expect the next frame to start, in samples.
+  // INT64_MIN when unknown, e.g. after a seek: we then leave a missing pts
+  // unset rather than guessing 0 like the CLI does.
+  // We count in samples rather than in the stream time base because the latter
+  // may not represent a frame's duration exactly (e.g. MKV's 1ms): adding up
+  // rounded durations would make the guessed pts drift further off with every
+  // frame.
+  int64_t next_frame_start_ = INT64_MIN;
+  int sample_rate_ = 0;
+};
+
 const int* get_supported_sample_rates(const AVCodec& av_codec);
 const AVSampleFormat* get_supported_output_sample_formats(
     const AVCodec& av_codec);

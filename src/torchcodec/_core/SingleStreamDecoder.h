@@ -376,6 +376,7 @@ class FORCE_PUBLIC_VISIBILITY SingleStreamDecoder {
   int64_t last_decoded_av_frame_pts_ = INT64_MIN;
   int64_t last_decoded_av_frame_duration_ = 0;
   int64_t last_decoded_frame_index_ = INT64_MIN;
+  AudioPtsExtrapolator audio_pts_extrapolator_;
 
   // Stores various internal decoding stats.
   DecodeStats decode_stats_;
