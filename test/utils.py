@@ -1242,6 +1242,21 @@ TEST_SRC_2_720P_MPEG4 = TestVideo(
     frames={0: {}},  # Not needed for now
 )
 
+# H.264 video in an AVI container. None of the packets or frames have a pts
+# value (they're all N/A), only a dts value. The baseline profile means there
+# are no B-frames, so the dts values are also the presentation timestamps.
+# Generated with:
+# ffmpeg -f lavfi -i testsrc2=duration=1:size=128x96:rate=30 -c:v libx264 \
+#   -profile:v baseline -pix_fmt yuv420p testsrc2_h264_no_pts.avi
+TEST_SRC_2_H264_NO_PTS = TestVideo(
+    filename="testsrc2_h264_no_pts.avi",
+    default_stream_index=0,
+    stream_infos={
+        0: TestVideoStreamInfo(width=128, height=96, num_color_channels=3),
+    },
+    frames={0: {}},  # Not needed for now
+)
+
 # ffmpeg -f lavfi -i color=c=black:s=64x64:d=0.034 -c:v mpeg4 -q:v 31 testsrc2_mpeg4.mp4
 TEST_SRC_2_MPEG4_MP4 = TestVideo(
     filename="testsrc2_mpeg4.mp4",
