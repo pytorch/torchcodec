@@ -599,6 +599,12 @@ class TestVideoDecoder:
         with pytest.raises(TypeError, match="Unsupported key type"):
             frame = decoder[2.3]  # noqa
 
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder[10:0]  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder[-1:5:2]  # noqa
+
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
     def test_iteration(self, device, seek_mode):
@@ -1048,6 +1054,19 @@ class TestVideoDecoder:
         torch.testing.assert_close(
             empty_frames.duration_seconds, NASA_VIDEO.empty_duration_seconds
         )
+
+    @pytest.mark.parametrize("device", all_supported_devices())
+    @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
+    def test_get_frames_in_range_fails(self, device, seek_mode):
+        decoder, _ = make_video_decoder(
+            NASA_VIDEO.path, device=device, seek_mode=seek_mode
+        )
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder.get_frames_in_range(10, 0)  # noqa
+
+        with pytest.raises(ValueError, match="Invalid start index"):
+            frame = decoder.get_frames_in_range(-1, 5, 2)  # noqa
 
     @pytest.mark.parametrize("device", all_supported_devices())
     @pytest.mark.parametrize("seek_mode", ("exact", "approximate"))
