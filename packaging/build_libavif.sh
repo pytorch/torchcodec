@@ -35,8 +35,28 @@ set -eux
 # invokes it under msys2's mingw bash -- but there pacman has already installed
 # the toolchain, so the block below is skipped because everything is on PATH
 # (Windows isn't a micromamba target here, and we don't want it to be).
+# On Windows/MSYS2, `uname -m` reports the architecture of MSYS2's own POSIX
+# runtime (msys-2.0.dll), which today has no native aarch64 build and so
+# always reports x86_64 -- even inside the CLANGARM64 subsystem, which is
+# what actually determines the *target* architecture being built for (its
+# toolchain packages, e.g. mingw-w64-clang-aarch64-toolchain, cross/natively
+# target aarch64). Relying on `uname -m` alone therefore wrongly concludes
+# we're on x86_64 under CLANGARM64 and demands nasm, which the arm64 build
+# intentionally does not install (dav1d needs nasm only for its x86 SIMD; its
+# NEON kernels are plain C intrinsics, verified below). Prefer $MSYSTEM when
+# set; it is unset (and uname -m is authoritative) on Linux/macOS.
+target_machine() {
+    if [[ -n "${MSYSTEM:-}" ]]; then
+        case "${MSYSTEM}" in
+            CLANGARM64) echo "arm64" ;;
+            *) uname -m ;;
+        esac
+    else
+        uname -m
+    fi
+}
 tools=(cmake ninja meson)
-case "$(uname -m)" in
+case "$(target_machine)" in
     x86_64 | amd64 | i?86) tools+=(nasm) ;;
 esac
 

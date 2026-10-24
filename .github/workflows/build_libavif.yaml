@@ -14,6 +14,7 @@ on:
     paths:
       - packaging/build_libavif.sh
       - packaging/build_libavif.bat
+      - packaging/build_libavif_arm64.bat
       - .github/workflows/build_libavif.yaml
   schedule:
     - cron: '0 0 * * 0'  # on sunday
@@ -121,3 +122,39 @@ jobs:
         artifact_dir="${RUNNER_ARTIFACT_DIR}/$(date +%Y-%m-%d)/windows_$(uname -m)"
         mkdir -p "${artifact_dir}"
         mv libavif.tar.gz "${artifact_dir}/${LIBAVIF_VERSION}.tar.gz"
+
+  # Native Windows ARM64 counterpart of libavif-Windows. See the equivalent
+  # LGPL-Windows-arm64 job in build_ffmpeg.yaml for why this uses GitHub's
+  # standard `windows-11-arm` hosted runner directly instead of
+  # pytorch/test-infra's windows_job.yml. Same manual-S3-upload caveat
+  # applies here too.
+  libavif-Windows-arm64:
+    strategy:
+      fail-fast: false
+      matrix:
+        libavif-version: ["1.4.2"]
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: bash -l -eo pipefail {0}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v6
+
+      - name: Build libavif (decode-only) and package artifact
+        run: |
+          export LIBAVIF_VERSION="${{ matrix.libavif-version }}"
+          export LIBAVIF_ROOT="${PWD}/libavif"
+
+          packaging/build_libavif_arm64.bat
+
+          # Include lib (import lib) and bin (DLL) so the consumer has both.
+          tar -cf libavif.tar.gz libavif/include libavif/lib libavif/bin libavif/licenses
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libavif-windows_arm64-${{ matrix.libavif-version }}
+          path: libavif.tar.gz
+          if-no-files-found: error
+          retention-days: 14

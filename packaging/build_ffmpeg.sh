@@ -36,7 +36,22 @@ trap 'cleanup $?' EXIT
 cd "${build_dir}"
 curl -LsS -o ffmpeg.tar.gz "${archive}"
 tar -xf ffmpeg.tar.gz --strip-components 1
+
+# FFmpeg's configure hardcodes cc_default="gcc"/cxx_default="g++" and does
+# NOT read $CC/$CXX from the environment -- only the explicit --cc=/--cxx=
+# flags override it. MSYS2's CLANGARM64 subsystem (used for the native
+# Windows Arm64 build) ships mingw-w64-clang-aarch64-toolchain, which
+# provides clang/clang++ but no gcc/g++ at all, so configure's default gcc
+# probe fails with "gcc is unable to create an executable file." Every other
+# platform this script runs on (Linux, macOS, the existing Windows x86_64
+# MINGW64 job) does have a working gcc and is unaffected by this override.
+extra_configure_args=()
+if [[ "${MSYSTEM:-}" == "CLANGARM64" ]]; then
+    extra_configure_args+=(--cc=clang --cxx=clang++)
+fi
+
 ./configure \
+    "${extra_configure_args[@]}" \
     --prefix="${prefix}" \
     --disable-all \
     --disable-everything \
